@@ -1,0 +1,185 @@
+﻿import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ibad_al_rahmann/core/app_constants.dart';
+import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
+import 'package:ibad_al_rahmann/core/services/intro_service.dart';
+import 'package:ibad_al_rahmann/core/theme/app_colors.dart';
+import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
+
+import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
+import 'package:ibad_al_rahmann/features/quran/ui/widgets/quran_pages_list.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:quran/quran.dart';
+
+import 'min_page_rich_text_mobile.dart';
+import 'mobile_min_quran_bottom_section.dart';
+import 'mobile_quran_top_bar.dart';
+
+class MinQuranMobile extends StatefulWidget {
+  const MinQuranMobile({super.key, this.currentPage});
+  final int? currentPage;
+
+  @override
+  State<MinQuranMobile> createState() => _MinQuranMobileState();
+}
+
+class _MinQuranMobileState extends State<MinQuranMobile> {
+  @override
+  void initState() {
+    if (widget.currentPage != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<QuranCubit>().initControllers(widget.currentPage!);
+        _showIntroIfNeeded();
+      });
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showIntroIfNeeded();
+      });
+    }
+    super.initState();
+  }
+
+  void _showIntroIfNeeded() {
+    // Show intro tutorial only if it hasn't been shown before
+    if (!IntroService.hasShownDoubleTapIntro()) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          _showDoubleTapHint();
+          // Mark as shown after starting
+          IntroService.markDoubleTapIntroAsShown();
+        }
+      });
+    }
+  }
+
+  void _showDoubleTapHint() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.touch_app, color: AppColors.white, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                'اضغط ضغطتين لتكبير الصفحة',
+                style: context.headlineLarge,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'يمكنك تكبير الشاشة عبر الضغط مرتين على الآيات',
+                style: context.headlineLarge.copyWith(fontSize: 20.sp),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text(
+                'حسنًا',
+                style: TextStyle(
+                  color: AppColors.white,
+                  fontFamily: AppConsts.uthmanic,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const flex1 = 1;
+    const flex2 = 3;
+
+    return Column(
+      children: [
+        const Expanded(flex: flex1, child: MobileQuranTopBar()),
+        Expanded(
+          flex: flex2,
+          child: GestureDetector(
+            onDoubleTap: () {
+              context.read<QuranCubit>().changeLayout();
+            },
+            child: PageView.builder(
+              controller: context.read<QuranCubit>().minQuranController,
+              itemCount: totalPagesCount,
+              onPageChanged: (value) {
+                context.read<QuranCubit>().onQuranPageChanged(value);
+              },
+              itemBuilder: (context, index) {
+                return BlocBuilder<ThemeCubit, ThemeState>(
+                  builder: (context, state) {
+                    return Container(
+                      alignment: index > 1
+                          ? index.isEven
+                                ? Alignment.centerLeft
+                                : Alignment.centerRight
+                          : Alignment.center,
+                      margin: EdgeInsets.only(left: index.isOdd ? 8 : 0),
+                      decoration: BoxDecoration(
+                        color: context.onPrimary,
+                        borderRadius: borderRadius(index),
+                        border: buildBorder(index),
+                      ),
+                      child: MobileMinPageRichText(pageNumber: index + 1),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ),
+        SizedBox(height: 10.h),
+        Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Container(
+              height: 60.h,
+              padding: EdgeInsets.symmetric(horizontal: 20.w),
+              child: const MobileMinQuranBottomSection(),
+            ),
+            SizedBox(height: 6.h),
+            SizedBox(
+              height: 50.h,
+              width: double.infinity,
+              child: const QuarnPagesList(),
+            ),
+            SizedBox(height: 10.h),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Border buildBorder(int index) {
+    return Border(
+      right: index.isOdd
+          ? BorderSide(width: 2, color: context.onPrimary)
+          : BorderSide.none,
+      left: index.isEven
+          ? BorderSide(width: 2, color: context.onPrimary)
+          : BorderSide.none,
+    );
+  }
+
+  BorderRadius borderRadius(int index) {
+    return BorderRadius.horizontal(
+      right: index.isEven
+          ? const Radius.circular(12)
+          : const Radius.circular(0),
+      left: index.isOdd ? const Radius.circular(12) : const Radius.circular(0),
+    );
+  }
+}
