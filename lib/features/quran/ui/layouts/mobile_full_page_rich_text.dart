@@ -1,11 +1,11 @@
-﻿// ignore_for_file: public_member_api_docs, sort_constructors_first
+// ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../core/helpers/fonts_helper.dart';
-import 'mobile_surah_verses_widget.dart';
+import '../widgets/wbw_page_widget.dart';
 
 class MobileFullPageRichText extends StatefulWidget {
   const MobileFullPageRichText({super.key, required this.pageNumber});
@@ -92,14 +92,7 @@ class _MobileFullPageRichTextState extends State<MobileFullPageRichText> {
             children: [
               Expanded(
                 child: Center(
-                  child: SingleChildScrollView(
-                    child: MobileSurahVersesWidget(
-                      isFullPage: true,
-                      family: currentFontFamily!,
-                      fontSize: getFontSize(),
-                      pageNumber: widget.pageNumber,
-                    ),
-                  ),
+                  child: WbwPageWidget(pageNumber: widget.pageNumber),
                 ),
               ),
               if (widget.pageNumber <= 2)

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
@@ -24,8 +24,10 @@ class MobileMinQuranBottomSection extends StatelessWidget {
         builder: (context) => AlertDialog(
           backgroundColor: context.onPrimary,
           title: const Text('الآيات المحفوظة'),
-          content:
-              Text('لم تقم بحفظ أى آية إلى الآن', style: context.titleSmall),
+          content: Text(
+            'لم تقم بحفظ أى آية إلى الآن',
+            style: context.titleSmall,
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -51,63 +53,62 @@ class MobileMinQuranBottomSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        GestureDetector(
-          onTap: () {
-            _showBookmarksDialog(context);
-          },
-          child: Container(
-            width: 58.h,
-            height: 58.h,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: context.surfaceColor,
-            ),
-            child: const Icon(
-              Icons.bookmark,
-              color: Colors.white,
-              size: 45,
-            ),
-          ),
-        ),
-        BlocBuilder<QuranCubit, QuranState>(
-          buildWhen: (previous, current) {
-            return previous.juzNumber != current.juzNumber;
-          },
-          builder: (context, state) {
-            return Text(
-              state.juzNumber.toJuzName,
-              style: context.headlineLarge,
-            );
-          },
-        ),
-        GestureDetector(
-          onTap: () {
-            context.read<ThemeCubit>().switchTheme();
-          },
-          child: Container(
-            width: 58.h,
-            height: 58.h,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: context.surfaceColor,
-            ),
-            child: BlocBuilder<ThemeCubit, ThemeState>(
-              builder: (context, state) {
-                return Icon(
-                  state.mode == ThemeMode.dark
-                      ? Icons.light_mode
-                      : Icons.dark_mode,
-                  color: Colors.white,
-                  size: 45,
-                );
-              },
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          GestureDetector(
+            onTap: () {
+              _showBookmarksDialog(context);
+            },
+            child: Container(
+              width: 58.h,
+              height: 58.h,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: context.surfaceColor,
+              ),
+              child: const Icon(Icons.bookmark, color: Colors.white, size: 45),
             ),
           ),
-        ),
-      ],
+          BlocBuilder<QuranCubit, QuranState>(
+            buildWhen: (previous, current) {
+              return previous.juzNumber != current.juzNumber;
+            },
+            builder: (context, state) {
+              return Text(
+                state.juzNumber.toJuzName,
+                style: context.headlineLarge,
+              );
+            },
+          ),
+          GestureDetector(
+            onTap: () {
+              context.read<ThemeCubit>().switchTheme();
+            },
+            child: Container(
+              width: 58.h,
+              height: 58.h,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: context.surfaceColor,
+              ),
+              child: BlocBuilder<ThemeCubit, ThemeState>(
+                builder: (context, state) {
+                  return Icon(
+                    state.mode == ThemeMode.dark
+                        ? Icons.light_mode
+                        : Icons.dark_mode,
+                    color: Colors.white,
+                    size: 45,
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

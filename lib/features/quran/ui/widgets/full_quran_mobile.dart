@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/app_navigator.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
@@ -25,8 +25,8 @@ class _FullQuranWidgetState extends State<FullQuranWidget> {
     if (widget.currentPage != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.read<QuranCubit>().fullQuranController.jumpToPage(
-              widget.currentPage!,
-            );
+          widget.currentPage!,
+        );
         _showIntroIfNeeded();
       });
     } else {
@@ -62,11 +62,7 @@ class _FullQuranWidgetState extends State<FullQuranWidget> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.touch_app,
-                color: AppColors.white,
-                size: 48,
-              ),
+              const Icon(Icons.touch_app, color: AppColors.white, size: 48),
               const SizedBox(height: 16),
               Text(
                 'اضغط ضغطتين لتصغير الشاشة',
@@ -115,7 +111,6 @@ class _FullQuranWidgetState extends State<FullQuranWidget> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(height: 18.h),
                   Expanded(child: FullPageRichText(pageNumber: index + 1)),
                 ],
               ),
