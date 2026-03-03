@@ -14,6 +14,7 @@ import '../services/prayer_service.dart';
 import '../services/notification_service.dart';
 import 'prayer_times_screen.dart';
 import 'muslim_azkar_screen.dart';
+import 'azkar_page.dart';
 import '../features/qiblah/qiblah_screen.dart';
 import 'tasbeeh_screen.dart';
 import 'accountability_screen.dart';
@@ -22,6 +23,11 @@ import 'nawawi_screen.dart';
 import 'ramadan_screen.dart';
 import 'more_screen.dart'; // Import More Screen
 import '../features/quran/ui/quran_screen.dart';
+import '../features/wird/ui/wird_dashboard_screen.dart';
+import '../features/wird/ui/isolated_wird_screen.dart';
+import '../features/wird/bloc/khatma_cubit.dart';
+import '../services/daily_tracker_service.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'ruqyah_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -36,6 +42,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final PrayerService _prayerService = PrayerService();
   PrayerTimes? _prayerTimes;
   Prayer? _nextPrayer;
+  Prayer? _currentPrayer;
+  bool _isCountUp = false;
 
   @override
   void initState() {
@@ -52,10 +60,6 @@ class _HomeScreenState extends State<HomeScreen> {
         final payload = NotificationService.onNotificationTap.value;
         if (payload != null) {
           _handleNotificationTap(payload);
-          // Clear it so we don't re-trigger on rebuilds if logical
-          // NotificationService.onNotificationTap.value = null;
-          // But ValueNotifier might act weird if we set null inside listener?
-          // Better to just handle it.
         }
       });
 
@@ -64,6 +68,33 @@ class _HomeScreenState extends State<HomeScreen> {
         _handleNotificationTap(NotificationService.onNotificationTap.value!);
       }
     });
+
+    _checkDailyTasks();
+  }
+
+  bool _isMorningAzkarDone = false;
+  bool _isEveningAzkarDone = false;
+  bool _isMorningAzkarStarted = false;
+  bool _isEveningAzkarStarted = false;
+  bool _isWirdStarted = false;
+
+  void _checkDailyTasks() async {
+    final mDone = await DailyTrackerService.isDone('morning_azkar');
+    final eDone = await DailyTrackerService.isDone('evening_azkar');
+
+    final mStarted = await DailyTrackerService.isStarted('morning_azkar');
+    final eStarted = await DailyTrackerService.isStarted('evening_azkar');
+    final wStarted = await DailyTrackerService.isStarted('wird');
+
+    if (mounted) {
+      setState(() {
+        _isMorningAzkarDone = mDone;
+        _isEveningAzkarDone = eDone;
+        _isMorningAzkarStarted = mStarted;
+        _isEveningAzkarStarted = eStarted;
+        _isWirdStarted = wStarted;
+      });
+    }
   }
 
   void _handleNotificationTap(String payload) {
@@ -133,47 +164,60 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _updateCountdown();
+          _checkDailyTasks();
+          _prayerService
+              .updatePersistentElements(); // Update persistent notif & widget
         });
       }
     });
   }
 
   Future<void> _updateCountdown() async {
-    if (_prayerTimes == null || _nextPrayer == null) return;
-
-    // Check if next prayer is valid and in future
-    DateTime? nextTime;
-    if (_nextPrayer != Prayer.none) {
-      nextTime = _prayerTimes!.timeForPrayer(_nextPrayer!);
-    }
+    if (_prayerTimes == null) return;
 
     final now = DateTime.now();
 
-    // If nextTime is null or in the past (e.g. after Isha), we need tomorrow's Fajr
-    if (nextTime == null || nextTime.isBefore(now)) {
-      // Get tomorrow's Fajr
-      // We can't easily get it from _prayerTimes (current day).
-      // Let's use PrayerService to get tomorrow's data relative to now.
-      // Or simply: if it's after Isha, next is Fajr tomorrow.
+    // 1. Determine Current and Next
+    _currentPrayer = _prayerTimes!.currentPrayer();
+    _nextPrayer = _prayerTimes!.nextPrayer();
 
-      // Quick fix: Get tomorrow's Fajr time
-      // We assume tomorrow's Fajr is roughly 24h + today's Fajr (or re-fetch)
-      // Best way:
+    DateTime? nextTime;
+    if (_nextPrayer != Prayer.none) {
+      nextTime = _prayerTimes!.timeForPrayer(_nextPrayer!);
+    } else {
+      // It's after Isha
       final tomorrow = now.add(const Duration(days: 1));
-      final tomorrowService = await PrayerService().getPrayerTimesForDate(
-        tomorrow,
-      );
-      if (tomorrowService != null) {
-        nextTime = tomorrowService.fajr;
-        // Update _nextPrayer to Fajr for display name
+      final tomorrowTimes = _prayerService.getPrayerTimesForDate(tomorrow);
+      nextTime = tomorrowTimes?.fajr;
+      _nextPrayer = Prayer.fajr;
+    }
+
+    // 2. 45-Minute Rule
+    DateTime? currentTime;
+    if (_currentPrayer != Prayer.none) {
+      currentTime = _prayerTimes!.timeForPrayer(_currentPrayer!);
+    } else {
+      // If before Fajr, previous was yesterday's Isha
+      final yesterday = now.subtract(const Duration(days: 1));
+      final yesterdayTimes = _prayerService.getPrayerTimesForDate(yesterday);
+      currentTime = yesterdayTimes?.isha;
+    }
+
+    _isCountUp = false;
+    if (currentTime != null) {
+      final elapsed = now.difference(currentTime);
+      if (elapsed.inMinutes >= 0 && elapsed.inMinutes < 45) {
+        _isCountUp = true;
         if (mounted) {
           setState(() {
-            _nextPrayer = Prayer.fajr;
+            _timeUntilNext = elapsed;
           });
         }
+        return;
       }
     }
 
+    // 3. Standard Countdown
     if (nextTime != null) {
       if (mounted) {
         setState(() {
@@ -181,12 +225,10 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } else {
-      // Fallback
       _loadPrayerTimes();
     }
   }
 
-  // Header Widget (Circular Timer + Ramadan)
   Widget _buildHeader() {
     HijriCalendar.setLocal('ar');
     final now = DateTime.now();
@@ -195,9 +237,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final hijri = HijriCalendar.fromDate(adjustedDate);
     final nextPrayerName = _nextPrayer != null
         ? _getPrayerName(_nextPrayer!)
-        : "الفجر"; // Default fall back
+        : "الفجر";
 
-    // Formatting Countdown
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     final countdownStr =
         "${twoDigits(_timeUntilNext.inHours)}:${twoDigits(_timeUntilNext.inMinutes.remainder(60))}:${twoDigits(_timeUntilNext.inSeconds.remainder(60))}";
@@ -207,7 +248,6 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.only(left: 20, right: 20, bottom: 10, top: 5),
       child: Column(
         children: [
-          // Hijri Date Top
           Text(
             "${hijri.toFormat("dd MMMM yyyy")} | ${DateFormat("EEEE", 'ar').format(now)}",
             style: const TextStyle(
@@ -216,15 +256,13 @@ class _HomeScreenState extends State<HomeScreen> {
               fontFamily: AppConsts.cairo,
             ),
           ),
-          const SizedBox(height: 4), // Reduced space
-          // Circular Timer
+          const SizedBox(height: 4),
           Stack(
             alignment: Alignment.center,
             children: [
-              // Outer Glow/Shadow
               Container(
-                width: 240, // Adjusted from 230
-                height: 240, // Adjusted from 230
+                width: 240,
+                height: 240,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   boxShadow: [
@@ -236,25 +274,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              // Ring
               SizedBox(
-                width: 205, // Adjusted from 200
-                height: 205, // Adjusted from 200
+                width: 205,
+                height: 205,
                 child: CircularProgressIndicator(
                   value: 1.0,
-                  strokeWidth: 10, // Slightly thicker
+                  strokeWidth: 10,
                   valueColor: const AlwaysStoppedAnimation<Color>(
                     Color(0xFFD0A871),
                   ),
                   backgroundColor: Colors.grey[900],
                 ),
               ),
-              // Inner Content
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    "الصلاة القادمة",
+                    _isCountUp ? "مضى على" : "الصلاة القادمة",
                     style: TextStyle(
                       color: Colors.grey[400],
                       fontSize: 14,
@@ -263,10 +299,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    nextPrayerName,
+                    _isCountUp
+                        ? _getPrayerName(
+                            _currentPrayer == Prayer.none ||
+                                    _currentPrayer == null
+                                ? Prayer.isha
+                                : _currentPrayer!,
+                          )
+                        : nextPrayerName,
                     style: TextStyle(
                       color: Theme.of(context).textTheme.bodyLarge?.color,
-                      fontSize: 28, // Same
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
                       fontFamily: AppConsts.expoArabic,
                     ),
@@ -276,7 +319,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     countdownStr,
                     style: const TextStyle(
                       color: Color(0xFFD0A871),
-                      fontSize: 30, // Reduced from 32
+                      fontSize: 30,
                       fontWeight: FontWeight.bold,
                       fontFamily: 'Courier',
                     ),
@@ -309,7 +352,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Grid Button
   Widget _buildGridItem(
     String title,
     IconData icon,
@@ -378,13 +420,246 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildReminderCards() {
+    return BlocBuilder<KhatmaCubit, KhatmaState>(
+      builder: (context, state) {
+        final times = _prayerService.getPrayerTimes();
+        final now = DateTime.now();
+
+        // 🟢 أذكار الصباح — تظهر من الفجر حتى المغرب 🟢
+        bool showMorningDelayed = false;
+        bool showMorningInProgress = false;
+        bool isMorningWindow = true;
+        if (times != null && now.isAfter(times.maghrib)) {
+          // بعد المغرب: اخفي أذكار الصباح تماماً
+          isMorningWindow = false;
+        }
+        if (isMorningWindow && !_isMorningAzkarDone) {
+          if (times != null && now.isAfter(times.dhuhr)) {
+            showMorningDelayed = true;
+          } else if (_isMorningAzkarStarted) {
+            showMorningInProgress = true;
+          } else {
+            // لم يبدأ بعد - نظهر تذكير ذهبي
+            showMorningInProgress = true;
+          }
+        }
+
+        // 🟠 أذكار المساء — تظهر من العصر حتى الفجر (الصباح التالي) 🟠
+        bool showEveningDelayed = false;
+        bool showEveningInProgress = false;
+        bool isEveningWindow = true;
+        if (times != null &&
+            now.isAfter(times.fajr) &&
+            now.isBefore(times.asr)) {
+          // بعد الفجر وقبل العصر: اخفي أذكار المساء تماماً
+          isEveningWindow = false;
+        }
+        if (isEveningWindow && !_isEveningAzkarDone) {
+          if (times != null && now.isAfter(times.isha)) {
+            showEveningDelayed = true;
+          } else if (_isEveningAzkarStarted) {
+            showEveningInProgress = true;
+          } else {
+            // لم يبدأ بعد - نظهر تذكير ذهبي
+            showEveningInProgress = true;
+          }
+        }
+
+        // 📖 الورد القرآني 📖
+        bool showWirdDelayed = false;
+        bool showWirdInProgress = false;
+        if (state is KhatmaLoaded) {
+          final target = context.read<KhatmaCubit>().getCurrentTargetWird();
+          if (target != null && !target.isCompleted) {
+            if (state.khatma.currentWirdIndex < target.wirdIndex) {
+              showWirdDelayed = true;
+            } else if (_isWirdStarted) {
+              showWirdInProgress = true;
+            } else {
+              // لو لسه مبدأش بس الوقت لسه معداش بنشوف لو "مطلوب حالياً"
+              // في وضع الصلوات ممكن نخليه ذهبي لو احنا في وقت الصلاة بتاعت الورد
+              if (state.khatma.notificationType == 'prayer') {
+                showWirdInProgress = true;
+              }
+            }
+          }
+        }
+
+        if (!showMorningDelayed &&
+            !showMorningInProgress &&
+            !showEveningDelayed &&
+            !showEveningInProgress &&
+            !showWirdDelayed &&
+            !showWirdInProgress) {
+          return const SizedBox.shrink();
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: Column(
+            children: [
+              // 🔴 المتأخر يطلع الأول باللون الأحمر 🔴
+              if (showWirdDelayed)
+                _buildReminderCard("فاتك الورد! اقرأ الآن لتعويض التأخير", () {
+                  final k = (state as KhatmaLoaded).khatma;
+                  final w = k.wirds[k.currentWirdIndex];
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => IsolatedWirdScreen(
+                        wirdIndex: k.currentWirdIndex,
+                        targetStartPage: w.startPage,
+                        targetEndPage: w.endPage,
+                      ),
+                    ),
+                  ).then((_) => _checkDailyTasks());
+                }, isDelayed: true),
+
+              if (showMorningDelayed)
+                _buildReminderCard("أذكار الصباح فات وقتها المفضل!", () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AzkarPage(
+                        title: "أذكار الصباح",
+                        jsonFile: "morning.json",
+                        image: "assets/images/morning.jpg",
+                      ),
+                    ),
+                  ).then((_) => _checkDailyTasks());
+                }, isDelayed: true),
+
+              if (showEveningDelayed)
+                _buildReminderCard("أذكار المساء فات وقتها المفضل!", () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AzkarPage(
+                        title: "أذكار المساء",
+                        jsonFile: "evening.json",
+                        image: "assets/images/night.jpg",
+                      ),
+                    ),
+                  ).then((_) => _checkDailyTasks());
+                }, isDelayed: true),
+
+              // 🟡 اللي في النص أو الجاري تنفيذه باللون الذهبي 🟡
+              if (showWirdInProgress && state is KhatmaLoaded)
+                _buildReminderCard("أكمل قراءة الورد الحالي", () {
+                  final k = state.khatma;
+                  final w = k.wirds[k.currentWirdIndex];
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => IsolatedWirdScreen(
+                        wirdIndex: k.currentWirdIndex,
+                        targetStartPage: w.startPage,
+                        targetEndPage: w.endPage,
+                      ),
+                    ),
+                  ).then((_) {
+                    _checkDailyTasks();
+                    if (mounted) context.read<KhatmaCubit>().loadKhatma();
+                  });
+                }, isDelayed: false),
+
+              if (showMorningInProgress)
+                _buildReminderCard("أكمل أذكار الصباح", () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AzkarPage(
+                        title: "أذكار الصباح",
+                        jsonFile: "morning.json",
+                        image: "assets/images/morning.jpg",
+                      ),
+                    ),
+                  ).then((_) => _checkDailyTasks());
+                }, isDelayed: false),
+
+              if (showEveningInProgress)
+                _buildReminderCard("أكمل أذكار المساء", () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AzkarPage(
+                        title: "أذكار المساء",
+                        jsonFile: "evening.json",
+                        image: "assets/images/night.jpg",
+                      ),
+                    ),
+                  ).then((_) => _checkDailyTasks());
+                }, isDelayed: false),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildReminderCard(
+    String title,
+    VoidCallback onTap, {
+    bool isDelayed = true,
+  }) {
+    const goldColor = Color(0xFFD0A871);
+    final themeColor = isDelayed ? Colors.redAccent : goldColor;
+    final bgColor = isDelayed
+        ? Colors.red.withValues(alpha: 0.15)
+        : goldColor.withValues(alpha: 0.15);
+    final borderColor = isDelayed
+        ? Colors.red.withValues(alpha: 0.5)
+        : goldColor.withValues(alpha: 0.5);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: borderColor, width: 1.5),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isDelayed
+                      ? FontAwesomeIcons.circleExclamation
+                      : FontAwesomeIcons.clockRotateLeft,
+                  color: themeColor,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: AppConsts.cairo,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: themeColor,
+                  ),
+                ),
+              ],
+            ),
+            Icon(Icons.arrow_forward_ios, color: themeColor, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Screens for BottomNav
     final List<Widget> bottomScreens = [
       // 0: Home (Grid)
       Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Theme BG
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: AnnotatedRegion<SystemUiOverlayStyle>(
           value: SystemUiOverlayStyle(
             statusBarColor: Colors.transparent,
@@ -394,11 +669,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 : Brightness.dark,
             statusBarBrightness: Theme.of(context).brightness == Brightness.dark
                 ? Brightness.dark
-                : Brightness.light, // iOS
+                : Brightness.light,
           ),
           child: SafeArea(
             child: Column(
               children: [
+                _buildReminderCards(),
                 _buildHeader(),
                 Expanded(
                   child: Padding(
@@ -445,15 +721,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           imagePath:
                               'assets/images/pngtree-luxury-islamic-prayer-beads-macro-png-image_18712828.webp',
                         ),
-
-                        // Removed "القبلة"
                         _buildGridItem(
                           "حاسب نفسك",
                           FontAwesomeIcons.listCheck,
                           const AccountabilityScreen(),
                         ),
-
-                        // Removed "الصيام"
                         _buildGridItem(
                           "الأربعين النووية",
                           FontAwesomeIcons.bookOpen,
@@ -472,22 +744,25 @@ class _HomeScreenState extends State<HomeScreen> {
       // 1: Mawaqit (Prayer Times)
       const PrayerTimesScreen(),
 
-      // 2: Qibla
+      // 2: Wird Dashboard
+      const WirdDashboardScreen(),
+
+      // 3: Qibla
       const QiblahScreen(),
 
-      // 3: Ramadan
+      // 4: Ramadan
       const RamadanScreen(),
 
-      // 4: More
+      // 5: More
       const MoreScreen(),
     ];
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Theme BG
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: bottomScreens[_currentIndex],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFD0A871), // Gold Background
+          color: const Color(0xFFD0A871),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
           boxShadow: [
             BoxShadow(
@@ -500,14 +775,11 @@ class _HomeScreenState extends State<HomeScreen> {
         child: ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
           child: BottomNavigationBar(
-            backgroundColor:
-                Colors.transparent, // Transparent to show Container Gold
+            backgroundColor: Colors.transparent,
             elevation: 0,
             type: BottomNavigationBarType.fixed,
-            selectedItemColor: Colors.black, // Dark for contrast on Gold
-            unselectedItemColor: Colors.white.withValues(
-              alpha: 0.8,
-            ), // White for unselected on Gold
+            selectedItemColor: Colors.black,
+            unselectedItemColor: Colors.white.withValues(alpha: 0.8),
             selectedFontSize: 12,
             unselectedFontSize: 12,
             selectedLabelStyle: const TextStyle(
@@ -533,6 +805,10 @@ class _HomeScreenState extends State<HomeScreen> {
               BottomNavigationBarItem(
                 icon: Icon(FontAwesomeIcons.clock),
                 label: "مواقيت",
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(FontAwesomeIcons.bookOpen),
+                label: "الورد اليومي",
               ),
               BottomNavigationBarItem(
                 icon: Icon(FontAwesomeIcons.compass),

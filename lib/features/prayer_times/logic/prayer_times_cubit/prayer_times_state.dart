@@ -1,4 +1,4 @@
-﻿part of 'prayer_times_cubit.dart';
+part of 'prayer_times_cubit.dart';
 
 sealed class PrayerTimesState {}
 
@@ -13,5 +13,3 @@ final class PrayerTimesFailure extends PrayerTimesState {
 
   PrayerTimesFailure({required this.errMessage});
 }
-
-

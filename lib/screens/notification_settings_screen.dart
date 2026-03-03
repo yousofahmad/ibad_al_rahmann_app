@@ -33,6 +33,7 @@ class _NotificationSettingsScreenState
   bool _sunriseAlert = false;
   bool _duhaAlert = false;
   bool _jumuaAlert = false;
+  bool _persistentNotification = true;
 
   // Pre-Prayer (Fard) - Enabled Toggles
   final Map<String, bool> _prePrayerEnabled = {
@@ -113,6 +114,8 @@ class _NotificationSettingsScreenState
       _sunriseAlert = prefs.getBool('notif_sunrise') ?? false;
       _duhaAlert = prefs.getBool('notif_duha') ?? false;
       _jumuaAlert = prefs.getBool('notif_jumua') ?? false;
+      _persistentNotification =
+          prefs.getBool('persistent_notification') ?? true;
 
       // Pre-Prayer
       for (var p in ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']) {
@@ -197,11 +200,11 @@ class _NotificationSettingsScreenState
                 children: [
                   const Icon(Icons.warning_amber, color: Colors.amber),
                   SizedBox(width: 10.w),
-                  Expanded(
+                  const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           "تنبيه: إذن المنبهات الدقيقة معطل",
                           style: TextStyle(
                             color: Colors.amber,
@@ -209,7 +212,7 @@ class _NotificationSettingsScreenState
                             fontFamily: AppConsts.expoArabic,
                           ),
                         ),
-                        const Text(
+                        Text(
                           "قد لا تعمل الإشعارات بدقة. يرجى تفعيل الإذن من الإعدادات.",
                           style: TextStyle(color: Colors.white70, fontSize: 12),
                         ),
@@ -339,6 +342,16 @@ class _NotificationSettingsScreenState
               setState(() => _jumuaAlert = val);
               _saveBool('notif_jumua', val);
             }),
+            const Divider(color: Color(0xFF333333)),
+            _buildSwitchTile(
+              "الإشعار الثابت",
+              "عرض أوقات الصلاة في شريط الإشعارات",
+              _persistentNotification,
+              (val) {
+                setState(() => _persistentNotification = val);
+                _saveBool('persistent_notification', val);
+              },
+            ),
           ]),
 
           _buildGroupTitle("تنبيه الأذان (الصوت)"),

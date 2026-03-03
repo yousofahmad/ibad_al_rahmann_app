@@ -8,6 +8,8 @@ import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:ibad_al_rahmann/core/theme/app_colors.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/search/search_cubit.dart';
+import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cubit.dart';
+import 'package:ibad_al_rahmann/features/quran/data/models/selected_verse_model.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:quran/surahs_tashkeel.dart';
 
@@ -53,22 +55,33 @@ class VerseSearchingBottomSheet extends StatelessWidget {
                           vertical: 4,
                         ),
                         child: GestureDetector(
-                          onTap: () {
-                            context.read<QuranCubit>().navigateToVerse(
-                                  surahNumber: verse.surahNumber,
-                                  verseNumber: verse.verseNumber,
-                                );
-                            // Clear search query and results after navigating
-                            context.read<SearchCubit>().clear();
-                            // The bottom sheet will close when the search field empties
+                          onTap: () async {
+                            FocusScope.of(context).unfocus();
+                            final quranCubit = context.read<QuranCubit>();
+                            final playerCubit = context
+                                .read<VersePlayerCubit>();
+
+                            // INJECT HIGHLIGHT STATE (silent – no player overlay)
+                            playerCubit.currnetVerse = VerseModel(
+                              surahNumber: verse.surahNumber,
+                              verseNumber: verse.verseNumber,
+                              verse: verse.content,
+                              fontFamily: 'UthmanicHafs',
+                            );
+                            // NOTE: playerCubit.show() intentionally omitted so
+                            // the audio player overlay does NOT open on search.
+
                             context.pop();
+
+                            // NAVIGATE
+                            await quranCubit.navigateToVerse(
+                              surahNumber: verse.surahNumber,
+                              verseNumber: verse.verseNumber,
+                            );
                           },
                           child: Column(
                             children: [
-                              Text(
-                                verse.content,
-                                style: context.titleSmall,
-                              ),
+                              Text(verse.content, style: context.titleSmall),
                               const SizedBox(height: 10),
                               Align(
                                 alignment: Alignment.centerRight,
@@ -78,7 +91,7 @@ class VerseSearchingBottomSheet extends StatelessWidget {
                                     fontFamily: AppConsts.uthmanic,
                                   ),
                                 ),
-                              )
+                              ),
                             ],
                           ),
                         ),

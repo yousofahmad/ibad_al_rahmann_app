@@ -13,11 +13,7 @@ class BookmarkItem extends StatefulWidget {
   final VerseModel verse;
   final VoidCallback onTap;
 
-  const BookmarkItem({
-    super.key,
-    required this.verse,
-    required this.onTap,
-  });
+  const BookmarkItem({super.key, required this.verse, required this.onTap});
 
   @override
   State<BookmarkItem> createState() => _BookmarkItemState();
@@ -41,7 +37,10 @@ class _BookmarkItemState extends State<BookmarkItem> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return InkWell(
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      hoverColor: Colors.transparent,
       onTap: widget.onTap,
       onLongPress: () {
         setState(() {
@@ -80,11 +79,7 @@ class _BookmarkItemState extends State<BookmarkItem> {
             SizedBox(height: 12.h),
             Row(
               children: [
-                Icon(
-                  Icons.access_time,
-                  size: 12.w,
-                  color: Colors.grey[500],
-                ),
+                Icon(Icons.access_time, size: 12.w, color: Colors.grey[500]),
                 SizedBox(width: 4.w),
                 Text(
                   widget.verse.bookmarkedAt.toSimpleDate,

@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -26,9 +26,9 @@ extension AppNavigator on BuildContext {
 
   void pushReplacement(Widget screen, {NavigationDirection? direction}) {
     if (Platform.isIOS) {
-      Navigator.of(this).pushReplacement(
-        MaterialPageRoute(builder: (_) => screen),
-      );
+      Navigator.of(
+        this,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => screen));
     } else {
       Navigator.pushReplacement(
         this,
@@ -65,27 +65,27 @@ class MyCustomRoute extends PageRouteBuilder {
   final Widget screen;
   final NavigationDirection direction;
   MyCustomRoute({required this.screen, required this.direction})
-      : super(
-          pageBuilder: (context, animation, secondaryAnimation) => screen,
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            var begin = const Offset(1, 0);
-            if (direction == NavigationDirection.upToDown) {
-              begin = const Offset(0, -1);
-            } else if (direction == NavigationDirection.downToUp) {
-              begin = const Offset(0, 1);
-            } else if (direction == NavigationDirection.leftToRight) {
-              begin = const Offset(-1, 0);
-            }
-            const end = Offset.zero;
-            const curve = Curves.easeInOut;
+    : super(
+        pageBuilder: (context, animation, secondaryAnimation) => screen,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          var begin = const Offset(1, 0);
+          if (direction == NavigationDirection.upToDown) {
+            begin = const Offset(0, -1);
+          } else if (direction == NavigationDirection.downToUp) {
+            begin = const Offset(0, 1);
+          } else if (direction == NavigationDirection.leftToRight) {
+            begin = const Offset(-1, 0);
+          }
+          const end = Offset.zero;
+          const curve = Curves.easeInOut;
 
-            final tween = Tween(
-              begin: begin,
-              end: end,
-            ).chain(CurveTween(curve: curve));
-            final offsetAnimation = animation.drive(tween);
+          final tween = Tween(
+            begin: begin,
+            end: end,
+          ).chain(CurveTween(curve: curve));
+          final offsetAnimation = animation.drive(tween);
 
-            return SlideTransition(position: offsetAnimation, child: child);
-          },
-        );
+          return SlideTransition(position: offsetAnimation, child: child);
+        },
+      );
 }

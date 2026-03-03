@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Large Widget (4×3): Salatuk-style Full Timetable -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg_gold"
+    android:orientation="vertical"
+    android:layoutDirection="rtl"
+    android:gravity="center_horizontal"
+    android:padding="16dp">
+
+    <!-- ═══ Row 1: Hijri Date (right) + Countdown (left) ═══ -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp"
+        android:layoutDirection="rtl"
+        android:padding="4dp">
+
+        <!-- Hijri Date (RTL start = right) -->
+        <TextView
+            android:id="@+id/tv_widget_large_hijri"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:text="١ رمضان ١٤٤٧"
+            android:textColor="#EEEEEE"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:textAlignment="center"
+            android:textDirection="locale"
+            android:shadowColor="#B3000000"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="3" />
+
+        <!-- Countdown (RTL end = left, gold) -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:layoutDirection="ltr">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="–"
+                android:textColor="#FFD700"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:textDirection="ltr"
+                android:shadowColor="#B3000000"
+                android:shadowDx="1"
+                android:shadowDy="1"
+                android:shadowRadius="3" />
+
+            <Chronometer
+                android:id="@+id/tv_widget_large_countdown"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="2dp"
+                android:textColor="#FFD700"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:textDirection="ltr"
+                android:countDown="true"
+                android:shadowColor="#B3000000"
+                android:shadowDx="1"
+                android:shadowDy="1"
+                android:shadowRadius="3" />
+        </LinearLayout>
+    </RelativeLayout>
+
+    <!-- ═══ Row 2: Dot Timeline ═══ -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:paddingHorizontal="8dp">
+
+        <!-- Horizontal Line -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:layout_gravity="center_vertical"
+            android:layout_marginHorizontal="16dp"
+            android:background="#88FFFFFF" />
+
+        <!-- 5 Dots -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:weightSum="5">
+
+            <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <ImageView android:id="@+id/dot_fajr" android:layout_width="12dp" android:layout_height="12dp" android:layout_gravity="center" android:src="@drawable/widget_dot_inactive" android:contentDescription="فجر" />
+            </FrameLayout>
+            <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <ImageView android:id="@+id/dot_dhuhr" android:layout_width="12dp" android:layout_height="12dp" android:layout_gravity="center" android:src="@drawable/widget_dot_inactive" android:contentDescription="ظهر" />
+            </FrameLayout>
+            <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <ImageView android:id="@+id/dot_asr" android:layout_width="12dp" android:layout_height="12dp" android:layout_gravity="center" android:src="@drawable/widget_dot_inactive" android:contentDescription="عصر" />
+            </FrameLayout>
+            <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <ImageView android:id="@+id/dot_maghrib" android:layout_width="12dp" android:layout_height="12dp" android:layout_gravity="center" android:src="@drawable/widget_dot_inactive" android:contentDescription="مغرب" />
+            </FrameLayout>
+            <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <ImageView android:id="@+id/dot_isha" android:layout_width="12dp" android:layout_height="12dp" android:layout_gravity="center" android:src="@drawable/widget_dot_inactive" android:contentDescription="عشاء" />
+            </FrameLayout>
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- ═══ Row 3: 5 Prayer Names ═══ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layoutDirection="rtl"
+        android:paddingHorizontal="8dp"
+        android:layout_marginBottom="4dp"
+        android:weightSum="5">
+
+        <TextView android:id="@+id/tv_widget_large_fajr_label"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center" android:layout_gravity="center" android:textAlignment="center"
+            android:text="الفجر" android:textColor="#EEEEEE" android:textSize="14sp" android:textStyle="bold"
+            android:shadowColor="#B3000000" android:shadowDx="1" android:shadowDy="1" android:shadowRadius="3" />
+        <TextView android:id="@+id/tv_widget_large_dhuhr_label"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center" android:layout_gravity="center" android:textAlignment="center"
+            android:text="الظهر" android:textColor="#EEEEEE" android:textSize="14sp" android:textStyle="bold"
+            android:shadowColor="#B3000000" android:shadowDx="1" android:shadowDy="1" android:shadowRadius="3" />
+        <TextView android:id="@+id/tv_widget_large_asr_label"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center" android:layout_gravity="center" android:textAlignment="center"
+            android:text="العصر" android:textColor="#EEEEEE" android:textSize="14sp" android:textStyle="bold"
+            android:shadowColor="#B3000000" android:shadowDx="1" android:shadowDy="1" android:shadowRadius="3" />
+        <TextView android:id="@+id/tv_widget_large_maghrib_label"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center" android:layout_gravity="center" android:textAlignment="center"
+            android:text="المغرب" android:textColor="#EEEEEE" android:textSize="14sp" android:textStyle="bold"
+            android:shadowColor="#B3000000" android:shadowDx="1" android:shadowDy="1" android:shadowRadius="3" />
+        <TextView android:id="@+id/tv_widget_large_isha_label"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center" android:layout_gravity="center" android:textAlignment="center"
+            android:text="العشاء" android:textColor="#EEEEEE" android:textSize="14sp" android:textStyle="bold"
+            android:shadowColor="#B3000000" android:shadowDx="1" android:shadowDy="1" android:shadowRadius="3" />
+    </LinearLayout>
+
+    <!-- ═══ Row 4: 5 Prayer Times ═══ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layoutDirection="rtl"
+        android:paddingHorizontal="8dp"
+        android:layout_marginBottom="12dp"
+        android:weightSum="5">
+
+        <TextView android:id="@+id/tv_widget_large_fajr"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center" android:layout_gravity="center" android:textAlignment="center"
+            android:textDirection="ltr" android:text="--:--" android:textColor="#FFFFFF"
+            android:textSize="16sp" android:textStyle="bold"
+            android:shadowColor="#B3000000" android:shadowDx="1" android:shadowDy="1" android:shadowRadius="3" />
+        <TextView android:id="@+id/tv_widget_large_dhuhr"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center" android:layout_gravity="center" android:textAlignment="center"
+            android:textDirection="ltr" android:text="--:--" android:textColor="#FFFFFF"
+            android:textSize="16sp" android:textStyle="bold"
+            android:shadowColor="#B3000000" android:shadowDx="1" android:shadowDy="1" android:shadowRadius="3" />
+        <TextView android:id="@+id/tv_widget_large_asr"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center" android:layout_gravity="center" android:textAlignment="center"
+            android:textDirection="ltr" android:text="--:--" android:textColor="#FFFFFF"
+            android:textSize="16sp" android:textStyle="bold"
+            android:shadowColor="#B3000000" android:shadowDx="1" android:shadowDy="1" android:shadowRadius="3" />
+        <TextView android:id="@+id/tv_widget_large_maghrib"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center" android:layout_gravity="center" android:textAlignment="center"
+            android:textDirection="ltr" android:text="--:--" android:textColor="#FFFFFF"
+            android:textSize="16sp" android:textStyle="bold"
+            android:shadowColor="#B3000000" android:shadowDx="1" android:shadowDy="1" android:shadowRadius="3" />
+        <TextView android:id="@+id/tv_widget_large_isha"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center" android:layout_gravity="center" android:textAlignment="center"
+            android:textDirection="ltr" android:text="--:--" android:textColor="#FFFFFF"
+            android:textSize="16sp" android:textStyle="bold"
+            android:shadowColor="#B3000000" android:shadowDx="1" android:shadowDy="1" android:shadowRadius="3" />
+    </LinearLayout>
+
+    <!-- ═══ Row 5: Footer — Sunrise (right) + Next Prayer Name (center) + Location (left) ═══ -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layoutDirection="rtl"
+        android:paddingHorizontal="4dp">
+
+        <!-- Sunrise (RTL start = right) -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="☀ "
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tv_widget_large_sunrise"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="الشروق 06:08"
+                android:textColor="#EEEEEE"
+                android:textSize="12sp"
+                android:gravity="center"
+                android:textDirection="locale"
+                android:shadowColor="#B3000000"
+                android:shadowDx="1"
+                android:shadowDy="1"
+                android:shadowRadius="3" />
+        </LinearLayout>
+
+        <!-- Next Prayer Name (center, gold) -->
+        <TextView
+            android:id="@+id/tv_widget_large_next_prayer_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:text="الفجر"
+            android:textColor="#FFD700"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:textAlignment="center"
+            android:shadowColor="#B3000000"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="3" />
+
+        <!-- Location (RTL end = left) -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📍 "
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tv_widget_large_location"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#EEEEEE"
+                android:textSize="12sp"
+                android:gravity="center"
+                android:textDirection="locale"
+                android:shadowColor="#B3000000"
+                android:shadowDx="1"
+                android:shadowDy="1"
+                android:shadowRadius="3" />
+        </LinearLayout>
+    </RelativeLayout>
+</LinearLayout>

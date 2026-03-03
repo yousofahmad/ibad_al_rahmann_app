@@ -1,7 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import 'package:ibad_al_rahmann/core/services/cache_service.dart';
 import 'package:ibad_al_rahmann/core/di/di.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
@@ -16,7 +15,19 @@ import 'widgets/quran_screen_body.dart';
 
 class QuranScreen extends StatefulWidget {
   final int? initialPage;
-  const QuranScreen({super.key, this.initialPage});
+  final bool isWirdMode;
+  final int? targetStartPage;
+  final int? targetEndPage;
+  final int? wirdIndex;
+
+  const QuranScreen({
+    super.key,
+    this.initialPage,
+    this.isWirdMode = false,
+    this.targetStartPage,
+    this.targetEndPage,
+    this.wirdIndex,
+  });
 
   @override
   State<QuranScreen> createState() => _QuranScreenState();
@@ -25,30 +36,62 @@ class QuranScreen extends StatefulWidget {
 class _QuranScreenState extends State<QuranScreen> {
   int? _cachedPage;
   bool _isInitialized = false;
+  late QuranCubit _quranCubit;
+  late VersePlayerCubit _versePlayerCubit;
+  late QuranThemeCubit _quranThemeCubit;
 
   @override
   void initState() {
     WakelockPlus.enable();
-    if (widget.initialPage != null) {
-      _cachedPage = widget.initialPage;
-      _isInitialized = true;
-    } else {
-      _initializeCache();
-    }
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
+    );
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    _initializeCache();
     super.initState();
   }
 
   Future<void> _initializeCache() async {
-    _cachedPage = getIt<CacheService>().getInt('last_quran_page');
-    if (mounted) {
-      setState(() {
-        _isInitialized = true;
-      });
+    try {
+      final cacheService = getIt<CacheService>();
+      await cacheService.init();
+      _cachedPage =
+          widget.initialPage ?? cacheService.getInt('last_quran_page');
+
+      _quranCubit = QuranCubit(
+        QuranRepo(tablet: true, initialPage: _cachedPage),
+        isWirdMode: widget.isWirdMode,
+        wirdStartPage: widget.targetStartPage,
+        targetEndPage: widget.targetEndPage,
+        wirdIndex: widget.wirdIndex,
+      );
+      _versePlayerCubit = VersePlayerCubit();
+      _quranThemeCubit = QuranThemeCubit();
+
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error initializing Quran Screen: $e");
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+      }
     }
   }
 
   @override
   void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -64,17 +107,9 @@ class _QuranScreenState extends State<QuranScreen> {
     }
     return MultiBlocProvider(
       providers: [
-        BlocProvider(
-          create: (_) => QuranCubit(
-            QuranRepo(
-              tablet: context.screenWidth > SizeConfig.tablet,
-              initialPage: _cachedPage,
-            ),
-          ),
-        ),
-        BlocProvider(create: (context) => VersePlayerCubit()),
-        // Provide QuranThemeCubit as ThemeCubit to isolate Quran theme
-        BlocProvider<ThemeCubit>(create: (context) => QuranThemeCubit()),
+        BlocProvider<QuranCubit>.value(value: _quranCubit),
+        BlocProvider<VersePlayerCubit>.value(value: _versePlayerCubit),
+        BlocProvider<ThemeCubit>.value(value: _quranThemeCubit),
       ],
       child: BlocBuilder<ThemeCubit, ThemeState>(
         builder: (context, state) {
@@ -85,7 +120,9 @@ class _QuranScreenState extends State<QuranScreen> {
           return Theme(
             data: themeData,
             child: Scaffold(
-              backgroundColor: themeData.scaffoldBackgroundColor,
+              backgroundColor: state.mode == ThemeMode.dark
+                  ? Colors.black
+                  : themeData.scaffoldBackgroundColor,
               resizeToAvoidBottomInset: false,
               body: const QuranScreenBody(),
             ),

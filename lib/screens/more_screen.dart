@@ -6,7 +6,6 @@ import 'package:ibad_al_rahmann/screens/alarms_screen.dart'; // As Alarms
 import 'package:ibad_al_rahmann/screens/settings_screen.dart';
 import 'package:ibad_al_rahmann/screens/tasbeeh_screen.dart';
 import 'occasions_screen.dart';
-import 'package:ibad_al_rahmann/features/quran/ui/quran_wird_screen.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ibad_al_rahmann/services/notification_service.dart';
@@ -64,17 +63,7 @@ class MoreScreen extends StatelessWidget {
               MaterialPageRoute(builder: (_) => const AlarmsScreen()),
             ),
           ),
-          _buildMenuButton(
-            context: context,
-            title: "ختمة القرآن",
-            imagePath: Theme.of(context).brightness == Brightness.dark
-                ? 'assets/sections/quran_dark.svg'
-                : 'assets/sections/quran_light.svg',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const QuranWirdScreen()),
-            ),
-          ),
+
           _buildMenuButton(
             context: context,
             title: "تنبيهات الصلاة على النبي",
@@ -88,7 +77,7 @@ class MoreScreen extends StatelessWidget {
             ),
             onTap: () => showDialog(
               context: context,
-              builder: (ctx) => const FridayReminderDialog(),
+              builder: (ctx) => const SalawatReminderDialog(),
             ),
           ),
           _buildMenuButton(
@@ -187,16 +176,27 @@ class MoreScreen extends StatelessWidget {
   }
 }
 
-class FridayReminderDialog extends StatefulWidget {
-  const FridayReminderDialog({super.key});
+class SalawatReminderDialog extends StatefulWidget {
+  const SalawatReminderDialog({super.key});
 
   @override
-  State<FridayReminderDialog> createState() => _FridayReminderDialogState();
+  State<SalawatReminderDialog> createState() => _SalawatReminderDialogState();
 }
 
-class _FridayReminderDialogState extends State<FridayReminderDialog> {
+class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
   bool _isEnabled = false;
   final TextEditingController _controller = TextEditingController();
+  List<int> _selectedDays = [DateTime.friday];
+
+  final Map<int, String> _daysMap = {
+    DateTime.saturday: 'السبت',
+    DateTime.sunday: 'الأحد',
+    DateTime.monday: 'الاثنين',
+    DateTime.tuesday: 'الثلاثاء',
+    DateTime.wednesday: 'الأربعاء',
+    DateTime.thursday: 'الخميس',
+    DateTime.friday: 'الجمعة',
+  };
 
   @override
   void initState() {
@@ -206,12 +206,16 @@ class _FridayReminderDialogState extends State<FridayReminderDialog> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    final enabled = prefs.getBool('friday_reminder_enabled') ?? false;
-    final minutes = prefs.getInt('friday_reminder_minutes') ?? 60;
+    final enabled = prefs.getBool('salawat_reminder_enabled') ?? false;
+    final minutes = prefs.getInt('salawat_reminder_minutes') ?? 60;
+    final daysList =
+        prefs.getStringList('salawat_reminder_days') ??
+        [DateTime.friday.toString()];
 
     setState(() {
       _isEnabled = enabled;
       _controller.text = minutes.toString();
+      _selectedDays = daysList.map((e) => int.parse(e)).toList();
     });
   }
 
@@ -219,13 +223,20 @@ class _FridayReminderDialogState extends State<FridayReminderDialog> {
     final prefs = await SharedPreferences.getInstance();
     final minutes = int.tryParse(_controller.text) ?? 60;
 
-    await prefs.setBool('friday_reminder_enabled', _isEnabled);
-    await prefs.setInt('friday_reminder_minutes', minutes);
+    await prefs.setBool('salawat_reminder_enabled', _isEnabled);
+    await prefs.setInt('salawat_reminder_minutes', minutes);
+    await prefs.setStringList(
+      'salawat_reminder_days',
+      _selectedDays.map((e) => e.toString()).toList(),
+    );
 
-    if (_isEnabled && minutes > 0) {
-      await NotificationService.scheduleFridayReminders(minutes);
+    if (_isEnabled && minutes > 0 && _selectedDays.isNotEmpty) {
+      await NotificationService.scheduleSalawatReminders(
+        minutes,
+        _selectedDays,
+      );
     } else {
-      await NotificationService.scheduleFridayReminders(0);
+      await NotificationService.scheduleSalawatReminders(0, []);
     }
 
     if (mounted) {
@@ -265,11 +276,11 @@ class _FridayReminderDialogState extends State<FridayReminderDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              "تذكير كل يوم جمعة بالصلاة على النبي ﷺ",
+              "تنبيهات دورية بالصلاة على النبي ﷺ",
               textAlign: TextAlign.center,
               style: TextStyle(fontFamily: AppConsts.expoArabic),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -279,12 +290,51 @@ class _FridayReminderDialogState extends State<FridayReminderDialog> {
                 ),
                 Switch(
                   value: _isEnabled,
-                  activeColor: const Color(0xFFD0A871),
+                  activeThumbColor: const Color(0xFFD0A871),
                   onChanged: (val) => setState(() => _isEnabled = val),
                 ),
               ],
             ),
             if (_isEnabled) ...[
+              const Divider(height: 24),
+              const Text(
+                "اختر الأيام:",
+                style: TextStyle(
+                  fontFamily: AppConsts.expoArabic,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: _daysMap.entries.map((entry) {
+                  final isSelected = _selectedDays.contains(entry.key);
+                  return FilterChip(
+                    label: Text(
+                      entry.value,
+                      style: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontSize: 12.sp,
+                        color: isSelected
+                            ? Colors.white
+                            : (isDark ? Colors.white70 : Colors.black87),
+                      ),
+                    ),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedDays.add(entry.key);
+                        } else {
+                          _selectedDays.remove(entry.key);
+                        }
+                      });
+                    },
+                    selectedColor: const Color(0xFFD0A871),
+                    checkmarkColor: Colors.white,
+                  );
+                }).toList(),
+              ),
               const SizedBox(height: 20),
               TextField(
                 controller: _controller,
@@ -311,12 +361,13 @@ class _FridayReminderDialogState extends State<FridayReminderDialog> {
               ),
               const SizedBox(height: 10),
               const Text(
-                "سيتم التذكير طوال يوم الجمعة حسب الفاصل المحدد.",
+                "سيتم التذكير في الأيام المختارة حسب الفاصل المحدد.",
                 style: TextStyle(
                   fontFamily: AppConsts.expoArabic,
-                  fontSize: 12,
+                  fontSize: 11,
                   color: Colors.grey,
                 ),
+                textAlign: TextAlign.center,
               ),
             ],
           ],

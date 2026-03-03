@@ -62,14 +62,60 @@ class _AzkarPageState extends State<AzkarPage> {
   bool _vibrationEnabled = true;
   final Color _goldColor = const Color(0xFFD0A871);
   int _streakCount = 0;
+  List<int> _currentCounts = [];
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadProgressAndData();
     _loadSettings();
     _setupAudioListeners();
     _player.setReleaseMode(ReleaseMode.stop);
+  }
+
+  Future<void> _loadProgressAndData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keyIndex = 'azkar_progress_${widget.jsonFile}';
+    final savedIndex = prefs.getInt(keyIndex) ?? 0;
+
+    await _loadData();
+
+    if (mounted && _azkarList.isNotEmpty) {
+      final keyCounts = 'azkar_counts_${widget.jsonFile}';
+      final savedCountsStr = prefs.getString(keyCounts);
+      if (savedCountsStr != null) {
+        try {
+          List<dynamic> decoded = json.decode(savedCountsStr);
+          _currentCounts = decoded.map((e) => e as int).toList();
+        } catch (_) {}
+      }
+      if (_currentCounts.length != _azkarList.length) {
+        _currentCounts = List.filled(_azkarList.length, 0);
+      }
+
+      setState(() {
+        _currentIndex = savedIndex < _azkarList.length ? savedIndex : 0;
+        _currentCount = _currentCounts[_currentIndex];
+      });
+      // Jump to saved page after build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(_currentIndex);
+        }
+      });
+    }
+  }
+
+  Future<void> _saveProgress(int index) async {
+    final prefs = await SharedPreferences.getInstance();
+    final keyIndex = 'azkar_progress_${widget.jsonFile}';
+    final keyCounts = 'azkar_counts_${widget.jsonFile}';
+    await prefs.setInt(keyIndex, index);
+
+    if (_currentCounts.isNotEmpty && _currentIndex < _currentCounts.length) {
+      _currentCounts[_currentIndex] = _currentCount;
+      await prefs.setString(keyCounts, json.encode(_currentCounts));
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -80,6 +126,7 @@ class _AzkarPageState extends State<AzkarPage> {
     // Load Streak
     String key = _getCategoryKey();
     if (key.isNotEmpty) {
+      await DailyTrackerService.markAsStarted(key);
       final streak = await DailyTrackerService.getStreak(key);
       if (mounted) setState(() => _streakCount = streak);
     }
@@ -437,9 +484,10 @@ class _AzkarPageState extends State<AzkarPage> {
                         itemCount: _azkarList.length,
                         onPageChanged: (index) {
                           _player.stop();
+                          _saveProgress(index);
                           setState(() {
                             _currentIndex = index;
-                            _currentCount = 0;
+                            _currentCount = _currentCounts[index];
                             _isPlaying = false;
                             _position = Duration.zero;
                             _duration = Duration.zero;
@@ -449,71 +497,160 @@ class _AzkarPageState extends State<AzkarPage> {
                             _buildZekrCard(_azkarList[index]),
                       ),
                     ),
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          if (_currentCount < _azkarList[_currentIndex].count) {
-                            _currentCount++;
-                          }
+                    Builder(
+                      builder: (context) {
+                        bool isLastItemMaxed =
+                            _currentIndex == _azkarList.length - 1 &&
+                            _currentCount == _azkarList[_currentIndex].count;
+                        bool isCompletedAll = false;
 
-                          if (_vibrationEnabled) {
-                            NotificationService.vibrate(duration: 70);
-                          }
+                        if (isLastItemMaxed) {
+                          isCompletedAll = _currentCounts.asMap().entries.every(
+                            (e) => e.value >= _azkarList[e.key].count,
+                          );
+                        }
 
-                          if (_currentCount ==
-                                  _azkarList[_currentIndex].count &&
-                              _currentIndex < _azkarList.length - 1) {
-                            if (_vibrationEnabled) {
-                              NotificationService.vibrate(
-                                duration: 500,
-                              ); // اهتزاز عند اتمام الذكر
-                            }
-                            Future.delayed(
-                              const Duration(milliseconds: 500),
-                              () => _pageController.nextPage(
-                                duration: const Duration(milliseconds: 600),
-                                curve: Curves.easeInOut,
-                              ),
-                            );
-                          } else if (_currentCount ==
-                                  _azkarList[_currentIndex].count &&
-                              _currentIndex == _azkarList.length - 1) {
-                            // Last Zekr Completed
-                            if (_vibrationEnabled) {
-                              NotificationService.vibrate(duration: 500);
-                            }
-                            _finishAzkarSession();
-                          }
-                        });
-                      },
-                      child: Container(
-                        width: 90,
-                        height: 90,
-                        margin: const EdgeInsets.only(bottom: 20),
-                        decoration: BoxDecoration(
-                          color: _goldColor,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                        ),
-                        child: Center(
-                          child: Text(
-                            "${_azkarList[_currentIndex].count - _currentCount}",
-                            style: TextStyle(
-                              fontFamily: AppConsts.expoArabic,
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              shadows: [
-                                Shadow(
-                                  offset: const Offset(1, 1),
-                                  blurRadius: 2,
-                                  color: Colors.black.withValues(alpha: 0.5),
+                        if (isCompletedAll) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 20),
+                            child: ElevatedButton.icon(
+                              onPressed: _finishAzkarSession,
+                              icon: const Icon(Icons.home, color: Colors.white),
+                              label: const Text(
+                                "العودة للصفحة الرئيسية",
+                                style: TextStyle(
+                                  fontFamily: AppConsts.expoArabic,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
-                              ],
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFD0A871),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 30,
+                                  vertical: 15,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                              ),
+                            ),
+                          );
+                        } else if (isLastItemMaxed && !isCompletedAll) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 20),
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                int incompleteIdx = _currentCounts
+                                    .asMap()
+                                    .entries
+                                    .firstWhere(
+                                      (e) => e.value < _azkarList[e.key].count,
+                                    )
+                                    .key;
+                                _pageController.animateToPage(
+                                  incompleteIdx,
+                                  duration: const Duration(milliseconds: 600),
+                                  curve: Curves.easeInOut,
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.arrow_back,
+                                color: Colors.white,
+                              ),
+                              label: const Text(
+                                "إكمال الأذكار المتبقية",
+                                style: TextStyle(
+                                  fontFamily: AppConsts.expoArabic,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red[800],
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 30,
+                                  vertical: 15,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              if (_currentCount <
+                                  _azkarList[_currentIndex].count) {
+                                _currentCount++;
+                                _currentCounts[_currentIndex] = _currentCount;
+                              }
+
+                              _saveProgress(_currentIndex);
+
+                              if (_vibrationEnabled) {
+                                NotificationService.vibrate(duration: 70);
+                              }
+
+                              if (_currentCount ==
+                                      _azkarList[_currentIndex].count &&
+                                  _currentIndex < _azkarList.length - 1) {
+                                if (_vibrationEnabled) {
+                                  NotificationService.vibrate(duration: 500);
+                                }
+                                Future.delayed(
+                                  const Duration(milliseconds: 500),
+                                  () => _pageController.nextPage(
+                                    duration: const Duration(milliseconds: 600),
+                                    curve: Curves.easeInOut,
+                                  ),
+                                );
+                              } else if (_currentCount ==
+                                      _azkarList[_currentIndex].count &&
+                                  _currentIndex == _azkarList.length - 1) {
+                                if (_vibrationEnabled) {
+                                  NotificationService.vibrate(duration: 500);
+                                }
+                              }
+                            });
+                          },
+                          child: Container(
+                            width: 90,
+                            height: 90,
+                            margin: const EdgeInsets.only(bottom: 20),
+                            decoration: BoxDecoration(
+                              color: _goldColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3),
+                            ),
+                            child: Center(
+                              child: Text(
+                                "${_azkarList[_currentIndex].count - _currentCount}",
+                                style: TextStyle(
+                                  fontFamily: AppConsts.expoArabic,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  shadows: [
+                                    Shadow(
+                                      offset: const Offset(1, 1),
+                                      blurRadius: 2,
+                                      color: Colors.black.withValues(
+                                        alpha: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                     if (hasSound)
                       SafeArea(

@@ -32,7 +32,7 @@ class MainActivity: FlutterActivity() {
     companion object {
         var methodChannel: MethodChannel? = null
 
-        fun scheduleAlarm(context: Context, id: Int, year: Int, month: Int, day: Int, hour: Int, minute: Int, soundName: String, title: String?, body: String?, payload: String?, isRepeating: Boolean, audioPath: String?) {
+        fun scheduleAlarm(context: Context, id: Int, year: Int, month: Int, day: Int, hour: Int, minute: Int, soundName: String, title: String?, body: String?, payload: String?, isRepeating: Boolean, audioPath: String?, intervalMinutes: Int = 0) {
             val prefs = context.getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE)
             with(prefs.edit()) {
                 putInt("alarm_${id}_year", year)
@@ -46,6 +46,7 @@ class MainActivity: FlutterActivity() {
                 if (body != null) putString("alarm_${id}_body", body)
                 if (payload != null) putString("alarm_${id}_payload", payload)
                 putBoolean("alarm_${id}_active", true)
+                putInt("alarm_${id}_interval", intervalMinutes)
                 apply()
             }
 
@@ -59,6 +60,7 @@ class MainActivity: FlutterActivity() {
                 putExtra("minute", minute)
                 putExtra("sound_name", soundName)
                 putExtra("audio_path", audioPath)
+                putExtra("interval_minutes", intervalMinutes)
                 if (title != null) putExtra("title", title)
                 if (body != null) putExtra("body", body)
                 if (payload != null) putExtra("payload", payload)
@@ -109,8 +111,9 @@ class MainActivity: FlutterActivity() {
                     val body = call.argument<String>("body")
                     val payload = call.argument<String>("payload")
                     val audioPath = call.argument<String>("audioPath")
+                    val intervalMinutes = call.argument<Int>("intervalMinutes") ?: 0
                     
-                    scheduleAlarm(this, id, year, month, day, hour, minute, soundName, title, body, payload, false, audioPath)
+                    scheduleAlarm(this, id, year, month, day, hour, minute, soundName, title, body, payload, false, audioPath, intervalMinutes)
                     result.success("Scheduled")
                 }
                 "cancelAlarm" -> {
@@ -131,6 +134,46 @@ class MainActivity: FlutterActivity() {
                         @Suppress("DEPRECATION")
                         vibrator.vibrate(duration)
                     }
+                    result.success(null)
+                }
+                "updatePrayerNotification" -> {
+                    try {
+                        val intent = Intent(this, PrayerNotificationService::class.java).apply {
+                            action = "UPDATE_PRAYER_NOTIFICATION"
+                            putExtra("fajr", call.argument<String>("fajr"))
+                            putExtra("dhuhr", call.argument<String>("dhuhr"))
+                            putExtra("asr", call.argument<String>("asr"))
+                            putExtra("maghrib", call.argument<String>("maghrib"))
+                            putExtra("isha", call.argument<String>("isha"))
+                            putExtra("nextName", call.argument<String>("nextName"))
+                            putExtra("countdown", call.argument<String>("countdown"))
+                            putExtra("hijri", call.argument<String>("hijri"))
+                            putExtra("prayerIndex", call.argument<Int>("prayerIndex"))
+                            
+                            val epochArg = call.argument<Any>("nextPrayerEpoch")
+                            val nextPrayerEpoch = when (epochArg) {
+                                is Long -> epochArg
+                                is Int -> epochArg.toLong()
+                                is String -> epochArg.toLongOrNull() ?: 0L
+                                else -> 0L
+                            }
+                            putExtra("nextPrayerEpoch", nextPrayerEpoch)
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(intent)
+                        } else {
+                            startService(intent)
+                        }
+                        result.success(null)
+                    } catch (e: Exception) {
+                        result.error("NOTIFICATION_ERROR", e.message, null)
+                    }
+                }
+                "stopPrayerNotification" -> {
+                    val intent = Intent(this, PrayerNotificationService::class.java).apply {
+                        action = "STOP_PRAYER_NOTIFICATION"
+                    }
+                    startService(intent)
                     result.success(null)
                 }
                 else -> result.notImplemented()
@@ -188,8 +231,9 @@ class AlarmReceiver : BroadcastReceiver() {
                     val body = prefs.getString("alarm_${id}_body", "حان الوقت")
                     val payload = prefs.getString("alarm_${id}_payload", null)
                     val audioPath = prefs.getString("alarm_${id}_audioPath", null)
+                    val interval = prefs.getInt("alarm_${id}_interval", 0)
 
-                    MainActivity.scheduleAlarm(context, id, -1, -1, -1, hour, minute, soundName, title, body, payload, false, audioPath)
+                    MainActivity.scheduleAlarm(context, id, -1, -1, -1, hour, minute, soundName, title, body, payload, false, audioPath, interval)
                 }
             }
             return
@@ -219,7 +263,26 @@ class AlarmReceiver : BroadcastReceiver() {
         if (alarmId < 1000) {
             val hour = intent.getIntExtra("hour", 0)
             val minute = intent.getIntExtra("minute", 0)
-            MainActivity.scheduleAlarm(context, alarmId, -1, -1, -1, hour, minute, soundName, title, body, payload, true, audioPath)
+            val interval = intent.getIntExtra("interval_minutes", 0)
+            MainActivity.scheduleAlarm(context, alarmId, -1, -1, -1, hour, minute, soundName, title, body, payload, true, audioPath, interval)
+        } else if (alarmId in 8000..8999) {
+            // Chaining Salawat Reminders
+            val interval = intent.getIntExtra("interval_minutes", 0)
+            if (interval > 0) {
+                val cal = Calendar.getInstance()
+                val currentDay = cal.get(Calendar.DAY_OF_YEAR)
+                cal.add(Calendar.MINUTE, interval)
+                
+                // Only schedule next if it's still the SAME day
+                if (cal.get(Calendar.DAY_OF_YEAR) == currentDay) {
+                    MainActivity.scheduleAlarm(
+                        context, alarmId,
+                        cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH),
+                        cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE),
+                        soundName, title, body, payload, false, audioPath, interval
+                    )
+                }
+            }
         }
     }
 
@@ -241,9 +304,11 @@ class AlarmReceiver : BroadcastReceiver() {
             baseChannelId = "iqama_channel"
             channelName = "إقامة الصلاة"
             importance = NotificationManager.IMPORTANCE_HIGH
-        } else if (cleanSoundName.contains("adhan") || cleanSoundName == "fajr" || cleanSoundName == "makkah" || cleanSoundName == "madina" || cleanSoundName == "sabah" || cleanSoundName == "masaa") {
+        } else if (cleanSoundName.contains("adhan") || cleanSoundName == "fajr" || cleanSoundName.contains("sunrise") || 
+            cleanSoundName.contains("shurooq") || cleanSoundName.contains("duha") || cleanSoundName.contains("qiyam") ||
+            cleanSoundName == "makkah" || cleanSoundName == "madina" || cleanSoundName == "sabah" || cleanSoundName == "masaa") {
             baseChannelId = "adhan_channel"
-            channelName = "الأذان"
+            channelName = "الأذان والتنبيهات الهامة"
             importance = NotificationManager.IMPORTANCE_HIGH
         } else if (cleanSoundName == "ruqyah" || cleanSoundName == "silent") {
             baseChannelId = "silent_channel"

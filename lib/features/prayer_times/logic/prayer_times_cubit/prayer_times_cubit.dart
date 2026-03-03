@@ -1,4 +1,4 @@
-﻿import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/features/prayer_times/data/models/prayer_times_model.dart';
 import 'package:ibad_al_rahmann/features/prayer_times/data/models/user_location_model.dart';
 import 'package:geocoding/geocoding.dart';
@@ -111,5 +111,3 @@ class PrayerTimesCubit extends Cubit<PrayerTimesState> {
     }
   }
 }
-
-

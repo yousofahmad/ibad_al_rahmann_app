@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:ibad_al_rahmann/core/theme/app_colors.dart';
@@ -46,16 +46,11 @@ class QuranFehresDialog extends StatelessWidget {
                   topRight: Radius.circular(12),
                 ),
               ),
-              child: Text(
-                'فهرس السور',
-                style: AppStyles.style16,
-              ),
+              child: Text('فهرس السور', style: AppStyles.style16),
             ),
             const SizedBox(height: 10),
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: TextField(
                 style: context.bodySmall,
                 decoration: InputDecoration(
@@ -75,9 +70,7 @@ class QuranFehresDialog extends StatelessWidget {
               child: ValueListenableBuilder<List<SearchingSurahModel>>(
                 valueListenable: surahsNotifier,
                 builder: (context, surahs, child) {
-                  return FehresItemsListView(
-                    surahs: surahs,
-                  );
+                  return FehresItemsListView(surahs: surahs);
                 },
               ),
             ),
@@ -92,14 +85,16 @@ class QuranFehresDialog extends StatelessWidget {
     String? value,
   }) {
     if (value == null) {
-      surahsNotifier.value =
-          surah.map((e) => SearchingSurahModel.fromMap(e)).toList();
+      surahsNotifier.value = surah
+          .map((e) => SearchingSurahModel.fromMap(e))
+          .toList();
     } else {
       List surahsData = surah
           .where((e) => (e['arabic'] as String).startsWith(value))
           .toList();
-      surahsNotifier.value =
-          surahsData.map((e) => SearchingSurahModel.fromMap(e)).toList();
+      surahsNotifier.value = surahsData
+          .map((e) => SearchingSurahModel.fromMap(e))
+          .toList();
     }
   }
 }

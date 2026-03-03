@@ -33,20 +33,23 @@ class SurahTitleBoxMobile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      width: 160.w,
-      height: 45.h,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      width: 120.w,
+      height: 35.h,
       child: CustomPaint(
         painter: FramePainter(
           selected: selected,
           backgroundColor: selected ? context.surfaceColor : context.secondary,
           borderColor: selected ? context.outline : context.secondary,
-          borderWidth: 4,
+          borderWidth: 2,
         ),
         child: Center(
           child: Text(
             'سُورَة $text',
-            style: AppStyles.style22u.copyWith(color: Colors.white),
+            style: AppStyles.style14u.copyWith(
+              color: Colors.white,
+              fontSize: 12.sp,
+            ),
           ),
         ),
       ),

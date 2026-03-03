@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -39,10 +39,7 @@ class AppInitializer {
   }
 
   static void homeInit() {
-    Future.wait([
-      TafsirHelper.initTafsir(),
-      BookmarkService.init(),
-    ]);
+    Future.wait([TafsirHelper.initTafsir(), BookmarkService.init()]);
   }
 
   static Future<void> _handleFullScreen() async {

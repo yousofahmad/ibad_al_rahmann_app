@@ -249,17 +249,6 @@ class _MobileSurahVersesWidgetState extends State<MobileSurahVersesWidget> {
               ),
             ),
           ..._buildSpans(context),
-          if (widget.pageNumber > 2)
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: '\n${widget.pageNumber.toArabicNums}',
-                  style: context.titleSmall.copyWith(
-                    fontSize: widget.isFullPage ? null : 16.sp,
-                  ),
-                ),
-              ],
-            ),
         ],
       ),
     );

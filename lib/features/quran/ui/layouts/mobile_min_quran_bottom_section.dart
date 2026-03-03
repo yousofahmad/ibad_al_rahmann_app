@@ -53,8 +53,8 @@ class MobileMinQuranBottomSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FittedBox(
-      fit: BoxFit.scaleDown,
+    return SizedBox(
+      width: double.infinity,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -63,13 +63,13 @@ class MobileMinQuranBottomSection extends StatelessWidget {
               _showBookmarksDialog(context);
             },
             child: Container(
-              width: 58.h,
-              height: 58.h,
+              width: 50.h,
+              height: 50.h,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: context.surfaceColor,
               ),
-              child: const Icon(Icons.bookmark, color: Colors.white, size: 45),
+              child: Icon(Icons.bookmark, color: Colors.white, size: 35.sp),
             ),
           ),
           BlocBuilder<QuranCubit, QuranState>(
@@ -79,7 +79,7 @@ class MobileMinQuranBottomSection extends StatelessWidget {
             builder: (context, state) {
               return Text(
                 state.juzNumber.toJuzName,
-                style: context.headlineLarge,
+                style: context.headlineLarge.copyWith(fontSize: 24.sp),
               );
             },
           ),
@@ -88,8 +88,8 @@ class MobileMinQuranBottomSection extends StatelessWidget {
               context.read<ThemeCubit>().switchTheme();
             },
             child: Container(
-              width: 58.h,
-              height: 58.h,
+              width: 50.h,
+              height: 50.h,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: context.surfaceColor,
@@ -101,7 +101,7 @@ class MobileMinQuranBottomSection extends StatelessWidget {
                         ? Icons.light_mode
                         : Icons.dark_mode,
                     color: Colors.white,
-                    size: 45,
+                    size: 35.sp,
                   );
                 },
               ),

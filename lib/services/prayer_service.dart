@@ -2,8 +2,12 @@ import 'package:flutter/foundation.dart';
 import 'package:adhan/adhan.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'notification_service.dart'; // Import NotificationService
+import 'notification_service.dart';
+import 'home_widget_service.dart';
+import 'package:home_widget/home_widget.dart';
+import 'prayer_notification_platform_channel.dart';
 import 'package:ibad_al_rahmann/features/locations/models/city_profile.dart';
+import 'package:hijri/hijri_calendar.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
 
@@ -53,6 +57,216 @@ class PrayerService extends ChangeNotifier {
     final times = getPrayerTimes();
     if (times != null) {
       NotificationService.schedulePrayerNotifications(times);
+      updatePersistentElements();
+    }
+  }
+
+  /// Unicode LTR mark to prevent garbled Arabic+number rendering in Android RemoteViews
+  static const String _ltr = '\u200E';
+
+  Future<void> updatePersistentElements() async {
+    final times = getPrayerTimes();
+    if (times == null) return;
+
+    final now = DateTime.now();
+
+    // Determine Next Prayer (Logic for skipping Sunrise if needed)
+    Prayer nextPrayer = times.nextPrayer();
+    DateTime? nextTime;
+
+    if (nextPrayer != Prayer.none) {
+      nextTime = times.timeForPrayer(nextPrayer);
+    } else {
+      // Logic for tomorrow's fajr
+      final tomorrow = now.add(const Duration(days: 1));
+      final tomorrowTimes = getPrayerTimesForDate(tomorrow);
+      if (tomorrowTimes != null) {
+        nextTime = tomorrowTimes.fajr;
+        nextPrayer = Prayer.fajr;
+      }
+    }
+
+    if (nextTime == null) return;
+
+    // --- 45-Minute Rule Logic (v3) ---
+    final currentPrayer = times.currentPrayer();
+    DateTime? currentTime;
+    if (currentPrayer != Prayer.none) {
+      currentTime = times.timeForPrayer(currentPrayer);
+    } else {
+      // Before Fajr (Night)
+      final yesterday = now.subtract(const Duration(days: 1));
+      final yesterdayTimes = getPrayerTimesForDate(yesterday);
+      currentTime = yesterdayTimes?.isha;
+    }
+
+    int goldTargetEpoch = nextTime.millisecondsSinceEpoch;
+    bool goldIsCountUp = false;
+
+    if (currentTime != null) {
+      final elapsed = now.difference(currentTime);
+      // If within 45 mins after a prayer started
+      if (elapsed.inMinutes >= 0 && elapsed.inMinutes < 45) {
+        goldTargetEpoch = currentTime.millisecondsSinceEpoch;
+        goldIsCountUp = true;
+      }
+    }
+
+    // --- Countdown target time (may be Sunrise) vs Highlighted prayer (always from the 5) ---
+    DateTime countdownTargetTime = nextTime;
+
+    // For the 5-prayer row highlight, Sunrise maps to Dhuhr
+    Prayer goldNextPrayer = nextPrayer;
+    DateTime? goldNextTime = nextTime;
+    if (goldNextPrayer == Prayer.sunrise) {
+      goldNextPrayer = Prayer.dhuhr;
+      goldNextTime = times.dhuhr;
+    }
+
+    // ── Highlighted Prayer Index (separate from countdown target) ──
+    // This is the index (0-4) that should "light up" in the native 5-prayer row.
+    // Key rule: If targeting Sunrise, we highlight Dhuhr (index 1).
+    int highlightedPrayerIndex;
+    if (goldIsCountUp) {
+      // Highlight the prayer that just passed (count-up mode)
+      highlightedPrayerIndex = _prayerToIndex(currentPrayer);
+    } else {
+      // Highlight the next prayer (countdown mode)
+      highlightedPrayerIndex = _prayerToIndex(goldNextPrayer);
+    }
+
+    // Format Countdown & Name (with LTR marks for Android RTL safety)
+    String countdownStr;
+    String goldNextName;
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+
+    if (goldIsCountUp && currentTime != null) {
+      final elapsed = now.difference(currentTime);
+      final hours = elapsed.inHours;
+      final minutes = elapsed.inMinutes.remainder(60);
+      final seconds = elapsed.inSeconds.remainder(60);
+      countdownStr =
+          "$_ltr${twoDigits(hours)}:${twoDigits(minutes)}:${twoDigits(seconds)}$_ltr";
+
+      final cName = _getPrayerName(
+        currentPrayer == Prayer.none ? Prayer.isha : currentPrayer,
+      );
+      goldNextName = "مضى على $cName";
+    } else {
+      final diff = countdownTargetTime.difference(now);
+      final hours = diff.inHours;
+      final minutes = diff.inMinutes.remainder(60);
+      final seconds = diff.inSeconds.remainder(60);
+      countdownStr =
+          "$_ltr${twoDigits(hours)}:${twoDigits(minutes)}:${twoDigits(seconds)}$_ltr";
+
+      // Gold widget label uses the highlighted prayer (skips Sunrise → Dhuhr)
+      final gn = _getPrayerName(
+        goldNextPrayer == Prayer.none ? Prayer.fajr : goldNextPrayer,
+      );
+      goldNextName = "$gn متبقي";
+    }
+
+    // Format Hijri (with LTR marks around numbers)
+    final hDate = HijriCalendar.fromDate(now.add(Duration(days: _hijriOffset)));
+    final hijriStr =
+        "$_ltr${hDate.hDay}$_ltr ${hDate.longMonthName} $_ltr${hDate.hYear}$_ltr";
+
+    // Update Persistent Notification
+    final prefs = await SharedPreferences.getInstance();
+    final persistentEnabled = prefs.getBool('persistent_notification') ?? true;
+
+    if (persistentEnabled) {
+      await PrayerNotificationServiceHelper.updateNotification(
+        fajr: _ltrWrap(formatTime(times.fajr)),
+        dhuhr: _ltrWrap(formatTime(times.dhuhr)),
+        asr: _ltrWrap(formatTime(times.asr)),
+        maghrib: _ltrWrap(formatTime(times.maghrib)),
+        isha: _ltrWrap(formatTime(times.isha)),
+        nextName: goldNextName,
+        countdown: countdownStr,
+        hijri: hijriStr,
+        prayerIndex: highlightedPrayerIndex,
+        nextPrayerEpoch: (goldIsCountUp && currentTime != null)
+            ? currentTime.millisecondsSinceEpoch
+            : countdownTargetTime.millisecondsSinceEpoch,
+      );
+    } else {
+      await PrayerNotificationServiceHelper.stopNotification();
+    }
+
+    // Update Widgets
+    await HomeWidgetService.updatePrayerWidget(
+      fajr: _ltrWrap(formatTime(times.fajr)),
+      dhuhr: _ltrWrap(formatTime(times.dhuhr)),
+      asr: _ltrWrap(formatTime(times.asr)),
+      maghrib: _ltrWrap(formatTime(times.maghrib)),
+      isha: _ltrWrap(formatTime(times.isha)),
+      nextName: goldNextName,
+      countdown: countdownStr,
+      hijri: hijriStr,
+      prayerIndex: highlightedPrayerIndex,
+      prayerTime: _ltrWrap(formatTime(goldNextTime)),
+      nextPrayerEpoch: (goldIsCountUp && currentTime != null)
+          ? currentTime.millisecondsSinceEpoch
+          : countdownTargetTime.millisecondsSinceEpoch,
+      sunriseTime: _ltrWrap(formatTime(times.sunrise)),
+      locationName: _activeCity?.name ?? "الموقع الحالي",
+    );
+
+    // Update Golden Widget Specific Extra Data
+    await HomeWidgetService.updateGoldWidgetData(
+      targetEpoch: goldTargetEpoch,
+      isCountUp: goldIsCountUp,
+    );
+
+    // Save highlighted_prayer_index for native Kotlin to read
+    await HomeWidget.saveWidgetData<int>(
+      'highlighted_prayer_index',
+      highlightedPrayerIndex,
+    );
+  }
+
+  /// Wraps a time/number string with LTR marks for safe Android RTL rendering
+  String _ltrWrap(String value) => '$_ltr$value$_ltr';
+
+  /// Maps a Prayer enum to a 0-4 index (Fajr=0, Dhuhr=1, Asr=2, Maghrib=3, Isha=4).
+  /// Sunrise maps to 1 (Dhuhr). Unknown/none returns -1.
+  int _prayerToIndex(Prayer p) {
+    switch (p) {
+      case Prayer.fajr:
+        return 0;
+      case Prayer.sunrise:
+        return 1; // Sunrise highlights Dhuhr
+      case Prayer.dhuhr:
+        return 1;
+      case Prayer.asr:
+        return 2;
+      case Prayer.maghrib:
+        return 3;
+      case Prayer.isha:
+        return 4;
+      default:
+        return -1;
+    }
+  }
+
+  String _getPrayerName(Prayer p) {
+    switch (p) {
+      case Prayer.fajr:
+        return "الفجر";
+      case Prayer.sunrise:
+        return "الشروق";
+      case Prayer.dhuhr:
+        return "الظهر";
+      case Prayer.asr:
+        return "العصر";
+      case Prayer.maghrib:
+        return "المغرب";
+      case Prayer.isha:
+        return "العشاء";
+      default:
+        return "الفجر";
     }
   }
 

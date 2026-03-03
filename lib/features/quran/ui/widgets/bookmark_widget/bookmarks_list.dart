@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/theme/app_colors.dart';
 import 'package:ibad_al_rahmann/features/quran/data/models/selected_verse_model.dart';
 
@@ -27,7 +27,6 @@ class BookmarksList extends StatelessWidget {
         return BookmarkItem(
           verse: verse,
           onTap: () => onNavigateToVerse(verse),
-          
         );
       },
       separatorBuilder: (context, index) =>

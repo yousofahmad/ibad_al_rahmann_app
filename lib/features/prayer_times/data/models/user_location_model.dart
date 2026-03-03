@@ -1,4 +1,4 @@
-﻿import 'package:geolocator/geolocator.dart';
+import 'package:geolocator/geolocator.dart';
 
 class UserLocationModel {
   final Position position;
@@ -15,5 +15,3 @@ class UserLocationModel {
     required this.city,
   });
 }
-
-

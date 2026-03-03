@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/app_navigator.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
@@ -44,17 +44,15 @@ class ReciterWidget extends StatelessWidget {
                 child: Text(
                   reciter.name,
                   style: AppStyles.style22expo.copyWith(
-                      fontSize: (context.isTablet || context.isLandscape)
-                          ? 18.sp
-                          : null),
+                    fontSize: (context.isTablet || context.isLandscape)
+                        ? 18.sp
+                        : null,
+                  ),
                   textAlign: TextAlign.center,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 24,
-              ),
+              const Icon(Icons.arrow_forward_ios_rounded, size: 24),
             ],
           ),
         ),

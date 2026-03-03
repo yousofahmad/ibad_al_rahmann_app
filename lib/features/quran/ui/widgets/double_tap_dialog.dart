@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -6,24 +6,16 @@ import '../../../../core/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 
 class DoubleTapDialog extends StatelessWidget {
-  const DoubleTapDialog({
-    super.key,
-  });
+  const DoubleTapDialog({super.key});
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.touch_app,
-            color: AppColors.white,
-            size: 48,
-          ),
+          const Icon(Icons.touch_app, color: AppColors.white, size: 48),
           const SizedBox(height: 16),
           Text(
             'اضغط ضغطتين لتكبير الصفحة',

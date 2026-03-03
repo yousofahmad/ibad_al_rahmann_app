@@ -6,6 +6,21 @@ class DailyTrackerService {
   static const String _lastStreakDateKey = 'last_streak_date';
   static const String _dailyPrefix = 'daily_';
 
+  /// Marks a specific category as started for today.
+  static Future<void> markAsStarted(String category) async {
+    final prefs = await SharedPreferences.getInstance();
+    final String today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final String key = '$_dailyPrefix${today}_${category}_started';
+    await prefs.setBool(key, true);
+  }
+
+  /// Checks if a category is started today.
+  static Future<bool> isStarted(String category) async {
+    final prefs = await SharedPreferences.getInstance();
+    final String today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    return prefs.getBool('$_dailyPrefix${today}_${category}_started') ?? false;
+  }
+
   /// Marks a specific Azkar category as done for today.
   /// [category] examples: 'morning_azkar', 'evening_azkar', 'prayer_azkar'.
   static Future<void> markAsDone(String category) async {
@@ -95,6 +110,48 @@ class DailyTrackerService {
     }
 
     return storedStreak;
+  }
+
+  /// Sets the progress for a specific session (e.g. Wird or Azkar)
+  static Future<void> saveProgress(String key, dynamic value) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (value is int) {
+      await prefs.setInt('progress_$key', value);
+    } else if (value is String) {
+      await prefs.setString('progress_$key', value);
+    } else if (value is bool) {
+      await prefs.setBool('progress_$key', value);
+    }
+  }
+
+  /// Gets the progress for a specific session
+  static Future<dynamic> getProgress(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.get('progress_$key');
+  }
+
+  /// Clears progress for a specific key
+  static Future<void> clearProgress(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('progress_$key');
+  }
+
+  /// Special helper for Wird
+  static Future<void> saveWirdProgress(int sessionIndex, int lastPage) async {
+    await saveProgress('active_wird_session', sessionIndex);
+    await saveProgress('active_wird_page', lastPage);
+  }
+
+  static Future<Map<String, int?>> getWirdProgress() async {
+    return {
+      'sessionIndex': await getProgress('active_wird_session') as int?,
+      'page': await getProgress('active_wird_page') as int?,
+    };
+  }
+
+  static Future<void> clearWirdProgress() async {
+    await clearProgress('active_wird_session');
+    await clearProgress('active_wird_page');
   }
 
   /// Initializes a daily entry with 0% if it doesn't exist.

@@ -10,7 +10,12 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
-    
+
+    <!-- Gallery save permissions (gal package) -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+
     <application
         android:label="عِبَادُ الرَّحْمَٰن"
         android:name="${applicationName}"
@@ -63,5 +68,42 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Persistent Prayer Notification Service -->
+        <service
+            android:name=".PrayerNotificationService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Prayer times countdown and details for user convenience."/>
+        </service>
+
+
+        <!-- Home Screen Widget (1x4 Wide) -->
+        <receiver android:name=".PrayerWidgetWideProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/widget_wide_info" />
+        </receiver>
+
+
+        <!-- Home Screen Widget (Large Golden 4x2) -->
+        <receiver android:name=".PrayerWidgetLargeProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/widget_large_info" />
+        </receiver>
+        
+        <receiver android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="es.antonborri.home_widget.action.BACKGROUND" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

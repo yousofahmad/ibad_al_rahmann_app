@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/alert_helper.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
@@ -39,10 +39,7 @@ class _ThemeChangerDialogState extends State<ThemeChangerDialog> {
         decoration: BoxDecoration(
           color: context.primaryColor,
           borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(
-            color: context.outline,
-            width: 1,
-          ),
+          border: Border.all(color: context.outline, width: 1),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -222,13 +219,13 @@ class _ThemeChangerDialogState extends State<ThemeChangerDialog> {
         style: ElevatedButton.styleFrom(
           backgroundColor: onPressed != null
               ? (isPrimary
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.surface)
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.surface)
               : Theme.of(context).colorScheme.surface.withAlpha(123),
           foregroundColor: onPressed != null
               ? (isPrimary
-                  ? Theme.of(context).colorScheme.onPrimary
-                  : Theme.of(context).colorScheme.onSurface)
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.onSurface)
               : Theme.of(context).colorScheme.onSurface.withAlpha(123),
           side: BorderSide(
             color: Theme.of(context).colorScheme.outline,
@@ -247,8 +244,10 @@ class _ThemeChangerDialogState extends State<ThemeChangerDialog> {
   void _applyTheme(BuildContext context, String themeKey) {
     final themeCubit = context.read<ThemeCubit>();
     themeCubit.selectTheme(themeKey);
-    AlertHelper.showSuccessAlert(context,
-        message: 'تم تطبيق المظهر: ${_getThemeDisplayName(themeKey)}');
+    AlertHelper.showSuccessAlert(
+      context,
+      message: 'تم تطبيق المظهر: ${_getThemeDisplayName(themeKey)}',
+    );
 
     Navigator.of(context).pop();
   }

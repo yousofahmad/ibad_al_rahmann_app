@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/di/di.dart';
 import 'package:ibad_al_rahmann/core/networking/api_keys.dart';
@@ -16,8 +16,9 @@ class QuranReadersCubit extends Cubit<QuranReadersState> {
 
   void onSearch(String? value) {
     if (value != null) {
-      List<ReciterModel> searchReciters =
-          reciters.where((e) => e.name.contains(value)).toList();
+      List<ReciterModel> searchReciters = reciters
+          .where((e) => e.name.contains(value))
+          .toList();
       emit(QuranReadersSuccess(reciters: searchReciters));
     } else {
       emit(QuranReadersSuccess(reciters: reciters));
@@ -34,15 +35,14 @@ class QuranReadersCubit extends Cubit<QuranReadersState> {
         queryParameters: {'language': 'ar'},
       );
       final List recitersList = response.data[ApiKeys.reciters];
-      reciters =
-          recitersList.map((qaree) => ReciterModel.fromJson(qaree)).toList();
+      reciters = recitersList
+          .map((qaree) => ReciterModel.fromJson(qaree))
+          .toList();
 
       emit(QuranReadersSuccess(reciters: reciters));
     } catch (e) {
       // log(e.toString());
-      emit(
-        QuranReadersFailure(errMessage: 'يرجى التحقق من الإنترنت'),
-      );
+      emit(QuranReadersFailure(errMessage: 'يرجى التحقق من الإنترنت'));
     }
   }
   // Future<void> getQuranReaders() async {

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/cupertino.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:just_audio/just_audio.dart';
@@ -8,9 +8,7 @@ import '../../../../core/di/di.dart';
 import '../../logic/quran_player/quran_player_cubit.dart';
 
 class SurahPlayerControllers extends StatelessWidget {
-  const SurahPlayerControllers({
-    super.key,
-  });
+  const SurahPlayerControllers({super.key});
 
   @override
   Widget build(BuildContext context) {

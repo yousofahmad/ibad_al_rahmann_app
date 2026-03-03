@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -117,8 +117,8 @@ class _TabletSurahVersesWidgetState extends State<TabletSurahVersesWidget> {
     final double height = (widget.pageNumber == 1 || widget.pageNumber == 2)
         ? 2
         : widget.isFullPage
-            ? 1.768
-            : 1.78;
+        ? 1.768
+        : 1.78;
 
     return getPageData(widget.pageNumber).expand((e) {
       final List<InlineSpan> spans = [];
@@ -136,7 +136,8 @@ class _TabletSurahVersesWidgetState extends State<TabletSurahVersesWidget> {
 
           if (widget.pageNumber != 187 && widget.pageNumber != 1) {
             spans.add(
-                WidgetSpan(child: TabletBasmallah(isFull: widget.isFullPage)));
+              WidgetSpan(child: TabletBasmallah(isFull: widget.isFullPage)),
+            );
           }
           if (widget.pageNumber == 187) {
             spans.add(const WidgetSpan(child: SizedBox(height: 10)));

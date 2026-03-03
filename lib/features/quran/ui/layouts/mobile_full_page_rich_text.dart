@@ -1,7 +1,4 @@
-// ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'package:flutter/material.dart';
-import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
-import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../core/helpers/fonts_helper.dart';
@@ -87,7 +84,12 @@ class _MobileFullPageRichTextState extends State<MobileFullPageRichText> {
     return Stack(
       children: [
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 10.w),
+          padding: EdgeInsets.only(
+            left: 6.w,
+            right: 6.w,
+            top: 4.h,
+            bottom: 2.h,
+          ),
           child: Column(
             children: [
               Expanded(
@@ -95,14 +97,6 @@ class _MobileFullPageRichTextState extends State<MobileFullPageRichText> {
                   child: WbwPageWidget(pageNumber: widget.pageNumber),
                 ),
               ),
-              if (widget.pageNumber <= 2)
-                Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12.h),
-                  child: Text(
-                    widget.pageNumber.toArabicNums,
-                    style: context.titleSmall,
-                  ),
-                ),
             ],
           ),
         ),

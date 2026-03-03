@@ -9,11 +9,10 @@ import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/widgets/quran_pages_list.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:quran/quran.dart';
 
-import 'min_page_rich_text_mobile.dart';
 import 'mobile_min_quran_bottom_section.dart';
 import 'mobile_quran_top_bar.dart';
+import '../widgets/wbw_page_widget.dart';
 
 class MinQuranMobile extends StatefulWidget {
   const MinQuranMobile({super.key, this.currentPage});
@@ -100,66 +99,72 @@ class _MinQuranMobileState extends State<MinQuranMobile> {
 
   @override
   Widget build(BuildContext context) {
-    const flex1 = 1;
-    const flex2 = 3;
-
-    return Column(
-      children: [
-        const Expanded(flex: flex1, child: MobileQuranTopBar()),
-        Expanded(
-          flex: flex2,
-          child: GestureDetector(
-            onDoubleTap: () {
-              context.read<QuranCubit>().changeLayout();
-            },
-            child: PageView.builder(
-              controller: context.read<QuranCubit>().minQuranController,
-              itemCount: totalPagesCount,
-              onPageChanged: (value) {
-                context.read<QuranCubit>().onQuranPageChanged(value);
-              },
-              itemBuilder: (context, index) {
-                return BlocBuilder<ThemeCubit, ThemeState>(
-                  builder: (context, state) {
-                    return Container(
-                      alignment: index > 1
-                          ? index.isEven
-                                ? Alignment.centerLeft
-                                : Alignment.centerRight
-                          : Alignment.center,
-                      margin: EdgeInsets.only(left: index.isOdd ? 8 : 0),
-                      decoration: BoxDecoration(
-                        color: context.onPrimary,
-                        borderRadius: borderRadius(index),
-                        border: buildBorder(index),
-                      ),
-                      child: MobileMinPageRichText(pageNumber: index + 1),
-                    );
-                  },
-                );
-              },
-            ),
+    return BlocBuilder<ThemeCubit, ThemeState>(
+      builder: (context, state) {
+        return Container(
+          color: state.mode == ThemeMode.dark
+              ? Theme.of(context).primaryColor
+              : Colors.transparent,
+          child: Column(
+            children: [
+              SafeArea(
+                bottom: false,
+                child: SizedBox(
+                  height: 140.h,
+                  child: const MobileQuranTopBar(),
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onDoubleTap: () => context.read<QuranCubit>().changeLayout(),
+                  child: PageView.builder(
+                    controller: context.read<QuranCubit>().minQuranController,
+                    itemCount: 604,
+                    onPageChanged: (value) =>
+                        context.read<QuranCubit>().onQuranPageChanged(value),
+                    itemBuilder: (context, index) {
+                      return Container(
+                        margin: EdgeInsets.only(left: index.isOdd ? 8 : 0),
+                        decoration: BoxDecoration(
+                          color: state.mode == ThemeMode.dark
+                              ? Colors.black
+                              : const Color(0xfffffdf5),
+                          borderRadius: borderRadius(index),
+                          border: buildBorder(index),
+                        ),
+                        child: WbwPageWidget(
+                          pageNumber: index + 1,
+                          showHeader: false,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Container(
+                      height: 60.h,
+                      padding: EdgeInsets.symmetric(horizontal: 20.w),
+                      child: const MobileMinQuranBottomSection(),
+                    ),
+                    SizedBox(height: 6.h),
+                    SizedBox(
+                      height: 50.h,
+                      width: double.infinity,
+                      child: const QuarnPagesList(),
+                    ),
+                    SizedBox(height: 10.h),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ),
-        SizedBox(height: 10.h),
-        Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Container(
-              height: 60.h,
-              padding: EdgeInsets.symmetric(horizontal: 20.w),
-              child: const MobileMinQuranBottomSection(),
-            ),
-            SizedBox(height: 6.h),
-            SizedBox(
-              height: 50.h,
-              width: double.infinity,
-              child: const QuarnPagesList(),
-            ),
-            SizedBox(height: 10.h),
-          ],
-        ),
-      ],
+        );
+      },
     );
   }
 

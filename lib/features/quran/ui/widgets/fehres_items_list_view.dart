@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/app_navigator.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
@@ -18,10 +18,8 @@ class FehresItemsListView extends StatelessWidget {
     final cubit = context.read<QuranCubit>();
     return ListView.separated(
       itemCount: surahs.length,
-      separatorBuilder: (context, index) => Divider(
-        color: Colors.grey.shade400,
-        height: 3,
-      ),
+      separatorBuilder: (context, index) =>
+          Divider(color: Colors.grey.shade400, height: 3),
       itemBuilder: (context, index) {
         // final surahFirstPage = getSurahPages(index + 1).first;
         // final juzNumber = getJuzNumber(index + 1, 1);
@@ -36,11 +34,7 @@ class FehresItemsListView extends StatelessWidget {
                 ? AppColors.greyYellow
                 : Colors.transparent,
             child: Padding(
-              padding: const EdgeInsets.only(
-                right: 20,
-                left: 20,
-                top: 8,
-              ),
+              padding: const EdgeInsets.only(right: 20, left: 20, top: 8),
               child: Row(
                 children: [
                   Text(
@@ -53,9 +47,7 @@ class FehresItemsListView extends StatelessWidget {
                     children: [
                       Text(
                         surahs[index].name,
-                        style: AppStyles.style22u.copyWith(
-                          color: Colors.black,
-                        ),
+                        style: AppStyles.style22u.copyWith(color: Colors.black),
                       ),
                       Text(
                         surahs[index].place,

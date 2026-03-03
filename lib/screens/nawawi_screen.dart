@@ -371,11 +371,7 @@ class _NawawiDetailScreenState extends State<NawawiDetailScreen> {
                             ),
                           ),
                           SizedBox(width: 5),
-                          Icon(
-                            Icons.copy,
-                            size: 16,
-                            color: Color(0xFFD0A871),
-                          ),
+                          Icon(Icons.copy, size: 16, color: Color(0xFFD0A871)),
                         ],
                       ),
                     ),

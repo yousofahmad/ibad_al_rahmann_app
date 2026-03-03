@@ -58,8 +58,9 @@ class _QuarnPagesListState extends State<QuarnPagesList> {
                 width: context.isTablet ? 14.w : 18.w,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(4),
-                  color:
-                      _selectedIndex == index ? Colors.white : AppColors.white,
+                  color: _selectedIndex == index
+                      ? Colors.white
+                      : AppColors.white,
                 ),
               ),
             ),
@@ -68,7 +69,7 @@ class _QuarnPagesListState extends State<QuarnPagesList> {
               style: AppStyles.style14u.copyWith(fontSize: 12.sp),
             ),
             if (_selectedIndex == index)
-              SvgPicture.asset(AppAssets.svgsStar, width: 80.w),
+              SvgPicture.asset(AppAssets.svgsStar, width: 50.w),
           ],
         );
       },

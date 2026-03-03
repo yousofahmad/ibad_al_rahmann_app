@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import 'package:ibad_al_rahmann/core/theme/app_assets.dart';
@@ -8,9 +8,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 
 class RecitersSearchBar extends StatelessWidget {
-  const RecitersSearchBar({
-    super.key,
-  });
+  const RecitersSearchBar({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -24,19 +22,19 @@ class RecitersSearchBar extends StatelessWidget {
       child: TextField(
         textAlign: TextAlign.center,
         style: AppStyles.style20harmattan.copyWith(
-            fontSize: context.isLandscape ? 14.sp : null, color: Colors.black),
+          fontSize: context.isLandscape ? 14.sp : null,
+          color: Colors.black,
+        ),
         controller: context.read<QuranReadersCubit>().searchController,
         onChanged: (value) {
           context.read<QuranReadersCubit>().onSearch(value);
         },
         decoration: InputDecoration(
           hintText: 'ابحث باسم القارئ',
-          hintStyle: AppStyles.style20harmattan
-              .copyWith(fontSize: context.isLandscape ? 14.sp : null),
-          contentPadding: EdgeInsets.symmetric(
-            vertical: 8.h,
-            horizontal: 24.w,
+          hintStyle: AppStyles.style20harmattan.copyWith(
+            fontSize: context.isLandscape ? 14.sp : null,
           ),
+          contentPadding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 24.w),
           border: outlineInputBorder,
           enabledBorder: outlineInputBorder,
           focusedBorder: outlineInputBorder,
@@ -49,8 +47,8 @@ class RecitersSearchBar extends StatelessWidget {
               width: context.isLandscape
                   ? 10.w
                   : context.isTablet
-                      ? 20.w
-                      : 10.w,
+                  ? 20.w
+                  : 10.w,
             ),
           ),
         ),

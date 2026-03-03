@@ -40,16 +40,20 @@ class QuranWord {
         '';
 
     return QuranWord(
-      suraNumber: sura,
-      ayahNumber: ayah,
-      pageNumber: page,
-      lineNumber: line,
+      suraNumber: sura != null ? int.tryParse(sura.toString()) : null,
+      ayahNumber: ayah != null ? int.tryParse(ayah.toString()) : null,
+      pageNumber: page != null ? int.tryParse(page.toString()) : null,
+      lineNumber: line != null ? int.tryParse(line.toString()) : null,
       text: textVal,
-      wordId: json['id'] ?? json['word_id'],
-      position: json['position'] ?? json['word_position'],
-      lineType: json['lineType'] ?? json['line_type'],
-      isCentered: json['isCentered'] ?? json['is_centered'] == 1,
-      headerSurah: json['headerSurah'] ?? json['header_surah'],
+      wordId: int.tryParse((json['id'] ?? json['word_id'] ?? '').toString()),
+      position: int.tryParse(
+        (json['position'] ?? json['word_position'] ?? '').toString(),
+      ),
+      lineType: (json['lineType'] ?? json['line_type'])?.toString(),
+      isCentered: (json['isCentered'] ?? json['is_centered']) == 1,
+      headerSurah: int.tryParse(
+        (json['headerSurah'] ?? json['header_surah'] ?? '').toString(),
+      ),
     );
   }
 }

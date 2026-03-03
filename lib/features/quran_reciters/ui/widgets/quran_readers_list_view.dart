@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/theme/app_assets.dart';
 import 'package:ibad_al_rahmann/core/widgets/top_bar_widget.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -24,10 +24,7 @@ class ReadersBody extends StatelessWidget {
         ),
         Align(
           alignment: Alignment.topCenter,
-          child: TopBar(
-            height: 242.h,
-            label: 'القـــراء',
-          ),
+          child: TopBar(height: 242.h, label: 'القـــراء'),
         ),
         Positioned.fill(
           top: 180.h,
@@ -98,10 +95,7 @@ class ReadersBody extends StatelessWidget {
 }
 
 class ReadersListView extends StatelessWidget {
-  const ReadersListView({
-    super.key,
-    required this.reciters,
-  });
+  const ReadersListView({super.key, required this.reciters});
 
   final List<ReciterModel> reciters;
 

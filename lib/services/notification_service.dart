@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:adhan/adhan.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:ibad_al_rahmann/features/wird/data/khatma_model.dart';
+import 'package:ibad_al_rahmann/features/wird/data/wird_model.dart';
 import 'prayer_service.dart';
 import 'notification_content_service.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -18,6 +21,9 @@ class NotificationService {
 
   static final FlutterLocalNotificationsPlugin
   _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+  static final ValueNotifier<String?> onNotificationTap =
+      ValueNotifier<String?>(null);
 
   // Initialization
   static Future<void> init() async {
@@ -269,7 +275,7 @@ class NotificationService {
         "حان موعد الشروق",
         times.sunrise.hour,
         times.sunrise.minute,
-        "default",
+        "sunrise",
       );
     }
 
@@ -282,7 +288,7 @@ class NotificationService {
         "حان موعد صلاة الضحى",
         duhaTime.hour,
         duhaTime.minute,
-        "default",
+        "duha",
       );
     }
 
@@ -330,7 +336,7 @@ class NotificationService {
         "الثلث الأخير من الليل",
         qiyamStart.hour,
         qiyamStart.minute,
-        "default",
+        "qiyam",
       );
     }
 
@@ -406,7 +412,7 @@ class NotificationService {
         "انتهى ثلث الليل الأول",
         firstThirdTime.hour,
         firstThirdTime.minute,
-        "default",
+        "qiyam",
       );
     }
 
@@ -430,7 +436,7 @@ class NotificationService {
         "حان منتصف الليل الشرعي",
         midnightTime.hour,
         midnightTime.minute,
-        "default",
+        "qiyam",
       );
     }
 
@@ -441,7 +447,7 @@ class NotificationService {
       while (nextFri.weekday != DateTime.friday) {
         nextFri = nextFri.add(const Duration(days: 1));
       }
-      final fridayTimes = await PrayerService().getPrayerTimesForDate(nextFri);
+      final fridayTimes = PrayerService().getPrayerTimesForDate(nextFri);
       if (fridayTimes != null) {
         final jumuaTime = fridayTimes.dhuhr.subtract(const Duration(hours: 1));
         await _flutterLocalNotificationsPlugin.zonedSchedule(
@@ -469,150 +475,101 @@ class NotificationService {
     }
   }
 
-  // Juz start pages (Madinah mushaf)
-  static const List<int> _juzStartPages = [
-    1,
-    22,
-    42,
-    62,
-    82,
-    102,
-    121,
-    142,
-    162,
-    182,
-    201,
-    222,
-    242,
-    262,
-    282,
-    302,
-    322,
-    342,
-    362,
-    382,
-    402,
-    422,
-    442,
-    462,
-    482,
-    502,
-    522,
-    542,
-    562,
-    582,
-  ];
-
-  static List<List<int>> _getWirdDayRanges(int days) {
-    if (days <= 0) days = 1;
-    if (days > 604) days = 604;
-    final List<List<int>> ranges = [];
-    if (days <= 30) {
-      double ajzaaPerDay = 30 / days;
-      double juzAccum = 0;
-      for (int d = 0; d < days; d++) {
-        int fromJuzIdx = juzAccum.floor();
-        juzAccum += ajzaaPerDay;
-        int toJuzIdx = (juzAccum - 0.001).floor();
-        if (fromJuzIdx >= 30) fromJuzIdx = 29;
-        if (toJuzIdx >= 30) toJuzIdx = 29;
-        int startPage = _juzStartPages[fromJuzIdx];
-        int endPage = (toJuzIdx + 1 < 30)
-            ? _juzStartPages[toJuzIdx + 1] - 1
-            : 604;
-        ranges.add([startPage, endPage]);
-      }
-    } else {
-      int pagesPerDay = (604 / days).floor();
-      int remainder = 604 - (pagesPerDay * days);
-      int cur = 1;
-      for (int d = 0; d < days; d++) {
-        int todayPages = pagesPerDay + (d < remainder ? 1 : 0);
-        int endPage = cur + todayPages - 1;
-        if (endPage > 604) endPage = 604;
-        ranges.add([cur, endPage]);
-        cur = endPage + 1;
-        if (cur > 604) break;
-      }
-    }
-    return ranges;
-  }
-
+  /// Smart/Sequential scheduling: only schedule the NEXT 5 upcoming notifications
+  /// based entirely on the dynamic Khatma plan stored in state.
   static Future<void> rescheduleWird() async {
     final prefs = await SharedPreferences.getInstance();
-    final type = prefs.getString('wird_reminder_type') ?? 'none';
-    if (type == 'none') return;
 
-    final startStr = prefs.getString('wird_start_date');
-    if (startStr == null) return;
+    // 1. Load active khatma data directly
+    final data = prefs.getString('active_khatma_data');
+    if (data == null) return;
 
-    final days = prefs.getInt('wird_days') ?? 30;
-    DateTime startDate = DateTime.parse(startStr);
+    final Map<String, dynamic> json = jsonDecode(data);
+    final khatma = KhatmaModel.fromJson(json);
 
-    // Safety check: ensure we don't schedule tons of past alarms if data is old.
-    // Actually, native logic in scheduleWird handles "past = +1 day" which might be wrong for OLD plan.
-    // If plan is old (started 10 days ago), we want to schedule Day 11.
-    // But `scheduleWird` logic I added recently: "if (date < now) date += 1".
-    // That was intended for "Setting up new".
-    // For Rescheduling, we should check: if (date < now) skip?
-    // Or if (date < now) continue;
+    if (khatma.notificationType == 'none') return;
 
-    // Juz-based page distribution
-    final ranges = _getWirdDayRanges(days);
+    final adhanDelay = prefs.getInt('wird_adhan_delay_minutes') ?? 20;
 
-    if (type == 'daily') {
-      for (int i = 0; i < ranges.length; i++) {
-        DateTime itemDate = startDate.add(Duration(days: i));
+    // We only schedule the next up-to-5 unread wirds
+    const int maxScheduled = 5;
+    int scheduled = 0;
+    int idCounter = 600;
+    final now = DateTime.now();
 
-        // Skip past days
-        if (itemDate.isBefore(DateTime.now())) {
-          continue;
+    // Collect next uncompleted wirds
+    List<WirdModel> unreadWirds = [];
+    for (
+      int i = khatma.currentWirdIndex;
+      i < khatma.wirds.length && unreadWirds.length < maxScheduled;
+      i++
+    ) {
+      if (!khatma.wirds[i].isCompleted) {
+        unreadWirds.add(khatma.wirds[i]);
+      }
+    }
+
+    if (unreadWirds.isEmpty) return; // Khatma is completed
+
+    if (khatma.notificationType == 'daily') {
+      // Find upcoming daily times
+      final dailyTimeStr = prefs.getString('wird_daily_time') ?? "20:00";
+      final parts = dailyTimeStr.split(":");
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+
+      List<DateTime> upcomingDailyTimes = [];
+      for (int dayOffset = 0; dayOffset < 10; dayOffset++) {
+        DateTime t = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          hour,
+          minute,
+        ).add(Duration(days: dayOffset));
+        if (t.isAfter(now)) {
+          upcomingDailyTimes.add(t);
         }
+        if (upcomingDailyTimes.length >= unreadWirds.length) break;
+      }
 
-        int startPage = ranges[i][0];
-        int endPage = ranges[i][1];
+      for (
+        int i = 0;
+        i < unreadWirds.length && i < upcomingDailyTimes.length;
+        i++
+      ) {
+        final wird = unreadWirds[i];
+        final notifTime = upcomingDailyTimes[i];
+        final pagesCount = (wird.endPage - wird.startPage) + 1;
 
         debugPrint(
-          "📅 Scheduling Wird Day ${i + 1} (ID: ${600 + i}) at: $itemDate — pages $startPage-$endPage",
+          "📅 Smart-Scheduled Daily Wird (ID: $idCounter) for ${notifTime.month}/${notifTime.day}",
         );
 
         await _scheduleNative(
-          600 + i,
-          "ورد القرآن اليومي (يوم ${i + 1})",
-          "وردك اليوم: من صفحة $startPage إلى $endPage",
-          itemDate.hour,
-          itemDate.minute,
+          idCounter,
+          "ورد القرآن اليومي",
+          "اقرأ من صفحة ${wird.startPage} إلى ${wird.endPage} ($pagesCount صفحات)",
+          notifTime.hour,
+          notifTime.minute,
           "default",
-          payload: "wird:$startPage",
-          year: itemDate.year,
-          month: itemDate.month,
-          day: itemDate.day,
+          payload: "wird:${wird.startPage}",
+          year: notifTime.year,
+          month: notifTime.month,
+          day: notifTime.day,
         );
+        idCounter++;
+        scheduled++;
       }
-    } else if (type == 'prayer') {
+    } else if (khatma.notificationType == 'prayer') {
+      // Find upcoming prayers strictly sequentially
       final prayerService = PrayerService();
-      int idCounter = 600;
+      List<Map<String, dynamic>> upcomingPrayers = [];
 
-      int scheduleDays = days;
-      if (scheduleDays > 60) scheduleDays = 60;
-
-      // Build flat list of (prayerTime, dayIndex) for all prayers across all days
-      // then assign juz-based page ranges from the day ranges
-      // Each day's pages get split across 5 prayers
-
-      for (int i = 0; i < scheduleDays; i++) {
-        if (idCounter >= 700) break;
-
-        DateTime dateBase = startDate.add(Duration(days: i));
+      for (int dayOffset = 0; dayOffset < 5; dayOffset++) {
+        DateTime dateBase = now.add(Duration(days: dayOffset));
         PrayerTimes? dayTimes = prayerService.getPrayerTimesForDate(dateBase);
         if (dayTimes == null) continue;
-
-        // Get this day's page range from juz distribution
-        int startPage = (i < ranges.length) ? ranges[i][0] : 604;
-        int endPage = (i < ranges.length) ? ranges[i][1] : 604;
-        int dayPages = endPage - startPage + 1;
-        int pagesPerPrayer = (dayPages / 5).ceil();
-        int curPage = startPage;
 
         List<Map<String, dynamic>> prayers = [
           {'name': 'الفجر', 'time': dayTimes.fajr},
@@ -623,40 +580,50 @@ class NotificationService {
         ];
 
         for (var p in prayers) {
-          if (idCounter >= 700 || curPage > endPage) break;
-
-          DateTime pTime = p['time'];
-          DateTime notifTime = pTime.add(const Duration(minutes: 20));
-
-          if (notifTime.isBefore(startDate)) continue;
-
-          int pEnd = curPage + pagesPerPrayer - 1;
-          if (pEnd > endPage) pEnd = endPage;
-
-          if (notifTime.isBefore(DateTime.now())) {
-            curPage = pEnd + 1;
-            idCounter++;
-            continue;
-          }
-
-          await _scheduleNative(
-            idCounter,
-            "ورد القرآن - بعد ${p['name']}",
-            "اقرأ من صفحة $curPage إلى $pEnd",
-            notifTime.hour,
-            notifTime.minute,
-            "default",
-            payload: "wird:$curPage",
-            year: notifTime.year,
-            month: notifTime.month,
-            day: notifTime.day,
+          DateTime notifTime = (p['time'] as DateTime).add(
+            Duration(minutes: adhanDelay),
           );
-
-          idCounter++;
-          curPage = pEnd + 1;
+          if (notifTime.isAfter(now)) {
+            upcomingPrayers.add({'name': p['name'], 'time': notifTime});
+          }
         }
+        if (upcomingPrayers.length >= unreadWirds.length + 2) break;
+      }
+
+      for (
+        int i = 0;
+        i < unreadWirds.length && i < upcomingPrayers.length;
+        i++
+      ) {
+        final wird = unreadWirds[i];
+        final match = upcomingPrayers[i];
+        final notifTime = match['time'] as DateTime;
+        final pagesCount = (wird.endPage - wird.startPage) + 1;
+
+        debugPrint(
+          "📅 Smart-Scheduled Prayer Wird (ID: $idCounter) for ${match['name']}",
+        );
+
+        await _scheduleNative(
+          idCounter,
+          "ورد القرآن - بعد ${match['name']}",
+          "اقرأ من صفحة ${wird.startPage} إلى ${wird.endPage} ($pagesCount صفحات)",
+          notifTime.hour,
+          notifTime.minute,
+          "default",
+          payload: "wird:${wird.startPage}",
+          year: notifTime.year,
+          month: notifTime.month,
+          day: notifTime.day,
+        );
+        idCounter++;
+        scheduled++;
       }
     }
+
+    debugPrint(
+      "📅 Successfully scheduled $scheduled dynamic Wird notifications.",
+    );
   }
 
   static Future<void> _schedulePrayer(
@@ -831,6 +798,7 @@ class NotificationService {
     int year = -1,
     int month = -1,
     int day = -1,
+    int intervalMinutes = 0,
   }) async {
     try {
       String? audioPath;
@@ -861,6 +829,7 @@ class NotificationService {
             soundName, // Pass original name for channel naming fallback
         'payload': payload,
         'audioPath': audioPath, // Pass resolved path (or null)
+        'intervalMinutes': intervalMinutes,
       });
       debugPrint(
         "Native Sched [$id]: $year-$month-$day $hour:$minute ($soundName) Path: $audioPath",
@@ -946,10 +915,6 @@ class NotificationService {
       return null;
     }
   }
-
-  // Helper for UI to listen (mocked or bridged if needed)
-  static final ValueNotifier<String?> onNotificationTap = ValueNotifier(null);
-
   // Backwards compat
   // --- Testing ---
 
@@ -1106,8 +1071,11 @@ class NotificationService {
     }
   }
 
-  static Future<void> scheduleFridayReminders(int intervalMinutes) async {
-    // Cancel old Friday notifications via both native and flutter plugin
+  static Future<void> scheduleSalawatReminders(
+    int intervalMinutes,
+    List<int> days,
+  ) async {
+    // Cancel old ones
     for (int i = 8000; i <= 8500; i++) {
       try {
         await _platform.invokeMethod('cancelAlarm', {'id': i});
@@ -1117,59 +1085,70 @@ class NotificationService {
       } catch (_) {}
     }
 
-    if (intervalMinutes <= 0) {
-      debugPrint("FridayReminders: Disabled (interval=$intervalMinutes)");
+    if (intervalMinutes <= 0 || days.isEmpty) {
+      debugPrint("SalawatReminders: Disabled or No days selected");
       return;
     }
 
-    // Calculate next Friday
     DateTime now = DateTime.now();
-    DateTime nextFriday = now;
-    while (nextFriday.weekday != DateTime.friday) {
-      nextFriday = nextFriday.add(const Duration(days: 1));
-    }
-
-    // Start of Friday (00:00)
-    nextFriday = DateTime(
-      nextFriday.year,
-      nextFriday.month,
-      nextFriday.day,
-      0,
-      0,
-      0,
-    );
-
-    debugPrint(
-      "FridayReminders: Scheduling every ${intervalMinutes}min starting $nextFriday",
-    );
-
     int id = 8000;
-    int scheduled = 0;
-    // Schedule for 24 hours of Friday
-    for (int minutes = 0; minutes < 24 * 60; minutes += intervalMinutes) {
-      final time = nextFriday.add(Duration(minutes: minutes));
-      if (id > 8500) break;
+    int scheduledTotal = 0;
 
+    for (int dayOfWeek in days) {
+      // Find the VERY NEXT occurrence of this day of week
+      DateTime targetDay = now;
+      while (targetDay.weekday != dayOfWeek) {
+        targetDay = targetDay.add(const Duration(days: 1));
+      }
+
+      // If it's today and already passed the start of day, we need careful logic.
+      // But the chaining starts from the current MOMENT if it's today.
+      DateTime startTime;
+      if (targetDay.day == now.day && targetDay.month == now.month) {
+        // Today: Schedule first one after interval
+        startTime = now.add(Duration(minutes: intervalMinutes));
+      } else {
+        // Future day: Start from 8:00 AM (good starting point for Salawat)
+        startTime = DateTime(
+          targetDay.year,
+          targetDay.month,
+          targetDay.day,
+          8,
+          0,
+        );
+      }
+
+      // Schedule ONLY THE BASE occurrence.
+      // Chaining happens in MainActivity.kt
       try {
         await _scheduleNative(
           id,
           'الصلاة على النبي ﷺ',
           'اللهم صلِّ وسلم على نبينا محمد',
-          time.hour,
-          time.minute,
+          startTime.hour,
+          startTime.minute,
           'saly_3ala_mo7amad',
           payload: 'friday_reminder',
-          year: time.year,
-          month: time.month,
-          day: time.day,
+          year: startTime.year,
+          month: startTime.month,
+          day: startTime.day,
+          intervalMinutes: intervalMinutes,
         );
-        scheduled++;
+        scheduledTotal++;
       } catch (e) {
-        debugPrint("FridayReminders: Error scheduling ID $id at $time: $e");
+        debugPrint("SalawatReminders Error: $e");
       }
       id++;
+      if (id > 8007) break; // One ID per day of week is plenty
     }
-    debugPrint("FridayReminders: Scheduled $scheduled notifications");
+    debugPrint(
+      "Salawat: Chained scheduling active (Scheduled $scheduledTotal base alarms)",
+    );
+  }
+
+  static Future<void> scheduleFridayReminders(int intervalMinutes) async {
+    // Backwards compatibility or specific Friday only call
+    await scheduleSalawatReminders(intervalMinutes, [DateTime.friday]);
   }
 
   static Future<void> cancelFridayCustom() async {

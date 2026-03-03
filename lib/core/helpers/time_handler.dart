@@ -1,4 +1,4 @@
-﻿import 'package:ibad_al_rahmann/features/prayer_times/data/models/prayer_times_model.dart';
+import 'package:ibad_al_rahmann/features/prayer_times/data/models/prayer_times_model.dart';
 
 // String reformatTime(String time) {
 //   List timeSections = time.split(':');
@@ -32,15 +32,18 @@
 /// Converts a time string like "19:11" to a DateTime object
 /// The returned DateTime will have today's date with the specified time
 /// Optionally adds increment minutes to the time
-DateTime convertTimeStringToDateTime(String timeString,
-    {int? incrementMinutes}) {
+DateTime convertTimeStringToDateTime(
+  String timeString, {
+  int? incrementMinutes,
+}) {
   try {
     // Split the time string by colon
     List<String> timeParts = timeString.split(':');
 
     if (timeParts.length != 2) {
       throw const FormatException(
-          'Invalid time format. Expected format: "HH:mm"');
+        'Invalid time format. Expected format: "HH:mm"',
+      );
     }
 
     // Parse hour and minute

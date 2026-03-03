@@ -5,8 +5,9 @@ import 'package:ibad_al_rahmann/core/theme/app_images.dart';
 
 class Basmallah extends StatelessWidget {
   final bool isFull;
+  final Color? color;
 
-  const Basmallah({super.key, required this.isFull});
+  const Basmallah({super.key, required this.isFull, this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +21,7 @@ class Basmallah extends StatelessWidget {
         ),
         child: Image.asset(
           AppImages.basmala,
-          color: context.onSecondary,
+          color: color ?? context.onSecondary,
           width: context.screenWidth,
         ),
       ),
@@ -30,8 +31,9 @@ class Basmallah extends StatelessWidget {
 
 class TabletBasmallah extends StatelessWidget {
   final bool isFull;
+  final Color? color;
 
-  const TabletBasmallah({super.key, required this.isFull});
+  const TabletBasmallah({super.key, required this.isFull, this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +47,7 @@ class TabletBasmallah extends StatelessWidget {
         ),
         child: Image.asset(
           AppImages.basmala,
-          color: context.onSecondary,
+          color: color ?? context.onSecondary,
           width: context.screenWidth * .4,
         ),
       ),

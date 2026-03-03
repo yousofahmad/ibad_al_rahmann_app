@@ -1,4 +1,4 @@
-﻿import 'package:intl/intl.dart';
+import 'package:intl/intl.dart';
 
 extension DateTimeExt on DateTime {
   String get toPrayerTime {
@@ -12,17 +12,37 @@ extension DateTimeExt on DateTime {
     if (difference.inSeconds < 60) {
       return 'الآن';
     } else if (difference.inMinutes < 60) {
-      return 'منذ ${difference.inMinutes} دقيقة${difference.inMinutes == 1 ? '' : difference.inMinutes < 11 ? '' : ''}';
+      return 'منذ ${difference.inMinutes} دقيقة${difference.inMinutes == 1
+          ? ''
+          : difference.inMinutes < 11
+          ? ''
+          : ''}';
     } else if (difference.inHours < 24) {
-      return 'منذ ${difference.inHours} ساعة${difference.inHours == 1 ? '' : difference.inHours < 11 ? '' : ''}';
+      return 'منذ ${difference.inHours} ساعة${difference.inHours == 1
+          ? ''
+          : difference.inHours < 11
+          ? ''
+          : ''}';
     } else if (difference.inDays < 30) {
-      return 'منذ ${difference.inDays} يوم${difference.inDays == 1 ? '' : difference.inDays < 11 ? '' : ''}';
+      return 'منذ ${difference.inDays} يوم${difference.inDays == 1
+          ? ''
+          : difference.inDays < 11
+          ? ''
+          : ''}';
     } else if (difference.inDays < 365) {
       final months = (difference.inDays / 30).floor();
-      return 'منذ $months شهر${months == 1 ? '' : months < 11 ? '' : ''}';
+      return 'منذ $months شهر${months == 1
+          ? ''
+          : months < 11
+          ? ''
+          : ''}';
     } else {
       final years = (difference.inDays / 365).floor();
-      return 'منذ $years سنة${years == 1 ? '' : years < 11 ? '' : ''}';
+      return 'منذ $years سنة${years == 1
+          ? ''
+          : years < 11
+          ? ''
+          : ''}';
     }
   }
 

@@ -64,9 +64,7 @@ class _BookmarksDialogState extends State<BookmarksDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: AppColors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20.r),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
       child: SizedBox(
         height: 600,
         child: Column(
@@ -115,10 +113,19 @@ class _BookmarksDialogState extends State<BookmarksDialog> {
   void _navigateToVerse(VerseModel verse) async {
     try {
       context.pop();
+
+      // SYNC HIGHLIGHT STATE BEFORE NAVIGATING
+      context.read<VersePlayerCubit>().setVerse(
+        surahNumber: verse.surahNumber,
+        verseNumber: verse.verseNumber,
+        fontFamily: verse.fontFamily,
+        verse: verse.verse,
+      );
+
       await context.read<QuranCubit>().navigateToVerse(
-            surahNumber: verse.surahNumber,
-            verseNumber: verse.verseNumber,
-          );
+        surahNumber: verse.surahNumber,
+        verseNumber: verse.verseNumber,
+      );
     } catch (e) {
       if (mounted) {
         AlertHelper.showWarningAlert(context, message: 'حدث خطأ ما');

@@ -1,4 +1,4 @@
-﻿// import 'dart:async';
+// import 'dart:async';
 
 // import 'package:flutter/material.dart';
 // import 'package:ibad_al_rahmann/core/helpers/extensions/app_navigator.dart';
@@ -285,5 +285,3 @@
 //     );
 //   }
 // }
-
-

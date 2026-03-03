@@ -9,6 +9,7 @@ import 'package:ibad_al_rahmann/screens/muezzin_selection_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -22,12 +23,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   late bool _is24Hour;
   int _hijriOffset = 0;
+  bool _persistentNotification = true;
 
   @override
   void initState() {
     super.initState();
     _is24Hour = _prayerService.is24Hour;
     _hijriOffset = _prayerService.hijriOffset;
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _persistentNotification =
+            prefs.getBool('persistent_notification') ?? true;
+      });
+    }
   }
 
   Future<void> _showHijriDialog() async {
@@ -145,7 +158,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             FontAwesomeIcons.clock,
             trailing: Switch(
               value: _is24Hour,
-              activeColor: const Color(0xFFD0A871),
+              activeThumbColor: const Color(0xFFD0A871),
               onChanged: (val) async {
                 await _prayerService.setIs24Hour(val);
                 setState(() => _is24Hour = val);
@@ -170,7 +183,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 FontAwesomeIcons.moon,
                 trailing: Switch(
                   value: isDarkMode,
-                  activeColor: const Color(0xFFD0A871),
+                  activeThumbColor: const Color(0xFFD0A871),
                   onChanged: (val) {
                     context.read<ThemeCubit>().switchTheme();
                   },
@@ -195,7 +208,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             FontAwesomeIcons.personPraying,
             trailing: Switch(
               value: _prayerService.madhab.toString().contains('hanafi'),
-              activeColor: const Color(0xFFD0A871),
+              activeThumbColor: const Color(0xFFD0A871),
               onChanged: (val) async {
                 await _prayerService.saveMadhab(val ? 'hanafi' : 'shafi');
                 setState(() {});
@@ -205,6 +218,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // 4. Notifications & Adjustments
           _buildSectionHeader("التنبيهات والتعديلات"),
+          _buildListTile(
+            "الإشعار الثابت",
+            "عرض أوقات الصلاة دائمًا في شريط الإشعارات",
+            FontAwesomeIcons.mobileScreen,
+            trailing: Switch(
+              value: _persistentNotification,
+              activeThumbColor: const Color(0xFFD0A871),
+              onChanged: (val) async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('persistent_notification', val);
+                setState(() => _persistentNotification = val);
+                _prayerService.scheduleNotifications();
+              },
+            ),
+          ),
           _buildListTile(
             "صوت الأذان",
             "اختر المؤذن المفضل لديك",

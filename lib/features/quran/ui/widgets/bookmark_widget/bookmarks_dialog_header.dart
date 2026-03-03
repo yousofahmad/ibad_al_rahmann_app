@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:ibad_al_rahmann/core/theme/app_colors.dart';
 
@@ -22,10 +22,7 @@ class BookmarksDialogHeader extends StatelessWidget {
         color: AppColors.lime,
         borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       ),
-      child: Text(
-        'الفواصل المحفوظة',
-        style: context.headlineLarge,
-      ),
+      child: Text('الفواصل المحفوظة', style: context.headlineLarge),
     );
   }
 }

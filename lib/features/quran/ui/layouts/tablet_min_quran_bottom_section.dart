@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
@@ -24,8 +24,10 @@ class TabletMinQuranBottomSection extends StatelessWidget {
         builder: (context) => AlertDialog(
           backgroundColor: context.onPrimary,
           title: const Text('الآيات المحفوظة'),
-          content:
-              Text('لم تقم بحفظ أى آية إلى الآن', style: context.titleSmall),
+          content: Text(
+            'لم تقم بحفظ أى آية إلى الآن',
+            style: context.titleSmall,
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -65,11 +67,7 @@ class TabletMinQuranBottomSection extends StatelessWidget {
               shape: BoxShape.circle,
               color: context.surfaceColor,
             ),
-            child: const Icon(
-              Icons.bookmark,
-              color: Colors.white,
-              size: 45,
-            ),
+            child: const Icon(Icons.bookmark, color: Colors.white, size: 45),
           ),
         ),
         BlocBuilder<QuranCubit, QuranState>(

@@ -7,6 +7,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/helpers/extensions/app_navigator.dart';
+import '../../../../core/helpers/share_helper.dart';
 import '../widgets/mobile_quran_search_widget.dart';
 import '../widgets/quran_fehres_dialog.dart';
 import '../widgets/quran_surah_list.dart';
@@ -33,6 +34,50 @@ class TabletQuranTopBar extends StatelessWidget {
                   icon: SvgPicture.asset(AppAssets.svgsMenu, height: 30.h),
                 ),
                 const MobileQuranSearch(),
+                // Save to Gallery button
+                BlocBuilder<QuranCubit, QuranState>(
+                  builder: (context, state) {
+                    return IconButton(
+                      tooltip: 'حفظ في المعرض',
+                      onPressed: () {
+                        final currentPageNum = (state.currentPage ?? 0) + 1;
+                        final key = cubit.getPageKey(currentPageNum);
+                        ShareHelper.savePageToGallery(
+                          context,
+                          key,
+                          'quran_page_$currentPageNum',
+                        );
+                      },
+                      icon: Icon(
+                        Icons.download_rounded,
+                        color: Colors.white,
+                        size: 20.w,
+                      ),
+                    );
+                  },
+                ),
+                // Share Page button
+                BlocBuilder<QuranCubit, QuranState>(
+                  builder: (context, state) {
+                    return IconButton(
+                      tooltip: 'مشاركة الصفحة',
+                      onPressed: () {
+                        final currentPageNum = (state.currentPage ?? 0) + 1;
+                        final key = cubit.getPageKey(currentPageNum);
+                        ShareHelper.sharePageImage(
+                          context,
+                          key,
+                          'quran_page_$currentPageNum',
+                        );
+                      },
+                      icon: Icon(
+                        Icons.share_rounded,
+                        color: Colors.white,
+                        size: 20.w,
+                      ),
+                    );
+                  },
+                ),
                 IconButton(
                   onPressed: () => showThemeDialog(context),
                   icon: SvgPicture.asset(AppAssets.svgsSettings, height: 24.h),

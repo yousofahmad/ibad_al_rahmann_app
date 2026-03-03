@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import 'package:ibad_al_rahmann/core/theme/app_colors.dart';
 import 'package:ibad_al_rahmann/core/theme/app_styles.dart';
@@ -8,10 +8,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 class ReciterDropdown extends StatefulWidget {
   final VersePlayerCubit cubit;
 
-  const ReciterDropdown({
-    super.key,
-    required this.cubit,
-  });
+  const ReciterDropdown({super.key, required this.cubit});
 
   @override
   State<ReciterDropdown> createState() => _ReciterDropdownState();

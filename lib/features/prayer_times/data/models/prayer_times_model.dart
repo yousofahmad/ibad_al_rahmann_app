@@ -1,14 +1,15 @@
-﻿import 'package:ibad_al_rahmann/features/prayer_times/data/models/user_location_model.dart';
+import 'package:ibad_al_rahmann/features/prayer_times/data/models/user_location_model.dart';
 
 class HijriDate {
   final int year, month, day;
   final String monthName;
 
-  HijriDate(
-      {required this.year,
-      required this.month,
-      required this.day,
-      required this.monthName});
+  HijriDate({
+    required this.year,
+    required this.month,
+    required this.day,
+    required this.monthName,
+  });
 
   factory HijriDate.fromJson(Map<String, dynamic> json) {
     return HijriDate(
@@ -52,8 +53,11 @@ class PrayerTimesResponseModel {
     final Map<String, dynamic> timings = json['timings'];
     final finalPrayerTimes = [
       PrayerTimeModel.fromTime('Fajr', timings['Fajr']),
-      PrayerTimeModel.fromTime('Sunrise', timings['Sunrise'],
-          increment: location.isoCode == 'AE' ? -4 : 0),
+      PrayerTimeModel.fromTime(
+        'Sunrise',
+        timings['Sunrise'],
+        increment: location.isoCode == 'AE' ? -4 : 0,
+      ),
       PrayerTimeModel.fromTime('Dhuhr', timings['Dhuhr']),
       PrayerTimeModel.fromTime('Asr', timings['Asr']),
       PrayerTimeModel.fromTime('Maghrib', timings['Maghrib']),
@@ -78,30 +82,12 @@ class PrayerTimesResponseModel {
 }
 
 enum PrayerType {
-  fajr(
-    name: 'الفجر',
-    incrementMinutes: 25,
-  ),
-  sunrise(
-    name: 'الشروق',
-    incrementMinutes: 20,
-  ),
-  dhuhr(
-    name: 'الظهر',
-    incrementMinutes: 20,
-  ),
-  asr(
-    name: 'العصر',
-    incrementMinutes: 20,
-  ),
-  maghrib(
-    name: 'المغرب',
-    incrementMinutes: 5,
-  ),
-  isha(
-    name: 'العشاء',
-    incrementMinutes: 20,
-  );
+  fajr(name: 'الفجر', incrementMinutes: 25),
+  sunrise(name: 'الشروق', incrementMinutes: 20),
+  dhuhr(name: 'الظهر', incrementMinutes: 20),
+  asr(name: 'العصر', incrementMinutes: 20),
+  maghrib(name: 'المغرب', incrementMinutes: 5),
+  isha(name: 'العشاء', incrementMinutes: 20);
 
   final String name;
   final int incrementMinutes;
@@ -127,10 +113,7 @@ enum PrayerType {
     }
   }
 
-  const PrayerType({
-    required this.name,
-    required this.incrementMinutes,
-  });
+  const PrayerType({required this.name, required this.incrementMinutes});
 }
 
 class PrayerTimeModel {
@@ -145,8 +128,11 @@ class PrayerTimeModel {
     required this.iqamaDate,
   });
 
-  factory PrayerTimeModel.fromTime(String prayerName, String time,
-      {int? increment}) {
+  factory PrayerTimeModel.fromTime(
+    String prayerName,
+    String time, {
+    int? increment,
+  }) {
     final prayerType = _getPrayerName(prayerName);
     return PrayerTimeModel(
       prayerType: prayerType,
@@ -188,7 +174,8 @@ class PrayerTimeModel {
 
       if (timeParts.length != 2) {
         throw const FormatException(
-            'Invalid time format. Expected format: "HH:mm"');
+          'Invalid time format. Expected format: "HH:mm"',
+        );
       }
 
       // Parse hour and minute
@@ -216,5 +203,3 @@ class PrayerTimeModel {
     }
   }
 }
-
-

@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Wide Widget (4×1): Compact Prayer Strip — Premium -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg_premium"
+    android:orientation="vertical"
+    android:layoutDirection="rtl"
+    android:gravity="center"
+    android:padding="14dp">
+
+    <!-- Row 1: Next Prayer Name + Live Countdown | Hijri Date -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp"
+        android:layoutDirection="rtl"
+        android:gravity="center_vertical"
+        android:padding="4dp">
+
+        <!-- Right (RTL Start): Next Prayer + Countdown -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tv_widget_wide_next_prayer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="الفجر متبقي"
+                android:textColor="@color/widget_accent"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:textAlignment="center"
+                android:textDirection="locale" />
+
+            <Chronometer
+                android:id="@+id/tv_widget_wide_countdown"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:textColor="@color/widget_accent"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:textAlignment="center"
+                android:textDirection="ltr"
+                android:countDown="true" />
+        </LinearLayout>
+
+        <!-- Left (RTL End): Hijri Date -->
+        <TextView
+            android:id="@+id/tv_widget_wide_hijri"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:text="١ رمضان ١٤٤٧"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="12sp"
+            android:gravity="center"
+            android:textAlignment="center"
+            android:textDirection="locale" />
+    </RelativeLayout>
+
+    <!-- Row 2: 5 Prayers Horizontal -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/widget_inner_bg"
+        android:gravity="center"
+        android:layout_gravity="center"
+        android:orientation="horizontal"
+        android:layoutDirection="rtl"
+        android:paddingVertical="8dp"
+        android:paddingHorizontal="4dp"
+        android:weightSum="5">
+
+        <!-- الفجر -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:layout_gravity="center"
+            android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="الفجر" android:textColor="@color/widget_text_secondary"
+                android:textSize="12sp" android:gravity="center" android:textAlignment="center"
+                android:layout_gravity="center" />
+            <TextView android:id="@+id/tv_widget_wide_fajr" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:layout_marginTop="4dp"
+                android:text="--:--" android:textColor="@color/widget_text_primary"
+                android:textSize="15sp" android:textStyle="bold" android:gravity="center"
+                android:textAlignment="center" android:textDirection="ltr"
+                android:layout_gravity="center" />
+        </LinearLayout>
+
+        <!-- الظهر -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:layout_gravity="center"
+            android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="الظهر" android:textColor="@color/widget_text_secondary"
+                android:textSize="12sp" android:gravity="center" android:textAlignment="center"
+                android:layout_gravity="center" />
+            <TextView android:id="@+id/tv_widget_wide_dhuhr" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:layout_marginTop="4dp"
+                android:text="--:--" android:textColor="@color/widget_text_primary"
+                android:textSize="15sp" android:textStyle="bold" android:gravity="center"
+                android:textAlignment="center" android:textDirection="ltr"
+                android:layout_gravity="center" />
+        </LinearLayout>
+
+        <!-- العصر -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:layout_gravity="center"
+            android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="العصر" android:textColor="@color/widget_text_secondary"
+                android:textSize="12sp" android:gravity="center" android:textAlignment="center"
+                android:layout_gravity="center" />
+            <TextView android:id="@+id/tv_widget_wide_asr" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:layout_marginTop="4dp"
+                android:text="--:--" android:textColor="@color/widget_text_primary"
+                android:textSize="15sp" android:textStyle="bold" android:gravity="center"
+                android:textAlignment="center" android:textDirection="ltr"
+                android:layout_gravity="center" />
+        </LinearLayout>
+
+        <!-- المغرب -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:layout_gravity="center"
+            android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="المغرب" android:textColor="@color/widget_text_secondary"
+                android:textSize="12sp" android:gravity="center" android:textAlignment="center"
+                android:layout_gravity="center" />
+            <TextView android:id="@+id/tv_widget_wide_maghrib" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:layout_marginTop="4dp"
+                android:text="--:--" android:textColor="@color/widget_text_primary"
+                android:textSize="15sp" android:textStyle="bold" android:gravity="center"
+                android:textAlignment="center" android:textDirection="ltr"
+                android:layout_gravity="center" />
+        </LinearLayout>
+
+        <!-- العشاء -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:layout_gravity="center"
+            android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="العشاء" android:textColor="@color/widget_text_secondary"
+                android:textSize="12sp" android:gravity="center" android:textAlignment="center"
+                android:layout_gravity="center" />
+            <TextView android:id="@+id/tv_widget_wide_isha" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:layout_marginTop="4dp"
+                android:text="--:--" android:textColor="@color/widget_text_primary"
+                android:textSize="15sp" android:textStyle="bold" android:gravity="center"
+                android:textAlignment="center" android:textDirection="ltr"
+                android:layout_gravity="center" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

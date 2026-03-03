@@ -20,7 +20,8 @@ class TafsirHelper {
   static String getVerseTafsir(int surahNumber, int verseNumber) {
     return _tafsir
         .firstWhere(
-            (e) => e.surahNumber == surahNumber && e.verseNumber == verseNumber)
+          (e) => e.surahNumber == surahNumber && e.verseNumber == verseNumber,
+        )
         .text;
   }
 }
@@ -37,9 +38,9 @@ class TafsirModel {
 
   factory TafsirModel.fromJson(Map<String, dynamic> json) {
     return TafsirModel(
-      surahNumber: int.parse(json['number']),
-      verseNumber: int.parse(json['aya']),
-      text: json['text'],
+      surahNumber: int.tryParse(json['number']?.toString() ?? '') ?? 0,
+      verseNumber: int.tryParse(json['aya']?.toString() ?? '') ?? 0,
+      text: json['text']?.toString() ?? '',
     );
   }
 }

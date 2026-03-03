@@ -1,4 +1,4 @@
-﻿import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ibad_al_rahmann/features/quran/data/models/selected_verse_model.dart';
 
 class BookmarkService {
@@ -28,7 +28,9 @@ class BookmarkService {
 
   /// Remove a verse from bookmarks by surah and verse number
   static Future<void> removeBookmarkByVerse(
-      int surahNumber, int verseNumber) async {
+    int surahNumber,
+    int verseNumber,
+  ) async {
     final key = '${surahNumber}_$verseNumber';
     await box.delete(key);
   }

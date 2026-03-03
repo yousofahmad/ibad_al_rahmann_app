@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/theme/app_assets.dart';
 import 'package:ibad_al_rahmann/core/widgets/top_bar_widget.dart';
 import 'package:ibad_al_rahmann/features/quran_reciters/ui/widgets/quran_readers_list_view.dart';
@@ -24,10 +24,7 @@ class LandscapeReadersBody extends StatelessWidget {
         ),
         Align(
           alignment: Alignment.topCenter,
-          child: TopBar(
-            height: 350.h,
-            label: 'القـــراء',
-          ),
+          child: TopBar(height: 350.h, label: 'القـــراء'),
         ),
         Positioned.fill(
           top: 270.h,

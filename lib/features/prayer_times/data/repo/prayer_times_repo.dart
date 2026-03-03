@@ -1,4 +1,4 @@
-﻿import 'package:ibad_al_rahmann/core/networking/api_keys.dart';
+import 'package:ibad_al_rahmann/core/networking/api_keys.dart';
 import 'package:ibad_al_rahmann/features/prayer_times/data/models/prayer_times_model.dart';
 import 'package:intl/intl.dart';
 
@@ -124,5 +124,3 @@ class PrayerTimesRepo {
   //   }
   // }
 }
-
-

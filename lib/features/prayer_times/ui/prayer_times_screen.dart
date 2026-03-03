@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/alert_helper.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/widgets_ext.dart';
@@ -158,13 +158,11 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
           }
 
           return BlocProvider(
-              create: (_) => PrayerTimesCubit(getIt()),
-              child: const PrayerTimesScreenBodyBuilder(),
-            );
+            create: (_) => PrayerTimesCubit(getIt()),
+            child: const PrayerTimesScreenBodyBuilder(),
+          );
         },
       ).withSafeArea(),
     );
   }
 }
-
-

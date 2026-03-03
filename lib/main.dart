@@ -11,6 +11,7 @@ import 'package:ibad_al_rahmann/features/quran/bloc/search/search_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/data/models/selected_verse_model.dart';
 import 'package:ibad_al_rahmann/features/quran/data/repo/quran_repo.dart';
 import 'package:ibad_al_rahmann/features/quran/data/services/bookmark_service.dart';
+import 'package:ibad_al_rahmann/features/wird/bloc/khatma_cubit.dart';
 
 import 'screens/splash_screen.dart';
 
@@ -23,9 +24,12 @@ import 'services/prayer_service.dart';
 import 'features/quran/ui/quran_screen.dart';
 
 import 'core/di/di.dart';
+import 'core/helpers/tafsir_helper.dart';
 import 'core/theme/theme_manager/theme_cubit.dart';
 
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
+import 'package:intl/date_symbol_data_local.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 const platform = MethodChannel('com.example.azkar/bubble');
@@ -33,19 +37,28 @@ const platform = MethodChannel('com.example.azkar/bubble');
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Date Formatting (REQUIRED for intl DateFormat)
+  await initializeDateFormatting('ar_SA', null);
+
   // Initialize Timezones
   tz.initializeTimeZones();
-  // Note: Without flutter_timezone, we rely on default local or UTC.
-  // Ideally: tz.setLocalLocation(tz.getLocation('Africa/Cairo')); manually or via user setting.
 
-  // Initialize Services
+  // Initialize Services - SINGLE CALL each
   await NotificationService.init();
-  await PrayerService().init();
+  final prayerService = PrayerService();
+  await prayerService.init();
 
   // Initialize Hive
   await Hive.initFlutter();
   Hive.registerAdapter(VerseModelAdapter());
   await BookmarkService.init();
+
+  // Initialize Daily Stats
+  await DailyTrackerService.initStatsForToday();
+
+  // Initialize DI & Tafsir
+  await serviceLocatorInit();
+  await TafsirHelper.initTafsir();
 
   // إعداد مستمع الإشعارات العالمي
   NotificationService.onNotificationTap.addListener(() {
@@ -56,27 +69,6 @@ Future<void> main() async {
       NotificationService.onNotificationTap.value = null;
     }
   });
-
-  try {
-    await NotificationService.init();
-    await NotificationService.scheduleDefaults();
-  } catch (e) {
-    debugPrint("Error init notifications: $e");
-  }
-
-  // Initialize Daily Stats for "Hasib Nafsak"
-  await DailyTrackerService.initStatsForToday();
-
-  // Initialize DI
-  await serviceLocatorInit();
-
-  // Schedule Prayer Notifications
-  try {
-    final prayerService = PrayerService();
-    await prayerService.init(); // Init loads settings & location & schedules
-  } catch (e) {
-    debugPrint("Error init prayer service: $e");
-  }
 
   runApp(const MyApp());
 }
@@ -142,6 +134,7 @@ class MyApp extends StatelessWidget {
             BlocProvider(create: (context) => QuranCubit(QuranRepo())),
             BlocProvider(create: (context) => VersePlayerCubit()),
             BlocProvider(create: (context) => SearchCubit()),
+            BlocProvider(create: (context) => KhatmaCubit()..loadKhatma()),
           ],
           child: BlocBuilder<ThemeCubit, ThemeState>(
             builder: (context, state) {

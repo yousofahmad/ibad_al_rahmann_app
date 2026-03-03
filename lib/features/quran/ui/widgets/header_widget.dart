@@ -8,36 +8,31 @@ import '../../../../../core/theme/app_images.dart';
 
 class FullHeaderWidget extends StatelessWidget {
   final int surahNumber;
+  final Color? color;
 
-  const FullHeaderWidget({super.key, required this.surahNumber});
+  const FullHeaderWidget({super.key, required this.surahNumber, this.color});
 
   @override
   Widget build(BuildContext context) {
     return IntrinsicHeight(
       child: Padding(
-        padding: EdgeInsets.symmetric(vertical: surahNumber <= 2 ? 20 : 0),
+        padding: const EdgeInsets.symmetric(vertical: 2.0),
         child: Stack(
+          alignment: Alignment.center,
           children: [
-            Center(
-              child: Image.asset(
-                AppImages.ayaFrame,
-                width: MediaQuery.of(context).size.width,
-              ),
+            Image.asset(
+              AppImages.ayaFrame,
+              width: MediaQuery.of(context).size.width * 0.95,
+              fit: BoxFit.contain,
+              color: color,
             ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Center(
-                  child: Text(
-                    textAlign: TextAlign.center,
-                    getSurahNameArabic(surahNumber),
-                    style: context.headlineMedium.copyWith(
-                      fontSize: context.isTablet ? 16.sp : null,
-                    ),
-                  ),
-                ),
-              ],
+            Text(
+              textAlign: TextAlign.center,
+              getSurahNameArabic(surahNumber),
+              style: context.headlineMedium.copyWith(
+                fontSize: context.isTablet ? 16.sp : null,
+                color: color,
+              ),
             ),
           ],
         ),
@@ -48,8 +43,9 @@ class FullHeaderWidget extends StatelessWidget {
 
 class MinHeaderWidget extends StatelessWidget {
   final int surahNumber;
+  final Color? color;
 
-  const MinHeaderWidget({super.key, required this.surahNumber});
+  const MinHeaderWidget({super.key, required this.surahNumber, this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +56,7 @@ class MinHeaderWidget extends StatelessWidget {
             child: Image.asset(
               AppImages.ayaFrame,
               width: MediaQuery.of(context).size.width,
+              color: color,
             ),
           ),
           Row(
@@ -72,6 +69,7 @@ class MinHeaderWidget extends StatelessWidget {
                   getSurahNameArabic(surahNumber),
                   style: context.labelSmall.copyWith(
                     fontSize: context.isTablet ? 10.sp : 14.sp,
+                    color: color,
                   ),
                 ),
               ),

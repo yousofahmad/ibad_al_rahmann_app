@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -49,5 +49,3 @@ class PrayerTimesGridView extends StatelessWidget {
     );
   }
 }
-
-

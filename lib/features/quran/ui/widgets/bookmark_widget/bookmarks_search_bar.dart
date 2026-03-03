@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class BookmarksSearchBar extends StatelessWidget {
@@ -24,23 +24,12 @@ class BookmarksSearchBar extends StatelessWidget {
         controller: controller,
         decoration: InputDecoration(
           hintText: 'Search bookmarks...',
-          hintStyle: TextStyle(
-            fontSize: 14.sp,
-            color: Colors.grey[500],
-          ),
-          prefixIcon: Icon(
-            Icons.search,
-            size: 20.w,
-            color: Colors.grey[500],
-          ),
+          hintStyle: TextStyle(fontSize: 14.sp, color: Colors.grey[500]),
+          prefixIcon: Icon(Icons.search, size: 20.w, color: Colors.grey[500]),
           suffixIcon: controller.text.isNotEmpty
               ? IconButton(
                   onPressed: onClear,
-                  icon: Icon(
-                    Icons.clear,
-                    size: 20.w,
-                    color: Colors.grey[500],
-                  ),
+                  icon: Icon(Icons.clear, size: 20.w, color: Colors.grey[500]),
                 )
               : null,
           border: InputBorder.none,

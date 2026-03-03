@@ -1,4 +1,3 @@
-﻿
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_styles.dart';
@@ -10,10 +9,7 @@ class QurraaErrorWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Text(
-        error,
-        style: AppStyles.style20.copyWith(color: Colors.red),
-      ),
+      child: Text(error, style: AppStyles.style20.copyWith(color: Colors.red)),
     );
   }
 }

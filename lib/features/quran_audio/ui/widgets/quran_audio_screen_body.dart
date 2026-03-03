@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/alert_helper.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/app_navigator.dart';
@@ -84,8 +84,9 @@ class TabletQuranAudioLayout extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.topCenter,
                       child: CustomTextWidget(
-                          text: reciter.name,
-                          fontSize: context.isLandscape ? 14.sp : 18.sp),
+                        text: reciter.name,
+                        fontSize: context.isLandscape ? 14.sp : 18.sp,
+                      ),
                     ),
                   ),
                   Positioned.fill(

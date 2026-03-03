@@ -1,4 +1,5 @@
-﻿import 'dart:io';
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -23,17 +24,18 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
   String? _selectedMuezzinId;
   String? _playingMuezzinId;
   String? _loadingMuezzinId; // For buffering state
-  Map<String, double> _downloadProgress = {}; // ID -> Progress (0.0 - 1.0)
+  final Map<String, double> _downloadProgress =
+      {}; // ID -> Progress (0.0 - 1.0)
   Set<String> _downloadedIds = {}; // Local cached IDs
 
   late List<Map<String, dynamic>> _filteredData;
   String? _localPath;
 
   static const String _baseUrl =
-      "https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-sounds/main/";
+      "https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-sounds/main";
 
   // --- THE DATA (Strictly as requested) ---
-  final List<Map<String, dynamic>> muezzinData = [
+  List<Map<String, dynamic>> muezzinData = [
     // 1. Famous Reciters (Egypt & Gulf)
     {
       "category": "قراء ومشاهير (مصر والخليج)",
@@ -142,9 +144,32 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
   @override
   void initState() {
     super.initState();
-    // CRITICAL FIX: Initialize _filteredData immediately to avoid LateInitializationError
     _filteredData = List.from(muezzinData);
     _initValues();
+    _fetchRemoteData();
+  }
+
+  Future<void> _fetchRemoteData() async {
+    try {
+      final response = await _dio.get("$_baseUrl/muezzins.json");
+      if (response.statusCode == 200) {
+        final List<dynamic> remoteData = response.data is String
+            ? List<Map<String, dynamic>>.from(jsonDecode(response.data))
+            : List<Map<String, dynamic>>.from(response.data);
+
+        if (mounted) {
+          setState(() {
+            muezzinData.clear();
+            muezzinData.addAll(remoteData.cast<Map<String, dynamic>>());
+            _filteredData = List.from(muezzinData);
+          });
+          await _checkDownloads();
+        }
+      }
+    } catch (e) {
+      // Keep using hardcoded data if remote fails
+      debugPrint("Failed to fetch remote muezzins: $e");
+    }
   }
 
   Future<void> _initValues() async {
@@ -221,12 +246,12 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
             "تم اختيار المؤذن (التنبيهات النظامية قد تستخدم الصوت الافتراضي إذا لم يكن مدمجًا)",
             style: TextStyle(fontFamily: AppConsts.cairo),
           ),
-          duration: const Duration(seconds: 3),
+          duration: Duration(seconds: 3),
         ),
       );
     }
@@ -264,7 +289,7 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
       if (mounted) {
         setState(() => _downloadProgress.remove(id));
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("فشل التحميل: تأكد من الإنترنت")),
+          const SnackBar(content: Text("فشل التحميل: تأكد من الإنترنت")),
         );
       }
     }
@@ -345,7 +370,7 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = const Color(0xFFD0A871);
+    const primaryColor = Color(0xFFD0A871);
 
     return Scaffold(
       backgroundColor: isDark
@@ -511,7 +536,7 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
                                           )
                                         else if (!isDownloaded)
                                           IconButton(
-                                            icon: Icon(
+                                            icon: const Icon(
                                               Icons.cloud_download_outlined,
                                               color: Colors.grey,
                                             ),
@@ -524,7 +549,7 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
                                             size: 20,
                                           ),
 
-                                        SizedBox(width: 8),
+                                        const SizedBox(width: 8),
 
                                         // Selection Check
                                         if (isSelected)
@@ -570,7 +595,7 @@ class _SectionHeaderDelegate extends SliverPersistentHeaderDelegate {
     bool overlapsContent,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = const Color(0xFFD0A871);
+    const primaryColor = Color(0xFFD0A871);
     return Container(
       color: isDark
           ? const Color(0xFF121212)
