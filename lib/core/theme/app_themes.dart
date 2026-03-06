@@ -207,6 +207,12 @@ class AppThemes {
     ),
   );
   static final darkBlue = lightBlue.copyWith(
+    scaffoldBackgroundColor: Colors.black,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.black,
+      scrolledUnderElevation: 0,
+      elevation: 0,
+    ),
     progressIndicatorTheme: const ProgressIndicatorThemeData(
       color: AppColors.lightYellow,
     ),
@@ -226,6 +232,12 @@ class AppThemes {
   );
 
   static final darkRed = red.copyWith(
+    scaffoldBackgroundColor: Colors.black,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.black,
+      scrolledUnderElevation: 0,
+      elevation: 0,
+    ),
     progressIndicatorTheme: const ProgressIndicatorThemeData(
       color: AppColors.lightYellow,
     ),
@@ -243,6 +255,12 @@ class AppThemes {
   );
 
   static final darkCyan = cyan.copyWith(
+    scaffoldBackgroundColor: Colors.black,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.black,
+      scrolledUnderElevation: 0,
+      elevation: 0,
+    ),
     progressIndicatorTheme: const ProgressIndicatorThemeData(
       color: AppColors.lightYellow,
     ),
@@ -260,6 +278,12 @@ class AppThemes {
   );
 
   static final darkGreen = green.copyWith(
+    scaffoldBackgroundColor: Colors.black,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.black,
+      scrolledUnderElevation: 0,
+      elevation: 0,
+    ),
     progressIndicatorTheme: const ProgressIndicatorThemeData(
       color: AppColors.lightYellow,
     ),

@@ -175,8 +175,6 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _updateCountdown();
           _checkDailyTasks();
-          _prayerService
-              .updatePersistentElements(); // Update persistent notif & widget
         });
       }
     });

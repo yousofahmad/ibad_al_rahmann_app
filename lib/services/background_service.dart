@@ -3,7 +3,9 @@ import 'package:flutter/foundation.dart';
 
 class BackgroundService {
   // اسم القناة لازم يكون مطابق للموجود في الكوتلين
-  static const _channel = MethodChannel('com.example.azkar/bubble');
+  static const _channel = MethodChannel(
+    'com.example.ibad_al_rahmann/native_notifications',
+  );
 
   static Future<void> init() async {}
 

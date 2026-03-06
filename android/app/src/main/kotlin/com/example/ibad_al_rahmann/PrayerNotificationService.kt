@@ -19,7 +19,6 @@ class PrayerNotificationService : Service() {
     private val refreshRunnable = object : Runnable {
         override fun run() {
             updateAllWidgets()
-            refreshHandler.postDelayed(this, 1000 * 60) // 60 seconds
         }
     }
 
@@ -29,7 +28,6 @@ class PrayerNotificationService : Service() {
         if (action == "UPDATE_PRAYER_NOTIFICATION") {
             // Start Auto-Refresh if not started
             refreshHandler.removeCallbacks(refreshRunnable)
-            refreshHandler.postDelayed(refreshRunnable, 1000 * 60)
 
             val fajr = intent.getStringExtra("fajr") ?: "--:--"
             val dhuhr = intent.getStringExtra("dhuhr") ?: "--:--"

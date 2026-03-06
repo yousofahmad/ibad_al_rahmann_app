@@ -24,7 +24,7 @@
             android:layout_alignParentBottom="true"
             android:layout_marginBottom="4dp"
             android:text="متبقي على الفجر"
-            android:textColor="#4A3B00" 
+            android:textColor="#000000" 
             android:textSize="26sp"
             android:textStyle="bold" />
 
@@ -43,7 +43,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text=""
-                android:textColor="#4A3B00" 
+                android:textColor="#000000" 
                 android:textSize="24sp"
                 android:textStyle="bold"
                 android:layout_marginEnd="4dp"
@@ -53,7 +53,7 @@
                 android:id="@+id/tv_large_chronometer"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#4A3B00" 
+                android:textColor="#000000" 
                 android:textSize="24sp"
                 android:textStyle="bold"
                 android:textDirection="ltr" />
@@ -99,7 +99,7 @@
         android:layout_weight="15"
         android:paddingHorizontal="24dp"
         android:gravity="center_vertical">
-        <TextView android:id="@+id/tv_large_date" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:layout_centerVertical="true" android:text="١٥ رمضان ١٤٤٧" android:textColor="#4A3B00" android:textSize="14sp" android:textStyle="bold" android:textDirection="rtl" />
-        <TextView android:id="@+id/tv_large_location" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentStart="true" android:layout_centerVertical="true" android:text="٤ مارس ٢٠٢٦" android:textColor="#4A3B00" android:textSize="14sp" android:textStyle="bold" android:textDirection="rtl" />
+        <TextView android:id="@+id/tv_large_date" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:layout_centerVertical="true" android:text="١٥ رمضان ١٤٤٧" android:textColor="#000000" android:textSize="14sp" android:textStyle="bold" android:textDirection="ltr" />
+        <TextView android:id="@+id/tv_large_location" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentStart="true" android:layout_centerVertical="true" android:text="٤ مارس ٢٠٢٦" android:textColor="#000000" android:textSize="14sp" android:textStyle="bold" android:textDirection="rtl" />
     </RelativeLayout>
 </LinearLayout>

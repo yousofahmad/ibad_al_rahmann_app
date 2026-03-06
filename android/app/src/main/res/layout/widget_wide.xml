@@ -68,7 +68,7 @@
             android:layout_alignParentEnd="true"
             android:layout_centerVertical="true"
             android:text="١ رمضان ١٤٤٧"
-            android:textColor="#4A3B00" 
+            android:textColor="#FFD700" 
             android:textSize="14sp"
             android:textStyle="bold"
             android:gravity="center"

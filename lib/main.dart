@@ -36,7 +36,9 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-const platform = MethodChannel('com.example.azkar/bubble');
+const platform = MethodChannel(
+  'com.example.ibad_al_rahmann/native_notifications',
+);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
