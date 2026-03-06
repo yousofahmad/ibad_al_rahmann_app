@@ -70,8 +70,12 @@ class PrayerService extends ChangeNotifier {
 
     final now = DateTime.now();
 
-    // Determine Next Prayer (Logic for skipping Sunrise if needed)
+    // Determine Next Prayer (Logic for skipping Sunrise entirely)
     Prayer nextPrayer = times.nextPrayer();
+    if (nextPrayer == Prayer.sunrise) {
+      nextPrayer = Prayer.dhuhr; // Skip sunrise, go straight to Dhuhr
+    }
+
     DateTime? nextTime;
 
     if (nextPrayer != Prayer.none) {
@@ -88,8 +92,13 @@ class PrayerService extends ChangeNotifier {
 
     if (nextTime == null) return;
 
-    // --- 45-Minute Rule Logic (v3) ---
-    final currentPrayer = times.currentPrayer();
+    // --- 45-Minute Rule Logic ---
+    Prayer currentPrayer = times.currentPrayer();
+    if (currentPrayer == Prayer.sunrise) {
+      currentPrayer = Prayer
+          .fajr; // Treat Sunrise period as still being Fajr's post-prayer time
+    }
+
     DateTime? currentTime;
     if (currentPrayer != Prayer.none) {
       currentTime = times.timeForPrayer(currentPrayer);
@@ -112,20 +121,15 @@ class PrayerService extends ChangeNotifier {
       }
     }
 
-    // --- Countdown target time (may be Sunrise) vs Highlighted prayer (always from the 5) ---
+    // --- Countdown target time vs Highlighted prayer ---
     DateTime countdownTargetTime = nextTime;
 
-    // For the 5-prayer row highlight, Sunrise maps to Dhuhr
+    // Since we skipped Sunrise above, goldNextPrayer is just nextPrayer
     Prayer goldNextPrayer = nextPrayer;
     DateTime? goldNextTime = nextTime;
-    if (goldNextPrayer == Prayer.sunrise) {
-      goldNextPrayer = Prayer.dhuhr;
-      goldNextTime = times.dhuhr;
-    }
 
     // ── Highlighted Prayer Index (separate from countdown target) ──
     // This is the index (0-4) that should "light up" in the native 5-prayer row.
-    // Key rule: If targeting Sunrise, we highlight Dhuhr (index 1).
     int highlightedPrayerIndex;
     if (goldIsCountUp) {
       // Highlight the prayer that just passed (count-up mode)
@@ -190,6 +194,7 @@ class PrayerService extends ChangeNotifier {
         nextPrayerEpoch: (goldIsCountUp && currentTime != null)
             ? currentTime.millisecondsSinceEpoch
             : countdownTargetTime.millisecondsSinceEpoch,
+        isCountUp: goldIsCountUp,
       );
     } else {
       await PrayerNotificationServiceHelper.stopNotification();
@@ -212,6 +217,7 @@ class PrayerService extends ChangeNotifier {
           : countdownTargetTime.millisecondsSinceEpoch,
       sunriseTime: _ltrWrap(formatTime(times.sunrise)),
       locationName: _activeCity?.name ?? "الموقع الحالي",
+      isCountUp: goldIsCountUp,
     );
 
     // Update Golden Widget Specific Extra Data

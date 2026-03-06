@@ -6,7 +6,6 @@ import '../../../../core/helpers/extensions/screen_details.dart';
 import '../../../../core/helpers/extensions/theme.dart';
 import '../../bloc/quran/quran_cubit.dart';
 import 'wbw_page_widget.dart';
-import 'full_page_rich_text_mobile.dart';
 
 class LandscapeQuranWidget extends StatefulWidget {
   const LandscapeQuranWidget({super.key});

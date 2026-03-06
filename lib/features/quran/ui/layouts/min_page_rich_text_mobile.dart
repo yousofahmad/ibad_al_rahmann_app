@@ -1,8 +1,6 @@
 ﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
-import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:ibad_al_rahmann/core/helpers/fonts_helper.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../widgets/wbw_page_widget.dart';

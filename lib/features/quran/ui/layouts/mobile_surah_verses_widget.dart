@@ -3,7 +3,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:ibad_al_rahmann/core/theme/app_colors.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cubit.dart';
@@ -223,7 +222,7 @@ class _MobileSurahVersesWidgetState extends State<MobileSurahVersesWidget> {
   @override
   Widget build(BuildContext context) {
     return RichText(
-      textAlign: TextAlign.center,
+      textAlign: widget.pageNumber <= 2 ? TextAlign.center : TextAlign.justify,
       softWrap: true,
       textDirection: TextDirection.rtl,
       text: TextSpan(

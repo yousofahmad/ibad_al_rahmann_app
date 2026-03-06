@@ -44,6 +44,7 @@ class KhatmaCubit extends Cubit<KhatmaState> {
     required String notificationType,
     required WirdUnit unit,
     int startJuz = 1,
+    int? startFromPage,
   }) async {
     emit(KhatmaLoading());
     try {
@@ -53,10 +54,10 @@ class KhatmaCubit extends Cubit<KhatmaState> {
           ? totalDays * 5
           : totalDays;
 
-      // 🟢 الاعتماد على المصفوفة السليمة اللي في الـ WirdCalculator 🟢
-      int startFromPage = 1;
-      if (startJuz >= 1 && startJuz <= 30) {
-        startFromPage = WirdCalculator.juzStartPages[startJuz - 1];
+      // Use startFromPage if provided, otherwise derive from startJuz
+      int effectiveStartPage = startFromPage ?? 1;
+      if (startFromPage == null && startJuz >= 1 && startJuz <= 30) {
+        effectiveStartPage = WirdCalculator.juzStartPages[startJuz - 1];
       }
 
       for (int i = 0; i < totalSessions; i++) {
@@ -64,7 +65,7 @@ class KhatmaCubit extends Cubit<KhatmaState> {
           sessionIndex: i,
           totalSessions: totalSessions,
           unit: unit,
-          startFromPage: startFromPage,
+          startFromPage: effectiveStartPage,
         );
 
         wirds.add(

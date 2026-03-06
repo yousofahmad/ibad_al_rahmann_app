@@ -31,16 +31,35 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
   late List<Map<String, dynamic>> _filteredData;
   String? _localPath;
 
+  // Sounds that are already built into the app's res/raw folder
+  final Set<String> _builtInIds = {
+    'nafis',
+    'full_adhan_makkah',
+    'full_adhan_madina',
+    'takbeer_makkah',
+    'takbeer_madina',
+    'eid_takbeerat',
+    'iqama',
+    'sabah',
+    'masaa',
+    'saly_3ala_mo7amad',
+  };
+
   static const String _baseUrl =
-      "https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-sounds/main";
+      "https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-sounds/main/";
 
   // --- THE DATA (Strictly as requested) ---
   List<Map<String, dynamic>> muezzinData = [
+    {
+      "category": "أذان افتراضي (الشيخ أحمد النفيس)",
+      "muezzins": [
+        {"name": "أحمد النفيس (الرئيسي)", "id": "nafis"},
+      ],
+    },
     // 1. Famous Reciters (Egypt & Gulf)
     {
       "category": "قراء ومشاهير (مصر والخليج)",
       "muezzins": [
-        {"name": "أحمد النفيس", "id": "nafis"}, // Added manually
         {"name": "مشاري راشد العفاسي (1)", "id": "mishary"},
         {"name": "مشاري راشد العفاسي (2)", "id": "mishary_2"},
         {"name": "عبد الباسط عبد الصمد (1)", "id": "abdulbasit"},
@@ -212,30 +231,39 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
         _selectedMuezzinId = prefs.getString(widget.prefsKey!);
       } else {
         // Load global default
-        _selectedMuezzinId = prefs.getString('adhan_muezzin_id') ?? 'mulla';
+        _selectedMuezzinId = prefs.getString('adhan_muezzin_id') ?? 'nafis';
       }
     });
   }
 
   Future<void> _saveSelection(String id) async {
-    // Optional: Force download if selecting?
-    // For now, let's allow selecting even if not downloaded,
-    // assuming native might have it baked in or user just wants the setting.
-    // But logically, if it's "custom", it should be downloaded.
-    if (!_downloadedIds.contains(id)) {
-      // Auto-download on select?
-      _downloadFile(id);
+    // ── Rule 2: Selection Guard ──
+    // Built-in sounds are always available
+    if (!_builtInIds.contains(id)) {
+      final file = File("$_localPath/$id.mp3");
+      if (!file.existsSync()) {
+        // File not downloaded — block selection
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                "برجاء تحميل الملف الصوتي أولاً",
+                style: TextStyle(fontFamily: AppConsts.cairo),
+              ),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
     }
 
     final prefs = await SharedPreferences.getInstance();
 
     if (widget.prefsKey != null) {
-      // Specific Prayer Override
       await prefs.setString(widget.prefsKey!, id);
     } else {
-      // Global Default
       await prefs.setString('adhan_muezzin_id', id);
-      // Sync all prayers to this selection (Global Override)
       final prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
       for (var p in prayers) {
         await prefs.setString('adhan_sound_$p', id);
@@ -246,19 +274,24 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            "تم اختيار المؤذن (التنبيهات النظامية قد تستخدم الصوت الافتراضي إذا لم يكن مدمجًا)",
-            style: TextStyle(fontFamily: AppConsts.cairo),
+            _builtInIds.contains(id)
+                ? "تم اختيار المؤذن ✓"
+                : "تم اختيار المؤذن ✓ (ملف محلي)",
+            style: const TextStyle(fontFamily: AppConsts.cairo),
           ),
-          duration: Duration(seconds: 3),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
   }
 
   Future<void> _downloadFile(String id) async {
-    if (_localPath == null || _downloadProgress.containsKey(id)) return;
+    if (_localPath == null ||
+        _downloadProgress.containsKey(id) ||
+        _builtInIds.contains(id))
+      return;
 
     setState(() => _downloadProgress[id] = 0.0);
 
@@ -305,25 +338,47 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
       return;
     }
 
-    // Stop current
     await _audioPlayer.stop();
-
-    // Check if local exists
-    final isLocal = _downloadedIds.contains(id);
 
     setState(() {
       _playingMuezzinId = null;
-      _loadingMuezzinId = id; // Buffering...
+      _loadingMuezzinId = id;
     });
 
     try {
-      if (isLocal && _localPath != null) {
-        final path = "$_localPath/$id.mp3";
-        await _audioPlayer.play(DeviceFileSource(path));
+      // ── Rule 3: Playback Guard ──
+      if (id == 'nafis') {
+        // Nafis has a Flutter asset copy for preview
+        await _audioPlayer.play(AssetSource('audio/nafis.mp3'));
+      } else if (_builtInIds.contains(id)) {
+        // Other built-ins: play from native res/raw/
+        const packageName = 'com.example.ibad_al_rahmann';
+        final uri = 'android.resource://$packageName/raw/$id';
+        await _audioPlayer.play(UrlSource(uri));
+      } else if (_localPath != null &&
+          File("$_localPath/$id.mp3").existsSync()) {
+        // Downloaded: play local file
+        await _audioPlayer.play(DeviceFileSource("$_localPath/$id.mp3"));
       } else {
-        // CRITICAL FIX: Trim ID and use correct URL for streaming
-        final url = "$_baseUrl${id.trim()}.mp3";
-        await _audioPlayer.play(UrlSource(url));
+        // Not local: attempt streaming from URL
+        try {
+          final url = "$_baseUrl${id.trim()}.mp3";
+          await _audioPlayer.play(UrlSource(url));
+        } catch (streamError) {
+          // Streaming failed (no internet)
+          if (mounted) {
+            setState(() => _loadingMuezzinId = null);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  "تأكد من اتصالك بالإنترنت لسماع المؤذن",
+                  style: TextStyle(fontFamily: AppConsts.cairo),
+                ),
+              ),
+            );
+          }
+          return;
+        }
       }
 
       if (mounted) {
@@ -335,9 +390,14 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _loadingMuezzinId = null);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("خطأ في التشغيل: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "تأكد من اتصالك بالإنترنت لسماع المؤذن",
+              style: TextStyle(fontFamily: AppConsts.cairo),
+            ),
+          ),
+        );
       }
     }
   }
@@ -379,7 +439,7 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
       appBar: AppBar(
         title: Text(
           widget.title ?? "اختيار المؤذن",
-          style: TextStyle(
+          style: const TextStyle(
             color: primaryColor,
             fontFamily: AppConsts.expoArabic,
             fontWeight: FontWeight.bold,
@@ -388,7 +448,7 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
         backgroundColor: isDark
             ? const Color(0xFF121212)
             : const Color(0xFFF5F5F5),
-        iconTheme: IconThemeData(color: primaryColor),
+        iconTheme: const IconThemeData(color: primaryColor),
         centerTitle: true,
         elevation: 0,
       ),
@@ -408,7 +468,7 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
                   color: isDark ? Colors.grey : Colors.grey[600],
                   fontFamily: AppConsts.cairo,
                 ),
-                prefixIcon: Icon(Icons.search, color: primaryColor),
+                prefixIcon: const Icon(Icons.search, color: primaryColor),
                 filled: true,
                 fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 border: OutlineInputBorder(
@@ -424,7 +484,9 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
           // List
           Expanded(
             child: _localPath == null
-                ? Center(child: CircularProgressIndicator(color: primaryColor))
+                ? const Center(
+                    child: CircularProgressIndicator(color: primaryColor),
+                  )
                 : CustomScrollView(
                     slivers: _filteredData.map((category) {
                       return SliverMainAxisGroup(
@@ -436,141 +498,142 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
                             ),
                           ),
                           SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                final muezzin = category['muezzins'][index];
-                                final id = muezzin['id'];
-                                final isSelected = _selectedMuezzinId == id;
-                                final isPlaying = _playingMuezzinId == id;
-                                final isLoading = _loadingMuezzinId == id;
-                                final isDownloaded = _downloadedIds.contains(
-                                  id,
-                                );
-                                final downloadProg = _downloadProgress[id];
+                            delegate: SliverChildBuilderDelegate((
+                              context,
+                              index,
+                            ) {
+                              final muezzin = category['muezzins'][index];
+                              final id = muezzin['id'];
+                              final isSelected = _selectedMuezzinId == id;
+                              final isPlaying = _playingMuezzinId == id;
+                              final isLoading = _loadingMuezzinId == id;
+                              final isBuiltIn = _builtInIds.contains(id);
+                              final isDownloaded =
+                                  isBuiltIn || _downloadedIds.contains(id);
+                              final downloadProg = isBuiltIn
+                                  ? null
+                                  : _downloadProgress[id];
 
-                                return Container(
-                                  margin: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? const Color(0xFF1E1E1E)
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: isSelected
-                                        ? Border.all(
-                                            color: primaryColor,
-                                            width: 1,
-                                          )
-                                        : null,
-                                    boxShadow: isDark
-                                        ? null
-                                        : [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(
-                                                0.05,
-                                              ),
-                                              blurRadius: 2,
-                                              offset: const Offset(0, 1),
+                              return Container(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? const Color(0xFF1E1E1E)
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: isSelected
+                                      ? Border.all(
+                                          color: primaryColor,
+                                          width: 1,
+                                        )
+                                      : null,
+                                  boxShadow: isDark
+                                      ? null
+                                      : [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(
+                                              0.05,
                                             ),
-                                          ],
-                                  ),
-                                  child: ListTile(
-                                    onTap: () => _saveSelection(id),
-                                    leading: GestureDetector(
-                                      onTap: () => _playPreview(id),
-                                      child: CircleAvatar(
-                                        backgroundColor: primaryColor
-                                            .withOpacity(0.15),
-                                        child: isLoading
-                                            ? SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                      color: primaryColor,
-                                                    ),
-                                              )
-                                            : Icon(
-                                                isPlaying
-                                                    ? Icons.stop
-                                                    : Icons.play_arrow,
+                                            blurRadius: 2,
+                                            offset: const Offset(0, 1),
+                                          ),
+                                        ],
+                                ),
+                                child: ListTile(
+                                  onTap: () => _saveSelection(id),
+                                  leading: GestureDetector(
+                                    onTap: () => _playPreview(id),
+                                    child: CircleAvatar(
+                                      backgroundColor: primaryColor.withOpacity(
+                                        0.15,
+                                      ),
+                                      child: isLoading
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
                                                 color: primaryColor,
                                               ),
-                                      ),
-                                    ),
-                                    title: Text(
-                                      muezzin['name'],
-                                      style: TextStyle(
-                                        color: isDark
-                                            ? Colors.white
-                                            : Colors.black87,
-                                        fontFamily: AppConsts.expoArabic,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    subtitle: isDownloaded
-                                        ? const Text(
-                                            "موجود على الجهاز",
-                                            style: TextStyle(
-                                              color: Colors.green,
-                                              fontSize: 10,
-                                            ),
-                                          )
-                                        : null,
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        // Download Button / Status
-                                        if (downloadProg != null)
-                                          SizedBox(
-                                            width: 24,
-                                            height: 24,
-                                            child: CircularProgressIndicator(
-                                              value: downloadProg,
+                                            )
+                                          : Icon(
+                                              isPlaying
+                                                  ? Icons.stop
+                                                  : Icons.play_arrow,
                                               color: primaryColor,
-                                              strokeWidth: 3,
                                             ),
-                                          )
-                                        else if (!isDownloaded)
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.cloud_download_outlined,
-                                              color: Colors.grey,
-                                            ),
-                                            onPressed: () => _downloadFile(id),
-                                          )
-                                        else
-                                          Icon(
-                                            Icons.check,
-                                            color: Colors.grey[600],
-                                            size: 20,
-                                          ),
-
-                                        const SizedBox(width: 8),
-
-                                        // Selection Check
-                                        if (isSelected)
-                                          Icon(
-                                            Icons.check_circle,
-                                            color: primaryColor,
-                                          )
-                                        else
-                                          Icon(
-                                            Icons.radio_button_unchecked,
-                                            color: isDark
-                                                ? Colors.grey
-                                                : Colors.grey[400],
-                                          ),
-                                      ],
                                     ),
                                   ),
-                                );
-                              },
-                              childCount: (category['muezzins'] as List).length,
-                            ),
+                                  title: Text(
+                                    muezzin['name'],
+                                    style: TextStyle(
+                                      color: isDark
+                                          ? Colors.white
+                                          : Colors.black87,
+                                      fontFamily: AppConsts.expoArabic,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  subtitle: isDownloaded
+                                      ? Text(
+                                          isBuiltIn
+                                              ? "تشغيل مباشر"
+                                              : "موجود على الجهاز",
+                                          style: TextStyle(
+                                            color: isBuiltIn
+                                                ? primaryColor
+                                                : Colors.green,
+                                            fontSize: 10,
+                                          ),
+                                        )
+                                      : null,
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // ── Rule 4: Download/Status Icon ──
+                                      if (downloadProg != null)
+                                        SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            value: downloadProg,
+                                            color: primaryColor,
+                                            strokeWidth: 3,
+                                          ),
+                                        )
+                                      else if (!isDownloaded)
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.cloud_download_outlined,
+                                            color: Colors.grey,
+                                          ),
+                                          onPressed: () => _downloadFile(id),
+                                        ),
+
+                                      // No check icon for downloaded — selection mark handles it
+                                      const SizedBox(width: 8),
+
+                                      // ── Rule 4: Selection Check (only if file verified) ──
+                                      if (isSelected && isDownloaded)
+                                        const Icon(
+                                          Icons.check_circle,
+                                          color: primaryColor,
+                                        )
+                                      else
+                                        Icon(
+                                          Icons.radio_button_unchecked,
+                                          color: isDark
+                                              ? Colors.grey
+                                              : Colors.grey[400],
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }, childCount: (category['muezzins'] as List).length),
                           ),
                         ],
                       );
@@ -604,7 +667,7 @@ class _SectionHeaderDelegate extends SliverPersistentHeaderDelegate {
       alignment: Alignment.centerRight,
       child: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           color: primaryColor,
           fontFamily: AppConsts.expoArabic,
           fontSize: 18,

@@ -22,16 +22,32 @@ class PrayerWidgetProvider : HomeWidgetProvider() {
                 val prayerName = widgetData.getString("prayer_name", "الصلاة القادمة").orEmpty()
                 setTextViewText(R.id.tv_prayer_name, prayerName)
 
-                // Top Section: Live Countdown (Chronometer)
+                // Live Chronometer (Chronometer)
                 // We expect Dart to pass the target epoch time in milliseconds
                 val targetEpochMs = widgetData.getLong("next_prayer_time_epoch", 0L)
+                val isCountUp = widgetData.getBoolean("is_count_up", false)
+
+                val signStr = if (targetEpochMs > 0L) {
+                    if (isCountUp) "+" else "-"
+                } else {
+                    ""
+                }
+                
+                setTextViewText(R.id.tv_prayer_name, prayerName)
+                setTextViewText(R.id.tv_widget_small_status_sign, signStr)
+
                 if (targetEpochMs > 0L) {
-                    // Chronometer counts up from 'base'. To make it count DOWN to a future time:
-                    // base = SystemClock.elapsedRealtime() + (TargetTime - CurrentWallTime)
                     val nowMs = System.currentTimeMillis()
                     val differenceMs = targetEpochMs - nowMs
                     val baseTime = android.os.SystemClock.elapsedRealtime() + differenceMs
-                    setChronometer(R.id.tv_countdown, baseTime, null, true)
+                    
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                        setChronometer(R.id.tv_widget_small_countdown, baseTime, null, true)
+                        setChronometerCountDown(R.id.tv_widget_small_countdown, !isCountUp)
+                        // Removed dynamic sign format that caused flickering
+                    } else {
+                        setChronometer(R.id.tv_widget_small_countdown, baseTime, null, true)
+                    }
                 }
 
                 // Middle Section: 5 Prayers

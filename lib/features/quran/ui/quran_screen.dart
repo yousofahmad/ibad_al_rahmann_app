@@ -10,7 +10,6 @@ import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cu
 import 'package:ibad_al_rahmann/features/quran/data/repo/quran_repo.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import '../../../core/helpers/size_config.dart';
 import 'widgets/quran_screen_body.dart';
 
 class QuranScreen extends StatefulWidget {
@@ -43,15 +42,9 @@ class _QuranScreenState extends State<QuranScreen> {
   @override
   void initState() {
     WakelockPlus.enable();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
-    );
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
     ]);
     _initializeCache();
     super.initState();
@@ -61,8 +54,15 @@ class _QuranScreenState extends State<QuranScreen> {
     try {
       final cacheService = getIt<CacheService>();
       await cacheService.init();
-      _cachedPage =
-          widget.initialPage ?? cacheService.getInt('last_quran_page');
+
+      // Load separate page progress for Mushaf vs Wird
+      if (widget.initialPage != null) {
+        _cachedPage = widget.initialPage;
+      } else if (widget.isWirdMode) {
+        _cachedPage = cacheService.getInt('last_wird_page');
+      } else {
+        _cachedPage = cacheService.getInt('last_quran_page');
+      }
 
       _quranCubit = QuranCubit(
         QuranRepo(tablet: true, initialPage: _cachedPage),
@@ -117,14 +117,25 @@ class _QuranScreenState extends State<QuranScreen> {
               ? state.theme.dark
               : state.theme.light;
 
+          final bgColor = state.mode == ThemeMode.dark
+              ? Colors.black
+              : themeData.scaffoldBackgroundColor;
+
           return Theme(
             data: themeData,
-            child: Scaffold(
-              backgroundColor: state.mode == ThemeMode.dark
-                  ? Colors.black
-                  : themeData.scaffoldBackgroundColor,
-              resizeToAvoidBottomInset: false,
-              body: const QuranScreenBody(),
+            child: AnnotatedRegion<SystemUiOverlayStyle>(
+              value: SystemUiOverlayStyle(
+                statusBarColor: bgColor,
+                statusBarIconBrightness: state.mode == ThemeMode.dark
+                    ? Brightness.light
+                    : Brightness.dark,
+                systemNavigationBarColor: bgColor,
+              ),
+              child: Scaffold(
+                backgroundColor: bgColor,
+                resizeToAvoidBottomInset: false,
+                body: const QuranScreenBody(),
+              ),
             ),
           );
         },

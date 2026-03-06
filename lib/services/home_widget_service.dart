@@ -17,9 +17,9 @@ Future<void> interactiveCallback(Uri? uri) async {
 class HomeWidgetService {
   // اسم التطبيق أو الحزمة للـ Group
   static const String appGroupId = 'group.com.example.ibad_al_rahmann';
+  static const String smallWidgetName = 'PrayerWidgetProvider';
   static const String wideWidgetName = 'PrayerWidgetWideProvider';
   static const String largeWidgetName = 'PrayerWidgetLargeProvider';
-  static const String goldWidgetName = 'PrayerWidgetGoldProvider';
 
   static Future<void> initialize() async {
     // تهيئة الجروب ليتم التواصل مع الودجت
@@ -43,6 +43,7 @@ class HomeWidgetService {
     required int prayerIndex,
     required String prayerTime,
     int? nextPrayerEpoch,
+    bool? isCountUp,
     String? sunriseTime,
     String? locationName,
   }) async {
@@ -63,6 +64,9 @@ class HomeWidgetService {
         nextPrayerEpoch,
       );
     }
+    if (isCountUp != null) {
+      await HomeWidget.saveWidgetData<bool>('is_count_up', isCountUp);
+    }
 
     await HomeWidget.saveWidgetData<String>('hijri_date', hijri);
     await HomeWidget.saveWidgetData<int>('prayerIndex', prayerIndex);
@@ -78,7 +82,11 @@ class HomeWidgetService {
       // Caller manages if it's "Current + 45" or "Next".
     }
 
-    // إرسال طلب لتحديث الـ Widgets
+    // Send request to update standard & wide widgets
+    await HomeWidget.updateWidget(
+      name: smallWidgetName,
+      androidName: smallWidgetName,
+    );
     await HomeWidget.updateWidget(
       name: wideWidgetName,
       androidName: wideWidgetName,
@@ -86,10 +94,6 @@ class HomeWidgetService {
     await HomeWidget.updateWidget(
       name: largeWidgetName,
       androidName: largeWidgetName,
-    );
-    await HomeWidget.updateWidget(
-      name: goldWidgetName,
-      androidName: goldWidgetName,
     );
   }
 
@@ -100,8 +104,8 @@ class HomeWidgetService {
     await HomeWidget.saveWidgetData<int>('gold_target_epoch', targetEpoch);
     await HomeWidget.saveWidgetData<bool>('gold_is_count_up', isCountUp);
     await HomeWidget.updateWidget(
-      name: goldWidgetName,
-      androidName: goldWidgetName,
+      name: largeWidgetName,
+      androidName: largeWidgetName,
     );
   }
 }

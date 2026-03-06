@@ -204,9 +204,9 @@ class NotificationService {
     await rescheduleWird();
 
     // 2. Prayers
+    final globalDefault = prefs.getString('adhan_muezzin_id') ?? 'nafis';
     String soundKey(String key) =>
-        (prefs.getString('adhan_sound_$key') ??
-        'adhan'); // Native expects simple name or path
+        (prefs.getString('adhan_sound_$key') ?? globalDefault);
 
     await _schedulePrayer(
       100,
@@ -268,7 +268,7 @@ class NotificationService {
 
     // 5. Other Prayers/Events
     // Sunrise (Shurooq) - ID 101 (Fits between Fajr 100 and Dhuhr 102)
-    if (prefs.getBool('notif_sunrise') ?? false) {
+    if (prefs.getBool('notif_sunrise') ?? true) {
       await _scheduleNative(
         101,
         "شروق الشمس",
@@ -927,7 +927,7 @@ class NotificationService {
     // Fetch default sound if not provided
     if (soundName == null) {
       final prefs = await SharedPreferences.getInstance();
-      soundName = prefs.getString('adhan_muezzin_id') ?? 'mulla';
+      soundName = prefs.getString('adhan_muezzin_id') ?? 'nafis';
     }
     // Schedule for 5 seconds from NOW
     // Note: On Android 12+, exact alarms require permission.
@@ -990,7 +990,7 @@ class NotificationService {
         final sound =
             prefs.getString('adhan_sound_fajr') ??
             prefs.getString('adhan_muezzin_id') ??
-            'mulla';
+            'nafis';
 
         await _scheduleNative(
           100,

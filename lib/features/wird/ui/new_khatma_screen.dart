@@ -25,6 +25,8 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
   WirdUnit _selectedUnit = WirdUnit.page;
 
   int _startJuz = 1;
+  int _startPage = 1; // For page-based start selection (1-604)
+  bool _startByJuz = true; // Toggle: start by juz or page
   String _reminderType = 'none'; // none, daily, prayer
 
   // Daily reminder time
@@ -53,25 +55,37 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
     );
   }
 
+  /// Effective start page based on toggle
+  int get _effectiveStartPage {
+    if (_startByJuz) {
+      return WirdCalculator.juzStartPages[_startJuz - 1];
+    }
+    return _startPage;
+  }
+
   /// Total estimated days dynamically calculated
   int get _estimatedDays {
     if (!_isByAmount) {
-      // لو من البداية نرجع المدة المختارة مباشرة لتجنب فروق التقريب
-      if (_startJuz <= 1) return _totalDays;
-
+      int remaining = 604 - _effectiveStartPage + 1;
       int ppd = _pagesPerDay;
       if (ppd <= 0) ppd = 1;
-      return (_remainingPages / ppd).ceil();
+      return (remaining / ppd).ceil();
     }
 
     // Amount mode logic...
     if (_selectedUnit == WirdUnit.juz) {
       int remainingJuzs = 31 - _startJuz;
       return (remainingJuzs / _amountValue).ceil();
+    } else if (_selectedUnit == WirdUnit.quarter) {
+      // 8 quarters per juz, 240 total
+      int totalQuarters = (31 - _startJuz) * 8;
+      return (totalQuarters / _amountValue).ceil();
     } else {
+      // Pages
+      int remaining = 604 - _effectiveStartPage + 1;
       int ppd = _pagesPerDay;
       if (ppd <= 0) ppd = 1;
-      return (_remainingPages / ppd).ceil();
+      return (remaining / ppd).ceil();
     }
   }
 
@@ -131,11 +145,13 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
     // Save custom adhan delay
     await prefs.setInt('wird_adhan_delay_minutes', _adhanDelayMinutes);
 
+    // Determine start parameters
     await context.read<KhatmaCubit>().startNewKhatma(
       totalDays: _estimatedDays,
       unit: _isByAmount ? _selectedUnit : WirdUnit.page,
       notificationType: _reminderType,
-      startJuz: _startJuz,
+      startJuz: _startByJuz ? _startJuz : 1,
+      startFromPage: _startByJuz ? null : _startPage,
     );
 
     if (mounted) {
@@ -295,6 +311,10 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
                                   child: Text("صفحات"),
                                 ),
                                 DropdownMenuItem(
+                                  value: WirdUnit.quarter,
+                                  child: Text("أرباع"),
+                                ),
+                                DropdownMenuItem(
                                   value: WirdUnit.juz,
                                   child: Text("أجزاء"),
                                 ),
@@ -344,61 +364,153 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
               icon: FontAwesomeIcons.bookOpen,
               child: Column(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "ابدأ القراءة من:",
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      DropdownButton<int>(
-                        value: _startJuz,
-                        dropdownColor: isDark ? Colors.grey[900] : Colors.white,
-                        style: TextStyle(
-                          color: textColor,
-                          fontFamily: AppConsts.cairo,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        underline: const SizedBox(),
-                        items: List.generate(30, (index) => index + 1).map((
-                          juz,
-                        ) {
-                          return DropdownMenuItem<int>(
-                            value: juz,
-                            child: Text("الجزء $juz"),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            // قبل ما نغير الجزء، نحفظ السرعة الحالية
-                            int currentSpeed = _pagesPerDay;
-                            setState(() {
-                              _startJuz = val;
-                              // في وضع المدة، بنحافظ على السرعة ونخلي الأيام هي اللي تتغير تلقائياً
-                              // ده بيتحقق لأن الكمر دلوقتى بيعرض _estimatedDays
-                              // بس عشان نضمن تناسق في اختيار الأيام لو حب يغيرها بعد كدة:
-                              if (!_isByAmount) {
-                                // نعدل الـ _totalDays المرجعية عشان تحافظ على نفس سرعة القراءة
-                                _totalDays = (604 / currentSpeed).round();
-                              }
-                            });
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                  if (_startJuz > 1)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        "صفحات متبقية: $_remainingPages من 604",
-                        style: TextStyle(
-                          color: goldColor.withValues(alpha: 0.7),
-                          fontSize: 13,
-                          fontFamily: AppConsts.cairo,
-                        ),
-                      ),
+                  // Toggle: start by juz or page
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: goldColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
                     ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _startByJuz = true),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _startByJuz
+                                    ? goldColor
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  "بالجزء",
+                                  style: TextStyle(
+                                    color: _startByJuz
+                                        ? Colors.black
+                                        : goldColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: AppConsts.cairo,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _startByJuz = false),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: !_startByJuz
+                                    ? goldColor
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  "بالصفحة",
+                                  style: TextStyle(
+                                    color: !_startByJuz
+                                        ? Colors.black
+                                        : goldColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: AppConsts.cairo,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  if (_startByJuz) ...[
+                    // Pick starting juz
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "ابدأ القراءة من:",
+                          style: TextStyle(fontSize: 16),
+                        ),
+                        DropdownButton<int>(
+                          value: _startJuz,
+                          dropdownColor: isDark
+                              ? Colors.grey[900]
+                              : Colors.white,
+                          style: TextStyle(
+                            color: textColor,
+                            fontFamily: AppConsts.cairo,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          underline: const SizedBox(),
+                          items: List.generate(30, (index) => index + 1).map((
+                            juz,
+                          ) {
+                            return DropdownMenuItem<int>(
+                              value: juz,
+                              child: Text("الجزء $juz"),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => _startJuz = val);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                    if (_startJuz > 1)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          "صفحات متبقية: $_remainingPages من 604",
+                          style: TextStyle(
+                            color: goldColor.withValues(alpha: 0.7),
+                            fontSize: 13,
+                            fontFamily: AppConsts.cairo,
+                          ),
+                        ),
+                      ),
+                  ] else ...[
+                    // Pick starting page number
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "ابدأ من صفحة:",
+                          style: TextStyle(fontSize: 16),
+                        ),
+                        _buildQuantityRow(
+                          value: _startPage,
+                          min: 1,
+                          max: 604,
+                          suffix: "$_startPage",
+                          onChanged: (v) => setState(() => _startPage = v),
+                          goldColor: goldColor,
+                        ),
+                      ],
+                    ),
+                    if (_startPage > 1)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          "صفحات متبقية: ${604 - _startPage + 1} من 604",
+                          style: TextStyle(
+                            color: goldColor.withValues(alpha: 0.7),
+                            fontSize: 13,
+                            fontFamily: AppConsts.cairo,
+                          ),
+                        ),
+                      ),
+                  ],
                 ],
               ),
             ),

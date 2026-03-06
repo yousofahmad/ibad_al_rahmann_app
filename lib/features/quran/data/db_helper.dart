@@ -127,7 +127,6 @@ class QuranWbwDbHelper {
       return _pageWordsCache[pageNumber]!;
     }
     try {
-      print('Fetching words for page: $pageNumber');
       final db = await instance.database;
 
       const query = '''

@@ -21,7 +21,11 @@ import 'screens/ruqyah_screen.dart';
 import 'services/notification_service.dart';
 import 'services/daily_tracker_service.dart';
 import 'services/prayer_service.dart';
-import 'features/quran/ui/quran_screen.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'features/wird/ui/wird_dashboard_screen.dart';
+import 'features/wird/ui/isolated_wird_screen.dart';
+import 'features/wird/data/khatma_model.dart';
 
 import 'core/di/di.dart';
 import 'core/helpers/tafsir_helper.dart';
@@ -73,7 +77,7 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-void _handleGlobalNavigation(String payload) {
+Future<void> _handleGlobalNavigation(String payload) async {
   if (navigatorKey.currentState == null) return;
 
   // Navigate based on payload
@@ -94,12 +98,46 @@ void _handleGlobalNavigation(String payload) {
   } else if (payload == 'ruqyah') {
     targetScreen = const RuqyahScreen();
   } else if (payload.startsWith('wird')) {
-    int? page;
+    // Load khatma data to get current wird info
     try {
-      final parts = payload.split(':');
-      if (parts.length > 1) page = int.tryParse(parts[1]);
+      final prefs = await SharedPreferences.getInstance();
+      final data = prefs.getString('active_khatma_data');
+      if (data != null) {
+        final json = jsonDecode(data) as Map<String, dynamic>;
+        final khatma = KhatmaModel.fromJson(json);
+
+        // Extract exact startPage from payload (e.g. "wird:15")
+        int? targetStartPage;
+        if (payload.contains(':')) {
+          final parts = payload.split(':');
+          if (parts.length > 1) {
+            targetStartPage = int.tryParse(parts[1]);
+          }
+        }
+
+        int targetIndex = khatma.currentWirdIndex;
+        // Find which wird index matches this exact startPage
+        if (targetStartPage != null) {
+          final foundIndex = khatma.wirds.indexWhere(
+            (w) => w.startPage == targetStartPage,
+          );
+          if (foundIndex != -1) {
+            targetIndex = foundIndex;
+          }
+        }
+
+        if (targetIndex < khatma.wirds.length) {
+          final wird = khatma.wirds[targetIndex];
+          targetScreen = IsolatedWirdScreen(
+            wirdIndex: targetIndex,
+            targetStartPage: wird.startPage,
+            targetEndPage: wird.endPage,
+          );
+        }
+      }
     } catch (_) {}
-    targetScreen = QuranScreen(initialPage: page);
+    // Fallback if no khatma data or error
+    targetScreen ??= const WirdDashboardScreen();
   }
   // For prayer payloads (fajr, dhuhr, etc.) and others, just go to HomeScreen
 

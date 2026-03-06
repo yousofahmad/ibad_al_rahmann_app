@@ -11,9 +11,7 @@ import 'package:quran/quran.dart';
 import '../../../../core/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import 'full_page_rich_text_mobile.dart';
-import '../layouts/mobile_quran_top_bar.dart';
-import '../layouts/mobile_min_quran_bottom_section.dart';
-import 'quran_pages_list.dart';
+import 'single_tap_menu.dart';
 
 class FullQuranWidget extends StatefulWidget {
   const FullQuranWidget({super.key, this.currentPage});
@@ -117,8 +115,9 @@ class _FullQuranWidgetState extends State<FullQuranWidget> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // Disable single tap overlays in full mode to prevent distraction
-        // and accidental triggers during immersive reading.
+        setState(() {
+          _showOverlays = !_showOverlays;
+        });
       },
       onDoubleTap: () {
         context.read<QuranCubit>().changeLayout();
@@ -146,38 +145,35 @@ class _FullQuranWidgetState extends State<FullQuranWidget> {
             ),
             if (_showOverlays)
               Positioned.fill(
-                child: SafeArea(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        color: Colors.black54,
-                        padding: const EdgeInsets.only(top: 8, bottom: 8),
-                        height: 125.h,
-                        child: const MobileQuranTopBar(),
-                      ),
-                      Container(
-                        color: Colors.black54,
-                        padding: EdgeInsets.only(bottom: 12.h, top: 8.h),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              height: 60.h,
-                              padding: EdgeInsets.symmetric(horizontal: 20.w),
-                              child: const MobileMinQuranBottomSection(),
-                            ),
-                            SizedBox(height: 6.h),
-                            SizedBox(
-                              height: 50.h,
-                              width: double.infinity,
-                              child: const QuarnPagesList(),
-                            ),
-                            SizedBox(height: 10.h),
-                          ],
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () {
+                    setState(() {
+                      _showOverlays = false;
+                    });
+                  },
+                  child: SafeArea(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: BlocBuilder<QuranCubit, QuranState>(
+                          builder: (context, state) {
+                            final currentPage = (state.currentPage ?? 0) + 1;
+                            return PageActionBar(
+                              pageNumber: currentPage,
+                              onDismiss: () {
+                                if (mounted) {
+                                  setState(() {
+                                    _showOverlays = false;
+                                  });
+                                }
+                              },
+                            );
+                          },
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),

@@ -41,9 +41,10 @@ class PrayerNotificationService : Service() {
             val hijri = intent.getStringExtra("hijri") ?: ""
             val currentPrayerIndex = intent.getIntExtra("prayerIndex", -1)
             val nextPrayerEpoch = intent.getLongExtra("nextPrayerEpoch", 0L)
+            val isCountUp = intent.getBooleanExtra("isCountUp", false)
 
             val notification = buildPersistentNotification(
-                fajr, dhuhr, asr, maghrib, isha, nextName, countdown, hijri, currentPrayerIndex, nextPrayerEpoch
+                fajr, dhuhr, asr, maghrib, isha, nextName, countdown, hijri, currentPrayerIndex, nextPrayerEpoch, isCountUp
             )
 
             // Start Foreground
@@ -68,9 +69,9 @@ class PrayerNotificationService : Service() {
     private fun updateAllWidgets() {
         // Trigger Update for all our widget providers
         val providers = arrayOf(
+            PrayerWidgetProvider::class.java,
             PrayerWidgetWideProvider::class.java,
-            PrayerWidgetLargeProvider::class.java,
-            PrayerWidgetGoldProvider::class.java
+            PrayerWidgetLargeProvider::class.java
         )
         
         for (provider in providers) {
@@ -93,7 +94,7 @@ class PrayerNotificationService : Service() {
 
     private fun buildPersistentNotification(
         fajr: String, dhuhr: String, asr: String, maghrib: String, isha: String,
-        nextName: String, countdown: String, hijri: String, activeIndex: Int, nextPrayerEpoch: Long
+        nextName: String, countdown: String, hijri: String, activeIndex: Int, nextPrayerEpoch: Long, isCountUp: Boolean
     ): Notification {
         val channelId = "persistent_prayer_v2"
         
@@ -109,35 +110,68 @@ class PrayerNotificationService : Service() {
             manager.createNotificationChannel(channel)
         }
 
-        // Inflate custom layout
-        val remoteViews = RemoteViews(packageName, R.layout.custom_notification)
+        // ─── Dynamic Prefix + Direction (native computation) ───
+        val nowMs = System.currentTimeMillis()
+        val differenceMs = nextPrayerEpoch - nowMs
+        val countUpThresholdMs = 45L * 60L * 1000L // 45 minutes
 
-        // Set Texts
-        remoteViews.setTextViewText(R.id.tv_fajr_time, fajr)
-        remoteViews.setTextViewText(R.id.tv_dhuhr_time, dhuhr)
-        remoteViews.setTextViewText(R.id.tv_asr_time, asr)
-        remoteViews.setTextViewText(R.id.tv_maghrib_time, maghrib)
-        remoteViews.setTextViewText(R.id.tv_isha_time, isha)
-        
-        // nextName is already formatted by Dart (e.g. "الفجر متبقي" or "مضى على الفجر")
-        remoteViews.setTextViewText(R.id.tv_next_prayer_name, nextName)
+        // Dart already sends a fully formatted nextName (e.g., "الفجر متبقي" or "مضى على الفجر")
+        // So we use it directly as the prefix text.
+        val dynamicIsCountUp = nextPrayerEpoch > 0L && differenceMs < 0 && Math.abs(differenceMs) <= countUpThresholdMs
+        // Add static plus or minus to the prefix so chronometer format doesn't flicker
+        val signStr = if (nextPrayerEpoch > 0L) {
+            if (dynamicIsCountUp) "+" else "-"
+        } else {
+            ""
+        }
+        val prefixText = nextName
 
-        // Use Chronometer for live countdown with seconds
+        // ─── Collapsed View ───
+        val collapsedView = RemoteViews(packageName, R.layout.notification_collapsed)
+        // Set Next Prayer Info (Collapsed)
+        collapsedView.setTextViewText(R.id.tv_next_prayer_name, prefixText)
+        collapsedView.setTextViewText(R.id.tv_next_prayer_sign, signStr)
+        collapsedView.setTextViewText(R.id.tv_hijri_date, hijri)
+        // Sign is removed from collapsedView explicitly, Chronometer handles minus
+
+        // Chronometer for collapsed view
         if (nextPrayerEpoch > 0L) {
-            val nowMs = System.currentTimeMillis()
-            val differenceMs = nextPrayerEpoch - nowMs
             val baseTime = android.os.SystemClock.elapsedRealtime() + differenceMs
-            remoteViews.setChronometer(R.id.tv_next_prayer_countdown, baseTime, null, true)
-            // Support count-up mode (when differenceMs is negative = elapsed)
+            collapsedView.setChronometer(R.id.tv_next_prayer_countdown, baseTime, null, true)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                remoteViews.setChronometerCountDown(R.id.tv_next_prayer_countdown, differenceMs > 0)
+                collapsedView.setChronometerCountDown(R.id.tv_next_prayer_countdown, !dynamicIsCountUp)
             }
         } else {
-            // Fallback to static text if no epoch
-            remoteViews.setChronometer(R.id.tv_next_prayer_countdown, android.os.SystemClock.elapsedRealtime(), null, false)
+            collapsedView.setChronometer(R.id.tv_next_prayer_countdown, android.os.SystemClock.elapsedRealtime(), null, false)
         }
 
-        remoteViews.setTextViewText(R.id.tv_hijri_date, hijri)
+        // ─── Expanded View (full detail: 5 prayer times + header + hijri) ───
+        val expandedView = RemoteViews(packageName, R.layout.custom_notification)
+
+        // Set Texts
+        expandedView.setTextViewText(R.id.tv_fajr_time, fajr)
+        expandedView.setTextViewText(R.id.tv_dhuhr_time, dhuhr)
+        expandedView.setTextViewText(R.id.tv_asr_time, asr)
+        expandedView.setTextViewText(R.id.tv_maghrib_time, maghrib)
+        expandedView.setTextViewText(R.id.tv_isha_time, isha)
+        
+        // Set Next Prayer Info (Expanded) - if your custom layout has these exact IDs
+        expandedView.setTextViewText(R.id.tv_next_prayer_name, prefixText)
+        expandedView.setTextViewText(R.id.tv_next_prayer_sign, signStr)
+        // Sign is removed from expandedView explicitly, Chronometer handles minus
+
+        // Chronometer for expanded view
+        if (nextPrayerEpoch > 0L) {
+            val baseTime = android.os.SystemClock.elapsedRealtime() + differenceMs
+            expandedView.setChronometer(R.id.tv_next_prayer_countdown, baseTime, null, true)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                expandedView.setChronometerCountDown(R.id.tv_next_prayer_countdown, !dynamicIsCountUp)
+            }
+        } else {
+            expandedView.setChronometer(R.id.tv_next_prayer_countdown, android.os.SystemClock.elapsedRealtime(), null, false)
+        }
+
+        expandedView.setTextViewText(R.id.tv_hijri_date, hijri)
 
         // Highlight Active Prayer (gold accent for active, default for others)
         val accentColorId = R.color.widget_accent
@@ -147,19 +181,19 @@ class PrayerNotificationService : Service() {
         val timeIds = intArrayOf(R.id.tv_fajr_time, R.id.tv_dhuhr_time, R.id.tv_asr_time, R.id.tv_maghrib_time, R.id.tv_isha_time)
         val labelIds = intArrayOf(R.id.tv_fajr_label, R.id.tv_dhuhr_label, R.id.tv_asr_label, R.id.tv_maghrib_label, R.id.tv_isha_label)
         for (i in timeIds.indices) {
-            remoteViews.setTextColor(timeIds[i], getColor(defaultColorId))
-            remoteViews.setTextColor(labelIds[i], getColor(defaultColorId))
+            expandedView.setTextColor(timeIds[i], getColor(defaultColorId))
+            expandedView.setTextColor(labelIds[i], getColor(defaultColorId))
         }
 
         // Highlight the current one (both label and time)
         if (activeIndex in 0..4) {
-            remoteViews.setTextColor(timeIds[activeIndex], getColor(accentColorId))
-            remoteViews.setTextColor(labelIds[activeIndex], getColor(accentColorId))
+            expandedView.setTextColor(timeIds[activeIndex], getColor(accentColorId))
+            expandedView.setTextColor(labelIds[activeIndex], getColor(accentColorId))
         }
 
         // Also highlight the Next Prayer Name and Countdown in the header
-        remoteViews.setTextColor(R.id.tv_next_prayer_name, getColor(accentColorId))
-        remoteViews.setTextColor(R.id.tv_next_prayer_countdown, getColor(accentColorId))
+        expandedView.setTextColor(R.id.tv_next_prayer_name, getColor(accentColorId))
+        expandedView.setTextColor(R.id.tv_next_prayer_countdown, getColor(accentColorId))
 
         // Tap on notification opens the App
         val intent = Intent(this, MainActivity::class.java).apply {
@@ -172,14 +206,14 @@ class PrayerNotificationService : Service() {
 
         return NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.mipmap.launcher_icon)
-            .setCustomContentView(remoteViews)
-            .setCustomBigContentView(remoteViews) // Extends if there's space
+            .setCustomContentView(collapsedView)
+            .setCustomBigContentView(expandedView)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setOngoing(true) 
-            .setPriority(NotificationCompat.PRIORITY_MAX) // MAX so it stays at the top of notification shade
-            .setSound(null) // No sound for persistent notification
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setSound(null)
             .setContentIntent(pendingIntent)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // Show on lock screen
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
     }
 

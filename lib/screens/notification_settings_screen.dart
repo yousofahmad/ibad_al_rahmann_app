@@ -111,7 +111,7 @@ class _NotificationSettingsScreenState
       _vibCounter = prefs.getBool('vib_counter') ?? true;
 
       _qiyamAlert = prefs.getBool('notif_qiyam') ?? false;
-      _sunriseAlert = prefs.getBool('notif_sunrise') ?? false;
+      _sunriseAlert = prefs.getBool('notif_sunrise') ?? true;
       _duhaAlert = prefs.getBool('notif_duha') ?? false;
       _jumuaAlert = prefs.getBool('notif_jumua') ?? false;
       _persistentNotification =

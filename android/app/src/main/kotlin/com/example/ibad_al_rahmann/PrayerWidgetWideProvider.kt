@@ -30,10 +30,15 @@ class PrayerWidgetWideProvider : AppWidgetProvider() {
 
                     // Live Chronometer using epoch from Dart
                     val targetEpochMs = widgetData.getLong("next_prayer_time_epoch", 0L)
-                    val isCountUp = widgetData.getBoolean("gold_is_count_up", false)
-
+                    val isCountUp = widgetData.getBoolean("is_count_up", false)
+                    val signStr = if (targetEpochMs > 0L) {
+                        if (isCountUp) "+" else "-"
+                    } else {
+                        ""
+                    }
                     // ─── Apply to Views ───
                     setTextViewText(R.id.tv_widget_wide_next_prayer, nextName)
+                    setTextViewText(R.id.tv_widget_wide_status_sign, signStr)
                     setTextViewText(R.id.tv_widget_wide_hijri, hijri)
 
                     // Live Chronometer
@@ -42,9 +47,9 @@ class PrayerWidgetWideProvider : AppWidgetProvider() {
                         val differenceMs = targetEpochMs - nowMs
                         val baseTime = SystemClock.elapsedRealtime() + differenceMs
 
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                            setChronometer(R.id.tv_widget_wide_countdown, baseTime, null, true)
-                            setChronometerCountDown(R.id.tv_widget_wide_countdown, !isCountUp)
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {  
+                            setChronometer(R.id.tv_widget_wide_countdown, baseTime, null, true)      
+                            setChronometerCountDown(R.id.tv_widget_wide_countdown, !isCountUp)       
                         } else {
                             setChronometer(R.id.tv_widget_wide_countdown, baseTime, null, true)
                         }
@@ -62,7 +67,7 @@ class PrayerWidgetWideProvider : AppWidgetProvider() {
 
                     // App Tap Intent
                     val intent = Intent(context, MainActivity::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP      
                     }
                     val pendingIntent = PendingIntent.getActivity(context, appWidgetId + 400, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
                     setOnClickPendingIntent(R.id.tv_widget_wide_fajr, pendingIntent)
@@ -74,4 +79,3 @@ class PrayerWidgetWideProvider : AppWidgetProvider() {
         }
     }
 }
-

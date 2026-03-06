@@ -17,8 +17,8 @@ class ShareHelper {
     final boundary =
         key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary == null) return null;
-    // pixelRatio 3.0 for HD quality
-    return boundary.toImage(pixelRatio: 3.0);
+    // pixelRatio 5.0 for HD quality
+    return boundary.toImage(pixelRatio: 5.0);
   }
 
   /// Writes the captured image to a temporary file and returns its path.
@@ -97,7 +97,7 @@ class ShareHelper {
       }
 
       // Use gal to save the image to the device gallery
-      await Gal.putImage(filePath);
+      await Gal.putImage(filePath, album: 'عباد الرحمن');
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -227,7 +227,7 @@ class ShareHelper {
 
       // Save each image individually to avoid large batch failures
       for (final path in paths) {
-        await Gal.putImage(path);
+        await Gal.putImage(path, album: 'عباد الرحمن');
       }
 
       if (context.mounted) {

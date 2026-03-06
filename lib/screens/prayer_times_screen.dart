@@ -211,42 +211,39 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                     itemCount:
                         _prayers.length +
                         _tomorrowPrayers.length +
-                        1, // +1 for Header
+                        2, // +2 for Today header + Tomorrow header
                     itemBuilder: (context, index) {
-                      // Section 1: Today
-                      if (index < _prayers.length) {
-                        final p = _prayers[index];
+                      // Section 0: Today's date header
+                      if (index == 0) {
+                        final todayDate = DateTime.now();
+                        final todayStr = DateFormat(
+                          'EEEE d MMMM yyyy',
+                          'ar',
+                        ).format(todayDate);
+                        return _buildDateHeader(todayStr);
+                      }
+
+                      // Section 1: Today's prayers
+                      if (index <= _prayers.length) {
+                        final p = _prayers[index - 1];
                         final isNext = p == _nextPrayer;
                         return _buildPrayerRow(p, isNext);
                       }
 
-                      // Section 2: Header
-                      if (index == _prayers.length) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20),
-                          child: Row(
-                            children: [
-                              Expanded(child: Divider(color: _goldColor)),
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 10),
-                                child: Text(
-                                  "مواقيت الغد",
-                                  style: TextStyle(
-                                    fontFamily: AppConsts.expoArabic,
-                                    color: _goldColor,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              Expanded(child: Divider(color: _goldColor)),
-                            ],
-                          ),
+                      // Section 2: Tomorrow's date header
+                      if (index == _prayers.length + 1) {
+                        final tomorrowDate = DateTime.now().add(
+                          const Duration(days: 1),
                         );
+                        final tomorrowStr = DateFormat(
+                          'EEEE d MMMM yyyy',
+                          'ar',
+                        ).format(tomorrowDate);
+                        return _buildDateHeader(tomorrowStr);
                       }
 
-                      // Section 3: Tomorrow
-                      final p = _tomorrowPrayers[index - _prayers.length - 1];
-                      // Tomorrow's prayers usually aren't "Next" unless it's very late today, handled by logic above
+                      // Section 3: Tomorrow's prayers
+                      final p = _tomorrowPrayers[index - _prayers.length - 2];
                       final isNext = p == _nextPrayer;
                       return _buildPrayerRow(p, isNext);
                     },
@@ -254,6 +251,29 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildDateHeader(String dateText) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Row(
+        children: [
+          const Expanded(child: Divider(color: _goldColor)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              dateText,
+              style: const TextStyle(
+                fontFamily: AppConsts.expoArabic,
+                color: _goldColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const Expanded(child: Divider(color: _goldColor)),
+        ],
+      ),
     );
   }
 

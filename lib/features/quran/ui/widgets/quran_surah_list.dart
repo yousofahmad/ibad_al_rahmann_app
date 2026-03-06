@@ -18,7 +18,6 @@ class _QuranSurahListState extends State<QuranSurahList> {
   @override
   void initState() {
     super.initState();
-    // Initialize with the current surah from the controller
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final controller = context.read<QuranCubit>().surahsController;
       if (controller.hasClients) {
@@ -34,6 +33,7 @@ class _QuranSurahListState extends State<QuranSurahList> {
     return PageView.builder(
       controller: context.read<QuranCubit>().surahsController,
       scrollDirection: Axis.horizontal,
+      clipBehavior: Clip.none, // دي مهمة عشان لو الكلمة كبيرة متتقصش
       itemCount: 114,
       onPageChanged: (value) {
         setState(() {
@@ -42,7 +42,9 @@ class _QuranSurahListState extends State<QuranSurahList> {
         context.read<QuranCubit>().onSurahListChanged(_currentPage);
       },
       itemBuilder: (context, index) {
+        // رجعنا الـ Row زي الكود القديم بالظبط عشان يمنع الـ Box إنه يتمط
         return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SurahTitleBox(
               text: surahArabicTashkel[index],

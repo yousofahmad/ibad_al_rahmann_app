@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:ibad_al_rahmann/core/services/intro_service.dart';
-import 'package:ibad_al_rahmann/core/theme/app_colors.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
 
 import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
@@ -60,21 +59,32 @@ class _MinQuranMobileState extends State<MinQuranMobile> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
+          title: const Text(
+            'تلميحات التصفح',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: AppConsts.cairo,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              color: Color(0xFFD0A871),
+            ),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.touch_app, color: AppColors.white, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'اضغط ضغطتين لتكبير الصفحة',
-                style: context.headlineLarge,
-                textAlign: TextAlign.center,
+              _buildHintRow(Icons.touch_app, 'ضغطتين', 'تكبير / تصغير الصفحة'),
+              const SizedBox(height: 12),
+              _buildHintRow(
+                Icons.touch_app_outlined,
+                'ضغطة مطولة',
+                'التفسير والمشاركة ومشغل الآيات',
               ),
-              const SizedBox(height: 8),
-              Text(
-                'يمكنك تكبير الشاشة عبر الضغط مرتين على الآيات',
-                style: context.headlineLarge.copyWith(fontSize: 20.sp),
-                textAlign: TextAlign.center,
+              const SizedBox(height: 12),
+              _buildHintRow(
+                Icons.bookmark_outline,
+                'ضغطة واحدة',
+                ' قائمة المحفوظات و تغيير الثيم والمشاركة او الحفظ وضغطة اخري تختفي',
               ),
             ],
           ),
@@ -86,14 +96,51 @@ class _MinQuranMobileState extends State<MinQuranMobile> {
               child: const Text(
                 'حسنًا',
                 style: TextStyle(
-                  color: AppColors.white,
-                  fontFamily: AppConsts.uthmanic,
+                  color: Color(0xFFD0A871),
+                  fontFamily: AppConsts.cairo,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildHintRow(IconData icon, String title, String desc) {
+    return Row(
+      textDirection: TextDirection.rtl,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: const Color(0xFFD0A871), size: 22),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontFamily: AppConsts.cairo,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+                textDirection: TextDirection.rtl,
+              ),
+              Text(
+                desc,
+                style: TextStyle(
+                  fontFamily: AppConsts.cairo,
+                  fontSize: 12,
+                  color: Colors.grey[400],
+                ),
+                textDirection: TextDirection.rtl,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

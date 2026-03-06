@@ -74,25 +74,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _isMorningAzkarDone = false;
   bool _isEveningAzkarDone = false;
-  bool _isMorningAzkarStarted = false;
-  bool _isEveningAzkarStarted = false;
-  bool _isWirdStarted = false;
 
   void _checkDailyTasks() async {
     final mDone = await DailyTrackerService.isDone('morning_azkar');
     final eDone = await DailyTrackerService.isDone('evening_azkar');
 
-    final mStarted = await DailyTrackerService.isStarted('morning_azkar');
-    final eStarted = await DailyTrackerService.isStarted('evening_azkar');
-    final wStarted = await DailyTrackerService.isStarted('wird');
-
     if (mounted) {
       setState(() {
         _isMorningAzkarDone = mDone;
         _isEveningAzkarDone = eDone;
-        _isMorningAzkarStarted = mStarted;
-        _isEveningAzkarStarted = eStarted;
-        _isWirdStarted = wStarted;
       });
     }
   }
@@ -115,20 +105,9 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // 3. Wird (Quran)
+    // 3. Wird (Quran) — open the reading screen directly
     if (payload.startsWith('wird')) {
-      int? page;
-      try {
-        final parts = payload.split(':');
-        if (parts.length > 1) {
-          page = int.tryParse(parts[1]);
-        }
-      } catch (_) {}
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => QuranScreen(initialPage: page)),
-      );
+      _openCurrentWird();
       return;
     }
 
@@ -140,6 +119,37 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
+  }
+
+  void _openCurrentWird() {
+    if (!mounted) return;
+    final khatmaCubit = context.read<KhatmaCubit>();
+    final state = khatmaCubit.state;
+
+    if (state is KhatmaLoaded) {
+      final khatma = state.khatma;
+      final currentIndex = khatma.currentWirdIndex;
+      if (currentIndex < khatma.wirds.length) {
+        final currentWird = khatma.wirds[currentIndex];
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => IsolatedWirdScreen(
+              wirdIndex: currentIndex,
+              targetStartPage: currentWird.startPage,
+              targetEndPage: currentWird.endPage,
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    // Fallback: no active khatma or completed — open dashboard
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const WirdDashboardScreen()),
+    );
   }
 
   void _loadPrayerTimes() {
@@ -426,65 +436,52 @@ class _HomeScreenState extends State<HomeScreen> {
         final times = _prayerService.getPrayerTimes();
         final now = DateTime.now();
 
-        // 🟢 أذكار الصباح — تظهر من الفجر حتى المغرب 🟢
+        // ─── أذكار الصباح ───
+        // عادي (ذهبي): الفجر → الظهر
+        // متأخر (أحمر): الظهر → العصر
         bool showMorningDelayed = false;
         bool showMorningInProgress = false;
-        bool isMorningWindow = true;
-        if (times != null && now.isAfter(times.maghrib)) {
-          // بعد المغرب: اخفي أذكار الصباح تماماً
-          isMorningWindow = false;
-        }
-        if (isMorningWindow && !_isMorningAzkarDone) {
-          if (times != null && now.isAfter(times.dhuhr)) {
+        if (times != null && !_isMorningAzkarDone) {
+          if (now.isAfter(times.fajr) && now.isBefore(times.dhuhr)) {
+            // وقت عادي: الفجر للظهر
+            showMorningInProgress = true;
+          } else if (now.isAfter(times.dhuhr) && now.isBefore(times.asr)) {
+            // متأخر: الظهر للعصر
             showMorningDelayed = true;
-          } else if (_isMorningAzkarStarted) {
-            showMorningInProgress = true;
-          } else {
-            // لم يبدأ بعد - نظهر تذكير ذهبي
-            showMorningInProgress = true;
           }
         }
 
-        // 🟠 أذكار المساء — تظهر من العصر حتى الفجر (الصباح التالي) 🟠
+        // ─── أذكار المساء ───
+        // عادي (ذهبي): العصر → المغرب
+        // متأخر (أحمر): المغرب → الفجر
         bool showEveningDelayed = false;
         bool showEveningInProgress = false;
-        bool isEveningWindow = true;
-        if (times != null &&
-            now.isAfter(times.fajr) &&
-            now.isBefore(times.asr)) {
-          // بعد الفجر وقبل العصر: اخفي أذكار المساء تماماً
-          isEveningWindow = false;
-        }
-        if (isEveningWindow && !_isEveningAzkarDone) {
-          if (times != null && now.isAfter(times.isha)) {
+        if (times != null && !_isEveningAzkarDone) {
+          if (now.isAfter(times.asr) && now.isBefore(times.maghrib)) {
+            // وقت عادي: العصر للمغرب
+            showEveningInProgress = true;
+          } else if (now.isAfter(times.maghrib) || now.isBefore(times.fajr)) {
+            // متأخر: بعد المغرب أو قبل الفجر
             showEveningDelayed = true;
-          } else if (_isEveningAzkarStarted) {
-            showEveningInProgress = true;
-          } else {
-            // لم يبدأ بعد - نظهر تذكير ذهبي
-            showEveningInProgress = true;
           }
         }
 
-        // 📖 الورد القرآني 📖
-        bool showWirdDelayed = false;
+        // ─── الورد القرآني ───
+        int delayedWirdCount = 0;
         bool showWirdInProgress = false;
         if (state is KhatmaLoaded) {
+          final khatma = state.khatma;
           final target = context.read<KhatmaCubit>().getCurrentTargetWird();
-          if (target != null && !target.isCompleted) {
-            if (state.khatma.currentWirdIndex < target.wirdIndex) {
-              showWirdDelayed = true;
-            } else if (_isWirdStarted) {
+          if (target != null) {
+            // عدد الأوراد المتأخرة = الفرق بين الهدف والحالي
+            delayedWirdCount = target.wirdIndex - khatma.currentWirdIndex;
+            if (delayedWirdCount <= 0 && !target.isCompleted) {
+              // في الوقت: الورد الحالي مطلوب
               showWirdInProgress = true;
-            } else {
-              // لو لسه مبدأش بس الوقت لسه معداش بنشوف لو "مطلوب حالياً"
-              // في وضع الصلوات ممكن نخليه ذهبي لو احنا في وقت الصلاة بتاعت الورد
-              if (state.khatma.notificationType == 'prayer') {
-                showWirdInProgress = true;
-              }
             }
           }
         }
+        final bool showWirdDelayed = delayedWirdCount > 0;
 
         if (!showMorningDelayed &&
             !showMorningInProgress &&
@@ -500,9 +497,9 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             children: [
               // 🔴 المتأخر يطلع الأول باللون الأحمر 🔴
-              if (showWirdDelayed)
-                _buildReminderCard("فاتك الورد! اقرأ الآن لتعويض التأخير", () {
-                  final k = (state as KhatmaLoaded).khatma;
+              if (showWirdDelayed && state is KhatmaLoaded)
+                _buildReminderCard("متأخر $delayedWirdCount ورد عن الختمة", () {
+                  final k = state.khatma;
                   final w = k.wirds[k.currentWirdIndex];
                   Navigator.push(
                     context,
@@ -544,7 +541,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ).then((_) => _checkDailyTasks());
                 }, isDelayed: true),
 
-              // 🟡 اللي في النص أو الجاري تنفيذه باللون الذهبي 🟡
+              // 🟡 الجاري تنفيذه باللون الذهبي 🟡
               if (showWirdInProgress && state is KhatmaLoaded)
                 _buildReminderCard("أكمل قراءة الورد الحالي", () {
                   final k = state.khatma;

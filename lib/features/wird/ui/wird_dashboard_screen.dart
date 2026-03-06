@@ -92,7 +92,7 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
                       children: [
                         const CircularProgressIndicator(),
                         const SizedBox(height: 20),
-                        Text(
+                        const Text(
                           'جاري التصدير...',
                           style: TextStyle(
                             fontFamily: AppConsts.cairo,
@@ -712,7 +712,7 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
     if (saveToGallery) {
       try {
         for (final path in capturedPaths) {
-          await Gal.putImage(path);
+          await Gal.putImage(path, album: 'عباد الرحمن');
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -896,8 +896,10 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
       if (_pageController.hasClients) {
         _pageController.jumpToPage(i);
       }
-      await Future<void>.delayed(const Duration(milliseconds: 400));
+      // Wait longer to ensure font + layout is fully rendered
+      await Future<void>.delayed(const Duration(milliseconds: 800));
       await WidgetsBinding.instance.endOfFrame;
+      await Future<void>.delayed(const Duration(milliseconds: 200));
 
       final realPage = widget.startPage + i;
       final key = cubit.getPageKey(realPage);
@@ -918,16 +920,26 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
 
   @override
   Widget build(BuildContext context) {
+    // Use full screen size to match the reading mode exactly
     return Scaffold(
       backgroundColor: Colors.white,
-      body: PageView.builder(
-        controller: _pageController,
-        itemCount: _totalPages,
-        physics: const NeverScrollableScrollPhysics(),
-        itemBuilder: (context, index) {
-          final realPage = widget.startPage + index;
-          return WbwPageWidget(pageNumber: realPage, isZoomEnabled: false);
-        },
+      body: SizedBox(
+        width: MediaQuery.of(context).size.width,
+        height: MediaQuery.of(context).size.height,
+        child: PageView.builder(
+          controller: _pageController,
+          itemCount: _totalPages,
+          physics: const NeverScrollableScrollPhysics(),
+          itemBuilder: (context, index) {
+            final realPage = widget.startPage + index;
+            return WbwPageWidget(
+              pageNumber: realPage,
+              isZoomEnabled: false,
+              paperColorOverride: Colors.white,
+              textColorOverride: Colors.black,
+            );
+          },
+        ),
       ),
     );
   }

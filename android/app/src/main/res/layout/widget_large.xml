@@ -47,6 +47,7 @@
             android:layoutDirection="ltr">
 
             <TextView
+                android:id="@+id/tv_widget_large_sign"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="–"

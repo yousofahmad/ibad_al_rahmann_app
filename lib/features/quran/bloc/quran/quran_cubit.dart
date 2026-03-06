@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/di/di.dart';
 import 'package:ibad_al_rahmann/core/services/cache_service.dart';
@@ -54,6 +55,7 @@ class QuranCubit extends Cubit<QuranState> {
   final QuranRepo _repo;
 
   static const String _lastPageKey = 'last_quran_page';
+  static const String _lastWirdPageKey = 'last_wird_page';
   static const String _lastLayoutKey = 'last_quran_layout';
 
   /// Initialize cache and load the last page
@@ -64,7 +66,8 @@ class QuranCubit extends Cubit<QuranState> {
 
   /// Load the last page from cache and set it as initial page
   Future<void> _loadLastPage() async {
-    int? lastPage = getIt<CacheService>().getInt(_lastPageKey);
+    final key = isWirdMode ? _lastWirdPageKey : _lastPageKey;
+    int? lastPage = getIt<CacheService>().getInt(key);
     final String? lastLayoutString = await getIt<CacheService>().getString(
       _lastLayoutKey,
     );
@@ -80,18 +83,19 @@ class QuranCubit extends Cubit<QuranState> {
         verseNumber: pageData[0]['start'],
       );
       emit(
-        QuranState(layout: layout, juzNumber: juzNum, currentPage: lastPage),
+        state.copyWith(
+          layout: layout,
+          juzNumber: juzNum,
+          currentPage: lastPage,
+        ),
       );
     }
   }
 
   /// Save the current page to cache
   Future<void> _saveCurrentPage(int pageIndex) async {
-    if (state.isWirdMode) {
-      await getIt<CacheService>().setInt('wird_last_page_absolute', pageIndex);
-    } else {
-      await getIt<CacheService>().setInt(_lastPageKey, pageIndex);
-    }
+    final key = state.isWirdMode ? _lastWirdPageKey : _lastPageKey;
+    await getIt<CacheService>().setInt(key, pageIndex);
   }
 
   /// Save the current layout to cache
@@ -113,31 +117,34 @@ class QuranCubit extends Cubit<QuranState> {
   }
 
   // Navigate Quran main pager to the given zero-based page index
+  Timer? _highlightTimer;
 
   Future<void> navigateToPage(int pageIndex, {String? highligthedVerse}) async {
     await _repo.navigateToPage(pageIndex);
 
     if (highligthedVerse != null) {
+      // Cancel any previous auto-clear timer
+      _highlightTimer?.cancel();
+
       emit(
         state.copyWith(
           highligthedVerse:
               '${highligthedVerse.substring(0, 1)}\u200A${highligthedVerse.substring(1)}',
         ),
       );
+
+      // Auto-clear highlight after 10 seconds
+      _highlightTimer = Timer(const Duration(seconds: 10), () {
+        clearHighlightedVerse();
+      });
     }
   }
 
   // Clear the transient highlighted verse (e.g., after navigation/scroll)
   void clearHighlightedVerse() {
+    _highlightTimer?.cancel();
     if (state.highligthedVerse != null) {
-      emit(
-        QuranState(
-          layout: state.layout,
-          juzNumber: state.juzNumber,
-          currentPage: state.currentPage,
-          highligthedVerse: null,
-        ),
-      );
+      emit(state.copyWith(clearHighligthedVerse: true));
     }
   }
 
@@ -223,8 +230,12 @@ class QuranCubit extends Cubit<QuranState> {
 
   void initControllers(int pageNumber) {
     _repo.initControllers(pageNumber);
-    // Silent background preloader for perfectly smooth page experience
-    QuranWbwDbHelper.instance.preloadAllPagesInBackground();
+    // Silent background preloader for perfectly smooth page experience - ONLY FIRST TIME
+    final cache = getIt<CacheService>();
+    if (cache.getBool('has_preloaded_all_pages') != true) {
+      QuranWbwDbHelper.instance.preloadAllPagesInBackground();
+      cache.setBool('has_preloaded_all_pages', true);
+    }
 
     final pageData = getPageData(pageNumber == 0 ? 1 : pageNumber);
     int juzNum = getCurrentJuzNumber(
@@ -239,28 +250,13 @@ class QuranCubit extends Cubit<QuranState> {
       int pageIndex = minQuranController.hasClients
           ? (minQuranController.page?.round() ?? 1)
           : 1;
-      emit(
-        QuranState(
-          layout: QuranLayout.full,
-          currentPage: pageIndex,
-          juzNumber: state.juzNumber,
-        ),
-      );
-      // Save the new layout to cache
+      emit(state.copyWith(layout: QuranLayout.full, currentPage: pageIndex));
       _saveCurrentLayout(QuranLayout.full);
     } else {
       int pageIndex = fullQuranController.hasClients
           ? (fullQuranController.page?.round() ?? 1)
           : 1;
-
-      emit(
-        QuranState(
-          layout: QuranLayout.min,
-          currentPage: pageIndex,
-          juzNumber: state.juzNumber,
-        ),
-      );
-      // Save the new layout to cache
+      emit(state.copyWith(layout: QuranLayout.min, currentPage: pageIndex));
       _saveCurrentLayout(QuranLayout.min);
     }
   }

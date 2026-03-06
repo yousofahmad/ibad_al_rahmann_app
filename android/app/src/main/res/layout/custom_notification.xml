@@ -5,84 +5,82 @@
     android:orientation="vertical"
     android:layoutDirection="rtl"
     android:background="@android:color/transparent"
-    android:padding="10dp">
-
-    <!-- Row 1: Header (Next Prayer + Countdown | Hijri Date) -->
-    <RelativeLayout
+    android:padding="6dp"> <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="10dp"
+        android:layout_marginBottom="6dp" 
         android:layoutDirection="rtl"
-        android:padding="4dp">
+        android:padding="0dp">
 
-        <!-- Right (RTL Start): Next Prayer + Countdown -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentStart="true"
             android:layout_centerVertical="true"
-            android:orientation="horizontal"
+            android:gravity="center_vertical"
             android:layoutDirection="rtl"
-            android:gravity="center_vertical">
+            android:orientation="horizontal">
 
             <TextView
                 android:id="@+id/tv_next_prayer_name"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textSize="16sp"
-                android:textStyle="bold"
                 android:gravity="center"
-                android:textAlignment="center"
+                android:text="الفجر متبقي:"
+                android:textColor="?android:attr/textColorPrimary"
                 android:textDirection="locale"
-                android:text="الفجر متبقي" />
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_next_prayer_sign"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:text="–"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
 
             <Chronometer
                 android:id="@+id/tv_next_prayer_countdown"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textSize="16sp"
-                android:textStyle="bold"
+                android:layout_marginStart="8dp" 
+                android:countDown="true"
                 android:gravity="center"
-                android:textAlignment="center"
+                android:textColor="?android:attr/textColorPrimary"
                 android:textDirection="ltr"
-                android:countDown="true" />
+                android:textSize="18sp" 
+                android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Left (RTL End): Hijri Date -->
         <TextView
             android:id="@+id/tv_hijri_date"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentEnd="true"
             android:layout_centerVertical="true"
-            android:textColor="?android:attr/textColorSecondary"
-            android:textSize="13sp"
             android:gravity="center"
-            android:textAlignment="center"
+            android:text="١ رمضان ١٤٤٧ هـ"
+            android:textColor="?android:attr/textColorSecondary"
             android:textDirection="locale"
-            android:text="١ رمضان ١٤٤٧ هـ" />
+            android:textSize="12sp" /> </RelativeLayout>
 
-    </RelativeLayout>
-
-    <!-- Row 2: 5 Prayers Timeline -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="0dp"
         android:orientation="horizontal"
         android:weightSum="5"
         android:layoutDirection="rtl"
         android:background="@drawable/notification_table_bg"
         android:gravity="center"
         android:layout_gravity="center"
-        android:paddingTop="10dp"
-        android:paddingBottom="10dp"
+        android:paddingTop="6dp" 
+        android:paddingBottom="6dp" 
         android:paddingHorizontal="4dp">
 
-        <!-- الفجر -->
         <LinearLayout
             android:id="@+id/layout_fajr"
             android:layout_width="0dp"
@@ -90,34 +88,28 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:layout_gravity="center">
-            <TextView
+            android:padding="2dp"> <TextView
                 android:id="@+id/tv_fajr_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="الفجر"
-                android:textSize="13sp"
+                android:textSize="12sp" 
                 android:textColor="?android:attr/textColorPrimary"
                 android:textStyle="bold"
-                android:gravity="center"
-                android:layout_gravity="center"
-                android:textAlignment="center" />
+                android:gravity="center" />
             <TextView
                 android:id="@+id/tv_fajr_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="2dp" 
                 android:text="--:--"
-                android:textSize="15sp"
+                android:textSize="14sp" 
                 android:textStyle="bold"
                 android:textColor="?android:attr/textColorPrimary"
                 android:gravity="center"
-                android:layout_gravity="center"
-                android:textAlignment="center"
                 android:textDirection="ltr" />
         </LinearLayout>
 
-        <!-- الظهر -->
         <LinearLayout
             android:id="@+id/layout_dhuhr"
             android:layout_width="0dp"
@@ -125,34 +117,29 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:layout_gravity="center">
+            android:padding="2dp">
             <TextView
                 android:id="@+id/tv_dhuhr_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="الظهر"
-                android:textSize="13sp"
+                android:textSize="12sp"
                 android:textColor="?android:attr/textColorPrimary"
                 android:textStyle="bold"
-                android:gravity="center"
-                android:layout_gravity="center"
-                android:textAlignment="center" />
+                android:gravity="center" />
             <TextView
                 android:id="@+id/tv_dhuhr_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="2dp"
                 android:text="--:--"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 android:textColor="?android:attr/textColorPrimary"
                 android:gravity="center"
-                android:layout_gravity="center"
-                android:textAlignment="center"
                 android:textDirection="ltr" />
         </LinearLayout>
 
-        <!-- العصر -->
         <LinearLayout
             android:id="@+id/layout_asr"
             android:layout_width="0dp"
@@ -160,34 +147,29 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:layout_gravity="center">
+            android:padding="2dp">
             <TextView
                 android:id="@+id/tv_asr_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="العصر"
-                android:textSize="13sp"
+                android:textSize="12sp"
                 android:textColor="?android:attr/textColorPrimary"
                 android:textStyle="bold"
-                android:gravity="center"
-                android:layout_gravity="center"
-                android:textAlignment="center" />
+                android:gravity="center" />
             <TextView
                 android:id="@+id/tv_asr_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="2dp"
                 android:text="--:--"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 android:textColor="?android:attr/textColorPrimary"
                 android:gravity="center"
-                android:layout_gravity="center"
-                android:textAlignment="center"
                 android:textDirection="ltr" />
         </LinearLayout>
 
-        <!-- المغرب -->
         <LinearLayout
             android:id="@+id/layout_maghrib"
             android:layout_width="0dp"
@@ -195,34 +177,29 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:layout_gravity="center">
+            android:padding="2dp">
             <TextView
                 android:id="@+id/tv_maghrib_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="المغرب"
-                android:textSize="13sp"
+                android:textSize="12sp"
                 android:textColor="?android:attr/textColorPrimary"
                 android:textStyle="bold"
-                android:gravity="center"
-                android:layout_gravity="center"
-                android:textAlignment="center" />
+                android:gravity="center" />
             <TextView
                 android:id="@+id/tv_maghrib_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="2dp"
                 android:text="--:--"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 android:textColor="?android:attr/textColorPrimary"
                 android:gravity="center"
-                android:layout_gravity="center"
-                android:textAlignment="center"
                 android:textDirection="ltr" />
         </LinearLayout>
 
-        <!-- العشاء -->
         <LinearLayout
             android:id="@+id/layout_isha"
             android:layout_width="0dp"
@@ -230,30 +207,26 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:layout_gravity="center">
+            android:padding="2dp">
             <TextView
                 android:id="@+id/tv_isha_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="العشاء"
-                android:textSize="13sp"
+                android:textSize="12sp"
                 android:textColor="?android:attr/textColorPrimary"
                 android:textStyle="bold"
-                android:gravity="center"
-                android:layout_gravity="center"
-                android:textAlignment="center" />
+                android:gravity="center" />
             <TextView
                 android:id="@+id/tv_isha_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="2dp"
                 android:text="--:--"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 android:textColor="?android:attr/textColorPrimary"
                 android:gravity="center"
-                android:layout_gravity="center"
-                android:textAlignment="center"
                 android:textDirection="ltr" />
         </LinearLayout>
 

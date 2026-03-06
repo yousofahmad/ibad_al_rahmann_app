@@ -121,6 +121,7 @@ object WidgetUpdateHelper {
             val appWidgetManager = AppWidgetManager.getInstance(context)
 
             val providers = arrayOf(
+                PrayerWidgetProvider::class.java,
                 PrayerWidgetWideProvider::class.java,
                 PrayerWidgetLargeProvider::class.java
             )

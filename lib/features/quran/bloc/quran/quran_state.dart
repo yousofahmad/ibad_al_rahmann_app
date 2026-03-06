@@ -27,6 +27,7 @@ class QuranState {
     int? juzNumber,
     int? currentPage,
     String? highligthedVerse,
+    bool clearHighligthedVerse = false,
     bool? isWirdMode,
     int? wirdStartPage,
     int? targetEndPage,
@@ -36,7 +37,9 @@ class QuranState {
       layout: layout ?? this.layout,
       juzNumber: juzNumber ?? this.juzNumber,
       currentPage: currentPage ?? this.currentPage,
-      highligthedVerse: highligthedVerse ?? this.highligthedVerse,
+      highligthedVerse: clearHighligthedVerse
+          ? null
+          : (highligthedVerse ?? this.highligthedVerse),
       isWirdMode: isWirdMode ?? this.isWirdMode,
       wirdStartPage: wirdStartPage ?? this.wirdStartPage,
       targetEndPage: targetEndPage ?? this.targetEndPage,

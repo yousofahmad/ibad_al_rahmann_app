@@ -1,6 +1,5 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
-import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:ibad_al_rahmann/core/theme/app_images.dart';
 
 class Basmallah extends StatelessWidget {
@@ -21,8 +20,9 @@ class Basmallah extends StatelessWidget {
         ),
         child: Image.asset(
           AppImages.basmala,
-          color: color ?? context.onSecondary,
           width: context.screenWidth,
+          color: color,
+          colorBlendMode: color != null ? BlendMode.srcIn : null,
         ),
       ),
     );
@@ -47,8 +47,9 @@ class TabletBasmallah extends StatelessWidget {
         ),
         child: Image.asset(
           AppImages.basmala,
-          color: color ?? context.onSecondary,
           width: context.screenWidth * .4,
+          color: color,
+          colorBlendMode: color != null ? BlendMode.srcIn : null,
         ),
       ),
     );

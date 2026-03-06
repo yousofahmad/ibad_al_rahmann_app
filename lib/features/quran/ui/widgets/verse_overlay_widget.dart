@@ -137,9 +137,13 @@ class _VerseShareDialogState extends State<_VerseShareDialog> {
       buf.write(' ${getVerseEndSymbol(i)} ');
     }
     buf.writeln();
-    buf.write(
-      '[ سورة ${getSurahNameArabic(widget.surahNumber)}، الآية ${widget.verseNumber} ]',
-    );
+
+    final surahName = getSurahNameArabic(widget.surahNumber);
+    if (startAyah == endAyah) {
+      buf.write('[ سورة $surahName، الآية $startAyah ]');
+    } else {
+      buf.write('[ سورة $surahName، الآيات من $startAyah إلى $endAyah ]');
+    }
     buf.writeln();
     buf.write('من تطبيق عِبَادُ الرَّحْمَٰن 📖');
     return buf.toString();
@@ -157,7 +161,7 @@ class _VerseShareDialogState extends State<_VerseShareDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
+              const Text(
                 'مشاركة الآية',
                 style: TextStyle(
                   fontSize: 20,

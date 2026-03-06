@@ -33,23 +33,22 @@ class SurahTitleBoxMobile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      width: 120.w,
-      height: 35.h,
+      // رجعنا المسافات والمقاسات الكبيرة بتاعة القديم
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      width: 160.w,
+      height: 45.h,
       child: CustomPaint(
         painter: FramePainter(
           selected: selected,
           backgroundColor: selected ? context.surfaceColor : context.secondary,
           borderColor: selected ? context.outline : context.secondary,
-          borderWidth: 2,
+          borderWidth: 4, // رجعنا سمك الإطار زي القديم
         ),
         child: Center(
           child: Text(
             'سُورَة $text',
-            style: AppStyles.style14u.copyWith(
-              color: Colors.white,
-              fontSize: 12.sp,
-            ),
+            // رجعنا الخط الكبير بتاع زمان
+            style: AppStyles.style22u.copyWith(color: Colors.white),
           ),
         ),
       ),
@@ -85,7 +84,7 @@ class SurahTitleBoxTablet extends StatelessWidget {
             'سُورَة $text',
             style: context.headlineSmall.copyWith(
               color: Colors.white,
-              fontSize: 14.8.sp,
+              fontSize: 22.sp,
             ),
           ),
         ),

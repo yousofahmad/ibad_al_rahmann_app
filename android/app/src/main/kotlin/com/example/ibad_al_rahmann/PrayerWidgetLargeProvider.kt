@@ -15,25 +15,25 @@ import java.util.Locale
  * Large Golden Prayer Widget (4×2 minimum).
  *
  * Layout: widget_large_golden.xml
- * - Top: Status prefix + live Chronometer
+ * - Top: Dynamic status prefix + live Chronometer
  * - Middle: 5 prayer columns (name + time), active prayer highlighted in white
  * - Bottom: Location + Hijri/Gregorian date
  *
- * Uses ONLY RemoteViews-safe widgets (LinearLayout, TextView, Chronometer).
- * All logic wrapped in try-catch to prevent "Failed to load widget" crashes.
+ * Dynamic prefix logic:
+ *   - If now < nextPrayerTime: "متبقي على [Name]" + count DOWN
+ *   - If now > currentPrayerTime (within 30min): "مضى على [Name]" + count UP
  */
 class PrayerWidgetLargeProvider : AppWidgetProvider() {
 
     companion object {
-        // Default text color: Dark Golden-Brown (elegant on gold background)
-        private const val COLOR_DEFAULT = 0xFF4A3B00.toInt()
-
-        // Highlighted (active prayer): Solid White for pop effect
+        private const val COLOR_DEFAULT = 0xFFE6D070.toInt() // Light elegant gold
         private const val COLOR_HIGHLIGHT = 0xFFFFFFFF.toInt()
 
-        // Prayer names in Arabic
         private val PRAYER_NAMES = arrayOf("الفجر", "الظهر", "العصر", "المغرب", "العشاء")
         private val PRAYER_TIME_KEYS = arrayOf("fajr_time", "dhuhr_time", "asr_time", "maghrib_time", "isha_time")
+
+        // 45 minutes threshold for "مضى على" mode
+        private const val COUNT_UP_THRESHOLD_MS = 45L * 60L * 1000L
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -50,37 +50,38 @@ class PrayerWidgetLargeProvider : AppWidgetProvider() {
         val widgetData = HomeWidgetPlugin.getData(context)
         val views = RemoteViews(context.packageName, R.layout.widget_large_golden)
 
-        // ─── Data from Dart (single source of truth) ───
+        // ─── Data from Dart ───
         val location = widgetData.getString("location_name", "القاهرة").orEmpty()
         val hijri = widgetData.getString("hijri_date", "").orEmpty()
         val nextName = widgetData.getString("prayer_name", "الفجر").orEmpty()
-        val targetEpochMs = widgetData.getLong("gold_target_epoch", 0L)
-        val isCountUp = widgetData.getBoolean("gold_is_count_up", false)
-        
-        // Use highlighted_prayer_index (Dart-computed), fallback to prayerIndex
+        val targetEpochMs = widgetData.getLong("gold_target_epoch", widgetData.getLong("next_prayer_time_epoch", 0L))
+
         val activeHighlightIndex = widgetData.getInt("highlighted_prayer_index", widgetData.getInt("prayerIndex", -1))
-        
+
         val prayerTimes = Array(5) { i ->
             widgetData.getString(PRAYER_TIME_KEYS[i], "--:--").orEmpty()
         }
 
-        // ─── Update Header Status ───
-        views.setTextViewText(R.id.tv_large_location, location)
-        views.setTextViewText(R.id.tv_large_status_prefix, "$nextName ")
+        // ─── Dynamic Prefix + Chronometer Direction ───
+        val nowMs = System.currentTimeMillis()
+        val differenceMs = targetEpochMs - nowMs
+        // Dart already provides a formatted nextName like "الفجر متبقي" or "مضى على الفجر"
+        val isCountUp = targetEpochMs > 0L && differenceMs < 0 && Math.abs(differenceMs) <= COUNT_UP_THRESHOLD_MS
+        val signStr = if (targetEpochMs > 0L) {
+            if (isCountUp) "+" else "-"
+        } else {
+            ""
+        }
 
-        // Chronometer Logic (Live Countdown/Count-up)
+        // ─── Update Header Status (Location removed, setting prefix only) ───
+        views.setTextViewText(R.id.tv_large_status_prefix, nextName)
+        views.setTextViewText(R.id.tv_large_status_sign, signStr)
+
+        // Chronometer Logic
         if (targetEpochMs > 0L) {
-            val nowMs = System.currentTimeMillis()
-            val differenceMs = targetEpochMs - nowMs
-            val baseTime = android.os.SystemClock.elapsedRealtime() + differenceMs
+            views.setViewVisibility(R.id.tv_large_chronometer, android.view.View.VISIBLE)
             
-            // Sign for count-up
-            if (isCountUp) {
-                views.setViewVisibility(R.id.tv_large_timer_sign, android.view.View.VISIBLE)
-                views.setTextViewText(R.id.tv_large_timer_sign, "+")
-            } else {
-                views.setViewVisibility(R.id.tv_large_timer_sign, android.view.View.GONE)
-            }
+            val baseTime = android.os.SystemClock.elapsedRealtime() + differenceMs
 
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
                 views.setChronometer(R.id.tv_large_chronometer, baseTime, null, true)
@@ -88,13 +89,17 @@ class PrayerWidgetLargeProvider : AppWidgetProvider() {
             } else {
                 views.setChronometer(R.id.tv_large_chronometer, baseTime, null, true)
             }
+        } else {
+            views.setViewVisibility(R.id.tv_large_chronometer, android.view.View.GONE)
         }
 
-        // ─── Footer: Date ───
-        val gregorian = SimpleDateFormat("dd MMM yyyy", Locale("ar")).format(Date())
-        views.setTextViewText(R.id.tv_large_date, if (hijri.isNotEmpty()) "$hijri — $gregorian" else gregorian)
+        // ─── Footer: Date (Hijri on one side, Gregorian on the other) ───
+        val gregorian = SimpleDateFormat("dd MMMM yyyy", Locale("ar")).format(Date())
+        views.setTextViewText(R.id.tv_large_date, hijri)
+        // We reuse the location TextView to show the Gregorian date on the other side
+        views.setTextViewText(R.id.tv_large_location, gregorian)
 
-        // ─── 5-Prayer Row: Highlight active prayer ───
+        // ─── 5-Prayer Row ───
         val nameIds = intArrayOf(R.id.tv_large_fajr_name, R.id.tv_large_dhuhr_name, R.id.tv_large_asr_name, R.id.tv_large_maghrib_name, R.id.tv_large_isha_name)
         val timeIds = intArrayOf(R.id.tv_large_fajr_time, R.id.tv_large_dhuhr_time, R.id.tv_large_asr_time, R.id.tv_large_maghrib_time, R.id.tv_large_isha_time)
 
@@ -106,7 +111,7 @@ class PrayerWidgetLargeProvider : AppWidgetProvider() {
             views.setTextColor(timeIds[i], textColor)
         }
 
-        // ─── Tap → Open App ───
+        // ─── Tap → Open App (use root layout via the prayers_container as tap target) ───
         try {
             val intent = Intent(context, MainActivity::class.java).apply {
                 action = Intent.ACTION_VIEW
@@ -114,10 +119,9 @@ class PrayerWidgetLargeProvider : AppWidgetProvider() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
             val pendingIntent = PendingIntent.getActivity(context, appWidgetId + 300, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-            views.setOnClickPendingIntent(R.id.widget_large_root, pendingIntent)
+            views.setOnClickPendingIntent(R.id.prayers_container, pendingIntent)
         } catch (e: Exception) { e.printStackTrace() }
 
         appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 }
-

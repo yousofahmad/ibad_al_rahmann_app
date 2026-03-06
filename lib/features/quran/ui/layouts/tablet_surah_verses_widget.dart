@@ -226,7 +226,7 @@ class _TabletSurahVersesWidgetState extends State<TabletSurahVersesWidget> {
   @override
   Widget build(BuildContext context) {
     return RichText(
-      textAlign: TextAlign.center,
+      textAlign: widget.pageNumber <= 2 ? TextAlign.center : TextAlign.justify,
       softWrap: true,
       textDirection: TextDirection.rtl,
       text: TextSpan(

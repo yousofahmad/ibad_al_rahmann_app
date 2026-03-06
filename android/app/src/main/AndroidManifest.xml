@@ -78,15 +78,6 @@
         </service>
 
 
-        <!-- Home Screen Widget (1x4 Wide) -->
-        <receiver android:name=".PrayerWidgetWideProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider"
-                android:resource="@xml/widget_wide_info" />
-        </receiver>
 
 
         <!-- Home Screen Widget (Large Golden 4x2) -->
@@ -98,6 +89,18 @@
             <meta-data android:name="android.appwidget.provider"
                 android:resource="@xml/widget_large_info" />
         </receiver>
+
+        <!-- Home Screen Widget (Wide 4x1) -->
+        <receiver android:name=".PrayerWidgetWideProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/widget_wide_info" />
+        </receiver>
+
+
         
         <receiver android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
             android:exported="true">
