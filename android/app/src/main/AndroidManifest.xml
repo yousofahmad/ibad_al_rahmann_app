@@ -1,5 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.ibad_al_rahmann">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.ibad_al_rahmann">
 
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
@@ -12,98 +11,61 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
 
     <!-- Gallery save permissions (gal package) -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
-    <application
-        android:label="عِبَادُ الرَّحْمَٰن"
-        android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
-        
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:launchMode="singleTop"
-            android:theme="@style/LaunchTheme"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-            android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize">
-            <meta-data
-              android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
+    <application android:label="عِبَادُ الرَّحْمَٰن" android:name="${applicationName}" android:icon="@mipmap/launcher_icon">
+
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:theme="@style/LaunchTheme" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" android:hardwareAccelerated="true" android:windowSoftInputMode="adjustResize">
+            <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        
-        <meta-data
-            android:name="flutterEmbedding"
-            android:value="2" />
-            
-        <receiver
-            android:name=".AlarmReceiver"
-            android:enabled="true"
-            android:exported="true">
+
+        <meta-data android:name="flutterEmbedding" android:value="2" />
+
+        <receiver android:name=".AlarmReceiver" android:enabled="true" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
             </intent-filter>
         </receiver>
 
-        <receiver
-            android:name=".NotificationDismissReceiver"
-            android:enabled="true"
-            android:exported="false" />
+        <receiver android:name=".NotificationDismissReceiver" android:enabled="true" android:exported="false" />
 
 
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="com.example.ibad_al_rahmann.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
+        <provider android:name="androidx.core.content.FileProvider" android:authorities="com.example.ibad_al_rahmann.fileprovider" android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
 
         <!-- Persistent Prayer Notification Service -->
-        <service
-            android:name=".PrayerNotificationService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Prayer times countdown and details for user convenience."/>
+        <service android:name=".PrayerNotificationService" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Prayer times countdown and details for user convenience."/>
         </service>
 
 
 
 
         <!-- Home Screen Widget (Large Golden 4x2) -->
-        <receiver android:name=".PrayerWidgetLargeProvider"
-            android:exported="true">
+        <receiver android:name=".PrayerWidgetLargeProvider" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider"
-                android:resource="@xml/widget_large_info" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_large_info" />
         </receiver>
 
         <!-- Home Screen Widget (Wide 4x1) -->
-        <receiver android:name=".PrayerWidgetWideProvider"
-            android:exported="true">
+        <receiver android:name=".PrayerWidgetWideProvider" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider"
-                android:resource="@xml/widget_wide_info" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_wide_info" />
         </receiver>
 
 
-        
-        <receiver android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
-            android:exported="true">
+
+        <receiver android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="es.antonborri.home_widget.action.BACKGROUND" />
             </intent-filter>
