@@ -25,7 +25,6 @@ migrate_working_dir/
 .packages
 .pub-cache/
 .pub/
-build/
 .build/
 
 # Android related (المهم جداً)
@@ -36,9 +35,6 @@ build/
 **/android/gradlew.bat
 **/android/local.properties
 **/android/GeneratedPluginRegistrant.java
-**/android/key.properties
-**/android/**/*.keystore
-**/android/**/*.jks
 
 # iOS/XCode related
 **/ios/**/*.mode1v3
