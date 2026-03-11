@@ -69,22 +69,25 @@ class SurahTitleBoxTablet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      width: 160.w,
-      height: 50.h,
+      margin: const EdgeInsets.symmetric(horizontal: 18),
+      width: 240,
+      height: 75,
       child: CustomPaint(
         painter: FramePainter(
           selected: selected,
           backgroundColor: selected ? context.surfaceColor : context.secondary,
           borderColor: selected ? context.outline : context.secondary,
-          borderWidth: 4,
+          borderWidth: 6,
         ),
         child: Center(
-          child: Text(
-            'سُورَة $text',
-            style: context.headlineSmall.copyWith(
-              color: Colors.white,
-              fontSize: 22.sp,
+          child: FittedBox(
+            fit: BoxFit.contain,
+            child: Text(
+              'سُورَة $text',
+              style: context.headlineSmall.copyWith(
+                color: Colors.white,
+                fontSize: 32,
+              ),
             ),
           ),
         ),

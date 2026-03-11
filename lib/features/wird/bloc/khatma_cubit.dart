@@ -15,19 +15,59 @@ class KhatmaCubit extends Cubit<KhatmaState> {
   KhatmaCubit() : super(KhatmaInitial());
 
   static const String _khatmaKey = 'active_khatma_data';
+  static const String _activeIdKey = 'active_khatma_id';
 
-  // 🔴 تم مسح المصفوفة المكررة من هنا عشان متبوظش الحسابات 🔴
+  KhatmaModel? getActiveKhatma() {
+    if (state is KhatmaLoaded) {
+      final khatmas = (state as KhatmaLoaded).khatmas;
+      if (khatmas.isNotEmpty) {
+        return khatmas.first;
+      }
+    }
+    return null;
+  }
 
-  Future<void> loadKhatma() async {
+  KhatmaModel? getKhatmaById(String id) {
+    if (state is KhatmaLoaded) {
+      final khatmas = (state as KhatmaLoaded).khatmas;
+      try {
+        return khatmas.firstWhere((k) => k.id == id);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  Future<void> loadKhatma({String? specificId}) async {
     emit(KhatmaLoading());
     try {
       final prefs = await SharedPreferences.getInstance();
-      final data = prefs.getString(_khatmaKey);
+      List<KhatmaModel> loadedKhatmas = [];
 
-      if (data != null) {
-        final Map<String, dynamic> json = jsonDecode(data);
-        final khatma = KhatmaModel.fromJson(json);
-        emit(KhatmaLoaded(khatma));
+      final keys = prefs.getKeys();
+      for (String key in keys) {
+        if (key.startsWith('khatma_')) {
+          final data = prefs.getString(key);
+          if (data != null) {
+            loadedKhatmas.add(KhatmaModel.fromJson(jsonDecode(data)));
+          }
+        }
+      }
+
+      // Legacy fallback
+      if (loadedKhatmas.isEmpty) {
+        final oldData = prefs.getString(_khatmaKey);
+        if (oldData != null) {
+          final k = KhatmaModel.fromJson(jsonDecode(oldData));
+          loadedKhatmas.add(k);
+          prefs.setString('khatma_${k.id}', oldData);
+        }
+      }
+
+      if (loadedKhatmas.isNotEmpty) {
+        // Sort so the newest or main logic applies
+        emit(KhatmaLoaded(loadedKhatmas));
       } else {
         emit(KhatmaEmpty());
       }
@@ -36,15 +76,15 @@ class KhatmaCubit extends Cubit<KhatmaState> {
     }
   }
 
-  /// [quantityType]: 'juz', 'quarter', 'pages'
-  /// [quantityValue]: number of juz (1-10), quarters (1-7), or pages (1-5)
-  /// [notificationType]: 'none', 'daily', 'prayer'
   Future<void> startNewKhatma({
+    required String id,
+    required String name,
     required int totalDays,
     required String notificationType,
     required WirdUnit unit,
     int startJuz = 1,
     int? startFromPage,
+    String? dailyTime,
   }) async {
     emit(KhatmaLoading());
     try {
@@ -54,7 +94,6 @@ class KhatmaCubit extends Cubit<KhatmaState> {
           ? totalDays * 5
           : totalDays;
 
-      // Use startFromPage if provided, otherwise derive from startJuz
       int effectiveStartPage = startFromPage ?? 1;
       if (startFromPage == null && startJuz >= 1 && startJuz <= 30) {
         effectiveStartPage = WirdCalculator.juzStartPages[startJuz - 1];
@@ -86,37 +125,56 @@ class KhatmaCubit extends Cubit<KhatmaState> {
       }
 
       final newKhatma = KhatmaModel(
+        id: id,
+        name: name,
         wirds: wirds,
         currentWirdIndex: 0,
         notificationType: notificationType,
         startDate: DateTime.now(),
         days: totalDays,
-        pagesPerWird: unit == WirdUnit.page ? 604 ~/ totalSessions : 0,
+        pagesPerWird: unit == WirdUnit.page
+            ? (604 - effectiveStartPage + 1) ~/ totalSessions
+            : (30 * 20) ~/ totalSessions,
+        dailyTime: dailyTime,
       );
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_khatmaKey, jsonEncode(newKhatma.toJson()));
+      final jsonData = jsonEncode(newKhatma.toJson());
+      await prefs.setString('khatma_$id', jsonData);
+      await prefs.setString(_activeIdKey, id);
+      await prefs.setString(_khatmaKey, jsonData); // Legacy support
 
-      await prefs.setString('wird_reminder_type', notificationType);
-      await prefs.setInt('wird_days', newKhatma.days);
-      await prefs.setString(
-        'wird_start_date',
-        DateTime.now().toIso8601String(),
-      );
-      await NotificationService.cancelAll(includeWird: true);
+      await prefs.setString('${id}_wird_reminder_type', notificationType);
+      await prefs.setInt('${id}_wird_days', newKhatma.days);
+
+      List<KhatmaModel> currentList = [];
+
+      // We repull to be absolutely safe, or grab from state instead of clearing
+      final keys = prefs.getKeys();
+      for (String key in keys) {
+        if (key.startsWith('khatma_')) {
+          final data = prefs.getString(key);
+          if (data != null) {
+            currentList.add(KhatmaModel.fromJson(jsonDecode(data)));
+          }
+        }
+      }
+
       await NotificationService.rescheduleWird();
-      PrayerService().scheduleNotifications();
 
-      emit(KhatmaLoaded(newKhatma));
+      emit(KhatmaLoaded(currentList));
     } catch (e) {
       emit(KhatmaError("حدث خطأ أثناء إنشاء الختمة الجديدة: $e"));
     }
   }
 
-  Future<void> markWirdAsCompleted(int index) async {
+  Future<void> markWirdAsCompleted(String khatmaId, int index) async {
     if (state is KhatmaLoaded) {
-      final currentKhatma = (state as KhatmaLoaded).khatma;
+      final khatmas = List<KhatmaModel>.from((state as KhatmaLoaded).khatmas);
+      final kIndex = khatmas.indexWhere((k) => k.id == khatmaId);
+      if (kIndex == -1) return;
 
+      final currentKhatma = khatmas[kIndex];
       final updatedWirds = List<WirdModel>.from(currentKhatma.wirds);
       if (index >= 0 && index < updatedWirds.length) {
         updatedWirds[index] = updatedWirds[index].copyWith(isCompleted: true);
@@ -132,17 +190,24 @@ class KhatmaCubit extends Cubit<KhatmaState> {
         currentWirdIndex: nextIndex,
       );
 
+      khatmas[kIndex] = updatedKhatma;
+
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_khatmaKey, jsonEncode(updatedKhatma.toJson()));
+      final jsonData = jsonEncode(updatedKhatma.toJson());
+      await prefs.setString('khatma_${updatedKhatma.id}', jsonData);
+
       await NotificationService.rescheduleWird();
 
-      emit(KhatmaLoaded(updatedKhatma));
+      emit(KhatmaLoaded(khatmas));
     }
   }
 
-  int getDaysLate() {
+  int getDaysLate(String khatmaId) {
     if (state is! KhatmaLoaded) return 0;
-    final khatma = (state as KhatmaLoaded).khatma;
+    final k = getKhatmaById(khatmaId);
+    if (k == null) return 0;
+
+    final khatma = k;
     final now = DateTime.now();
     final start = khatma.startDate;
     final daysSinceStart = now.difference(start).inDays;
@@ -178,9 +243,12 @@ class KhatmaCubit extends Cubit<KhatmaState> {
     }
   }
 
-  WirdModel? getCurrentTargetWird() {
+  WirdModel? getCurrentTargetWird(String khatmaId) {
     if (state is! KhatmaLoaded) return null;
-    final khatma = (state as KhatmaLoaded).khatma;
+    final k = getKhatmaById(khatmaId);
+    if (k == null) return null;
+
+    final khatma = k;
     final now = DateTime.now();
     final daysSinceStart = now.difference(khatma.startDate).inDays;
 
@@ -199,23 +267,44 @@ class KhatmaCubit extends Cubit<KhatmaState> {
     return null;
   }
 
-  WirdModel? getNextWird() {
+  WirdModel? getNextWird(String khatmaId) {
     if (state is! KhatmaLoaded) return null;
-    final khatma = (state as KhatmaLoaded).khatma;
+    final k = getKhatmaById(khatmaId);
+    if (k == null) return null;
+
+    final khatma = k;
     final nextIdx = khatma.currentWirdIndex + 1;
     if (nextIdx < khatma.wirds.length) return khatma.wirds[nextIdx];
     return null;
   }
 
-  Future<void> deleteKhatma() async {
+  Future<void> deleteKhatma(String id) async {
+    if (state is! KhatmaLoaded) return;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_khatmaKey);
+    await prefs.remove('khatma_$id');
+
+    // Clear legacy active if deleting the legacy fallback
+    if (prefs.getString(_activeIdKey) == id) {
+      await prefs.remove(_activeIdKey);
+      await prefs.remove(_khatmaKey);
+    }
+
     final keys = prefs.getKeys();
     for (String key in keys) {
-      if (key.startsWith('wird_last_page_')) {
+      if (key.startsWith('wird_last_page_') || key.startsWith('${id}_')) {
         await prefs.remove(key);
       }
     }
-    emit(KhatmaEmpty());
+
+    List<KhatmaModel> khatmas = List<KhatmaModel>.from(
+      (state as KhatmaLoaded).khatmas,
+    );
+    khatmas.removeWhere((k) => k.id == id);
+
+    if (khatmas.isEmpty) {
+      emit(KhatmaEmpty());
+    } else {
+      emit(KhatmaLoaded(khatmas));
+    }
   }
 }

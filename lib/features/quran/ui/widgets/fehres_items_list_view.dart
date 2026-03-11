@@ -6,7 +6,6 @@ import 'package:ibad_al_rahmann/core/theme/app_colors.dart';
 import 'package:ibad_al_rahmann/core/theme/app_styles.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/data/models/searching_surah_model.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:quran/quran.dart';
 
 class FehresItemsListView extends StatelessWidget {
@@ -39,20 +38,24 @@ class FehresItemsListView extends StatelessWidget {
                 children: [
                   Text(
                     surahs[index].surahNumber.toArabicNums,
-                    style: AppStyles.style24u,
+                    style: AppStyles.style24u.copyWith(fontSize: 24),
                   ),
-                  SizedBox(width: 30.w),
+                  const SizedBox(width: 20),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         surahs[index].name,
-                        style: AppStyles.style22u.copyWith(color: Colors.black),
+                        style: AppStyles.style22u.copyWith(
+                          color: Colors.black,
+                          fontSize: 22,
+                        ),
                       ),
                       Text(
                         surahs[index].place,
                         style: AppStyles.style18u.copyWith(
                           color: Colors.grey.shade600,
+                          fontSize: 16,
                         ),
                       ),
                     ],
@@ -60,16 +63,17 @@ class FehresItemsListView extends StatelessWidget {
                   const Spacer(),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
-                    spacing: 6.h,
+                    spacing: 6,
                     children: [
                       Text(
                         'صفحة ${surahs[index].firstPage.toArabicNums}',
-                        style: AppStyles.style14u,
+                        style: AppStyles.style14u.copyWith(fontSize: 14),
                       ),
                       Text(
                         'الجزء ${surahs[index].juzNumber.toArabicNums}',
                         style: AppStyles.style14u.copyWith(
                           color: Colors.grey.shade600,
+                          fontSize: 14,
                         ),
                       ),
                     ],

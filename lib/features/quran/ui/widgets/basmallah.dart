@@ -21,6 +21,7 @@ class Basmallah extends StatelessWidget {
         child: Image.asset(
           AppImages.basmala,
           width: context.screenWidth,
+          fit: BoxFit.contain,
           color: color,
           colorBlendMode: color != null ? BlendMode.srcIn : null,
         ),
@@ -48,6 +49,7 @@ class TabletBasmallah extends StatelessWidget {
         child: Image.asset(
           AppImages.basmala,
           width: context.screenWidth * .4,
+          fit: BoxFit.contain,
           color: color,
           colorBlendMode: color != null ? BlendMode.srcIn : null,
         ),

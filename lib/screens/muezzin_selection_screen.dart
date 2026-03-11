@@ -290,8 +290,9 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
   Future<void> _downloadFile(String id) async {
     if (_localPath == null ||
         _downloadProgress.containsKey(id) ||
-        _builtInIds.contains(id))
+        _builtInIds.contains(id)) {
       return;
+    }
 
     setState(() => _downloadProgress[id] = 0.0);
 
@@ -409,11 +410,11 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
       } else {
         _filteredData = muezzinData
             .map((category) {
-              final PLAYERS = (category['muezzins'] as List).where((m) {
+              final players = (category['muezzins'] as List).where((m) {
                 return (m['name'] as String).contains(query);
               }).toList();
-              if (PLAYERS.isEmpty) return null;
-              return {"category": category['category'], "muezzins": PLAYERS};
+              if (players.isEmpty) return null;
+              return {"category": category['category'], "muezzins": players};
             })
             .whereType<Map<String, dynamic>>()
             .toList();
@@ -534,8 +535,8 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
                                       ? null
                                       : [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(
-                                              0.05,
+                                            color: Colors.black.withValues(
+                                              alpha: 0.05,
                                             ),
                                             blurRadius: 2,
                                             offset: const Offset(0, 1),
@@ -547,8 +548,8 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
                                   leading: GestureDetector(
                                     onTap: () => _playPreview(id),
                                     child: CircleAvatar(
-                                      backgroundColor: primaryColor.withOpacity(
-                                        0.15,
+                                      backgroundColor: primaryColor.withValues(
+                                        alpha: 0.15,
                                       ),
                                       child: isLoading
                                           ? const SizedBox(

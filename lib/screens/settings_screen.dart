@@ -112,9 +112,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   onPressed: () async {
+                    final navigator = Navigator.of(context);
                     await _prayerService.setHijriOffset(tempOffset);
                     setState(() => _hijriOffset = tempOffset);
-                    if (mounted) Navigator.pop(context);
+                    if (mounted) navigator.pop();
                   },
                 ),
               ],
@@ -339,7 +340,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ? null
             : [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 5,
                   offset: const Offset(0, 2),
                 ),
@@ -417,9 +418,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               onTap: () async {
+                final navigator = Navigator.of(context);
                 await _prayerService.saveMethod(entry.key);
                 setState(() {});
-                if (mounted) Navigator.pop(context);
+                if (mounted) navigator.pop();
               },
             );
           }).toList(),

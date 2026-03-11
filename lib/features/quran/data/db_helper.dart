@@ -15,6 +15,9 @@ class QuranWbwDbHelper {
   final Map<int, List<PageLine>> _pageLinesCache = {};
   final Map<int, List<QuranWord>> _pageWordsCache = {};
 
+  List<PageLine>? getPageLinesSync(int pageNumber) => _pageLinesCache[pageNumber];
+  List<QuranWord>? getPageWordsSync(int pageNumber) => _pageWordsCache[pageNumber];
+
   void preloadAllPagesInBackground() async {
     if (_isPreloading) return;
     _isPreloading = true;
@@ -68,7 +71,7 @@ class QuranWbwDbHelper {
     final mainDbPath = join(dbPath, 'qpc-v1-glyph-codes-wbw.db');
     final mapDbPath = join(dbPath, 'qpc-v1-15-lines.db');
 
-    print('Initializing DB. paths: $mainDbPath, $mapDbPath');
+    // debugPrint('Initializing DB. paths: $mainDbPath, $mapDbPath');
     final db = await openDatabase(
       mainDbPath,
       readOnly: true,
@@ -77,7 +80,7 @@ class QuranWbwDbHelper {
           // Some PRAGMAs might return values and be treated as queries by the lower level driver
           await db.rawQuery('PRAGMA busy_timeout = 5000');
         } catch (e) {
-          print('Error setting busy_timeout: $e');
+          // debugPrint('Error setting busy_timeout: $e');
         }
       },
     );
@@ -94,16 +97,16 @@ class QuranWbwDbHelper {
       );
 
       if (!isAttached) {
-        print('Attaching map_db...');
+        // debugPrint('Attaching map_db...');
         await db.execute("ATTACH DATABASE '$mapDbPath' AS map_db");
-        print('map_db attached.');
+        // debugPrint('map_db attached.');
       }
     } catch (e) {
       if (e.toString().contains('already in use') ||
           e.toString().contains('already attached')) {
-        print('map_db already attached (ignored error).');
+        // debugPrint('map_db already attached (ignored error).');
       } else {
-        print('Error checking/attaching map_db: $e');
+        // debugPrint('Error checking/attaching map_db: $e');
       }
     }
 
@@ -166,7 +169,7 @@ class QuranWbwDbHelper {
       _pageWordsCache[pageNumber] = result;
       return result;
     } catch (e) {
-      print('🔴 Error in getPageWords($pageNumber): $e');
+      // debugPrint('🔴 Error in getPageWords($pageNumber): $e');
       return [];
     }
   }
@@ -197,7 +200,7 @@ class QuranWbwDbHelper {
       _pageLinesCache[pageNumber] = result;
       return result;
     } catch (e) {
-      print('🔴 Error in getPageLines($pageNumber): $e');
+      // debugPrint('🔴 Error in getPageLines($pageNumber): $e');
       return [];
     }
   }
@@ -234,7 +237,7 @@ class QuranWbwDbHelper {
         );
       }).toList();
     } catch (e) {
-      print('🔴 Error in getWordsForLine($firstWordId, $lastWordId): $e');
+      // debugPrint('🔴 Error in getWordsForLine($firstWordId, $lastWordId): $e');
       return [];
     }
   }

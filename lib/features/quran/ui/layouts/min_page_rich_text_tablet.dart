@@ -35,7 +35,9 @@ class _TabletMinPageRichTextState extends State<TabletMinPageRichText> {
             child: Container(
               alignment: Alignment.center,
               padding: EdgeInsets.symmetric(
-                horizontal: widget.pageNumber == 1 ? 45.w : 30.w,
+                horizontal:
+                    MediaQuery.sizeOf(context).width *
+                    (widget.pageNumber == 1 ? 0.08 : 0.04),
               ),
               child: WbwPageWidget(pageNumber: widget.pageNumber),
             ),

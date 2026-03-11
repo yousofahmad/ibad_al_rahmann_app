@@ -1,0 +1,18 @@
+lib/features/prayer_times/ui/widgets/prayer_times_screen_body.dart:          child: Image.asset(
+lib/features/qiblah/qiblah_compass.dart:                                child: Image.asset(
+lib/features/quran/ui/layouts/mobile_full_page_rich_text.dart://             child: Image.asset(
+lib/features/quran/ui/layouts/mobile_full_page_rich_text.dart://             child: Image.asset(
+lib/features/quran/ui/widgets/basmallah.dart:        child: Image.asset(
+lib/features/quran/ui/widgets/basmallah.dart:        child: Image.asset(
+lib/features/quran/ui/widgets/header_widget.dart:          Image.asset(
+lib/features/quran/ui/widgets/header_widget.dart:            child: Image.asset(
+lib/features/quran/ui/widgets/wbw_page_widget.dart:        Image.asset(
+lib/features/quran_audio/ui/widgets/surah_widget.dart:                    : Image.asset(
+lib/features/quran_reciters/ui/widgets/landscape_quran_readers_list_view.dart:          child: Image.asset(
+lib/features/quran_reciters/ui/widgets/quran_readers_list_view.dart:          child: Image.asset(
+lib/screens/home_screen.dart:                  : Image.asset(
+lib/screens/more_screen.dart:                      : Image.asset(
+lib/screens/onboarding_screen.dart:                        child: Image.asset(
+lib/screens/onboarding_screen.dart:                    imageWidget: Image.asset(
+lib/screens/settings_screen.dart:                applicationIcon: Image.asset(
+lib/screens/splash_screen.dart:            child: Image.asset(

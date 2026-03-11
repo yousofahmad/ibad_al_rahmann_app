@@ -3,11 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/theme/app_assets.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:ibad_al_rahmann/core/services/intro_service.dart';
 
 import '../../../../core/helpers/extensions/app_navigator.dart';
-import '../../../../core/helpers/share_helper.dart';
 import '../widgets/mobile_quran_search_widget.dart';
 import '../widgets/quran_fehres_dialog.dart';
 import '../widgets/quran_surah_list.dart';
@@ -20,75 +20,39 @@ class TabletQuranTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cubit = context.read<QuranCubit>();
     return Padding(
-      padding: EdgeInsets.only(top: 8.h),
+      padding: const EdgeInsets.only(top: 12),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 2.w),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
                   onPressed: () => showFehresDialog(context, cubit),
-                  icon: SvgPicture.asset(AppAssets.svgsMenu, height: 30.h),
+                  icon: SvgPicture.asset(AppAssets.svgsMenu, height: 45),
                 ),
                 const MobileQuranSearch(),
-                // Save to Gallery button
-                BlocBuilder<QuranCubit, QuranState>(
-                  builder: (context, state) {
-                    return IconButton(
-                      tooltip: 'حفظ في المعرض',
-                      onPressed: () {
-                        final currentPageNum = (state.currentPage ?? 0) + 1;
-                        final key = cubit.getPageKey(currentPageNum);
-                        ShareHelper.savePageToGallery(
-                          context,
-                          key,
-                          'quran_page_$currentPageNum',
-                        );
-                      },
-                      icon: Icon(
-                        Icons.download_rounded,
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => showThemeDialog(context),
+                      icon: SvgPicture.asset(AppAssets.svgsSettings),
+                    ),
+                    IconButton(
+                      onPressed: () => IntroService.showQuranIntro(context),
+                      icon: const Icon(Icons.info_outline, color: Colors.white),
+                    ),
+                    IconButton(
+                      onPressed: () => context.pop(),
+                      icon: const Icon(
+                        Icons.arrow_forward_ios_rounded,
                         color: Colors.white,
-                        size: 20.w,
+                        size: 32,
                       ),
-                    );
-                  },
-                ),
-                // Share Page button
-                BlocBuilder<QuranCubit, QuranState>(
-                  builder: (context, state) {
-                    return IconButton(
-                      tooltip: 'مشاركة الصفحة',
-                      onPressed: () {
-                        final currentPageNum = (state.currentPage ?? 0) + 1;
-                        final key = cubit.getPageKey(currentPageNum);
-                        ShareHelper.sharePageImage(
-                          context,
-                          key,
-                          'quran_page_$currentPageNum',
-                        );
-                      },
-                      icon: Icon(
-                        Icons.share_rounded,
-                        color: Colors.white,
-                        size: 20.w,
-                      ),
-                    );
-                  },
-                ),
-                IconButton(
-                  onPressed: () => showThemeDialog(context),
-                  icon: SvgPicture.asset(AppAssets.svgsSettings, height: 24.h),
-                ),
-                IconButton(
-                  onPressed: () => context.pop(),
-                  icon: Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    color: Colors.white,
-                    size: 18.w,
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),

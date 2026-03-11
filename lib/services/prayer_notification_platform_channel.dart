@@ -36,9 +36,16 @@ class PrayerNotificationServiceHelper {
         'isCountUp': isCountUp,
       });
       _hasLoggedError = false; // Reset on success
+    } on MissingPluginException {
+      // Background isolates may not have the custom channel registered yet.
+      // We catch this to prevent the app from crashing, relying on HomeWidget's native updates.
+      if (!_hasLoggedError) {
+        // debugPrint("MissingPluginException: Native notification channel not found in this isolate.");
+        _hasLoggedError = true;
+      }
     } catch (e) {
       if (!_hasLoggedError) {
-        print("Failed to update prayer notification: $e");
+        // debugPrint("Failed to update prayer notification: $e");
         _hasLoggedError = true;
       }
     }
@@ -51,7 +58,7 @@ class PrayerNotificationServiceHelper {
       _hasLoggedError = false;
     } catch (e) {
       if (!_hasLoggedError) {
-        print("Failed to stop prayer notification: $e");
+        // debugPrint("Failed to stop prayer notification: $e");
         _hasLoggedError = true;
       }
     }

@@ -1,10 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/theme/app_assets.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:ibad_al_rahmann/core/services/intro_service.dart';
 
 import '../../../../core/helpers/extensions/app_navigator.dart';
 import '../widgets/mobile_quran_search_widget.dart';
@@ -34,6 +35,10 @@ class MobileQuranTopBar extends StatelessWidget {
               IconButton(
                 onPressed: () => showThemeDialog(context),
                 icon: SvgPicture.asset(AppAssets.svgsSettings),
+              ),
+              IconButton(
+                onPressed: () => IntroService.showQuranIntro(context),
+                icon: const Icon(Icons.info_outline, color: Colors.white),
               ),
               IconButton(
                 onPressed: () => context.pop(),

@@ -1,6 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:ibad_al_rahmann/core/services/intro_service.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
@@ -42,106 +41,12 @@ class _MinQuranMobileState extends State<MinQuranMobile> {
     if (!IntroService.hasShownDoubleTapIntro()) {
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
-          _showDoubleTapHint();
+          IntroService.showQuranIntro(context);
           // Mark as shown after starting
           IntroService.markDoubleTapIntroAsShown();
         }
       });
     }
-  }
-
-  void _showDoubleTapHint() {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            'تلميحات التصفح',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: AppConsts.cairo,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: Color(0xFFD0A871),
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHintRow(Icons.touch_app, 'ضغطتين', 'تكبير / تصغير الصفحة'),
-              const SizedBox(height: 12),
-              _buildHintRow(
-                Icons.touch_app_outlined,
-                'ضغطة مطولة',
-                'التفسير والمشاركة ومشغل الآيات',
-              ),
-              const SizedBox(height: 12),
-              _buildHintRow(
-                Icons.bookmark_outline,
-                'ضغطة واحدة',
-                ' قائمة المحفوظات و تغيير الثيم والمشاركة او الحفظ وضغطة اخري تختفي',
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text(
-                'حسنًا',
-                style: TextStyle(
-                  color: Color(0xFFD0A871),
-                  fontFamily: AppConsts.cairo,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildHintRow(IconData icon, String title, String desc) {
-    return Row(
-      textDirection: TextDirection.rtl,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: const Color(0xFFD0A871), size: 22),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontFamily: AppConsts.cairo,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-                textDirection: TextDirection.rtl,
-              ),
-              Text(
-                desc,
-                style: TextStyle(
-                  fontFamily: AppConsts.cairo,
-                  fontSize: 12,
-                  color: Colors.grey[400],
-                ),
-                textDirection: TextDirection.rtl,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
   }
 
   @override
@@ -179,6 +84,7 @@ class _MinQuranMobileState extends State<MinQuranMobile> {
                           borderRadius: borderRadius(index),
                           border: buildBorder(index),
                         ),
+                        clipBehavior: Clip.antiAlias,
                         child: WbwPageWidget(
                           pageNumber: index + 1,
                           showHeader: false,
@@ -229,9 +135,9 @@ class _MinQuranMobileState extends State<MinQuranMobile> {
   BorderRadius borderRadius(int index) {
     return BorderRadius.horizontal(
       right: index.isEven
-          ? const Radius.circular(12)
+          ? const Radius.circular(16)
           : const Radius.circular(0),
-      left: index.isOdd ? const Radius.circular(12) : const Radius.circular(0),
+      left: index.isOdd ? const Radius.circular(16) : const Radius.circular(0),
     );
   }
 }

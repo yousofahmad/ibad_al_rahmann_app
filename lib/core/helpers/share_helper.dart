@@ -23,6 +23,10 @@ class ShareHelper {
 
   /// Writes the captured image to a temporary file and returns its path.
   static Future<String?> _saveToTempFile(GlobalKey key, String fileName) async {
+    // Rule 2: Breathing Room (Delay) BEFORE capturing
+    // This ensures the framework has time to render the widget after any state changes.
+    await Future.delayed(const Duration(milliseconds: 300));
+
     final image = await _captureImage(key);
     if (image == null) return null;
 
@@ -32,7 +36,12 @@ class ShareHelper {
 
     final pngBytes = byteData.buffer.asUint8List();
     final directory = await getTemporaryDirectory();
-    final filePath = '${directory.path}/$fileName.png';
+
+    // Rule 3: Explicit Extension Check
+    final String cleanFileName =
+        fileName.toLowerCase().endsWith('.png') ? fileName : '$fileName.png';
+    final filePath = '${directory.path}/$cleanFileName';
+
     final file = File(filePath);
     await file.writeAsBytes(pngBytes);
     return filePath;
@@ -227,7 +236,22 @@ class ShareHelper {
 
       // Save each image individually to avoid large batch failures
       for (final path in paths) {
-        await Gal.putImage(path, album: 'عباد الرحمن');
+        try {
+          // Rule 3: Explicit Extension Check
+          if (path.isEmpty || !path.toLowerCase().endsWith('.png')) {
+            debugPrint('Skipping non-png file: $path');
+            continue;
+          }
+
+          // Rule 1: Sequential saving (already in for loop)
+          await Gal.putImage(path, album: 'عباد الرحمن');
+
+          // Optional: small delay between gal saves
+          await Future.delayed(const Duration(milliseconds: 300));
+        } catch (e) {
+          // Rule 4: Graceful Error Handling inside the loop
+          debugPrint('Failed to save page $path to gallery: $e');
+        }
       }
 
       if (context.mounted) {

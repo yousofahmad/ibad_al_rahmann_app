@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/di/di.dart';
@@ -183,7 +183,7 @@ class QuranCubit extends Cubit<QuranState> {
       final words = await _repo.getPageWords(pageNumber);
       pageCache[pageNumber] = words;
     } catch (e) {
-      print('Error pre-caching page $pageNumber: $e');
+      // debugPrint('Error pre-caching page $pageNumber: $e');
     }
   }
 
@@ -230,12 +230,8 @@ class QuranCubit extends Cubit<QuranState> {
 
   void initControllers(int pageNumber) {
     _repo.initControllers(pageNumber);
-    // Silent background preloader for perfectly smooth page experience - ONLY FIRST TIME
-    final cache = getIt<CacheService>();
-    if (cache.getBool('has_preloaded_all_pages') != true) {
-      QuranWbwDbHelper.instance.preloadAllPagesInBackground();
-      cache.setBool('has_preloaded_all_pages', true);
-    }
+    // Silent background preloader for perfectly smooth page experience
+    QuranWbwDbHelper.instance.preloadAllPagesInBackground();
 
     final pageData = getPageData(pageNumber == 0 ? 1 : pageNumber);
     int juzNum = getCurrentJuzNumber(

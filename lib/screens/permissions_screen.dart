@@ -180,6 +180,9 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                   onPressed: _requestPermission,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFD0A871),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: const Text(
                     "سماح بالإشعارات",
@@ -191,19 +194,22 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                   ),
                 ),
               ),
-
-              if (isNotificationGranted) ...[
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (_) => const SplashScreen()),
-                  ),
-                  child: const Text(
-                    "دخول التطبيق",
-                    style: TextStyle(fontFamily: AppConsts.expoArabic),
+              const SizedBox(height: 15),
+              // Skip button
+              TextButton(
+                onPressed: () => Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const SplashScreen()),
+                ),
+                child: const Text(
+                  "دخول التطبيق بدون تنبيهات",
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    color: Colors.grey,
+                    fontSize: 14,
+                    decoration: TextDecoration.underline,
                   ),
                 ),
-              ],
+              ),
             ],
           ),
         ),

@@ -4,6 +4,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cubit.dart';
@@ -23,6 +24,7 @@ import 'services/daily_tracker_service.dart';
 import 'services/prayer_service.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'features/wird/ui/wird_dashboard_screen.dart';
 import 'features/wird/ui/isolated_wird_screen.dart';
 import 'features/wird/data/khatma_model.dart';
@@ -40,14 +42,30 @@ const platform = MethodChannel(
   'com.example.ibad_al_rahmann/native_notifications',
 );
 
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  // This is used by background services like android_alarm_manager
+  WidgetsFlutterBinding.ensureInitialized();
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Date Formatting (REQUIRED for intl DateFormat)
   await initializeDateFormatting('ar_SA', null);
 
+  // Initialize Android Alarm Manager
+  await AndroidAlarmManager.initialize();
+
   // Initialize Timezones
   tz.initializeTimeZones();
+
+  // Initialize JustAudioBackground
+  await JustAudioBackground.init(
+    androidNotificationChannelId: 'com.ryanheise.bg_demo.channel.audio',
+    androidNotificationChannelName: 'Audio playback',
+    androidNotificationOngoing: true,
+  );
 
   // Initialize Services - SINGLE CALL each
   await NotificationService.init();
@@ -103,34 +121,48 @@ Future<void> _handleGlobalNavigation(String payload) async {
     // Load khatma data to get current wird info
     try {
       final prefs = await SharedPreferences.getInstance();
-      final data = prefs.getString('active_khatma_data');
-      if (data != null) {
-        final json = jsonDecode(data) as Map<String, dynamic>;
-        final khatma = KhatmaModel.fromJson(json);
+      KhatmaModel? targetKhatma;
+      final parts = payload.split(':');
+      // Pattern: wird:{startPage}:{khatmaId}
 
-        // Extract exact startPage from payload (e.g. "wird:15")
-        int? targetStartPage;
-        if (payload.contains(':')) {
-          final parts = payload.split(':');
-          if (parts.length > 1) {
-            targetStartPage = int.tryParse(parts[1]);
+      if (parts.length >= 3) {
+        final targetId = parts[2];
+        final data = prefs.getString('khatma_$targetId');
+        if (data != null) {
+          targetKhatma = KhatmaModel.fromJson(jsonDecode(data));
+        }
+      }
+
+      // Fallback: If no khatmaId supplied or not found, try getting any active khatma
+      if (targetKhatma == null) {
+        final keys = prefs.getKeys();
+        for (String key in keys) {
+          if (key.startsWith('khatma_')) {
+            final data = prefs.getString(key);
+            if (data != null) {
+              targetKhatma = KhatmaModel.fromJson(jsonDecode(data));
+              break;
+            }
+          }
+        }
+      }
+
+      if (targetKhatma != null) {
+        int targetIndex = targetKhatma.currentWirdIndex;
+        if (parts.length > 1) {
+          final targetStartPage = int.tryParse(parts[1]);
+          if (targetStartPage != null) {
+            final foundIndex = targetKhatma.wirds.indexWhere(
+              (w) => w.startPage == targetStartPage,
+            );
+            if (foundIndex != -1) targetIndex = foundIndex;
           }
         }
 
-        int targetIndex = khatma.currentWirdIndex;
-        // Find which wird index matches this exact startPage
-        if (targetStartPage != null) {
-          final foundIndex = khatma.wirds.indexWhere(
-            (w) => w.startPage == targetStartPage,
-          );
-          if (foundIndex != -1) {
-            targetIndex = foundIndex;
-          }
-        }
-
-        if (targetIndex < khatma.wirds.length) {
-          final wird = khatma.wirds[targetIndex];
+        if (targetIndex < targetKhatma.wirds.length) {
+          final wird = targetKhatma.wirds[targetIndex];
           targetScreen = IsolatedWirdScreen(
+            khatmaId: targetKhatma.id,
             wirdIndex: targetIndex,
             targetStartPage: wird.startPage,
             targetEndPage: wird.endPage,

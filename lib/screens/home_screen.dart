@@ -48,6 +48,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // Lock home screen to portrait — only Mushaf/Wird screens allow landscape
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
     _loadPrayerTimes();
     _startTimer();
 
@@ -124,10 +129,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openCurrentWird() {
     if (!mounted) return;
     final khatmaCubit = context.read<KhatmaCubit>();
-    final state = khatmaCubit.state;
+    final khatma = khatmaCubit.getActiveKhatma();
 
-    if (state is KhatmaLoaded) {
-      final khatma = state.khatma;
+    if (khatma != null) {
       final currentIndex = khatma.currentWirdIndex;
       if (currentIndex < khatma.wirds.length) {
         final currentWird = khatma.wirds[currentIndex];
@@ -135,6 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
           context,
           MaterialPageRoute(
             builder: (_) => IsolatedWirdScreen(
+              khatmaId: khatma.id,
               wirdIndex: currentIndex,
               targetStartPage: currentWird.startPage,
               targetEndPage: currentWird.endPage,
@@ -172,10 +177,16 @@ class _HomeScreenState extends State<HomeScreen> {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
-        setState(() {
-          _updateCountdown();
-          _checkDailyTasks();
-        });
+        _updateCountdown();
+      }
+    });
+
+    // Check daily tasks every 5 minutes instead of every second
+    Timer.periodic(const Duration(minutes: 5), (timer) {
+      if (mounted) {
+        _checkDailyTasks();
+      } else {
+        timer.cancel();
       }
     });
   }
@@ -465,28 +476,77 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         // ─── الورد القرآني ───
-        int delayedWirdCount = 0;
-        bool showWirdInProgress = false;
+        List<Widget> lateWirdCards = [];
+        List<Widget> inProgressWirdCards = [];
+
         if (state is KhatmaLoaded) {
-          final khatma = state.khatma;
-          final target = context.read<KhatmaCubit>().getCurrentTargetWird();
-          if (target != null) {
-            // عدد الأوراد المتأخرة = الفرق بين الهدف والحالي
-            delayedWirdCount = target.wirdIndex - khatma.currentWirdIndex;
-            if (delayedWirdCount <= 0 && !target.isCompleted) {
-              // في الوقت: الورد الحالي مطلوب
-              showWirdInProgress = true;
+          for (final khatma in state.khatmas) {
+            final delayedWirds = context.read<KhatmaCubit>().getDaysLate(khatma.id);
+            if (delayedWirds > 0) {
+              lateWirdCards.add(
+                _buildReminderCard(
+                  "لديك تأخير في ${khatma.name} بمقدار $delayedWirds ورد",
+                  () {
+                    final w = khatma.wirds[khatma.currentWirdIndex];
+                    final cubit = context.read<KhatmaCubit>();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => IsolatedWirdScreen(
+                          khatmaId: khatma.id,
+                          wirdIndex: khatma.currentWirdIndex,
+                          targetStartPage: w.startPage,
+                          targetEndPage: w.endPage,
+                        ),
+                      ),
+                    ).then((_) {
+                      if (!mounted) return;
+                      _checkDailyTasks();
+                      cubit.loadKhatma();
+                    });
+                  },
+                  isDelayed: true,
+                ),
+              );
+            } else {
+              final target = context.read<KhatmaCubit>().getCurrentTargetWird(khatma.id);
+              if (target != null && !target.isCompleted) {
+                inProgressWirdCards.add(
+                  _buildReminderCard(
+                    "أكمل قراءة الورد الحالي: ${khatma.name}",
+                    () {
+                      final w = khatma.wirds[khatma.currentWirdIndex];
+                      final cubit = context.read<KhatmaCubit>();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => IsolatedWirdScreen(
+                            khatmaId: khatma.id,
+                            wirdIndex: khatma.currentWirdIndex,
+                            targetStartPage: w.startPage,
+                            targetEndPage: w.endPage,
+                          ),
+                        ),
+                      ).then((_) {
+                        if (!mounted) return;
+                        _checkDailyTasks();
+                        cubit.loadKhatma();
+                      });
+                    },
+                    isDelayed: false,
+                  ),
+                );
+              }
             }
           }
         }
-        final bool showWirdDelayed = delayedWirdCount > 0;
 
         if (!showMorningDelayed &&
             !showMorningInProgress &&
             !showEveningDelayed &&
             !showEveningInProgress &&
-            !showWirdDelayed &&
-            !showWirdInProgress) {
+            lateWirdCards.isEmpty &&
+            inProgressWirdCards.isEmpty) {
           return const SizedBox.shrink();
         }
 
@@ -495,21 +555,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             children: [
               // 🔴 المتأخر يطلع الأول باللون الأحمر 🔴
-              if (showWirdDelayed && state is KhatmaLoaded)
-                _buildReminderCard("متأخر $delayedWirdCount ورد عن الختمة", () {
-                  final k = state.khatma;
-                  final w = k.wirds[k.currentWirdIndex];
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => IsolatedWirdScreen(
-                        wirdIndex: k.currentWirdIndex,
-                        targetStartPage: w.startPage,
-                        targetEndPage: w.endPage,
-                      ),
-                    ),
-                  ).then((_) => _checkDailyTasks());
-                }, isDelayed: true),
+              ...lateWirdCards,
 
               if (showMorningDelayed)
                 _buildReminderCard("أذكار الصباح فات وقتها المفضل!", () {
@@ -540,24 +586,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 }, isDelayed: true),
 
               // 🟡 الجاري تنفيذه باللون الذهبي 🟡
-              if (showWirdInProgress && state is KhatmaLoaded)
-                _buildReminderCard("أكمل قراءة الورد الحالي", () {
-                  final k = state.khatma;
-                  final w = k.wirds[k.currentWirdIndex];
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => IsolatedWirdScreen(
-                        wirdIndex: k.currentWirdIndex,
-                        targetStartPage: w.startPage,
-                        targetEndPage: w.endPage,
-                      ),
-                    ),
-                  ).then((_) {
-                    _checkDailyTasks();
-                    if (mounted) context.read<KhatmaCubit>().loadKhatma();
-                  });
-                }, isDelayed: false),
+              ...inProgressWirdCards,
 
               if (showMorningInProgress)
                 _buildReminderCard("أكمل أذكار الصباح", () {

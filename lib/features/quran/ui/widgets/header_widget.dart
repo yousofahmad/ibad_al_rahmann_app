@@ -1,7 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:quran/quran.dart';
 
 import '../../../../../core/theme/app_images.dart';
@@ -15,14 +14,13 @@ class FullHeaderWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 8.0),
+      width: 380,
+      padding: const EdgeInsets.symmetric(vertical: 1.0, horizontal: 4.0),
       child: Stack(
         alignment: Alignment.center,
         children: [
           Image.asset(
             AppImages.ayaFrame,
-            width: double.infinity,
             fit: BoxFit.contain,
           ),
           Padding(
@@ -33,7 +31,7 @@ class FullHeaderWidget extends StatelessWidget {
                 getSurahNameArabic(surahNumber),
                 textAlign: TextAlign.center,
                 style: context.headlineMedium.copyWith(
-                  fontSize: context.isTablet ? 22.sp : 20.sp,
+                  fontSize: context.isTablet ? 28 : 22,
                   color: color,
                   fontWeight: FontWeight.bold,
                 ),
@@ -60,24 +58,26 @@ class MinHeaderWidget extends StatelessWidget {
           Center(
             child: Image.asset(
               AppImages.ayaFrame,
-              width: MediaQuery.of(context).size.width,
+              width: 380,
+              fit: BoxFit.contain,
             ),
           ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Center(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 50.0),
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
                 child: Text(
                   textAlign: TextAlign.center,
                   getSurahNameArabic(surahNumber),
                   style: context.labelSmall.copyWith(
-                    fontSize: context.isTablet ? 10.sp : 14.sp,
+                    fontSize: context.isTablet ? 22 : 18,
                     color: color,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-            ],
+            ),
           ),
         ],
       ),

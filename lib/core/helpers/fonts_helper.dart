@@ -1,8 +1,10 @@
-﻿import 'package:flutter/services.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 
 class FontsHelper {
   static final Set<String> _loadedFonts = {};
+
+  static bool isFontLoaded(String family) => _loadedFonts.contains(family);
 
   static Future<void> loadFont(String family, String path) async {
     if (_loadedFonts.contains(family)) return;

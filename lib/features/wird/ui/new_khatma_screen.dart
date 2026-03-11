@@ -14,6 +14,10 @@ class NewKhatmaScreen extends StatefulWidget {
 }
 
 class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
+  final TextEditingController _nameController = TextEditingController(
+    text: "ختمة جديدة",
+  );
+
   // Mode selection
   bool _isByAmount = false;
 
@@ -37,14 +41,19 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
 
   bool _isLoading = false;
 
-  /// Remaining pages from startJuz
-  int get _remainingPages => WirdCalculator.getRemainingPages(_startJuz);
+  /// Remaining pages from the chosen start point
+  int get _remainingPages {
+    if (_startByJuz) {
+      return WirdCalculator.getRemainingPages(_startJuz);
+    }
+    return 604 - _startPage + 1;
+  }
 
   /// Pages per day, dynamically computed based on mode and reminder type
   int get _pagesPerDay {
     if (!_isByAmount) {
-      // سرعة القراءة الأساسية: بنقسم المصحف كامل على المدة اللي اختارها
-      return (604 / _totalDays).ceil();
+      int speed = (_remainingPages / _totalDays).ceil();
+      return speed > 0 ? speed : 1;
     }
     // Amount mode: depends on whether daily or per-prayer
     bool isPerPrayer = _reminderType == 'prayer';
@@ -66,10 +75,7 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
   /// Total estimated days dynamically calculated
   int get _estimatedDays {
     if (!_isByAmount) {
-      int remaining = 604 - _effectiveStartPage + 1;
-      int ppd = _pagesPerDay;
-      if (ppd <= 0) ppd = 1;
-      return (remaining / ppd).ceil();
+      return _totalDays;
     }
 
     // Amount mode logic...
@@ -93,8 +99,8 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
   /// (disabled if less than 5 pages per day)
   bool get _canDistributeOverPrayers {
     if (!_isByAmount) {
-      // الاعتماد المباشر على سرعة القراءة الجديدة الموحدة
-      return _pagesPerDay >= 5;
+      // Allow if average pages per day >= 5
+      return (_remainingPages / _totalDays) >= 5;
     }
     // In amount mode, calculate what the per-prayer setting would give
     int ppdIfPrayer = WirdCalculator.getPagesPerDay(
@@ -108,6 +114,26 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
   /// Estimated total wirds
   int get _estimatedWirds {
     return _reminderType == 'prayer' ? _estimatedDays * 5 : _estimatedDays;
+  }
+
+  /// Auto-adjust _totalDays when start point changes (duration mode)
+  void _autoAdjustDays() {
+    if (!_isByAmount) {
+      if (_startByJuz) {
+        // Count remaining Juz directly for accurate day count
+        _totalDays = 31 - _startJuz;
+      } else {
+        // Default to roughly 1 Juz (20 pages) per day for the remaining pages
+        _totalDays = (_remainingPages / 20).ceil();
+      }
+      if (_totalDays < 1) _totalDays = 1;
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
   }
 
   void _pickDailyTime() async {
@@ -131,8 +157,16 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
   }
 
   void _startKhatma() async {
+    if (_nameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("برجاء إدخال اسم الختمة")));
+      return;
+    }
+
     setState(() => _isLoading = true);
 
+    final khatmaCubit = context.read<KhatmaCubit>();
     final prefs = await SharedPreferences.getInstance();
 
     // Save daily time if needed
@@ -146,12 +180,19 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
     await prefs.setInt('wird_adhan_delay_minutes', _adhanDelayMinutes);
 
     // Determine start parameters
-    await context.read<KhatmaCubit>().startNewKhatma(
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    final timeStr =
+        '${_dailyTime.hour.toString().padLeft(2, '0')}:${_dailyTime.minute.toString().padLeft(2, '0')}';
+
+    await khatmaCubit.startNewKhatma(
+      id: id,
+      name: _nameController.text.trim(),
       totalDays: _estimatedDays,
       unit: _isByAmount ? _selectedUnit : WirdUnit.page,
       notificationType: _reminderType,
       startJuz: _startByJuz ? _startJuz : 1,
       startFromPage: _startByJuz ? null : _startPage,
+      dailyTime: _reminderType == 'daily' ? timeStr : null,
     );
 
     if (mounted) {
@@ -198,6 +239,32 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // ═══ Khatma Name ═══
+            _buildCard(
+              context: context,
+              title: "اسم الختمة",
+              icon: FontAwesomeIcons.signature,
+              child: TextField(
+                controller: _nameController,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: goldColor,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: AppConsts.cairo,
+                ),
+                decoration: const InputDecoration(
+                  hintText: "مثلاً: ختمة رمضان، الختمة الثالثة",
+                  hintStyle: TextStyle(color: Colors.grey, fontSize: 13),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Colors.grey),
+                  ),
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: goldColor),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
             // ═══ Mode Selection ═══
             Container(
               decoration: BoxDecoration(
@@ -274,15 +341,7 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
                       suffix: "$_estimatedDays يوم",
                       onChanged: (v) {
                         setState(() {
-                          // نحسب سرعة القراءة المطلوبة لإنهاء المتبقي في v يوم
-                          double requiredSpeed = _remainingPages / v;
-                          // الآن نضبط _totalDays بحيث تعطينا هذه السرعة للمصحف كامل
-                          if (requiredSpeed > 0) {
-                            _totalDays = (604 / requiredSpeed).round();
-                          }
-                          // حدود الأمان للـ _totalDays
-                          if (_totalDays < 1) _totalDays = 1;
-                          if (_totalDays > 1000) _totalDays = 1000;
+                          _totalDays = v;
                         });
                       },
                       goldColor: goldColor,
@@ -375,7 +434,10 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
                       children: [
                         Expanded(
                           child: GestureDetector(
-                            onTap: () => setState(() => _startByJuz = true),
+                            onTap: () => setState(() {
+                              _startByJuz = true;
+                              _autoAdjustDays();
+                            }),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
@@ -402,7 +464,10 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
                         ),
                         Expanded(
                           child: GestureDetector(
-                            onTap: () => setState(() => _startByJuz = false),
+                            onTap: () => setState(() {
+                              _startByJuz = false;
+                              _autoAdjustDays();
+                            }),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
@@ -461,7 +526,10 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
                           }).toList(),
                           onChanged: (val) {
                             if (val != null) {
-                              setState(() => _startJuz = val);
+                              setState(() {
+                                _startJuz = val;
+                                _autoAdjustDays();
+                              });
                             }
                           },
                         ),
@@ -493,7 +561,10 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
                           min: 1,
                           max: 604,
                           suffix: "$_startPage",
-                          onChanged: (v) => setState(() => _startPage = v),
+                          onChanged: (v) => setState(() {
+                            _startPage = v;
+                            _autoAdjustDays();
+                          }),
                           goldColor: goldColor,
                         ),
                       ],
@@ -522,141 +593,137 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
               context: context,
               title: "نظام التذكير",
               icon: FontAwesomeIcons.bell,
-              child: Column(
-                children: [
-                  RadioListTile<String>(
-                    title: const Text("بدون تذكير"),
-                    value: 'none',
-                    groupValue: _reminderType,
-                    activeColor: goldColor,
-                    onChanged: (v) => setState(() => _reminderType = v!),
-                  ),
-                  RadioListTile<String>(
-                    title: const Text("تذكير يومي للورد"),
-                    value: 'daily',
-                    groupValue: _reminderType,
-                    activeColor: goldColor,
-                    onChanged: (v) => setState(() => _reminderType = v!),
-                  ),
-                  // Show time picker when daily is selected
-                  if (_reminderType == 'daily')
-                    Padding(
-                      padding: const EdgeInsets.only(right: 32, bottom: 8),
-                      child: InkWell(
-                        onTap: _pickDailyTime,
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: goldColor.withValues(alpha: 0.3),
+              child: RadioGroup<String>(
+                groupValue: _reminderType,
+                onChanged: (v) {
+                  if (v != null) setState(() => _reminderType = v);
+                },
+                child: Column(
+                  children: [
+                    const RadioListTile<String>(
+                      title: Text("بدون تذكير"),
+                      value: 'none',
+                      activeColor: goldColor,
+                    ),
+                    const RadioListTile<String>(
+                      title: Text("تذكير يومي للورد"),
+                      value: 'daily',
+                      activeColor: goldColor,
+                    ),
+                    if (_reminderType == 'daily')
+                      Padding(
+                        padding: const EdgeInsets.only(right: 32, bottom: 8),
+                        child: InkWell(
+                          onTap: _pickDailyTime,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
                             ),
-                            borderRadius: BorderRadius.circular(10),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: goldColor.withValues(alpha: 0.3),
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.access_time,
+                                  color: goldColor,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "الساعة ${_dailyTime.hour.toString().padLeft(2, '0')}:${_dailyTime.minute.toString().padLeft(2, '0')}",
+                                  style: const TextStyle(
+                                    color: goldColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  Icons.edit,
+                                  color: goldColor.withValues(alpha: 0.5),
+                                  size: 16,
+                                ),
+                              ],
+                            ),
                           ),
+                        ),
+                      ),
+                    RadioListTile<String>(
+                      title: Text(
+                        "توزيع بعد الصلوات",
+                        style: TextStyle(
+                          color: _canDistributeOverPrayers ? null : Colors.grey,
+                        ),
+                      ),
+                      subtitle: !_canDistributeOverPrayers
+                          ? Text(
+                              "يتطلب ٥ صفحات على الأقل يومياً",
+                              style: TextStyle(
+                                color: Colors.red.withValues(alpha: 0.7),
+                                fontSize: 12,
+                              ),
+                            )
+                          : (_reminderType == 'prayer'
+                                ? Text(
+                                    "كل صلاة = جزء من الورد اليومي",
+                                    style: TextStyle(
+                                      color: goldColor.withValues(alpha: 0.7),
+                                      fontSize: 12,
+                                    ),
+                                  )
+                                : null),
+                      value: 'prayer',
+                      activeColor: goldColor,
+                      enabled: _canDistributeOverPrayers,
+                    ),
+                    if (_reminderType == 'prayer')
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          right: 32,
+                          left: 16,
+                          bottom: 8,
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
                           child: Row(
-                            mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(
-                                Icons.access_time,
+                                Icons.timer_outlined,
                                 color: goldColor,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                "الساعة ${_dailyTime.hour.toString().padLeft(2, '0')}:${_dailyTime.minute.toString().padLeft(2, '0')}",
-                                style: const TextStyle(
-                                  color: goldColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                                "تأخير بعد الأذان: ",
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontFamily: AppConsts.cairo,
+                                  fontSize: 14,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Icon(
-                                Icons.edit,
-                                color: goldColor.withValues(alpha: 0.5),
-                                size: 16,
+                              _buildQuantityRow(
+                                value: _adhanDelayMinutes,
+                                min: 5,
+                                max: 60,
+                                suffix: "$_adhanDelayMinutes د",
+                                onChanged: (v) =>
+                                    setState(() => _adhanDelayMinutes = v),
+                                goldColor: goldColor,
                               ),
                             ],
                           ),
                         ),
                       ),
-                    ),
-                  // Distribute over prayers — only enabled if >= 5 pages/day
-                  RadioListTile<String>(
-                    title: Text(
-                      "توزيع بعد الصلوات",
-                      style: TextStyle(
-                        color: _canDistributeOverPrayers ? null : Colors.grey,
-                      ),
-                    ),
-                    subtitle: !_canDistributeOverPrayers
-                        ? Text(
-                            "يتطلب ٥ صفحات على الأقل يومياً",
-                            style: TextStyle(
-                              color: Colors.red.withValues(alpha: 0.7),
-                              fontSize: 12,
-                            ),
-                          )
-                        : (_reminderType == 'prayer'
-                              ? Text(
-                                  "كل صلاة = جزء من الورد اليومي",
-                                  style: TextStyle(
-                                    color: goldColor.withValues(alpha: 0.7),
-                                    fontSize: 12,
-                                  ),
-                                )
-                              : null),
-                    value: 'prayer',
-                    groupValue: _reminderType,
-                    activeColor: goldColor,
-                    onChanged: _canDistributeOverPrayers
-                        ? (v) => setState(() => _reminderType = v!)
-                        : null,
-                  ),
-                  // Custom Adhan delay setting (only for prayer mode)
-                  if (_reminderType == 'prayer')
-                    Padding(
-                      padding: const EdgeInsets.only(
-                        right: 32,
-                        left: 16,
-                        bottom: 8,
-                      ),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerRight,
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.timer_outlined,
-                              color: goldColor,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              "تأخير بعد الأذان: ",
-                              style: TextStyle(
-                                color: textColor,
-                                fontFamily: AppConsts.cairo,
-                                fontSize: 14,
-                              ),
-                            ),
-                            _buildQuantityRow(
-                              value: _adhanDelayMinutes,
-                              min: 5,
-                              max: 60,
-                              suffix: "$_adhanDelayMinutes د",
-                              onChanged: (v) =>
-                                  setState(() => _adhanDelayMinutes = v),
-                              goldColor: goldColor,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
 

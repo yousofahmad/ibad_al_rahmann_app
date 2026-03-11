@@ -7,9 +7,9 @@ class KhatmaInitial extends KhatmaState {}
 class KhatmaLoading extends KhatmaState {}
 
 class KhatmaLoaded extends KhatmaState {
-  final KhatmaModel khatma;
+  final List<KhatmaModel> khatmas;
 
-  KhatmaLoaded(this.khatma);
+  KhatmaLoaded(this.khatmas);
 }
 
 class KhatmaEmpty extends KhatmaState {}

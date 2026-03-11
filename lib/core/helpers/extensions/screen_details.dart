@@ -6,7 +6,7 @@ extension ScreenDetails on BuildContext {
   double get screenHeight => MediaQuery.sizeOf(this).height;
 
   bool get isTablet =>
-      (isLandscape ? screenHeight : screenWidth) >= SizeConfig.tablet;
+      MediaQuery.sizeOf(this).shortestSide >= SizeConfig.tablet;
   double get topPadding => MediaQuery.of(this).padding.top;
 
   bool get isLandscape =>

@@ -42,7 +42,6 @@ class _QuranSurahListState extends State<QuranSurahList> {
         context.read<QuranCubit>().onSurahListChanged(_currentPage);
       },
       itemBuilder: (context, index) {
-        // رجعنا الـ Row زي الكود القديم بالظبط عشان يمنع الـ Box إنه يتمط
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

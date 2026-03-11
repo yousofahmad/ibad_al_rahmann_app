@@ -22,7 +22,7 @@ class AdhanManager {
       country: 'مصر',
       category: 'Egypt',
       url:
-          'https://media.blubrry.com/muslim_central_quran/podcasts.qurancentral.com/adhan/abdul-basit/adhan-abdul-basit-01.mp3', // TODO: Fix URL
+          'https://download.tvquran.com/download/Adhan/Low_Quality/Abdul_Basit_Abdul_Samad.mp3',
     ),
     /*
     Muezzin(

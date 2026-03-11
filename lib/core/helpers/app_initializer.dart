@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:ibad_al_rahmann/features/quran/data/db_helper.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,6 +32,8 @@ class AppInitializer {
     ]);
 
     await PrayerTimesCache.clearStaleEntries();
+    // Start preloading the Quran strictly to RAM the exact moment the app launches
+    QuranWbwDbHelper.instance.preloadAllPagesInBackground();
   }
 
   static Future<void> _initHive() async {

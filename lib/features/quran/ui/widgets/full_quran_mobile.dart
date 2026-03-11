@@ -133,14 +133,7 @@ class _FullQuranWidgetState extends State<FullQuranWidget> {
                 context.read<QuranCubit>().onQuranPageChanged(value);
               },
               itemBuilder: (context, index) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Expanded(child: FullPageRichText(pageNumber: index + 1)),
-                    ],
-                  ),
-                );
+                return FullPageRichText(pageNumber: index + 1);
               },
             ),
             if (_showOverlays)

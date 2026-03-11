@@ -206,13 +206,13 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
                   color: containerColor,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: const Color(0xFFD0A871).withOpacity(0.2),
+                    color: const Color(0xFFD0A871).withValues(alpha: 0.2),
                   ),
                   boxShadow: isDark
                       ? null
                       : [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 5,
                             offset: const Offset(0, 2),
                           ),
@@ -264,7 +264,7 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
                       ? null
                       : [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 5,
                             offset: const Offset(0, 2),
                           ),
@@ -394,7 +394,7 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
                                 "وقت الإقامة (دقائق)",
                                 style: TextStyle(
                                   fontFamily: AppConsts.cairo,
-                                  color: textColor.withOpacity(0.7),
+                                  color: textColor.withValues(alpha: 0.7),
                                   fontSize: 13,
                                 ),
                               ),
@@ -599,7 +599,7 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
                 ? null
                 : [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 5,
                       offset: const Offset(0, 2),
                     ),

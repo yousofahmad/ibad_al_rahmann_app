@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/widgets/adaptive_layout.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/layouts/min_quran_mobile.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/layouts/min_quran_tablet.dart';
@@ -11,7 +11,7 @@ class MinQuranWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return AdaptiveLayout(
       mobileLayout: (_) => MinQuranMobile(currentPage: currentPage),
-      tabletLayout: (_) => MinQuranTablet(currecntPage: currentPage),
+      tabletLayout: (_) => MinQuranTablet(currentPage: currentPage),
     );
   }
 }

@@ -16,8 +16,6 @@ class _MushafScreenState extends State<MushafScreen> {
   @override
   void initState() {
     super.initState();
-    // Quran pages go from 1 to 604, but PageView uses 0-indexed.
-    // Starting at 0 (Page 1) or any preferred index.
     _pageController = PageController(initialPage: 0);
   }
 
@@ -30,9 +28,7 @@ class _MushafScreenState extends State<MushafScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(
-        0xfffffdf5,
-      ), // Traditional Mushaf paper color
+      backgroundColor: const Color(0xfffffdf5), 
       body: SafeArea(
         child: Column(
           children: [
@@ -40,9 +36,7 @@ class _MushafScreenState extends State<MushafScreen> {
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
-                // 604 pages in the standard Mushaf
                 itemCount: 604,
-                // Arabic reads Right-to-Left, so pages should flip accordingly
                 reverse: true,
                 itemBuilder: (context, index) {
                   final pageNumber = index + 1;
@@ -52,8 +46,8 @@ class _MushafScreenState extends State<MushafScreen> {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
                       } else if (snapshot.hasError) {
-                        return const Center(
-                          child: Text('Error loading page: \${snapshot.error}'),
+                        return Center(
+                          child: Text('Error loading page: ${snapshot.error}'),
                         );
                       } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
                         return const Center(
@@ -78,7 +72,6 @@ class _MushafScreenState extends State<MushafScreen> {
                             final String lineType =
                                 lineData['line_type'] as String? ?? 'ayah';
 
-                            // Handle Surah/Juz headers if they are centered
                             if (isCentered == 1 ||
                                 lineType == 'surah_name' ||
                                 lineType == 'basmalah') {
@@ -91,7 +84,7 @@ class _MushafScreenState extends State<MushafScreen> {
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     fontFamily: 'UthmanicHafs',
-                                    fontSize: 24, // Adjust for headers
+                                    fontSize: 24, 
                                     color: Colors.black,
                                   ),
                                 ),
@@ -101,28 +94,30 @@ class _MushafScreenState extends State<MushafScreen> {
                             final isPage1Or2 =
                                 pageNumber == 1 || pageNumber == 2;
 
-                            // Render exactly one justified line using FittedBox
                             return Expanded(
                               child: FittedBox(
                                 fit: BoxFit.scaleDown,
                                 alignment: Alignment.center,
-                                child: SizedBox(
-                                  width: (isCentered == 1 || isPage1Or2)
-                                      ? null
-                                      : 1000,
-                                  child: RichText(
-                                    textDirection: TextDirection.rtl,
-                                    textAlign: (isCentered == 1 || isPage1Or2)
-                                        ? TextAlign.center
-                                        : TextAlign.justify,
-                                    text: TextSpan(
-                                      text: text,
-                                      style: const TextStyle(
-                                        fontFamily: 'UthmanicHafs',
-                                        fontSize:
-                                            40, // Base large size to downscale smoothly
-                                        height: 1.5,
-                                        color: Colors.black,
+                                // FIX: Add Clip.none to stop cutting Arabic tails
+                                clipBehavior: Clip.none,
+                                child: Padding(
+                                  // Add small padding to ensure breathing room inside the scaling box
+                                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                  child: SizedBox(
+                                    width: 1000,
+                                    child: RichText(
+                                      textDirection: TextDirection.rtl,
+                                      textAlign: (isCentered == 1 || isPage1Or2)
+                                          ? TextAlign.center
+                                          : TextAlign.justify,
+                                      text: TextSpan(
+                                        text: text,
+                                        style: const TextStyle(
+                                          fontFamily: 'UthmanicHafs',
+                                          fontSize: 40,
+                                          height: 1.5,
+                                          color: Colors.black,
+                                        ),
                                       ),
                                     ),
                                   ),

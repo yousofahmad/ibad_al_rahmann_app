@@ -963,7 +963,9 @@ class _AzkarPageState extends State<AzkarPage> {
                     ),
                     IconButton(
                       icon: Icon(Icons.share, color: _goldColor, size: 26),
-                      onPressed: () => Share.share(data.text),
+                      onPressed: () => SharePlus.instance.share(
+                        ShareParams(text: data.text),
+                      ),
                     ),
                   ],
                 ),

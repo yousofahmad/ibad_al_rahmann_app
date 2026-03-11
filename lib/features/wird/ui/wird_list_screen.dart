@@ -7,9 +7,14 @@ import '../bloc/khatma_cubit.dart';
 import 'isolated_wird_screen.dart';
 
 class WirdListScreen extends StatelessWidget {
+  final String khatmaId;
   final bool showPrevious;
 
-  const WirdListScreen({super.key, required this.showPrevious});
+  const WirdListScreen({
+    super.key,
+    required this.khatmaId,
+    required this.showPrevious,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +40,7 @@ class WirdListScreen extends StatelessWidget {
       body: BlocBuilder<KhatmaCubit, KhatmaState>(
         builder: (context, state) {
           if (state is KhatmaLoaded) {
-            final khatma = state.khatma;
+            final khatma = state.khatmas.firstWhere((k) => k.id == khatmaId);
             final currentIndex = khatma.currentWirdIndex;
 
             // Filter
@@ -69,6 +74,7 @@ class WirdListScreen extends StatelessWidget {
                       navigatorKey.currentState!.push(
                         MaterialPageRoute(
                           builder: (_) => IsolatedWirdScreen(
+                            khatmaId: khatmaId,
                             wirdIndex: wird.wirdIndex,
                             targetStartPage: wird.startPage,
                             targetEndPage: wird.endPage,

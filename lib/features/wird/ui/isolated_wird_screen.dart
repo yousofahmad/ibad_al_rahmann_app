@@ -13,12 +13,14 @@ import '../../quran/ui/widgets/wbw_page_widget.dart';
 import 'package:ibad_al_rahmann/services/daily_tracker_service.dart';
 
 class IsolatedWirdScreen extends StatefulWidget {
+  final String khatmaId;
   final int wirdIndex;
   final int targetStartPage;
   final int targetEndPage;
 
   const IsolatedWirdScreen({
     super.key,
+    required this.khatmaId,
     required this.wirdIndex,
     required this.targetStartPage,
     required this.targetEndPage,
@@ -45,7 +47,7 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen> {
 
     _pageController = PageController(initialPage: _currentIndex);
 
-    // Enter full immersive mode — hide status bar + nav bar
+    // Re-enable immersive mode for a better reading experience
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
     _loadWirdProgress();
@@ -150,7 +152,10 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen> {
       (widget.targetEndPage - widget.targetStartPage + 1).clamp(0, 604);
 
   void _finishWird() {
-    context.read<KhatmaCubit>().markWirdAsCompleted(widget.wirdIndex);
+    context.read<KhatmaCubit>().markWirdAsCompleted(
+      widget.khatmaId,
+      widget.wirdIndex,
+    );
     getIt<CacheService>().setInt('wird_${widget.wirdIndex}_current_page', 0);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -199,64 +204,72 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen> {
           }
           return Scaffold(
             backgroundColor: bgColor,
-            // No SafeArea — fully immersive, no back button bar
-            body: GestureDetector(
-              onDoubleTap: _toggleTheme,
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: _itemCount,
-                physics: const PageScrollPhysics(),
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentIndex = index;
-                  });
-
-                  _finishTimer?.cancel();
-                  if (index == _itemCount - 1) {
-                    _finishTimer = Timer(const Duration(seconds: 60), () {
-                      if (mounted) {
-                        setState(() => _showFinishButton = true);
-                      }
+            // Immersive mode, very light padding to avoid notch without 'cutting' the page appearance
+            body: Padding(
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top > 0 ? 5.0 : 0.0,
+                bottom: 8.0,
+              ),
+              child: GestureDetector(
+                onDoubleTap: _toggleTheme,
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: _itemCount,
+                  physics: const PageScrollPhysics(),
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentIndex = index;
                     });
-                  } else {
-                    setState(() => _showFinishButton = false);
-                  }
 
-                  getIt<CacheService>().setInt(
-                    'wird_${_wirdStartDate}_${widget.wirdIndex}_current_page',
-                    index,
-                  );
-                  context.read<QuranCubit>().onQuranPageChanged(
-                    widget.targetStartPage + index - 1,
-                  );
-                },
-                itemBuilder: (context, index) {
-                  final realPage = widget.targetStartPage + index;
-
-                  final state = context.read<KhatmaCubit>().state;
-                  int? sSura, sAyah, eSura, eAyah;
-
-                  if (state is KhatmaLoaded) {
-                    final wirdModel = state.khatma.wirds[widget.wirdIndex];
-                    if (wirdModel.isPartial) {
-                      sSura = wirdModel.startSuraNumber;
-                      sAyah = wirdModel.startAyah;
-                      eSura = wirdModel.endSuraNumber;
-                      eAyah = wirdModel.endAyah;
+                    _finishTimer?.cancel();
+                    if (index == _itemCount - 1) {
+                      _finishTimer = Timer(const Duration(seconds: 60), () {
+                        if (mounted) {
+                          setState(() => _showFinishButton = true);
+                        }
+                      });
+                    } else {
+                      setState(() => _showFinishButton = false);
                     }
-                  }
 
-                  return WbwPageWidget(
-                    pageNumber: realPage,
-                    startSuraNumber: sSura,
-                    startAyah: sAyah,
-                    endSuraNumber: eSura,
-                    endAyah: eAyah,
-                    textColorOverride: textColor,
-                    paperColorOverride: bgColor,
-                    isZoomEnabled: true,
-                  );
-                },
+                    getIt<CacheService>().setInt(
+                      'wird_${_wirdStartDate}_${widget.wirdIndex}_current_page',
+                      index,
+                    );
+                    context.read<QuranCubit>().onQuranPageChanged(
+                      widget.targetStartPage + index - 1,
+                    );
+                  },
+                  itemBuilder: (context, index) {
+                    final realPage = widget.targetStartPage + index;
+
+                    final state = context.read<KhatmaCubit>().state;
+                    int? sSura, sAyah, eSura, eAyah;
+
+                    if (state is KhatmaLoaded) {
+                      final wirdModel = state.khatmas
+                          .firstWhere((k) => k.id == widget.khatmaId)
+                          .wirds[widget.wirdIndex];
+                      if (wirdModel.isPartial) {
+                        sSura = wirdModel.startSuraNumber;
+                        sAyah = wirdModel.startAyah;
+                        eSura = wirdModel.endSuraNumber;
+                        eAyah = wirdModel.endAyah;
+                      }
+                    }
+
+                    return WbwPageWidget(
+                      pageNumber: realPage,
+                      startSuraNumber: sSura,
+                      startAyah: sAyah,
+                      endSuraNumber: eSura,
+                      endAyah: eAyah,
+                      textColorOverride: textColor,
+                      paperColorOverride: bgColor,
+                      isZoomEnabled: true,
+                    );
+                  },
+                ),
               ),
             ),
             floatingActionButtonLocation:

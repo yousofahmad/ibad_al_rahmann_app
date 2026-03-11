@@ -20,13 +20,13 @@ import android.os.Build
 import androidx.annotation.NonNull
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.util.Calendar
 
-class MainActivity: FlutterActivity() {
+class MainActivity: AudioServiceActivity() {
     private val CHANNEL = "com.example.ibad_al_rahmann/native_notifications"
     
     companion object {
@@ -99,6 +99,59 @@ class MainActivity: FlutterActivity() {
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel!!.setMethodCallHandler { call, result ->
             when (call.method) {
+                "cancelAlarm" -> {
+                    val id = call.argument<Int>("id") ?: 1
+                    cancelAlarm(id)
+                    result.success("Canceled")
+                }
+                "checkLaunchPayload" -> {
+                    val target = intent?.getStringExtra("target_page")
+                    result.success(target)
+                }
+                "updatePrayerNotification" -> {
+                    try {
+                        val nextName = call.argument<String>("nextName")
+                        val hijri = call.argument<String>("hijri")
+                        val prayerIndex = call.argument<Int>("prayerIndex") ?: -1
+                        val nextPrayerEpoch = when (val epochArg = call.argument<Any>("nextPrayerEpoch")) {
+                            is Long -> epochArg
+                            is Int -> epochArg.toLong()
+                            is String -> epochArg.toLongOrNull() ?: 0L
+                            else -> 0L
+                        }
+
+                        val serviceIntent = Intent(this, PrayerNotificationService::class.java).apply {
+                            action = "UPDATE_PRAYER_NOTIFICATION"
+                            putExtra("fajr", call.argument<String>("fajr"))
+                            putExtra("dhuhr", call.argument<String>("dhuhr"))
+                            putExtra("asr", call.argument<String>("asr"))
+                            putExtra("maghrib", call.argument<String>("maghrib"))
+                            putExtra("isha", call.argument<String>("isha"))
+                            putExtra("nextName", nextName)
+                            putExtra("countdown", call.argument<String>("countdown"))
+                            putExtra("hijri", hijri)
+                            putExtra("prayerIndex", prayerIndex)
+                            putExtra("nextPrayerEpoch", nextPrayerEpoch)
+                            putExtra("isCountUp", call.argument<Boolean>("isCountUp") ?: false)
+                        }
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(serviceIntent)
+                        } else {
+                            startService(serviceIntent)
+                        }
+                        result.success(null)
+                    } catch (e: Exception) {
+                        result.error("NOTIFICATION_ERROR", e.message, null)
+                    }
+                }
+                "stopPrayerNotification" -> {
+                    val serviceIntent = Intent(this, PrayerNotificationService::class.java).apply {
+                        action = "STOP_PRAYER_NOTIFICATION"
+                    }
+                    startService(serviceIntent)
+                    result.success(null)
+                }
                 "scheduleAlarm" -> {
                     val id = call.argument<Int>("id") ?: 1
                     val year = call.argument<Int>("year") ?: -1
@@ -116,15 +169,6 @@ class MainActivity: FlutterActivity() {
                     scheduleAlarm(this, id, year, month, day, hour, minute, soundName, title, body, payload, false, audioPath, intervalMinutes)
                     result.success("Scheduled")
                 }
-                "cancelAlarm" -> {
-                    val id = call.argument<Int>("id") ?: 1
-                    cancelAlarm(id)
-                    result.success("Canceled")
-                }
-                "checkLaunchPayload" -> {
-                    val target = intent?.getStringExtra("target_page")
-                    result.success(target)
-                }
                 "vibrate" -> {
                     val duration = call.argument<Int>("duration")?.toLong() ?: 100L
                     val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
@@ -134,46 +178,6 @@ class MainActivity: FlutterActivity() {
                         @Suppress("DEPRECATION")
                         vibrator.vibrate(duration)
                     }
-                    result.success(null)
-                }
-                "updatePrayerNotification" -> {
-                    try {
-                        val intent = Intent(this, PrayerNotificationService::class.java).apply {
-                            action = "UPDATE_PRAYER_NOTIFICATION"
-                            putExtra("fajr", call.argument<String>("fajr"))
-                            putExtra("dhuhr", call.argument<String>("dhuhr"))
-                            putExtra("asr", call.argument<String>("asr"))
-                            putExtra("maghrib", call.argument<String>("maghrib"))
-                            putExtra("isha", call.argument<String>("isha"))
-                            putExtra("nextName", call.argument<String>("nextName"))
-                            putExtra("countdown", call.argument<String>("countdown"))
-                            putExtra("hijri", call.argument<String>("hijri"))
-                            putExtra("prayerIndex", call.argument<Int>("prayerIndex"))
-                            
-                            val epochArg = call.argument<Any>("nextPrayerEpoch")
-                            val nextPrayerEpoch = when (epochArg) {
-                                is Long -> epochArg
-                                is Int -> epochArg.toLong()
-                                is String -> epochArg.toLongOrNull() ?: 0L
-                                else -> 0L
-                            }
-                            putExtra("nextPrayerEpoch", nextPrayerEpoch)
-                        }
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            startForegroundService(intent)
-                        } else {
-                            startService(intent)
-                        }
-                        result.success(null)
-                    } catch (e: Exception) {
-                        result.error("NOTIFICATION_ERROR", e.message, null)
-                    }
-                }
-                "stopPrayerNotification" -> {
-                    val intent = Intent(this, PrayerNotificationService::class.java).apply {
-                        action = "STOP_PRAYER_NOTIFICATION"
-                    }
-                    startService(intent)
                     result.success(null)
                 }
                 else -> result.notImplemented()
@@ -221,7 +225,8 @@ class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
             val prefs = context.getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE)
-            val allIds = (1..1000).toList()
+            // Restore IDs including Khatma (6000+) and Salawat (8000+)
+            val allIds = (1..1000).toList() + (6000..7000).toList() + (8000..8010).toList()
             for (id in allIds) {
                 if (prefs.getBoolean("alarm_${id}_active", false)) {
                     val hour = prefs.getInt("alarm_${id}_hour", 6)
@@ -388,7 +393,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 in 100..399 -> "prayers_group"  // أذان + إقامة + قبل الصلاة
                 in 400..499 -> "ramadan_group"   // رمضان
                 in 500..599 -> "eid_group"       // العيد
-                in 600..699 -> "wird_group"      // الورد
+                in 600..699, in 6000..6999 -> "wird_group" // الورد
                 in 700..799 -> "prayers_group"   // ضحى، قيام، ثلث الليل
                 in 8000..8999 -> "azkar_group"   // الصلاة على النبي
                 else -> "reminders_group"
@@ -428,7 +433,7 @@ class AlarmReceiver : BroadcastReceiver() {
             in 300..399 -> "group_prayers"  // Iqama
             in 400..499 -> "group_ramadan"  // Ramadan (Iftar, Suhoor)
             in 500..599 -> "group_eid"      // Eid + Takbeerat
-            in 600..699 -> "group_wird"     // Wird
+            in 600..699, in 6000..6999 -> "group_wird" // Wird
             in 700..799 -> "group_prayers"  // Duha, Qiyam, Thirds, Midnight, Jumua
             in 8000..8999 -> "group_azkar"  // Friday Salawat
             else -> "group_azkar"

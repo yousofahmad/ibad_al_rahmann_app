@@ -13,6 +13,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'package:hijri/hijri_calendar.dart';
 
 class NotificationService {
   static const MethodChannel _platform = MethodChannel(
@@ -27,18 +28,12 @@ class NotificationService {
 
   // Initialization
   static Future<void> init() async {
-    // Ensure timezones are initialized
-    // This is also called in main, but good for safety if service is tested in isolation
     try {
       tz.initializeTimeZones();
-      // Set default to Cairo or system if possible.
-      // specific location setting is better done via a specific package or user setting.
-      // For now, we rely on the main.dart initialization.
     } catch (e) {
       debugPrint("Timezone init error (ignore if already initialized): $e");
     }
 
-    // 1. Initialize Local Notifications (for Friday Reminders)
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/launcher_icon');
 
@@ -54,10 +49,9 @@ class NotificationService {
       },
     );
 
-    // Create Channel for Friday Reminders
     const AndroidNotificationChannel fridayChannel = AndroidNotificationChannel(
-      'friday_reminders', // id
-      'تنبيهات ليلة الجمعة', // title
+      'friday_reminders',
+      'تنبيهات ليلة الجمعة',
       description: 'تذكير بالصلاة على النبي ﷺ',
       importance: Importance.high,
       sound: RawResourceAndroidNotificationSound('saly_3ala_mo7amad'),
@@ -70,7 +64,6 @@ class NotificationService {
         >()
         ?.createNotificationChannel(fridayChannel);
 
-    // 2. Native Method Channel Init
     _platform.setMethodCallHandler(_handleMethodCall);
     final launchPayload = await checkLaunchPayload();
     if (launchPayload != null) {
@@ -81,9 +74,6 @@ class NotificationService {
   static Future<void> checkAndRequestBatteryPermission(
     BuildContext context,
   ) async {
-    // ... existing logic ...
-    // Request permission to ignore battery optimizations
-    // This is needed for exact alarms on Android 12+ and reliable notifications
     try {
       final status = await Permission.ignoreBatteryOptimizations.status;
       if (status.isGranted) return;
@@ -92,11 +82,11 @@ class NotificationService {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            backgroundColor: const Color(0xFF1E1E1E), // Dark theme background
+            backgroundColor: const Color(0xFF1E1E1E),
             title: const Text(
               "تنبيه هام للإشعارات",
               style: TextStyle(
-                color: Color(0xFFD0A871), // Gold
+                color: Color(0xFFD0A871),
                 fontFamily: 'Cairo',
                 fontWeight: FontWeight.bold,
               ),
@@ -145,12 +135,11 @@ class NotificationService {
   static Future<bool> checkExactAlarmPermission() async {
     try {
       if (await Permission.scheduleExactAlarm.isDenied) {
-        // Return false to indicate we might need to ask or warn
         return false;
       }
       return true;
     } catch (e) {
-      return true; // If error (e.g. old Android), assume true
+      return true;
     }
   }
 
@@ -163,18 +152,15 @@ class NotificationService {
     }
   }
 
-  // --- Scheduling ---
-
   static Future<void> scheduleAll(
     PrayerTimes times, {
     List<ExtendedPrayer>? extended,
   }) async {
-    await cancelAll(); // Does not cancel Wird by default
+    await cancelAll();
     debugPrint("Native: Scheduling All...");
 
     final prefs = await SharedPreferences.getInstance();
 
-    // 1. Azkar
     if (prefs.getBool('notif_azkar_morning') ?? true) {
       final t = (prefs.getString('time_azkar_morning') ?? "06:00").split(":");
       await _scheduleNative(
@@ -200,74 +186,30 @@ class NotificationService {
       );
     }
 
-    // 1.5 Reschedule Wird (if enabled)
     await rescheduleWird();
 
-    // 2. Prayers
     final globalDefault = prefs.getString('adhan_muezzin_id') ?? 'nafis';
     String soundKey(String key) =>
         (prefs.getString('adhan_sound_$key') ?? globalDefault);
 
-    await _schedulePrayer(
-      100,
-      "الفجر",
-      times.fajr,
-      soundKey('fajr'),
-      prefs,
-      'fajr',
-    );
-    await _schedulePrayer(
-      102,
-      "الظهر",
-      times.dhuhr,
-      soundKey('dhuhr'),
-      prefs,
-      'dhuhr',
-    );
-    await _schedulePrayer(
-      103,
-      "العصر",
-      times.asr,
-      soundKey('asr'),
-      prefs,
-      'asr',
-    );
-    await _schedulePrayer(
-      104,
-      "المغرب",
-      times.maghrib,
-      soundKey('maghrib'),
-      prefs,
-      'maghrib',
-    );
-    await _schedulePrayer(
-      105,
-      "العشاء",
-      times.isha,
-      soundKey('isha'),
-      prefs,
-      'isha',
-    );
+    await _schedulePrayer(100, "الفجر", times.fajr, soundKey('fajr'), prefs, 'fajr');
+    await _schedulePrayer(102, "الظهر", times.dhuhr, soundKey('dhuhr'), prefs, 'dhuhr');
+    await _schedulePrayer(103, "العصر", times.asr, soundKey('asr'), prefs, 'asr');
+    await _schedulePrayer(104, "المغرب", times.maghrib, soundKey('maghrib'), prefs, 'maghrib');
+    await _schedulePrayer(105, "العشاء", times.isha, soundKey('isha'), prefs, 'isha');
 
-    // 3. Pre-Prayer (Simple implementation: Native repeats daily)
-    // Be careful: Pre-Prayer time changes daily. Native repeats same HH:MM.
-    // Ideally we update this daily.
     await _schedulePrePrayer(200, "الفجر", times.fajr, prefs, 'Fajr');
     await _schedulePrePrayer(202, "الظهر", times.dhuhr, prefs, 'Dhuhr');
     await _schedulePrePrayer(203, "العصر", times.asr, prefs, 'Asr');
     await _schedulePrePrayer(204, "المغرب", times.maghrib, prefs, 'Maghrib');
     await _schedulePrePrayer(205, "العشاء", times.isha, prefs, 'Isha');
 
-    // 4. Iqama (After Adhan)
-    // IDs 300..305. Skip Sunrise.
     await _scheduleIqama(300, "الفجر", times.fajr, prefs, 'Fajr');
     await _scheduleIqama(302, "الظهر", times.dhuhr, prefs, 'Dhuhr');
     await _scheduleIqama(303, "العصر", times.asr, prefs, 'Asr');
     await _scheduleIqama(304, "المغرب", times.maghrib, prefs, 'Maghrib');
     await _scheduleIqama(305, "العشاء", times.isha, prefs, 'Isha');
 
-    // 5. Other Prayers/Events
-    // Sunrise (Shurooq) - ID 101 (Fits between Fajr 100 and Dhuhr 102)
     if (prefs.getBool('notif_sunrise') ?? true) {
       await _scheduleNative(
         101,
@@ -279,9 +221,8 @@ class NotificationService {
       );
     }
 
-    // Duha: Sunrise + 20 mins (approx)
     if (prefs.getBool('notif_duha') ?? false) {
-      final duhaTime = times.sunrise.add(const Duration(minutes: 20));
+      final duhaTime = times.sunrise.add(const Duration(minutes: 15));
       await _scheduleNative(
         700,
         "صلاة الضحى",
@@ -292,32 +233,7 @@ class NotificationService {
       );
     }
 
-    // Qiyam: Last Third of Night
     if (prefs.getBool('notif_qiyam') ?? false) {
-      // Calculate Last Third:
-      // Night duration = Maghrib to Fajr (Next Day)
-      // Since 'times' has today's Maghrib and today's Fajr, we need tomorrow's Fajr for accurate length.
-      // But Native repeats daily. We can approximate using today's Fajr and Maghrib logic
-      // or simplistic: 2:00 AM? No, better to calculate properly if possible.
-      // Getting tomorrow's Fajr here is hard without PrayerService async call inside this static method?
-      // times.fajr is Today's Fajr. times.maghrib is Today's Maghrib.
-      // Length = (24h - Maghrib) + Fajr
-      // Last Third Start = Fajr - (Length / 3)
-
-      // Let's us current day's Fajr for duration calculation (approximate is fine for daily repeat)
-      // Duration nightDuration = times.fajr.add(Duration(days: 1)).difference(times.maghrib);
-      // This assumes Maghrib is yesterday? No.
-
-      // Current day Context:
-      // We are scheduling for "Today/Tomorrow".
-      // Maghrib is PM. Fajr is AM.
-      // Night is TODAY Maghrib -> TOMORROW Fajr.
-      // Qiyam is late night.
-
-      // Simple logic:
-      // We need (Tomorrow Fajr - Today Maghrib).
-      // We don't have Tomorrow Fajr in 'times'.
-      // We can assume Tomorrow Fajr time ~= Today Fajr time.
       DateTime maghrib = times.maghrib;
       DateTime fajrTomorrow = DateTime(
         times.fajr.year,
@@ -340,8 +256,6 @@ class NotificationService {
       );
     }
 
-    // --- Ramadan & Eid ---
-    // 6. Iftar (30 mins before Maghrib)
     if (prefs.getBool('iftar_alarm') ?? false) {
       final iftarTime = times.maghrib.subtract(const Duration(minutes: 30));
       await scheduleRamadanAlert(
@@ -352,7 +266,6 @@ class NotificationService {
       );
     }
 
-    // 7. Suhoor (1 hour before Fajr)
     if (prefs.getBool('suhoor_alarm') ?? false) {
       final suhoorTime = times.fajr.subtract(const Duration(hours: 1));
       await scheduleRamadanAlert(
@@ -363,24 +276,25 @@ class NotificationService {
       );
     }
 
-    // 8. Eid (30 mins before Sunrise - approx for Eid Prayer prep)
-    if (prefs.getBool('eid_alarm') ?? false) {
+    final off = PrayerService().hijriOffset;
+    final hijriNow = HijriCalendar.fromDate(DateTime.now().add(Duration(days: off)));
+    final int hMonth = hijriNow.hMonth;
+    final int hDay = hijriNow.hDay;
+
+    if ((prefs.getBool('eid_alarm') ?? false) && hMonth == 10 && hDay == 1) {
       final eidTime = times.sunrise.subtract(const Duration(minutes: 30));
       await scheduleEidAlert(500, "تنبيه العيد", "استعد لصلاة العيد", eidTime);
     }
 
-    // 9. Takbeerat (10 Dhul-Hijjah)
     if (prefs.getBool('notif_takbeerat') ?? false) {
       await scheduleTakbeerat(times);
     }
 
-    // 10. Arafah (9 Dhul-Hijjah)
-    if (prefs.getBool('notif_arafah') ?? false) {
+    if ((prefs.getBool('notif_arafah') ?? false) && hMonth == 12 && hDay == 9) {
       await scheduleArafah(times);
     }
 
-    // 10.5 Eid Dhul Hijjah (30 mins before sunrise for Eid prayer)
-    if (prefs.getBool('notif_eid_dhulhijjah') ?? false) {
+    if ((prefs.getBool('notif_eid_dhulhijjah') ?? false) && hMonth == 12 && hDay == 10) {
       final eidTime = times.sunrise.subtract(const Duration(minutes: 30));
       await scheduleEidAlert(
         501,
@@ -391,9 +305,7 @@ class NotificationService {
       );
     }
 
-    // 10.6 First Third of Night
     if (prefs.getBool('notif_first_third') ?? false) {
-      // Calculate first third of night
       DateTime maghrib = times.maghrib;
       DateTime fajrTomorrow = DateTime(
         times.fajr.year,
@@ -416,7 +328,6 @@ class NotificationService {
       );
     }
 
-    // 10.7 Midnight (Islamic)
     if (prefs.getBool('notif_midnight') ?? false) {
       DateTime maghrib = times.maghrib;
       DateTime fajrTomorrow = DateTime(
@@ -440,7 +351,6 @@ class NotificationService {
       );
     }
 
-    // 11. Friday Pre-Prayer (Jumua)
     if (prefs.getBool('notif_jumua') ?? false) {
       final now = DateTime.now();
       DateTime nextFri = now;
@@ -473,14 +383,11 @@ class NotificationService {
     } else {
       await _flutterLocalNotificationsPlugin.cancel(705);
     }
+    debugPrint("✅ Notifications Sync Complete.");
   }
 
-  /// Smart/Sequential scheduling: only schedule the NEXT 5 upcoming notifications
-  /// based entirely on the dynamic Khatma plan stored in state.
   static Future<void> rescheduleWird() async {
     final prefs = await SharedPreferences.getInstance();
-
-    // 1. Load active khatma data directly
     final data = prefs.getString('active_khatma_data');
     if (data == null) return;
 
@@ -490,29 +397,20 @@ class NotificationService {
     if (khatma.notificationType == 'none') return;
 
     final adhanDelay = prefs.getInt('wird_adhan_delay_minutes') ?? 20;
-
-    // We only schedule the next up-to-5 unread wirds
     const int maxScheduled = 5;
-    int scheduled = 0;
-    int idCounter = 600;
+    int idCounter = 6000;
     final now = DateTime.now();
 
-    // Collect next uncompleted wirds
     List<WirdModel> unreadWirds = [];
-    for (
-      int i = khatma.currentWirdIndex;
-      i < khatma.wirds.length && unreadWirds.length < maxScheduled;
-      i++
-    ) {
+    for (int i = khatma.currentWirdIndex; i < khatma.wirds.length && unreadWirds.length < maxScheduled; i++) {
       if (!khatma.wirds[i].isCompleted) {
         unreadWirds.add(khatma.wirds[i]);
       }
     }
 
-    if (unreadWirds.isEmpty) return; // Khatma is completed
+    if (unreadWirds.isEmpty) return;
 
     if (khatma.notificationType == 'daily') {
-      // Find upcoming daily times
       final dailyTimeStr = prefs.getString('wird_daily_time') ?? "20:00";
       final parts = dailyTimeStr.split(":");
       final hour = int.parse(parts[0]);
@@ -520,36 +418,20 @@ class NotificationService {
 
       List<DateTime> upcomingDailyTimes = [];
       for (int dayOffset = 0; dayOffset < 10; dayOffset++) {
-        DateTime t = DateTime(
-          now.year,
-          now.month,
-          now.day,
-          hour,
-          minute,
-        ).add(Duration(days: dayOffset));
+        DateTime t = DateTime(now.year, now.month, now.day, hour, minute).add(Duration(days: dayOffset));
         if (t.isAfter(now)) {
           upcomingDailyTimes.add(t);
         }
         if (upcomingDailyTimes.length >= unreadWirds.length) break;
       }
 
-      for (
-        int i = 0;
-        i < unreadWirds.length && i < upcomingDailyTimes.length;
-        i++
-      ) {
+      for (int i = 0; i < unreadWirds.length && i < upcomingDailyTimes.length; i++) {
         final wird = unreadWirds[i];
         final notifTime = upcomingDailyTimes[i];
-        final pagesCount = (wird.endPage - wird.startPage) + 1;
-
-        debugPrint(
-          "📅 Smart-Scheduled Daily Wird (ID: $idCounter) for ${notifTime.month}/${notifTime.day}",
-        );
-
         await _scheduleNative(
           idCounter,
           "ورد القرآن اليومي",
-          "اقرأ من صفحة ${wird.startPage} إلى ${wird.endPage} ($pagesCount صفحات)",
+          "اقرأ من صفحة ${wird.startPage} إلى ${wird.endPage}",
           notifTime.hour,
           notifTime.minute,
           "default",
@@ -559,13 +441,10 @@ class NotificationService {
           day: notifTime.day,
         );
         idCounter++;
-        scheduled++;
       }
     } else if (khatma.notificationType == 'prayer') {
-      // Find upcoming prayers strictly sequentially
       final prayerService = PrayerService();
       List<Map<String, dynamic>> upcomingPrayers = [];
-
       for (int dayOffset = 0; dayOffset < 5; dayOffset++) {
         DateTime dateBase = now.add(Duration(days: dayOffset));
         PrayerTimes? dayTimes = prayerService.getPrayerTimesForDate(dateBase);
@@ -580,9 +459,7 @@ class NotificationService {
         ];
 
         for (var p in prayers) {
-          DateTime notifTime = (p['time'] as DateTime).add(
-            Duration(minutes: adhanDelay),
-          );
+          DateTime notifTime = (p['time'] as DateTime).add(Duration(minutes: adhanDelay));
           if (notifTime.isAfter(now)) {
             upcomingPrayers.add({'name': p['name'], 'time': notifTime});
           }
@@ -590,24 +467,14 @@ class NotificationService {
         if (upcomingPrayers.length >= unreadWirds.length + 2) break;
       }
 
-      for (
-        int i = 0;
-        i < unreadWirds.length && i < upcomingPrayers.length;
-        i++
-      ) {
+      for (int i = 0; i < unreadWirds.length && i < upcomingPrayers.length; i++) {
         final wird = unreadWirds[i];
         final match = upcomingPrayers[i];
         final notifTime = match['time'] as DateTime;
-        final pagesCount = (wird.endPage - wird.startPage) + 1;
-
-        debugPrint(
-          "📅 Smart-Scheduled Prayer Wird (ID: $idCounter) for ${match['name']}",
-        );
-
         await _scheduleNative(
           idCounter,
           "ورد القرآن - بعد ${match['name']}",
-          "اقرأ من صفحة ${wird.startPage} إلى ${wird.endPage} ($pagesCount صفحات)",
+          "اقرأ من صفحة ${wird.startPage} إلى ${wird.endPage}",
           notifTime.hour,
           notifTime.minute,
           "default",
@@ -617,13 +484,8 @@ class NotificationService {
           day: notifTime.day,
         );
         idCounter++;
-        scheduled++;
       }
     }
-
-    debugPrint(
-      "📅 Successfully scheduled $scheduled dynamic Wird notifications.",
-    );
   }
 
   static Future<void> _schedulePrayer(
@@ -634,10 +496,7 @@ class NotificationService {
     SharedPreferences prefs,
     String key,
   ) async {
-    // Check if notification is enabled for this specific prayer
-    // Default is true
     if (prefs.getBool('notif_prayer_$key') ?? true) {
-      // Native expects HH, MM
       await _scheduleNative(
         id,
         "صلاة $name",
@@ -652,21 +511,50 @@ class NotificationService {
   static Future<void> _schedulePrePrayer(
     int id,
     String name,
-    DateTime time,
+    DateTime todayTime,
     SharedPreferences prefs,
     String key,
   ) async {
-    int mins = prefs.getInt('time_pre_$key') ?? 15;
-    if (prefs.getBool('notif_pre_$key') ?? false) {
-      final alertTime = time.subtract(Duration(minutes: mins));
-      await _scheduleNative(
-        id,
-        "اقتراب صلاة $name",
-        "باقي $mins دقيقة على الصلاة",
-        alertTime.hour,
-        alertTime.minute,
-        "default",
-      );
+    final bool isEnabled = prefs.getBool('notif_pre_$key') ?? false;
+    if (!isEnabled) {
+      for (int i = 0; i < 7; i++) {
+        await _platform.invokeMethod('cancelAlarm', {'id': id + (i * 1000)});
+      }
+      return;
+    }
+
+    final int preMins = prefs.getInt('time_pre_$key') ?? 15;
+    final prayerService = PrayerService();
+
+    for (int i = 0; i < 7; i++) {
+      final DateTime targetDate = DateTime.now().add(Duration(days: i));
+      final PrayerTimes? dayTimes = prayerService.getPrayerTimesForDate(targetDate);
+      if (dayTimes == null) continue;
+
+      DateTime prayerTime;
+      switch (key.toLowerCase()) {
+        case 'fajr': prayerTime = dayTimes.fajr; break;
+        case 'dhuhr': prayerTime = dayTimes.dhuhr; break;
+        case 'asr': prayerTime = dayTimes.asr; break;
+        case 'maghrib': prayerTime = dayTimes.maghrib; break;
+        case 'isha': prayerTime = dayTimes.isha; break;
+        default: continue;
+      }
+
+      final alertTime = prayerTime.subtract(Duration(minutes: preMins));
+      if (alertTime.isAfter(DateTime.now())) {
+        await _scheduleNative(
+          id + (i * 1000),
+          "اقتراب صلاة $name",
+          "باقي $preMins دقيقة على الصلاة",
+          alertTime.hour,
+          alertTime.minute,
+          "default",
+          year: alertTime.year,
+          month: alertTime.month,
+          day: alertTime.day,
+        );
+      }
     }
   }
 
@@ -677,10 +565,8 @@ class NotificationService {
     SharedPreferences prefs,
     String key,
   ) async {
-    // Default 15 mins, except Maghrib 10, Fajr 20
     int def = (key == 'Maghrib' ? 10 : (key == 'Fajr' ? 20 : 15));
     int mins = prefs.getInt('iqama_minutes_$key') ?? def;
-
     if (prefs.getBool('iqama_enabled_$key') ?? false) {
       final alertTime = time.add(Duration(minutes: mins));
       await _scheduleNative(
@@ -690,21 +576,12 @@ class NotificationService {
         alertTime.hour,
         alertTime.minute,
         "iqama",
-        payload: "home", // Go to home or specific
+        payload: "home",
       );
     }
   }
 
-  // --- Special Events (Ramadan & Eid) ---
-
-  static Future<void> scheduleRamadanAlert(
-    int id, // Expect 400-499
-    String title,
-    String body,
-    DateTime time, {
-    String sound = 'default',
-  }) async {
-    // Native expects HH, MM
+  static Future<void> scheduleRamadanAlert(int id, String title, String body, DateTime time, {String sound = 'default'}) async {
     await _scheduleNative(
       id,
       title,
@@ -718,73 +595,54 @@ class NotificationService {
     );
   }
 
-  static Future<void> scheduleEidAlert(
-    int id, // Expect 500-599
-    String title,
-    String body,
-    DateTime time, {
-    String sound = 'default',
-  }) async {
+  static Future<void> scheduleEidAlert(int id, String title, String body, DateTime time, {String sound = 'default'}) async {
     await _scheduleNative(
       id,
       title,
       body,
       time.hour,
       time.minute,
-      sound, // e.g. 'takbeerat_eid'
+      sound,
       year: time.year,
       month: time.month,
       day: time.day,
     );
   }
 
-  // --- Takbeerat & Arafah (Added Fix) ---
-
   static Future<void> scheduleTakbeerat(PrayerTimes times) async {
-    // Requires Hijri check. For now, we assume if enabled, we schedule for "Next 10 Dhul-Hijjah"?
-    // Or if enabled, we schedule for *Today* if it IS 10 Dhul Hijjah?
-    // Since this runs daily/often, effective usage is: User enables it around Eid.
-    // Ideally update this to check Hijri.
-    // For now, let's schedule a sample "Takbeerat" if enabled, to prove it works.
-    // But better: checks strict date.
-    // I'll leave a TODO for Hijri check but schedule it to show "working".
-    // Actually, let's just schedule 3 fixed times: 7AM, 8AM, 9AM?
-    // User requested "Every hour".
-
-    // We will schedule simple alarms starting from sunrise for 5 hours.
-    DateTime base = times.sunrise.add(const Duration(minutes: 15));
-    for (int i = 0; i < 5; i++) {
-      await _scheduleNative(
-        510 + i,
-        "تكبيرات العيد",
-        "الله أكبر الله أكبر الله أكبر...",
-        base.hour,
-        base.minute,
-        "takbeerat", // Ensure this sound exists or map to default
-      );
-      base = base.add(const Duration(hours: 1));
+    final off = PrayerService().hijriOffset;
+    final hijriNow = HijriCalendar.fromDate(DateTime.now().add(Duration(days: off)));
+    if (hijriNow.hMonth == 12 && hijriNow.hDay >= 1 && hijriNow.hDay <= 10) {
+      final DateTime now = DateTime.now();
+      final DateTime eidPrayerTime = times.sunrise.add(const Duration(minutes: 20));
+      for (int hour = 0; hour <= 23; hour++) {
+        final DateTime scheduledTime = DateTime(now.year, now.month, now.day, hour, 0);
+        if (hijriNow.hDay == 10) {
+          if (scheduledTime.isAfter(eidPrayerTime)) {
+            await _platform.invokeMethod('cancelAlarm', {'id': 600 + hour});
+            continue; 
+          }
+        }
+        if (scheduledTime.isAfter(now)) {
+          await _scheduleNative(
+            600 + hour,
+            "تكبيرات عشر ذي الحجّة",
+            "الله أكبر الله أكبر الله أكبر، لا إله إلا الله، الله أكبر الله أكبر ولله الحمد",
+            hour,
+            0,
+            "takbeerat",
+            year: scheduledTime.year,
+            month: scheduledTime.month,
+            day: scheduledTime.day,
+          );
+        }
+      }
     }
   }
 
   static Future<void> scheduleArafah(PrayerTimes times) async {
-    // Suhoor (Fajr - 1h)
-    await _scheduleNative(
-      520,
-      "سحور يوم عرفة",
-      "تذكير بالسحور لصيام يوم عرفة",
-      times.fajr.subtract(const Duration(hours: 1)).hour,
-      times.fajr.subtract(const Duration(hours: 1)).minute,
-      "default",
-    );
-    // Iftar (Maghrib)
-    await _scheduleNative(
-      521,
-      "إفطار يوم عرفة",
-      "تقبل الله صيامكم",
-      times.maghrib.hour,
-      times.maghrib.minute,
-      "default",
-    );
+    await _scheduleNative(520, "سحور يوم عرفة", "تذكير بالسحور لصيام يوم عرفة", times.fajr.subtract(const Duration(hours: 1)).hour, times.fajr.subtract(const Duration(hours: 1)).minute, "default");
+    await _scheduleNative(521, "إفطار يوم عرفة", "تقبل الله صيامكم", times.maghrib.hour, times.maghrib.minute, "default");
   }
 
   static Future<void> _scheduleNative(
@@ -803,361 +661,77 @@ class NotificationService {
     try {
       String? audioPath;
       try {
-        // Check for custom downloaded file
-        // Logic: soundName is the ID (e.g. 'mishary', 'nafis').
-        // We check in Support/adhans/ID.mp3 (mapped to 'files/adhans/' for FileProvider)
         final dir = await getApplicationSupportDirectory();
         final file = File("${dir.path}/adhans/$soundName.mp3");
         if (await file.exists()) {
           audioPath = file.path;
-          debugPrint("Found custom sound: $audioPath");
         }
-      } catch (e) {
-        debugPrint("Error resolving audio path: $e");
-      }
+      } catch (_) {}
 
       await _platform.invokeMethod('scheduleAlarm', {
-        'id': id,
-        'year': year,
-        'month': month,
-        'day': day,
-        'hour': hour,
-        'minute': minute,
-        'title': title,
-        'body': body,
-        'soundName':
-            soundName, // Pass original name for channel naming fallback
-        'payload': payload,
-        'audioPath': audioPath, // Pass resolved path (or null)
-        'intervalMinutes': intervalMinutes,
+        'id': id, 'year': year, 'month': month, 'day': day, 'hour': hour, 'minute': minute,
+        'title': title, 'body': body, 'soundName': soundName, 'payload': payload,
+        'audioPath': audioPath, 'intervalMinutes': intervalMinutes,
       });
-      debugPrint(
-        "Native Sched [$id]: $year-$month-$day $hour:$minute ($soundName) Path: $audioPath",
-      );
-    } catch (e) {
-      debugPrint("Native Sched Error: $e");
-    }
+    } catch (_) {}
   }
 
   static Future<void> cancelAll({bool includeWird = false}) async {
-    // Native doesn't have cancelAll exposed in the snippet I saw, but has cancelAlarm(id).
-    // Loop known IDs.
-    // 1..3 for Azkar
-    // 100..105 for Prayers
-    // 200..205 for Pre-Prayers
-    // 300..305 for Iqama
-    // 400..599 for Events (Ramadan/Eid)
-    // 600+ for Wird
-    var ids =
-        [1, 2, 3] +
-        [100, 101, 102, 103, 104, 105] + // 101=Sunrise
-        [200, 202, 203, 204, 205] +
-        [300, 302, 303, 304, 305] +
-        List.generate(200, (i) => 400 + i) + // 400-599
-        [700, 701, 702, 703, 705]; // Duha, Qiyam, FirstThird, Midnight, Jumua
-
+    var ids = [1, 2, 3] + [100, 101, 102, 103, 104, 105] + [200, 202, 203, 204, 205] + [300, 302, 303, 304, 305] + List.generate(200, (i) => 400 + i) + [700, 701, 702, 703, 705];
     if (includeWird) {
-      ids += List.generate(100, (i) => 600 + i); // Wird 600-699
+      ids += List.generate(100, (i) => 600 + i);
+      ids += List.generate(1000, (i) => 6000 + i);
     }
     for (var id in ids) {
-      try {
-        await _platform.invokeMethod('cancelAlarm', {'id': id});
-      } catch (_) {}
+      try { await _platform.invokeMethod('cancelAlarm', {'id': id}); } catch (_) {}
     }
   }
 
-  static Future<void> scheduleWird(
-    int id,
-    String title,
-    String body,
-    DateTime date,
-    String? payload,
-  ) async {
-    // 1. Cancel existing alarm with this ID to prevent duplicates
+  static Future<void> scheduleWird(int id, String title, String body, DateTime date, String? payload) async {
     await _platform.invokeMethod('cancelAlarm', {'id': id});
-
-    // 2. Ensure date is in the future
     DateTime scheduledDate = date;
     if (scheduledDate.isBefore(DateTime.now())) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
-
-    await _scheduleNative(
-      id,
-      title,
-      body,
-      scheduledDate.hour,
-      scheduledDate.minute,
-      "default",
-      payload: payload,
-      year: scheduledDate.year,
-      month: scheduledDate.month,
-      day: scheduledDate.day,
-    );
+    await _scheduleNative(id, title, body, scheduledDate.hour, scheduledDate.minute, "default", payload: payload, year: scheduledDate.year, month: scheduledDate.month, day: scheduledDate.day);
   }
 
-  // --- Utilities ---
-
   static Future<void> vibrate({int duration = 500}) async {
-    try {
-      await _platform.invokeMethod('vibrate', {'duration': duration});
-    } catch (e) {
-      debugPrint("Native Vibrate Error: $e");
-    }
+    try { await _platform.invokeMethod('vibrate', {'duration': duration}); } catch (_) {}
   }
 
   static Future<String?> checkLaunchPayload() async {
-    try {
-      final String? result = await _platform.invokeMethod('checkLaunchPayload');
-      return result;
-    } catch (e) {
-      debugPrint("Native Payload Error: $e");
-      return null;
-    }
-  }
-  // Backwards compat
-  // --- Testing ---
-
-  static Future<void> testTrigger(
-    int id,
-    String title,
-    String body, {
-    String? soundName,
-  }) async {
-    // Fetch default sound if not provided
-    if (soundName == null) {
-      final prefs = await SharedPreferences.getInstance();
-      soundName = prefs.getString('adhan_muezzin_id') ?? 'nafis';
-    }
-    // Schedule for 5 seconds from NOW
-    // Note: On Android 12+, exact alarms require permission.
-    // If not granted, it might be inexact (delayed).
-    // For debugging, we hope it works or user accepts delay.
-    final now = DateTime.now().add(const Duration(seconds: 5));
-    await _scheduleNative(
-      id,
-      title,
-      body,
-      now.hour,
-      now.minute,
-      soundName,
-      payload: "test_payload",
-    );
-    // Also try to force a second one slightly later if first misses? No, simple is best.
-    // Native implementation handles "current time" checks by adding a day,
-    // so we need to be careful.
-    // The Native Logic says: if (calendar <= now) add day.
-    // So we must ensure 'now' passed to native is > system time.
-    // Logic in native:
-    // val calendar = Calendar... set(hour, minute, 0, 0)
-    // if (calendar <= now) add day.
-
-    // PROBLEM: Native code sets Seconds to 0.
-    // If we send 12:00:05, Native sets 12:00:00.
-    // If current time is 12:00:01, Native thinks it passed and schedules for TOMORROW.
-
-    // FIX: We need to send a time that is safely in the next minute if seconds are close to end?
-    // OR update Native to accept seconds?
-    // Native: set(Calendar.SECOND, 0) -> It ignores seconds.
-    // So we can only schedule for the NEXT MINUTE to be safe.
-
-    // Let's schedule for Now + 1 Minute to avoid "Tomorrow" bug.
-    final nextMin = DateTime.now().add(const Duration(minutes: 1));
-    await _scheduleNative(
-      id,
-      title,
-      body,
-      nextMin.hour,
-      nextMin.minute,
-      soundName,
-      payload: "test_payload",
-    );
-    debugPrint(
-      "TEST: Scheduled ID $id ($soundName) at ${nextMin.hour}:${nextMin.minute}",
-    );
+    try { return await _platform.invokeMethod('checkLaunchPayload'); } catch (_) { return null; }
   }
 
-  static Future<void> testSpecificNotification(String type) async {
-    final now = DateTime.now().add(const Duration(minutes: 1));
-    final h = now.hour;
-    final m = now.minute;
-
-    // Use real IDs and real sounds based on logic
-    switch (type) {
-      case 'adhan':
-        // Simulating Fajr (ID 100)
-        final prefs = await SharedPreferences.getInstance();
-        final sound =
-            prefs.getString('adhan_sound_fajr') ??
-            prefs.getString('adhan_muezzin_id') ??
-            'nafis';
-
-        await _scheduleNative(
-          100,
-          "صلاة الفجر (تحديد)",
-          "حان موعد صلاة الفجر",
-          h,
-          m,
-          sound,
-        );
-        break;
-      case 'iqama':
-        // Simulating Iqama (ID 300)
-        await _scheduleNative(
-          300,
-          "إقامة الصلاة (تحديد)",
-          "تقام الصلاة الآن",
-          h,
-          m,
-          "iqama",
-        );
-        break;
-      case 'ramadan':
-        // Simulating Iftar (ID 400)
-        await _scheduleNative(
-          400,
-          "مدفع الإفطار (رمضان)",
-          "حان موعد الإفطار",
-          h,
-          m,
-          "default",
-        ); // or cannon if avail
-        break;
-      case 'eid':
-        // Simulating Eid (ID 500)
-        await _scheduleNative(
-          500,
-          "عيد مبارك",
-          "كل عام وأنتم بخير",
-          h,
-          m,
-          "takbeerat",
-        );
-        break;
-      case 'azkar':
-        // Simulating Morning Azkar (ID 1)
-        await _scheduleNative(1, "أذكار الصباح", "همسة الصباح", h, m, "sabah");
-        break;
-      case 'wird':
-        // Simulating Wird (ID 600)
-        await _scheduleNative(
-          600,
-          "ورد القرآن",
-          "حان وقت القراءة",
-          h,
-          m,
-          "default",
-        );
-        break;
-      case 'friday':
-        // Use native scheduling like all other notifications
-        try {
-          debugPrint("TEST FRIDAY: Scheduling via native for +1 min");
-          await _scheduleNative(
-            8000,
-            'الصلاة على النبي ﷺ (تجربة)',
-            'اللهم صلِّ وسلم على نبينا محمد',
-            h,
-            m,
-            'saly_3ala_mo7amad',
-            payload: 'friday_reminder',
-          );
-          debugPrint("TEST FRIDAY: Scheduled successfully (ID 8000)");
-        } catch (e, s) {
-          debugPrint("TEST FRIDAY ERROR: $e");
-          debugPrint("TEST FRIDAY STACK: $s");
-        }
-        break;
-    }
-  }
-
-  static Future<void> scheduleSalawatReminders(
-    int intervalMinutes,
-    List<int> days,
-  ) async {
-    // Cancel old ones
+  static Future<void> scheduleSalawatReminders(int intervalMinutes, List<int> days) async {
     for (int i = 8000; i <= 8500; i++) {
-      try {
-        await _platform.invokeMethod('cancelAlarm', {'id': i});
-      } catch (_) {}
-      try {
-        await _flutterLocalNotificationsPlugin.cancel(i);
-      } catch (_) {}
+      try { await _platform.invokeMethod('cancelAlarm', {'id': i}); } catch (_) {}
+      try { await _flutterLocalNotificationsPlugin.cancel(i); } catch (_) {}
     }
-
-    if (intervalMinutes <= 0 || days.isEmpty) {
-      debugPrint("SalawatReminders: Disabled or No days selected");
-      return;
-    }
-
+    if (intervalMinutes <= 0 || days.isEmpty) return;
     DateTime now = DateTime.now();
     int id = 8000;
-    int scheduledTotal = 0;
-
     for (int dayOfWeek in days) {
-      // Find the VERY NEXT occurrence of this day of week
       DateTime targetDay = now;
-      while (targetDay.weekday != dayOfWeek) {
-        targetDay = targetDay.add(const Duration(days: 1));
-      }
-
-      // If it's today and already passed the start of day, we need careful logic.
-      // But the chaining starts from the current MOMENT if it's today.
+      while (targetDay.weekday != dayOfWeek) { targetDay = targetDay.add(const Duration(days: 1)); }
       DateTime startTime;
       if (targetDay.day == now.day && targetDay.month == now.month) {
-        // Today: Schedule first one after interval
         startTime = now.add(Duration(minutes: intervalMinutes));
       } else {
-        // Future day: Start from 8:00 AM (good starting point for Salawat)
-        startTime = DateTime(
-          targetDay.year,
-          targetDay.month,
-          targetDay.day,
-          8,
-          0,
-        );
+        startTime = DateTime(targetDay.year, targetDay.month, targetDay.day, 8, 0);
       }
-
-      // Schedule ONLY THE BASE occurrence.
-      // Chaining happens in MainActivity.kt
       try {
-        await _scheduleNative(
-          id,
-          'الصلاة على النبي ﷺ',
-          'اللهم صلِّ وسلم على نبينا محمد',
-          startTime.hour,
-          startTime.minute,
-          'saly_3ala_mo7amad',
-          payload: 'friday_reminder',
-          year: startTime.year,
-          month: startTime.month,
-          day: startTime.day,
-          intervalMinutes: intervalMinutes,
-        );
-        scheduledTotal++;
-      } catch (e) {
-        debugPrint("SalawatReminders Error: $e");
-      }
+        await _scheduleNative(id, 'الصلاة على النبي ﷺ', 'اللهم صلِّ وسلم على نبينا محمد', startTime.hour, startTime.minute, 'saly_3ala_mo7amad', payload: 'friday_reminder', year: startTime.year, month: startTime.month, day: startTime.day, intervalMinutes: intervalMinutes);
+      } catch (_) {}
       id++;
-      if (id > 8007) break; // One ID per day of week is plenty
+      if (id > 8007) break;
     }
-    debugPrint(
-      "Salawat: Chained scheduling active (Scheduled $scheduledTotal base alarms)",
-    );
   }
 
-  static Future<void> scheduleFridayReminders(int intervalMinutes) async {
-    // Backwards compatibility or specific Friday only call
-    await scheduleSalawatReminders(intervalMinutes, [DateTime.friday]);
-  }
-
+  static Future<void> scheduleFridayReminders(int intervalMinutes) async => scheduleSalawatReminders(intervalMinutes, [DateTime.friday]);
   static Future<void> cancelFridayCustom() async {
-    for (int i = 8000; i <= 8500; i++) {
-      await _flutterLocalNotificationsPlugin.cancel(i);
-    }
+    for (int i = 8000; i <= 8500; i++) { await _flutterLocalNotificationsPlugin.cancel(i); }
   }
-
-  static Future<void> schedulePrayerNotifications(PrayerTimes times) async =>
-      scheduleAll(times);
-  static Future<void> scheduleDefaults() async {}
+  static Future<void> schedulePrayerNotifications(PrayerTimes times) async => scheduleAll(times);
 }

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:adhan/adhan.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,6 +10,20 @@ import 'package:ibad_al_rahmann/features/locations/models/city_profile.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
+
+@pragma('vm:entry-point')
+Future<void> backgroundWidgetUpdateCallback() async {
+  // Ensure Flutter is initialized in the background isolate
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Force Arabic locale
+  HijriCalendar.setLocal('ar');
+  Intl.defaultLocale = 'ar';
+
+  final service = PrayerService();
+  await service.init();
+}
 
 class PrayerService extends ChangeNotifier {
   static final PrayerService _instance = PrayerService._internal();
@@ -144,6 +158,15 @@ class PrayerService extends ChangeNotifier {
     String goldNextName;
     String twoDigits(int n) => n.toString().padLeft(2, '0');
 
+    String toArabicDigits(String input) {
+      const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+      const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+      for (int i = 0; i < english.length; i++) {
+        input = input.replaceAll(english[i], arabic[i]);
+      }
+      return input;
+    }
+
     if (goldIsCountUp && currentTime != null) {
       final elapsed = now.difference(currentTime);
       final hours = elapsed.inHours;
@@ -168,25 +191,54 @@ class PrayerService extends ChangeNotifier {
       final gn = _getPrayerName(
         goldNextPrayer == Prayer.none ? Prayer.fajr : goldNextPrayer,
       );
-      goldNextName = "$gn متبقي";
+      goldNextName = "متبقي على $gn";
     }
 
     // Format Hijri (with LTR marks around numbers)
+    HijriCalendar.setLocal('ar');
     final hDate = HijriCalendar.fromDate(now.add(Duration(days: _hijriOffset)));
-    final hijriStr =
-        "$_ltr${hDate.hDay}$_ltr ${hDate.longMonthName} $_ltr${hDate.hYear}$_ltr";
+    String hijriStr =
+        "\u200F${hDate.hDay} ${hDate.longMonthName} ${hDate.hYear}\u200F";
+
+    // Convert to Arabic numerals
+    countdownStr = toArabicDigits(countdownStr);
+    hijriStr = toArabicDigits(hijriStr);
 
     // Update Persistent Notification
     final prefs = await SharedPreferences.getInstance();
     final persistentEnabled = prefs.getBool('persistent_notification') ?? true;
 
+    // --- Background Alarm Scheduling ---
+    // Calculate exactly when the state will flip between elapsed/countdown
+    DateTime nextTriggerTime;
+    if (goldIsCountUp && currentTime != null) {
+      // The state flips exactly 45 minutes after the current prayer started
+      nextTriggerTime = currentTime.add(const Duration(minutes: 45));
+    } else {
+      // The state flips exactly when the next prayer starts
+      nextTriggerTime = countdownTargetTime;
+    }
+
+    // Schedule a background wakeup event via AlarmManager exactly on the minute
+    await AndroidAlarmManager.oneShotAt(
+      nextTriggerTime.add(
+        const Duration(seconds: 1),
+      ), // +1 second safety margin
+      999, // Unique alarm ID for widget updates
+      backgroundWidgetUpdateCallback,
+      exact: true,
+      wakeup: true,
+      rescheduleOnReboot: true,
+    );
+    // ------------------------------------
+
     if (persistentEnabled) {
       await PrayerNotificationServiceHelper.updateNotification(
-        fajr: _ltrWrap(formatTime(times.fajr)),
-        dhuhr: _ltrWrap(formatTime(times.dhuhr)),
-        asr: _ltrWrap(formatTime(times.asr)),
-        maghrib: _ltrWrap(formatTime(times.maghrib)),
-        isha: _ltrWrap(formatTime(times.isha)),
+        fajr: toArabicDigits(_ltrWrap(formatTime(times.fajr))),
+        dhuhr: toArabicDigits(_ltrWrap(formatTime(times.dhuhr))),
+        asr: toArabicDigits(_ltrWrap(formatTime(times.asr))),
+        maghrib: toArabicDigits(_ltrWrap(formatTime(times.maghrib))),
+        isha: toArabicDigits(_ltrWrap(formatTime(times.isha))),
         nextName: goldNextName,
         countdown: countdownStr,
         hijri: hijriStr,
@@ -202,22 +254,30 @@ class PrayerService extends ChangeNotifier {
 
     // Update Widgets
     await HomeWidgetService.updatePrayerWidget(
-      fajr: _ltrWrap(formatTime(times.fajr)),
-      dhuhr: _ltrWrap(formatTime(times.dhuhr)),
-      asr: _ltrWrap(formatTime(times.asr)),
-      maghrib: _ltrWrap(formatTime(times.maghrib)),
-      isha: _ltrWrap(formatTime(times.isha)),
+      fajr: toArabicDigits(_ltrWrap(formatTime(times.fajr))),
+      dhuhr: toArabicDigits(_ltrWrap(formatTime(times.dhuhr))),
+      asr: toArabicDigits(_ltrWrap(formatTime(times.asr))),
+      maghrib: toArabicDigits(_ltrWrap(formatTime(times.maghrib))),
+      isha: toArabicDigits(_ltrWrap(formatTime(times.isha))),
       nextName: goldNextName,
       countdown: countdownStr,
       hijri: hijriStr,
       prayerIndex: highlightedPrayerIndex,
-      prayerTime: _ltrWrap(formatTime(goldNextTime)),
+      prayerTime: toArabicDigits(_ltrWrap(formatTime(goldNextTime))),
       nextPrayerEpoch: (goldIsCountUp && currentTime != null)
           ? currentTime.millisecondsSinceEpoch
           : countdownTargetTime.millisecondsSinceEpoch,
-      sunriseTime: _ltrWrap(formatTime(times.sunrise)),
+      sunriseTime: toArabicDigits(_ltrWrap(formatTime(times.sunrise))),
       locationName: _activeCity?.name ?? "الموقع الحالي",
       isCountUp: goldIsCountUp,
+      persistentEnabled: persistentEnabled,
+      // Pass Epochs for Native Smart Logic
+      fajrEpoch: times.fajr.millisecondsSinceEpoch,
+      dhuhrEpoch: times.dhuhr.millisecondsSinceEpoch,
+      asrEpoch: times.asr.millisecondsSinceEpoch,
+      maghribEpoch: times.maghrib.millisecondsSinceEpoch,
+      ishaEpoch: times.isha.millisecondsSinceEpoch,
+      sunriseEpoch: times.sunrise.millisecondsSinceEpoch,
     );
 
     // Update Golden Widget Specific Extra Data
@@ -631,8 +691,8 @@ class PrayerService extends ChangeNotifier {
 
     // Extras
     DateTime duha = sunrise.add(
-      const Duration(minutes: 20),
-    ); // Fixed 20 min after Shurooq
+      const Duration(minutes: 15),
+    ); // Fixed 15 min after Shurooq
 
     // Night Calculations
     // Night is from Maghrib (Target Date) to Fajr (Next Day)
@@ -710,7 +770,6 @@ class PrayerService extends ChangeNotifier {
         time: lastThird,
         prayer: null,
       ),
-      // ExtendedPrayer(id: 'witr', name: 'الوتر', time: witr, prayer: null), // Removed as requested
     ];
   }
 

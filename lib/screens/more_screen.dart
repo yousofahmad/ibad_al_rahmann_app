@@ -223,6 +223,7 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
     final prefs = await SharedPreferences.getInstance();
     final minutes = int.tryParse(_controller.text) ?? 60;
 
+    // Save preferences immediately (fast)
     await prefs.setBool('salawat_reminder_enabled', _isEnabled);
     await prefs.setInt('salawat_reminder_minutes', minutes);
     await prefs.setStringList(
@@ -230,15 +231,7 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
       _selectedDays.map((e) => e.toString()).toList(),
     );
 
-    if (_isEnabled && minutes > 0 && _selectedDays.isNotEmpty) {
-      await NotificationService.scheduleSalawatReminders(
-        minutes,
-        _selectedDays,
-      );
-    } else {
-      await NotificationService.scheduleSalawatReminders(0, []);
-    }
-
+    // Close dialog immediately — don't wait for scheduling
     if (mounted) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -254,6 +247,16 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
           ),
         ),
       );
+    }
+
+    // Schedule notifications in background (no await blocking UI)
+    if (_isEnabled && minutes > 0 && _selectedDays.isNotEmpty) {
+      NotificationService.scheduleSalawatReminders(
+        minutes,
+        _selectedDays,
+      );
+    } else {
+      NotificationService.scheduleSalawatReminders(0, []);
     }
   }
 

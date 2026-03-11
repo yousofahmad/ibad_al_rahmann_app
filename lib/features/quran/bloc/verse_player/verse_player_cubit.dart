@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/di/di.dart';
@@ -39,20 +39,6 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
     initVerse();
   }
 
-  void verseListener() {
-    playerStateSubscription = player.playerStateStream.listen((value) {
-      if (value.processingState == ProcessingState.completed) {
-        // Audio finished
-        player.pause();
-        player.seek(const Duration(milliseconds: 0));
-
-        emit(VersePlayerInitial(showed: true));
-        // or you can emit a dedicated Finished state
-        // emit(VersePlayerFinished(surahNumber!, verseNumber!));
-      }
-    });
-  }
-
   void setVerse({
     required int surahNumber,
     required int verseNumber,
@@ -70,8 +56,7 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   Future<void> initVerse() async {
     if (currnetVerse != null) {
       if (player.playing) {
-        player.stop();
-        initVerse();
+        await player.stop();
       }
 
       String ayahUrl = getAudioURLByVerse(
@@ -88,14 +73,30 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
           tag: MediaItem(
             id: ayahUrl,
             title: surahArabicTashkel[currnetVerse!.surahNumber - 1],
-            // artUri: Uri.parse(AppConstants.notificationImage),
           ),
         ),
-        preload: true,
+        preload: false,
       );
+
       verseListener();
+      // Removed player.play() to prevent autoplay
       emit(VersePlayerInitial(showed: true, loading: false));
     }
+  }
+
+
+  void verseListener() {
+    playerStateSubscription?.cancel();
+    playerStateSubscription = player.playerStateStream.listen((playerState) {
+      if (playerState.processingState == ProcessingState.completed) {
+        emit(VersePlayerInitial(showed: true, loading: false));
+      } else if (playerState.processingState == ProcessingState.buffering || 
+                 playerState.processingState == ProcessingState.loading) {
+        emit(VersePlayerInitial(showed: true, loading: true));
+      } else if (playerState.processingState == ProcessingState.ready) {
+        emit(VersePlayerInitial(showed: true, loading: false));
+      }
+    });
   }
 
   void handlePlayPause() {
@@ -105,8 +106,9 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
       } else {
         player.play();
       }
+      // Re-emit state to trigger UI update for the play/pause icon
+      emit(VersePlayerInitial(showed: true, loading: false));
     }
-    emit(VersePlayerInitial(showed: true));
   }
 
   void show() {

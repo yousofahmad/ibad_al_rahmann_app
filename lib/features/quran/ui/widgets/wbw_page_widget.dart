@@ -5,8 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:quran/quran.dart';
 import 'package:ibad_al_rahmann/core/theme/app_colors.dart';
-import 'package:ibad_al_rahmann/core/di/di.dart';
-import 'package:ibad_al_rahmann/core/services/cache_service.dart';
 import '../../data/quran_word.dart';
 import '../../data/models/page_line.dart';
 import '../../data/db_helper.dart';
@@ -17,7 +15,9 @@ import '../../../../core/helpers/extensions/int_extensions.dart';
 import 'verse_overlay_widget.dart';
 import 'header_widget.dart';
 import 'basmallah.dart';
+import '../../../../core/helpers/extensions/screen_details.dart';
 import '../../../../core/theme/theme_manager/theme_cubit.dart';
+import '../../../../core/theme/quran_theme_extension.dart';
 import '../../../../core/helpers/fonts_helper.dart';
 
 class WbwPageWidget extends StatefulWidget {
@@ -28,6 +28,7 @@ class WbwPageWidget extends StatefulWidget {
   final int? endSuraNumber;
   final int? endAyah;
   final bool showHeader;
+  final bool showPageNumber;
   final Color? textColorOverride;
   final Color? paperColorOverride;
 
@@ -40,6 +41,7 @@ class WbwPageWidget extends StatefulWidget {
     this.endSuraNumber,
     this.endAyah,
     this.showHeader = true,
+    this.showPageNumber = true,
     this.textColorOverride,
     this.paperColorOverride,
   });
@@ -54,14 +56,11 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
   String? _error;
   QuranWord? _selectedWord;
   String? _fontFamily;
-  bool _isLoading = true;
+  bool _isLoading = true; // Gets overridden synchronously if cache hits
   final ScrollController _scrollController = ScrollController();
   bool _isAtBottom = false;
 
-  // ─── Bookmark highlight auto-fade ───
   Timer? _bookmarkHighlightTimer;
-
-  static const String _longPressHintKey = 'long_press_hint_shown';
 
   @override
   void initState() {
@@ -69,33 +68,9 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
     _fontFamily = FontsHelper.getFontFamily(widget.pageNumber);
     _loadLinesAndWords();
     _scrollController.addListener(_onScroll);
-    _showLongPressHint();
-  }
-
-  void _showLongPressHint() {
-    final alreadyShown =
-        getIt<CacheService>().getBool(_longPressHintKey) ?? false;
-    if (alreadyShown) return;
-
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'تلميح: اضغط مطولاً على الآية لعرض خيارات التفسير والمشاركة',
-            style: TextStyle(fontFamily: 'cairo'),
-          ),
-          duration: Duration(seconds: 4),
-        ),
-      );
-      getIt<CacheService>().setBool(_longPressHintKey, true);
-    });
   }
 
   void _onScroll() {
-    if (!_scrollController.hasClients) return;
-
-    // Check if user has scrolled near to the bottom
     final bool atBottom =
         _scrollController.position.pixels >=
         (_scrollController.position.maxScrollExtent - 20);
@@ -114,9 +89,32 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
     super.dispose();
   }
 
-  Future<void> _loadLinesAndWords() async {
+  void _loadLinesAndWords() {
+    final cachedLines = QuranWbwDbHelper.instance.getPageLinesSync(widget.pageNumber);
+    final cachedWords = QuranWbwDbHelper.instance.getPageWordsSync(widget.pageNumber);
+    final isFontLoaded = FontsHelper.isFontLoaded(_fontFamily!);
+
+    if (cachedLines != null && cachedWords != null && isFontLoaded) {
+      // Sync fast path! Zero-latency rendering. No loading spinner.
+      _pageLines = cachedLines;
+      
+      final Map<int, List<QuranWord>> lineMap = {};
+      for (var word in cachedWords) {
+        final ln = word.lineNumber ?? 1;
+        lineMap.putIfAbsent(ln, () => []).add(word);
+      }
+      _lineWordsMap = lineMap;
+      _isLoading = false;
+      return; // Return immediately, no async gaps
+    }
+
+    // Async slow path
+    _isLoading = true;
+    _fetchAsync();
+  }
+
+  Future<void> _fetchAsync() async {
     try {
-      // Load font and data in parallel
       await Future.wait([
         FontsHelper.loadFontFromFamily(_fontFamily!),
         _fetchDbData(),
@@ -157,22 +155,21 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
     }
   }
 
-  // ─── Bookmark highlight auto-clear ───
-
   void _scheduleHighlightClear() {
     _bookmarkHighlightTimer?.cancel();
-    _bookmarkHighlightTimer = Timer(const Duration(seconds: 7), () {
+    _bookmarkHighlightTimer = Timer(const Duration(seconds: 3), () {
       if (mounted) {
         final playerCubit = context.read<VersePlayerCubit>();
-        playerCubit.hide();
+        // Only clear the highlight if the audio player is not explicitly shown
+        if (!playerCubit.state.showed) {
+          playerCubit.hide();
+        }
         setState(() {
           _selectedWord = null;
         });
       }
     });
   }
-
-  // ─── Long-press (existing) ───
 
   Future<void> _onWordLongPressed(
     BuildContext context,
@@ -211,8 +208,6 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
       },
     );
 
-    // After the bottom sheet (and any nested sheets) are closed:
-    // Clear the highlight and stop playback.
     if (mounted) {
       playerCubit.hide();
       setState(() {
@@ -236,7 +231,6 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
     final playerCubit = context.watch<VersePlayerCubit>();
     final playingVerse = playerCubit.currnetVerse;
 
-    // Auto-fade bookmark highlight after 7s if navigated from bookmarks
     if (playingVerse != null && _selectedWord == null) {
       _scheduleHighlightClear();
     }
@@ -281,10 +275,17 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
     final int juzNum = getJuzNumber(surahNum, verseNum == 0 ? 1 : verseNum);
     final int hizbQ = (juzNum - 1) * 2 + 1;
 
+    final bool isTablet = context.isTablet;
+
     final headerBar = (widget.showHeader && !isPage1or2)
         ? Container(
+            height: isTablet ? 48 : 30,
+            width: double.infinity,
             color: Colors.transparent,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: EdgeInsets.symmetric(
+              horizontal: isTablet ? 24 : 16,
+              vertical: isTablet ? 4 : 2,
+            ),
             child: Row(
               children: [
                 Expanded(
@@ -295,7 +296,7 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
                       '${juzNum.toJuzName} - الحزب $hizbQ',
                       style: TextStyle(
                         color: headerTextColor,
-                        fontSize: 12,
+                        fontSize: isTablet ? 22 : 14,
                         fontWeight: FontWeight.bold,
                         fontFamily: AppConsts.cairo,
                       ),
@@ -309,10 +310,9 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
                     alignment: Alignment.centerLeft,
                     child: Text(
                       "سورة ${getSurahNameArabic(surahNum)}",
-                      textAlign: TextAlign.start,
                       style: TextStyle(
                         color: headerTextColor,
-                        fontSize: 12,
+                        fontSize: isTablet ? 22 : 14,
                         fontWeight: FontWeight.bold,
                         fontFamily: AppConsts.cairo,
                       ),
@@ -362,13 +362,16 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
           );
           if (!isVisible) header = Opacity(opacity: 0.0, child: header);
 
+          // FIX 1: Wrap header in FittedBox to stop 85px overflow on Tablets
+          header = FittedBox(fit: BoxFit.scaleDown, child: header);
+
           lineContent = (isLandscape || isPage1or2)
               ? SizedBox(
-                  height: isPage1or2 ? 120.h : null,
+                  height: isPage1or2 ? 90.h : null,
                   child: Padding(
                     padding: EdgeInsets.only(
-                      bottom: isPage1or2 ? 0.0 : 4.0,
-                      top: isPage1or2 ? 10.0 : 0.0,
+                      bottom: isPage1or2 ? 8.0 : 4.0,
+                      top: isPage1or2 ? 10.0 : 4.0,
                     ),
                     child: header,
                   ),
@@ -382,75 +385,80 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
 
           lineContent = (isLandscape || isPage1or2)
               ? SizedBox(
-                  height: isPage1or2 ? 50.h : null,
+                  height: isPage1or2 ? 40.h : null,
                   child: Padding(
                     padding: EdgeInsets.symmetric(
                       vertical: isPage1or2 ? 8.0 : 4.0,
                     ),
-                    child: FittedBox(fit: BoxFit.scaleDown, child: basmallah),
+                    child: FittedBox(fit: BoxFit.contain, child: basmallah),
                   ),
                 )
               : Expanded(
-                  child: FittedBox(fit: BoxFit.scaleDown, child: basmallah),
+                  child: FittedBox(fit: BoxFit.contain, child: basmallah),
                 );
         } else {
           final lineWords = _lineWordsMap[lineNumber] ?? [];
           final double canvasFontSize = isPage1or2 ? 28.0 : 82.0;
 
+          // FIX 2: Add horizontal padding inside the row to give Arabic tails room to breathe
           Widget row = Directionality(
             textDirection: TextDirection.rtl,
-            child: Row(
-              mainAxisSize: isPage1or2 ? MainAxisSize.min : MainAxisSize.max,
-              mainAxisAlignment: isPage1or2
-                  ? MainAxisAlignment.center
-                  : MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: lineWords.map<Widget>((word) {
-                final bool isHighlighted =
-                    (playingVerse != null &&
-                        playingVerse.surahNumber == word.suraNumber &&
-                        playingVerse.verseNumber == word.ayahNumber) ||
-                    (_selectedWord != null &&
-                        _selectedWord!.suraNumber == word.suraNumber &&
-                        _selectedWord!.ayahNumber == word.ayahNumber &&
-                        _selectedWord!.wordId == word.wordId);
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                mainAxisSize: isPage1or2 ? MainAxisSize.min : MainAxisSize.max,
+                mainAxisAlignment: isPage1or2
+                    ? MainAxisAlignment.center
+                    : MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: lineWords.map<Widget>((word) {
+                  final bool isHighlighted =
+                      (playingVerse != null &&
+                          playingVerse.surahNumber == word.suraNumber &&
+                          playingVerse.verseNumber == word.ayahNumber) ||
+                      (_selectedWord != null &&
+                          _selectedWord!.suraNumber == word.suraNumber &&
+                          _selectedWord!.ayahNumber == word.ayahNumber &&
+                          _selectedWord!.wordId == word.wordId);
 
-                int currentWSura = word.suraNumber ?? surahNum;
-                int currentWAyah = word.ayahNumber ?? 0;
-                bool isVisible = isWordInRange(currentWSura, currentWAyah);
+                  int currentWSura = word.suraNumber ?? surahNum;
+                  int currentWAyah = word.ayahNumber ?? 0;
+                  bool isVisible = isWordInRange(currentWSura, currentWAyah);
 
-                Color textColor =
-                    widget.textColorOverride ??
-                    (isDarkInner ? Colors.white : Colors.black);
+                  Color textColor =
+                      widget.textColorOverride ??
+                      (isDarkInner ? Colors.white : Colors.black);
 
-                if (!isVisible) textColor = Colors.transparent;
+                  if (!isVisible) textColor = Colors.transparent;
 
-                return GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onLongPress: () {
-                    if (isVisible) {
-                      _onWordLongPressed(context, playerCubit, word);
-                    }
-                  },
-                  child: Container(
-                    color: isHighlighted && isVisible
-                        ? AppColors.lime.withAlpha(120)
-                        : Colors.transparent,
-                    child: Text(
-                      word.text,
-                      style: TextStyle(
-                        fontFamily: _fontFamily,
-                        fontSize: canvasFontSize,
-                        color: textColor,
-                        height: 1.0,
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onLongPress: () {
+                      if (isVisible) {
+                        _onWordLongPressed(context, playerCubit, word);
+                      }
+                    },
+                    child: Container(
+                      color: isHighlighted && isVisible
+                          ? AppColors.lime.withAlpha(120)
+                          : Colors.transparent,
+                      child: Text(
+                        word.text,
+                        style: TextStyle(
+                          fontFamily: _fontFamily,
+                          fontSize: canvasFontSize,
+                          color: textColor,
+                          height: 1.0,
+                        ),
                       ),
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
+              ),
             ),
           );
 
+          // FIX 3: Apply clipBehavior: Clip.none to all FittedBoxes to stop cutting the tails
           if (isPage1or2) {
             lineContent = Padding(
               padding: EdgeInsets.symmetric(
@@ -459,6 +467,7 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.center,
+                clipBehavior: Clip.none, 
                 child: row,
               ),
             );
@@ -468,6 +477,7 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.center,
+                clipBehavior: Clip.none,
                 child: row,
               ),
             );
@@ -476,6 +486,7 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.center,
+                clipBehavior: Clip.none,
                 child: row,
               ),
             );
@@ -489,35 +500,30 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
     final pageContent = LayoutBuilder(
       builder: (context, constraints) {
         final bool hasBoundedHeight = constraints.hasBoundedHeight;
-        final innerWidget = Padding(
-          padding: EdgeInsets.only(
-            top: isPage1or2 ? 10.0 : 8.0,
-            bottom: isPage1or2 ? 20.0 : 60.0,
-            left: isPage1or2 ? 5.w : 12.0,
-            right: isPage1or2 ? 5.w : 12.0,
-          ),
-          child: SizedBox(width: constraints.maxWidth, child: versesColumn),
-        );
+        final double screenWidth = constraints.maxWidth;
+        // On tablets, let content fill full width (min layout already constrains via its Container).
+        // On mobile, cap at 650 to prevent over-stretching.
+        final double maxWidthAllowed = context.isTablet ? screenWidth : 650.0;
+        final double contentWidth = screenWidth > maxWidthAllowed ? maxWidthAllowed : screenWidth;
+        final double sidePadding = screenWidth > maxWidthAllowed ? (screenWidth - maxWidthAllowed) / 2 : 6.0;
 
-        return SizedBox(
-          width: constraints.maxWidth,
-          height: hasBoundedHeight ? constraints.maxHeight : null,
-          child: isPage1or2
-              ? Center(
-                  child: hasBoundedHeight && constraints.maxHeight < 500
-                      // Min/zoomed-out layout: scale down to fit
-                      ? FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.center,
-                          child: SizedBox(
-                            width: constraints.maxWidth,
-                            child: innerWidget,
-                          ),
-                        )
-                      // Full layout: just center vertically
-                      : innerWidget,
+        return Container(
+          width: double.infinity,
+          // Add extra top padding if we're on tablet and using a custom overlay header
+          padding: EdgeInsets.only(
+            top: (!widget.showHeader && context.isTablet) ? 150.0 : 5.0,
+            bottom: 5.0,
+            left: sidePadding,
+            right: sidePadding,
+          ),
+          child: (isPage1or2 && hasBoundedHeight)
+              ? FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  child: SizedBox(width: contentWidth, child: versesColumn),
                 )
-              : innerWidget,
+              : versesColumn,
         );
       },
     );
@@ -529,15 +535,15 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
       children: [
         Image.asset(
           'assets/images/Gold-Decorative-Ornamental-Round-Frame.webp',
-          width: 55, // Smaller frame
-          height: 55, // Smaller frame
-          fit: BoxFit.scaleDown,
+          width: 55,
+          height: 55,
+          fit: BoxFit.contain,
         ),
         Text(
           widget.pageNumber.toArabicNums,
           style: const TextStyle(
             fontFamily: AppConsts.expoArabic,
-            fontSize: 14, // Adjusted for smaller frame
+            fontSize: 14,
             fontWeight: FontWeight.bold,
             color: Color(0xFFD3AD73),
           ),
@@ -545,11 +551,13 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
       ],
     );
 
+    final quranTheme = Theme.of(context).extension<QuranThemeColors>();
     final paperColor =
         widget.paperColorOverride ??
-        (isDarkInner ? Colors.black : const Color(0xfffffdf5));
+        (isDarkInner
+            ? (quranTheme?.paperColorDark ?? Colors.black)
+            : (quranTheme?.paperColorLight ?? const Color(0xfffffdf5)));
 
-    // Determine brightness based on paperColor luminance
     final bool isActuallyDark = paperColor.computeLuminance() < 0.4;
 
     SystemChrome.setSystemUIOverlayStyle(
@@ -568,87 +576,72 @@ class _WbwPageWidgetState extends State<WbwPageWidget> {
       ),
     );
 
-    // Get the RepaintBoundary key from the cubit for HD capture
     final repaintKey = context.read<QuranCubit>().getPageKey(widget.pageNumber);
-
-    // Main layout logic
-    if (isLandscape) {
-      return RepaintBoundary(
-        key: repaintKey,
-        child: ColoredBox(
-          color: paperColor,
-          child: Container(
-            color: paperColor,
-            child: Column(
-              children: [
-                SafeArea(bottom: false, child: headerBar),
-                Expanded(
-                  child: SingleChildScrollView(
-                    controller: _scrollController,
-                    physics: const BouncingScrollPhysics(),
-                    child: InteractiveViewer(
-                      panEnabled: widget.isZoomEnabled,
-                      scaleEnabled: widget.isZoomEnabled,
-                      minScale: 1.0,
-                      maxScale: widget.isZoomEnabled ? 3.5 : 1.0,
-                      child: pageContent,
-                    ),
-                  ),
-                ),
-                // Fixed bottom bar for page number, only visible at the bottom
-                if (_isAtBottom)
-                  SafeArea(
-                    top: false,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 2,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: isOddPage
-                            ? MainAxisAlignment.end
-                            : MainAxisAlignment.start,
-                        children: [pageNumberFrameWidget],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
 
     return RepaintBoundary(
       key: repaintKey,
       child: ColoredBox(
         color: paperColor,
-        child: Container(
-          color: paperColor,
-          child: Stack(
-            children: [
-              Column(
-                children: [
-                  SafeArea(bottom: false, child: headerBar),
-                  Expanded(
-                    child: InteractiveViewer(
-                      panEnabled: widget.isZoomEnabled,
-                      scaleEnabled: widget.isZoomEnabled,
-                      minScale: 1.0,
-                      maxScale: widget.isZoomEnabled ? 3.5 : 1.0,
-                      child: pageContent,
+        child: LayoutBuilder(
+          builder: (context, outerConstraints) {
+            final double screenWidth = outerConstraints.maxWidth;
+            
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SafeArea(bottom: false, child: headerBar),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, middleConstraints) {
+                      final double contentHeight = isLandscape
+                          ? (screenWidth * 1.5)
+                          : middleConstraints.maxHeight;
+
+                      Widget middleContent = SizedBox(
+                        width: middleConstraints.maxWidth,
+                        height: contentHeight,
+                        child: pageContent,
+                      );
+
+                      if (isLandscape) {
+                        middleContent = SingleChildScrollView(
+                          controller: _scrollController,
+                          physics: const BouncingScrollPhysics(),
+                          child: middleContent,
+                        );
+                      }
+
+                      return InteractiveViewer(
+                        panEnabled: widget.isZoomEnabled,
+                        scaleEnabled: widget.isZoomEnabled,
+                        minScale: 1.0,
+                        maxScale: widget.isZoomEnabled ? 3.5 : 1.0,
+                        child: middleContent,
+                      );
+                    },
+                  ),
+                ),
+                if (widget.showPageNumber)
+                  SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Row(
+                        mainAxisAlignment: isOddPage
+                            ? MainAxisAlignment.end
+                            : MainAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: pageNumberFrameWidget,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ],
-              ),
-              Positioned(
-                bottom: 2,
-                left: isOddPage ? null : 10,
-                right: isOddPage ? 10 : null,
-                child: SafeArea(child: pageNumberFrameWidget),
-              ),
-            ],
-          ),
+              ],
+            );
+          },
         ),
       ),
     );

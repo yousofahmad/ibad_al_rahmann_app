@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/helpers/extensions/screen_details.dart';
@@ -50,7 +50,8 @@ class QuranScreenBody extends StatelessWidget {
                     top: !isFull, // Hide Top SafeArea padding in Full Screen
                     left: false,
                     right: false,
-                    bottom: true,
+                    bottom:
+                        !isFull, // Hide Bottom SafeArea padding in Full Screen
                     child: BlocBuilder<QuranCubit, QuranState>(
                       buildWhen: (previous, current) {
                         return previous.layout != current.layout ||
@@ -63,6 +64,7 @@ class QuranScreenBody extends StatelessWidget {
                             initialAbsolutePage: state.currentPage ?? 1,
                           );
                         }
+
                         switch (state.layout) {
                           case QuranLayout.full:
                             return FullQuranWidget(

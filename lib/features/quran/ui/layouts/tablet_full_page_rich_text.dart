@@ -1,11 +1,12 @@
-﻿import 'package:flutter/material.dart';
-import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
-import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../core/helpers/fonts_helper.dart';
 import '../widgets/wbw_page_widget.dart';
 
+/// Tablet-optimized layout for full-screen Quran page display.
+/// Uses WbwPageWidget which handles its own header, page number,
+/// and content width adaptation for tablets internally.
 class TabletFullPageRichText extends StatefulWidget {
   const TabletFullPageRichText({super.key, required this.pageNumber});
 
@@ -42,18 +43,11 @@ class _TabletFullPageRichTextState extends State<TabletFullPageRichText> {
     }
 
     return Padding(
-      padding: EdgeInsets.only(left: 35.w, right: 35.w, top: 10.h, bottom: 4.h),
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
       child: Column(
         children: [
           Expanded(
-            child: Center(child: WbwPageWidget(pageNumber: widget.pageNumber)),
-          ),
-          Padding(
-            padding: EdgeInsets.symmetric(vertical: 4.h),
-            child: Text(
-              widget.pageNumber.toArabicNums,
-              style: context.titleSmall.copyWith(fontSize: 22.sp),
-            ),
+            child: WbwPageWidget(pageNumber: widget.pageNumber),
           ),
         ],
       ),

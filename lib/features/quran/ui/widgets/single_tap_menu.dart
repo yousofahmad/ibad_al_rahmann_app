@@ -163,6 +163,8 @@ class _PageActionBarState extends State<PageActionBar>
 
   Future<void> _onSaveAsImage() async {
     try {
+      final quranCubit = context.read<QuranCubit>();
+      
       // Request gallery permission
       final hasAccess = await Gal.hasAccess();
       if (!hasAccess) {
@@ -180,8 +182,7 @@ class _PageActionBarState extends State<PageActionBar>
         }
       }
 
-      final cubit = context.read<QuranCubit>();
-      final repaintKey = cubit.getPageKey(widget.pageNumber);
+      final repaintKey = quranCubit.getPageKey(widget.pageNumber);
       final boundary =
           repaintKey.currentContext?.findRenderObject()
               as RenderRepaintBoundary?;
@@ -204,6 +205,15 @@ class _PageActionBarState extends State<PageActionBar>
       }
 
       final pngBytes = byteData.buffer.asUint8List();
+
+      // Rule 3: Ensure the Uint8List is NOT null and NOT empty before saving.
+      if (pngBytes.isEmpty) {
+        if (mounted) {
+          AlertHelper.showWarningAlert(context, message: 'بيانات الصورة فارغة');
+        }
+        widget.onDismiss();
+        return;
+      }
 
       // Save directly to gallery
       await Gal.putImageBytes(pngBytes, album: 'عباد الرحمن');

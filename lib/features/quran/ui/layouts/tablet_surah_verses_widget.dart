@@ -7,7 +7,6 @@ import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:ibad_al_rahmann/core/theme/app_colors.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cubit.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:quran/quran.dart';
 
 import '../widgets/basmallah.dart';
@@ -128,9 +127,12 @@ class _TabletSurahVersesWidgetState extends State<TabletSurahVersesWidget> {
           addDetails = false;
           spans.add(
             WidgetSpan(
-              child: widget.isFullPage
-                  ? FullHeaderWidget(surahNumber: e["surah"])
-                  : MinHeaderWidget(surahNumber: e["surah"]),
+              child: FittedBox(
+                fit: BoxFit.contain,
+                child: widget.isFullPage
+                    ? FullHeaderWidget(surahNumber: e["surah"])
+                    : MinHeaderWidget(surahNumber: e["surah"]),
+              ),
             ),
           );
 
@@ -208,7 +210,7 @@ class _TabletSurahVersesWidgetState extends State<TabletSurahVersesWidget> {
           0,
           WidgetSpan(
             child: Padding(
-              padding: EdgeInsets.only(bottom: 6.h),
+              padding: const EdgeInsets.only(bottom: 6),
               child: FullPageDetails(
                 surahNumber: e["surah"],
                 firstVerse: e["start"],
@@ -232,13 +234,13 @@ class _TabletSurahVersesWidgetState extends State<TabletSurahVersesWidget> {
       text: TextSpan(
         style: const TextStyle(color: Colors.black),
         children: [
-          WidgetSpan(child: SizedBox(height: 25.h)),
+          const WidgetSpan(child: SizedBox(height: 25)),
           ..._buildSpans(context),
           if (widget.pageNumber > 2)
             TextSpan(
               text: '\n${widget.pageNumber.toArabicNums}',
               style: context.titleSmall.copyWith(
-                fontSize: widget.isFullPage ? 18.sp : 12.sp,
+                fontSize: widget.isFullPage ? 18 : 12,
               ),
             ),
         ],

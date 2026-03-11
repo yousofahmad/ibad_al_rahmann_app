@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/widgets/adaptive_layout.dart';
 
 import '../layouts/mobile_full_page_rich_text.dart';

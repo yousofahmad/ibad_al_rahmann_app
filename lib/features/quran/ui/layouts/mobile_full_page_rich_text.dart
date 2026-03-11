@@ -93,9 +93,7 @@ class _MobileFullPageRichTextState extends State<MobileFullPageRichText> {
           child: Column(
             children: [
               Expanded(
-                child: Center(
-                  child: WbwPageWidget(pageNumber: widget.pageNumber),
-                ),
+                child: WbwPageWidget(pageNumber: widget.pageNumber),
               ),
             ],
           ),

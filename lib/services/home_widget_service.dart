@@ -27,7 +27,7 @@ class HomeWidgetService {
 
     // Register the background callback so Android can call into Dart
     // when the widget is interacted with while the app is not running.
-    HomeWidget.registerBackgroundCallback(interactiveCallback);
+    HomeWidget.registerInteractivityCallback(interactiveCallback);
   }
 
   /// وظيفة لتحديث الودجت الخاص بالصلاة ببيانات جديدة
@@ -44,17 +44,45 @@ class HomeWidgetService {
     required String prayerTime,
     int? nextPrayerEpoch,
     bool? isCountUp,
+    bool? persistentEnabled,
     String? sunriseTime,
     String? locationName,
+    // Add Epochs for native smart logic
+    int? fajrEpoch,
+    int? dhuhrEpoch,
+    int? asrEpoch,
+    int? maghribEpoch,
+    int? ishaEpoch,
+    int? sunriseEpoch,
   }) async {
     // حفظ البيانات في SharedPreferences الخاصة بالودجت
-    await HomeWidget.saveWidgetData<String>('fajr_time', fajr);
-    await HomeWidget.saveWidgetData<String>('dhuhr_time', dhuhr);
-    await HomeWidget.saveWidgetData<String>('asr_time', asr);
-    await HomeWidget.saveWidgetData<String>('maghrib_time', maghrib);
-    await HomeWidget.saveWidgetData<String>('isha_time', isha);
-    await HomeWidget.saveWidgetData<String>('prayer_name', nextName);
+    await HomeWidget.saveWidgetData<String>('fajr', fajr);
+    await HomeWidget.saveWidgetData<String>('dhuhr', dhuhr);
+    await HomeWidget.saveWidgetData<String>('asr', asr);
+    await HomeWidget.saveWidgetData<String>('maghrib', maghrib);
+    await HomeWidget.saveWidgetData<String>('isha', isha);
+    await HomeWidget.saveWidgetData<String>('nextName', nextName);
     await HomeWidget.saveWidgetData<String>('prayer_time', prayerTime);
+
+    // Save Epochs
+    if (fajrEpoch != null) {
+      await HomeWidget.saveWidgetData<int>('fajr_epoch', fajrEpoch);
+    }
+    if (dhuhrEpoch != null) {
+      await HomeWidget.saveWidgetData<int>('dhuhr_epoch', dhuhrEpoch);
+    }
+    if (asrEpoch != null) {
+      await HomeWidget.saveWidgetData<int>('asr_epoch', asrEpoch);
+    }
+    if (maghribEpoch != null) {
+      await HomeWidget.saveWidgetData<int>('maghrib_epoch', maghribEpoch);
+    }
+    if (ishaEpoch != null) {
+      await HomeWidget.saveWidgetData<int>('isha_epoch', ishaEpoch);
+    }
+    if (sunriseEpoch != null) {
+      await HomeWidget.saveWidgetData<int>('sunrise_epoch', sunriseEpoch);
+    }
 
     // We keep countdown for legacy fallback but also pass the true Epoch target
     await HomeWidget.saveWidgetData<String>('countdown', countdown);
@@ -67,19 +95,20 @@ class HomeWidgetService {
     if (isCountUp != null) {
       await HomeWidget.saveWidgetData<bool>('is_count_up', isCountUp);
     }
+    if (persistentEnabled != null) {
+      await HomeWidget.saveWidgetData<bool>(
+        'persistent_notification_enabled',
+        persistentEnabled,
+      );
+    }
 
-    await HomeWidget.saveWidgetData<String>('hijri_date', hijri);
+    await HomeWidget.saveWidgetData<String>('hijri', hijri);
     await HomeWidget.saveWidgetData<int>('prayerIndex', prayerIndex);
     if (sunriseTime != null) {
       await HomeWidget.saveWidgetData<String>('sunrise_time', sunriseTime);
     }
     if (locationName != null) {
-      await HomeWidget.saveWidgetData<String>('location_name', locationName);
-    }
-
-    // --- Dynamic Golden Widget Data (45-Minute Rule) ---
-    if (nextPrayerEpoch != null) {
-      // Caller manages if it's "Current + 45" or "Next".
+      await HomeWidget.saveWidgetData<String>('locationName', locationName);
     }
 
     // Send request to update standard & wide widgets

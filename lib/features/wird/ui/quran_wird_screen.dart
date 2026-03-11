@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-// Assuming screenutil is used project-wide
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// For PrayerTimes calculation context if needed
 import 'package:ibad_al_rahmann/core/app_constants.dart';
-import 'package:ibad_al_rahmann/services/notification_service.dart';
-import 'package:ibad_al_rahmann/services/prayer_service.dart';
+import '../bloc/khatma_cubit.dart';
+import '../utils/wird_calculator.dart';
 
 class QuranWirdScreen extends StatefulWidget {
   const QuranWirdScreen({super.key});
@@ -17,6 +16,14 @@ class QuranWirdScreen extends StatefulWidget {
 class _QuranWirdScreenState extends State<QuranWirdScreen> {
   final TextEditingController _daysController = TextEditingController();
   int _pagesPerDay = 0;
+
+  // Multiple Khatma Support
+  String _currentKhatmaId = 'khatma_1';
+  final Map<String, String> _khatmas = {
+    'khatma_1': 'الختمة الأولى',
+    'khatma_2': 'الختمة الثانية',
+    'ramadan': 'ختمة رمضان',
+  };
 
   // Reminder Settings
   String _reminderType = 'none'; // none, daily, prayer
@@ -32,134 +39,81 @@ class _QuranWirdScreenState extends State<QuranWirdScreen> {
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      int days = prefs.getInt('wird_days') ?? 30;
+      int days = prefs.getInt('${_currentKhatmaId}_wird_days') ?? 30;
       _daysController.text = days.toString();
       _calculatePages();
 
-      _reminderType = prefs.getString('wird_reminder_type') ?? 'none';
+      _reminderType =
+          prefs.getString('${_currentKhatmaId}_wird_reminder_type') ?? 'none';
 
-      final t = (prefs.getString('wird_daily_time') ?? "20:00").split(":");
+      final t =
+          (prefs.getString('${_currentKhatmaId}_wird_daily_time') ?? "20:00")
+              .split(":");
       _dailyTime = TimeOfDay(hour: int.parse(t[0]), minute: int.parse(t[1]));
     });
-  }
-
-  // Madinah mushaf juz start pages (0-indexed: juz 1 starts at page 1)
-  static const List<int> _juzStartPages = [
-    1, 22, 42, 62, 82, 102, 121, 142, 162, 182, // Juz 1-10
-    201, 222, 242, 262, 282, 302, 322, 342, 362, 382, // Juz 11-20
-    402, 422, 442, 462, 482, 502, 522, 542, 562, 582, // Juz 21-30
-  ];
-
-  // Returns list of (startPage, endPage) for each day based on juz distribution
-  static List<List<int>> getWirdDayRanges(int days) {
-    if (days <= 0) days = 1;
-    if (days > 604) days = 604;
-
-    final List<List<int>> ranges = [];
-
-    if (days <= 30) {
-      // Distribute 30 ajza' across N days
-      // Each day gets (30/days) ajza'
-      double ajzaaPerDay = 30 / days;
-      double juzAccum = 0;
-
-      for (int d = 0; d < days; d++) {
-        double fromJuz = juzAccum;
-        juzAccum += ajzaaPerDay;
-        double toJuz = juzAccum;
-
-        int fromJuzIdx = fromJuz.floor(); // 0-indexed
-        int toJuzIdx = (toJuz - 0.001).floor(); // inclusive end juz
-
-        if (fromJuzIdx >= 30) fromJuzIdx = 29;
-        if (toJuzIdx >= 30) toJuzIdx = 29;
-
-        int startPage = _juzStartPages[fromJuzIdx];
-        int endPage = (toJuzIdx + 1 < 30)
-            ? _juzStartPages[toJuzIdx + 1] - 1
-            : 604;
-
-        ranges.add([startPage, endPage]);
-      }
-    } else {
-      // More than 30 days: distribute 604 pages simply
-      int pagesPerDay = (604 / days).floor();
-      int remainder = 604 - (pagesPerDay * days);
-      int currentPage = 1;
-
-      for (int d = 0; d < days; d++) {
-        int todayPages = pagesPerDay + (d < remainder ? 1 : 0);
-        int endPage = currentPage + todayPages - 1;
-        if (endPage > 604) endPage = 604;
-        ranges.add([currentPage, endPage]);
-        currentPage = endPage + 1;
-        if (currentPage > 604) break;
-      }
-    }
-
-    return ranges;
   }
 
   void _calculatePages() {
     int days = int.tryParse(_daysController.text) ?? 30;
     if (days <= 0) days = 1;
-    final ranges = getWirdDayRanges(days);
-    // Show average pages per day
-    int totalPages = 0;
-    for (var r in ranges) {
-      totalPages += (r[1] - r[0] + 1);
-    }
+
+    // Use WirdCalculator for consistent calculation
     setState(() {
-      _pagesPerDay = (totalPages / ranges.length).round();
+      _pagesPerDay =
+          WirdCalculator.getPagesPerDay(
+            amount: 1,
+            unit: WirdUnit.juz,
+            isPerPrayer: false,
+          ) *
+          30 ~/
+          days;
     });
   }
 
   Future<void> _saveAndSchedule() async {
     setState(() => _isLoading = true);
-    final prefs = await SharedPreferences.getInstance();
 
     int days = int.tryParse(_daysController.text) ?? 30;
     if (days <= 0) days = 1;
 
-    // Reset Start Date
-    DateTime now = DateTime.now();
-    DateTime startDate = now;
-
-    if (_reminderType == 'daily') {
-      startDate = DateTime(
-        now.year,
-        now.month,
-        now.day,
-        _dailyTime.hour,
-        _dailyTime.minute,
+    try {
+      await context.read<KhatmaCubit>().startNewKhatma(
+        id: _currentKhatmaId,
+        name: _khatmas[_currentKhatmaId]!,
+        totalDays: days,
+        notificationType: _reminderType,
+        unit: WirdUnit
+            .page, // Default to page-based distribution for this simplified UI
       );
-      if (startDate.isBefore(now)) {
-        startDate = startDate.add(const Duration(days: 1));
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('${_currentKhatmaId}_wird_days', days);
+      await prefs.setString(
+        '${_currentKhatmaId}_wird_reminder_type',
+        _reminderType,
+      );
+      await prefs.setString(
+        '${_currentKhatmaId}_wird_daily_time',
+        "${_dailyTime.hour}:${_dailyTime.minute}",
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "تم حفظ الجدول وتفعيل التنبيهات لـ ${_khatmas[_currentKhatmaId]}",
+            ),
+          ),
+        );
       }
-    } else {
-      // Prayer type: Start date is effectively today (passed prayers skipped)
-      startDate = now;
-    }
-
-    await prefs.setString('wird_start_date', startDate.toIso8601String());
-    await prefs.setInt('wird_days', days);
-    await prefs.setString('wird_reminder_type', _reminderType);
-    await prefs.setString(
-      'wird_daily_time',
-      "${_dailyTime.hour}:${_dailyTime.minute}",
-    );
-
-    // Cancel old Wird & reschedule
-    await NotificationService.cancelAll(includeWird: true);
-    await NotificationService.rescheduleWird();
-    // Re-schedule prayer/azkar notifications that cancelAll removed
-    PrayerService().scheduleNotifications();
-
-    setState(() => _isLoading = false);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("تم حفظ الجدول وتفعيل التنبيهات")),
-      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("حدث خطأ أثناء الحفظ: $e")));
+      }
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -189,6 +143,49 @@ class _QuranWirdScreenState extends State<QuranWirdScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // 0. Khatma Selector
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _khatmas.entries.map((e) {
+                  bool isSelected = _currentKhatmaId == e.key;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                    child: ChoiceChip(
+                      label: Text(e.value),
+                      selected: isSelected,
+                      onSelected: (val) async {
+                        if (val) {
+                          final khatmaCubit = context.read<KhatmaCubit>();
+                          setState(() {
+                            _currentKhatmaId = e.key;
+                          });
+                          await _loadData();
+                          if (mounted) {
+                            khatmaCubit.loadKhatma(
+                              specificId: e.key,
+                            );
+                          }
+                        }
+                      },
+                      selectedColor: const Color(0xFFD0A871),
+                      backgroundColor: isDark ? Colors.white10 : Colors.white,
+                      labelStyle: TextStyle(
+                        color: isSelected
+                            ? Colors.black
+                            : (isDark ? Colors.white70 : Colors.black54),
+                        fontFamily: AppConsts.cairo,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 20),
+
             // 1. Goal Section
             _buildCard(
               context: context,
@@ -394,7 +391,7 @@ class _QuranWirdScreenState extends State<QuranWirdScreen> {
             ? null
             : [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 5,
                   offset: const Offset(0, 2),
                 ),

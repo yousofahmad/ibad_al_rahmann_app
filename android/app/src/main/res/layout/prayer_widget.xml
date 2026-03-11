@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg_gold"
     android:orientation="vertical"
-    android:padding="20dp"
+    android:padding="22dp"
     android:gravity="center">
 
     <!-- Top Section: Next Prayer & Live Countdown -->

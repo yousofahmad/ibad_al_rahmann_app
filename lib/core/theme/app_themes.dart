@@ -4,6 +4,7 @@ import 'package:ibad_al_rahmann/core/app_colors.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'app_styles.dart';
+import 'quran_theme_extension.dart';
 
 import 'package:flutter/services.dart';
 
@@ -30,6 +31,12 @@ class AppThemes {
       onSecondary: Colors.black,
     ),
     useMaterial3: true,
+    extensions: const [
+      QuranThemeColors(
+        paperColorLight: Colors.white,
+        paperColorDark: Colors.black,
+      ),
+    ],
   );
 
   static final goldDark = ThemeData(
@@ -52,6 +59,12 @@ class AppThemes {
       surface: Colors.black,
     ),
     useMaterial3: true,
+    extensions: const [
+      QuranThemeColors(
+        paperColorLight: Colors.white,
+        paperColorDark: Colors.black,
+      ),
+    ],
   );
 
   static final red = ThemeData(
@@ -110,6 +123,12 @@ class AppThemes {
         color: const Color.fromARGB(242, 255, 255, 255),
       ),
     ),
+    extensions: const [
+      QuranThemeColors(
+        paperColorLight: Colors.white,
+        paperColorDark: Colors.black,
+      ),
+    ],
   );
 
   static final cyan = lightBlue.copyWith(
@@ -128,6 +147,12 @@ class AppThemes {
       onPrimary: Colors.white,
       onSecondary: Colors.black,
     ),
+    extensions: const [
+      QuranThemeColors(
+        paperColorLight: Colors.white,
+        paperColorDark: Colors.black,
+      ),
+    ],
   );
 
   static final green = lightBlue.copyWith(
@@ -146,6 +171,12 @@ class AppThemes {
       onPrimary: Colors.white,
       onSecondary: Colors.black,
     ),
+    extensions: const [
+      QuranThemeColors(
+        paperColorLight: Colors.white,
+        paperColorDark: Colors.black,
+      ),
+    ],
   );
 
   static final lightBlue = ThemeData(
@@ -205,6 +236,12 @@ class AppThemes {
         color: const Color.fromARGB(242, 255, 255, 255),
       ),
     ),
+    extensions: const [
+      QuranThemeColors(
+        paperColorLight: Colors.white,
+        paperColorDark: Colors.black,
+      ),
+    ],
   );
   static final darkBlue = lightBlue.copyWith(
     scaffoldBackgroundColor: Colors.black,
@@ -229,6 +266,12 @@ class AppThemes {
         color: Colors.white,
       ),
     ),
+    extensions: const [
+      QuranThemeColors(
+        paperColorLight: Colors.white,
+        paperColorDark: Colors.black,
+      ),
+    ],
   );
 
   static final darkRed = red.copyWith(
@@ -252,6 +295,12 @@ class AppThemes {
       titleSmall: red.textTheme.titleSmall!.copyWith(color: Colors.white),
       headlineMedium: red.textTheme.titleSmall!.copyWith(color: Colors.white),
     ),
+    extensions: const [
+      QuranThemeColors(
+        paperColorLight: Colors.white,
+        paperColorDark: Colors.black,
+      ),
+    ],
   );
 
   static final darkCyan = cyan.copyWith(
@@ -275,6 +324,12 @@ class AppThemes {
       titleSmall: cyan.textTheme.titleSmall!.copyWith(color: Colors.white),
       headlineMedium: cyan.textTheme.titleSmall!.copyWith(color: Colors.white),
     ),
+    extensions: const [
+      QuranThemeColors(
+        paperColorLight: Colors.white,
+        paperColorDark: Colors.black,
+      ),
+    ],
   );
 
   static final darkGreen = green.copyWith(
@@ -298,6 +353,12 @@ class AppThemes {
       titleSmall: green.textTheme.titleSmall!.copyWith(color: Colors.white),
       headlineMedium: green.textTheme.titleSmall!.copyWith(color: Colors.white),
     ),
+    extensions: const [
+      QuranThemeColors(
+        paperColorLight: Colors.white,
+        paperColorDark: Colors.black,
+      ),
+    ],
   );
 
   // Get all available themes

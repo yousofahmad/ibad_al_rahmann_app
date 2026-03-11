@@ -7,7 +7,6 @@ import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/data/services/bookmark_service.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/widgets/bookmark_widget/bookmarks_dialog.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class TabletMinQuranBottomSection extends StatelessWidget {
   const TabletMinQuranBottomSection({super.key});
@@ -61,13 +60,13 @@ class TabletMinQuranBottomSection extends StatelessWidget {
             _showBookmarksDialog(context);
           },
           child: Container(
-            width: 50.w,
-            height: 50.w,
+            width: 75,
+            height: 75,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: context.surfaceColor,
             ),
-            child: const Icon(Icons.bookmark, color: Colors.white, size: 45),
+            child: const Icon(Icons.bookmark, color: Colors.white, size: 60),
           ),
         ),
         BlocBuilder<QuranCubit, QuranState>(
@@ -77,7 +76,7 @@ class TabletMinQuranBottomSection extends StatelessWidget {
           builder: (context, state) {
             return Text(
               state.juzNumber.toJuzName,
-              style: context.headlineLarge.copyWith(fontSize: 20.sp),
+              style: context.headlineLarge.copyWith(fontSize: 30),
             );
           },
         ),
@@ -86,8 +85,8 @@ class TabletMinQuranBottomSection extends StatelessWidget {
             context.read<ThemeCubit>().switchTheme();
           },
           child: Container(
-            width: 50.w,
-            height: 50.w,
+            width: 75,
+            height: 75,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: context.surfaceColor,
@@ -99,7 +98,7 @@ class TabletMinQuranBottomSection extends StatelessWidget {
                       ? Icons.light_mode
                       : Icons.dark_mode,
                   color: Colors.white,
-                  size: 45,
+                  size: 60,
                 );
               },
             ),
