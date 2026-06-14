@@ -1,0 +1,198 @@
+package app.ibad_al_rahmann
+
+import android.content.Context
+import com.batoulapps.adhan.*
+import com.batoulapps.adhan.data.DateComponents
+import java.util.*
+
+object NativePrayerManager {
+    fun calculatePrayerTimes(context: Context, date: Date = Date()): PrayerTimes? {
+        val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        
+        // Use double/long safe reading as Flutter saves as Long sometimes, or as a base64-prefixed String
+        fun getSafeDouble(key: String, def: Double): Double {
+            val v = prefs.all[key]
+            return when (v) {
+                is Double -> v
+                is Float -> v.toDouble()
+                is Long -> Double.fromBits(v)
+                is Int -> v.toDouble()
+                is String -> {
+                    val doublePrefix = "VGhpcyBpcyB0aGUgcHJlZml4IGZvciBEb3VibGUu"
+                    if (v.startsWith(doublePrefix)) {
+                        v.removePrefix(doublePrefix).toDoubleOrNull() ?: def
+                    } else {
+                        v.toDoubleOrNull() ?: def
+                    }
+                }
+                else -> def
+            }
+        }
+
+        var lat = getSafeDouble("flutter.latitude", 0.0)
+        if (lat == 0.0) lat = getSafeDouble("flutter.last_lat", 0.0)
+        
+        var lng = getSafeDouble("flutter.longitude", 0.0)
+        if (lng == 0.0) lng = getSafeDouble("flutter.last_lng", 0.0)
+
+        
+        // Strictly use saved coordinates, never attempt to 'search' for location here.
+        if (lat == 0.0 && lng == 0.0) return null
+
+        val methodStr = prefs.getString("flutter.calculation_method", "EGYPTIAN") ?: "EGYPTIAN"
+        val params = when (methodStr) {
+            "KARACHI" -> CalculationMethod.KARACHI.parameters
+            "UMM_AL_QURA" -> CalculationMethod.UMM_AL_QURA.parameters
+            "MUSLIM_WORLD_LEAGUE" -> CalculationMethod.MUSLIM_WORLD_LEAGUE.parameters
+            "EGYPTIAN" -> CalculationMethod.EGYPTIAN.parameters
+            "NORTH_AMERICA" -> CalculationMethod.NORTH_AMERICA.parameters
+            "KUWAIT" -> CalculationMethod.KUWAIT.parameters
+            "QATAR" -> CalculationMethod.QATAR.parameters
+            "SINGAPORE" -> CalculationMethod.SINGAPORE.parameters
+            "DUBAI" -> CalculationMethod.DUBAI.parameters
+            else -> CalculationMethod.EGYPTIAN.parameters
+        }
+
+        val madhabStr = prefs.getString("flutter.madhab", "SHAFI") ?: "SHAFI"
+        params.madhab = if (madhabStr == "HANAFI") Madhab.HANAFI else Madhab.SHAFI
+
+        fun getSafeInt(key: String, default: Int): Int {
+            return when (val v = prefs.all[key]) {
+                is Long   -> v.toInt()
+                is Int    -> v
+                is Float  -> v.toInt()
+                is String -> v.toIntOrNull() ?: default
+                else      -> default
+            }
+        }
+
+        params.adjustments.fajr = getSafeInt("flutter.offset_Fajr", 0)
+        params.adjustments.sunrise = getSafeInt("flutter.offset_Sunrise", 0)
+        params.adjustments.dhuhr = getSafeInt("flutter.offset_Dhuhr", 0)
+        params.adjustments.asr = getSafeInt("flutter.offset_Asr", 0)
+        params.adjustments.maghrib = getSafeInt("flutter.offset_Maghrib", 0)
+        params.adjustments.isha = getSafeInt("flutter.offset_Isha", 0)
+
+        val coordinates = Coordinates(lat, lng)
+        val components = DateComponents.from(date)
+        
+        return PrayerTimes(coordinates, components, params)
+    }
+
+    fun getHijriDate(context: Context, date: Date = Date()): String {
+        val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        
+        // Pull manual offset or Firebase override
+        // Priority: firebase_hijri_offset > manual_hijri_offset
+        val firebaseOffset = prefs.all["flutter.firebase_hijri_offset"] as? Long ?: 0L
+        val manualOffset = prefs.all["flutter.hijri_offset"] as? Long ?: 0L
+        
+        val totalOffset = firebaseOffset + manualOffset
+        
+        val calendar = Calendar.getInstance()
+        calendar.time = date
+        calendar.add(Calendar.DAY_OF_YEAR, totalOffset.toInt())
+        
+        return HijriCalendarHelper.getArabicDate(calendar.time)
+    }
+
+    fun generateThirtyDayCache(context: Context) {
+        val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        val lat = prefs.all["flutter.latitude"]?.toString()?.toDoubleOrNull() ?: 0.0
+        val lng = prefs.all["flutter.longitude"]?.toString()?.toDoubleOrNull() ?: 0.0
+        
+        if (lat == 0.0 && lng == 0.0) return
+
+        val jsonResult = org.json.JSONObject()
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        val timeFmt = java.text.SimpleDateFormat("hh:mm a", java.util.Locale("ar"))
+        
+        val calendar = java.util.Calendar.getInstance()
+        
+        // Calculate for 30 days starting from today
+        for (i in 0..30) {
+            val date = calendar.time
+            val prayerTimes = calculatePrayerTimes(context, date)
+            
+            if (prayerTimes != null) {
+                val dayObj = org.json.JSONObject()
+                dayObj.put("f", prayerTimes.fajr.time)
+                dayObj.put("s", prayerTimes.sunrise.time)
+                dayObj.put("d", prayerTimes.dhuhr.time)
+                dayObj.put("a", prayerTimes.asr.time)
+                dayObj.put("m", prayerTimes.maghrib.time)
+                dayObj.put("i", prayerTimes.isha.time)
+                
+                dayObj.put("f_str", timeFmt.format(prayerTimes.fajr))
+                dayObj.put("s_str", timeFmt.format(prayerTimes.sunrise))
+                dayObj.put("d_str", timeFmt.format(prayerTimes.dhuhr))
+                dayObj.put("a_str", timeFmt.format(prayerTimes.asr))
+                dayObj.put("m_str", timeFmt.format(prayerTimes.maghrib))
+                dayObj.put("i_str", timeFmt.format(prayerTimes.isha))
+                
+                jsonResult.put(sdf.format(date), dayObj)
+            }
+            calendar.add(java.util.Calendar.DAY_OF_YEAR, 1)
+        }
+        
+        val groupPrefs = context.getSharedPreferences("HomeWidgetPreferences", Context.MODE_PRIVATE)
+        groupPrefs.edit().putString("prayer_times_30d", jsonResult.toString()).apply()
+        
+        // Immediately patch today's data so widgets update right away
+        PrayerDataPatcher.patchTodayEpochsFrom30d(context)
+    }
+}
+
+object HijriCalendarHelper {
+    fun getArabicDate(date: Date): String {
+        val cal = Calendar.getInstance()
+        cal.time = date
+        
+        var day = cal.get(Calendar.DAY_OF_MONTH)
+        var month = cal.get(Calendar.MONTH) + 1
+        var year = cal.get(Calendar.YEAR)
+
+        var m = month
+        var y = year
+        if (m < 3) {
+            y -= 1
+            m += 12
+        }
+
+        var a = Math.floor(y / 100.0).toInt()
+        var b = 2 - a + Math.floor(a / 4.0).toInt()
+        
+        var jd = Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + day + b - 1524.5
+
+        var z = jd + 0.5
+        var cyc = Math.floor((z - 1948439.5) / 10631.0).toInt()
+        var rem = z - 1948439.5 - cyc * 10631.0
+        
+        var j = Math.floor((rem - 0.12) / 354.3666).toInt()
+        var res = rem - Math.floor(j * 354.3666 + 0.5)
+        
+        var hYear = cyc * 30 + j + 1
+        var hMonth = Math.floor((res + 28.5001) / 29.5).toInt()
+        if (hMonth == 13) hMonth = 12
+        
+        var hDay = (res - Math.floor(hMonth * 29.5 - 28.999)).toInt()
+        if (hDay == 0) hDay = 1
+
+        val monthsAr = arrayOf(
+            "محرم", "صفر", "ربيع الأول", "ربيع الثاني", "جمادى الأولى", "جمادى الآخرة",
+            "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
+        )
+        
+        val monthName = if (hMonth in 1..12) monthsAr[hMonth - 1] else ""
+        
+        return toArabicDigits("$hDay $monthName $hYear هـ")
+    }
+
+    private fun toArabicDigits(input: String): String {
+        val english = arrayOf("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
+        val arabic = arrayOf("٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩")
+        var result = input
+        for (i in english.indices) result = result.replace(english[i], arabic[i])
+        return result
+    }
+}

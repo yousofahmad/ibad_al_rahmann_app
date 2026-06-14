@@ -1,0 +1,56 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
+
+import '../components/surah_title_box.dart';
+
+class QuranSurahList extends StatefulWidget {
+  const QuranSurahList({super.key});
+
+  @override
+  State<QuranSurahList> createState() => _QuranSurahListState();
+}
+
+class _QuranSurahListState extends State<QuranSurahList> {
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final controller = context.read<QuranCubit>().surahsController;
+      if (controller.hasClients) {
+        setState(() {
+          _currentPage = controller.page?.round() ?? 0;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PageView.builder(
+      controller: context.read<QuranCubit>().surahsController,
+      scrollDirection: Axis.horizontal,
+      clipBehavior: Clip.none, // دي مهمة عشان لو الكلمة كبيرة متتقصش
+      itemCount: 114,
+      onPageChanged: (value) {
+        setState(() {
+          _currentPage = value;
+        });
+        context.read<QuranCubit>().onSurahListChanged(_currentPage);
+      },
+      itemBuilder: (context, index) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SurahTitleBox(
+              surahIndex: index,
+              selected: index == _currentPage,
+            ),
+          ],
+        );
+      },
+    );
+  }
+}

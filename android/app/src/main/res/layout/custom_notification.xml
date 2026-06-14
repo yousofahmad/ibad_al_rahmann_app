@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root_expanded"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:layoutDirection="rtl"
+    android:background="@android:color/transparent"
+    android:padding="2dp">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="2dp"
+        android:layoutDirection="rtl"
+        android:padding="0dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:gravity="center_vertical"
+            android:layoutDirection="rtl"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tv_next_prayer_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="الفجر متبقي:"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textDirection="locale"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <Chronometer
+                android:id="@+id/tv_next_prayer_countdown"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:countDown="true"
+                android:gravity="center"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textDirection="ltr"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_hijri_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:gravity="center"
+            android:text="١ رمضان ١٤٤٧ هـ"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textDirection="locale"
+            android:textSize="12sp" />
+    </RelativeLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="0dp"
+        android:orientation="horizontal"
+        android:weightSum="5"
+        android:layoutDirection="rtl"
+        android:background="@drawable/notification_table_bg"
+        android:gravity="center"
+        android:layout_gravity="center"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
+        android:paddingHorizontal="2dp">
+
+        <LinearLayout
+            android:id="@+id/layout_fajr"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="2dp">
+            <TextView
+                android:id="@+id/tv_fajr_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="الفجر"
+                android:textSize="12sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textStyle="bold"
+                android:gravity="center" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:orientation="horizontal"
+                android:layoutDirection="ltr"
+                android:gravity="center">
+                <TextView
+                    android:id="@+id/tv_fajr_am_pm"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ص"
+                    android:textSize="10sp"
+                    android:layout_marginEnd="2dp"
+                    android:textColor="?android:attr/textColorSecondary" />
+                <TextView
+                    android:id="@+id/tv_fajr_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--:--"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="?android:attr/textColorPrimary" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layout_dhuhr"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="2dp">
+            <TextView
+                android:id="@+id/tv_dhuhr_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="الظهر"
+                android:textSize="12sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textStyle="bold"
+                android:gravity="center" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:orientation="horizontal"
+                android:layoutDirection="ltr"
+                android:gravity="center">
+                <TextView
+                    android:id="@+id/tv_dhuhr_am_pm"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="م"
+                    android:textSize="10sp"
+                    android:layout_marginEnd="2dp"
+                    android:textColor="?android:attr/textColorSecondary" />
+                <TextView
+                    android:id="@+id/tv_dhuhr_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--:--"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="?android:attr/textColorPrimary" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layout_asr"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="2dp">
+            <TextView
+                android:id="@+id/tv_asr_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="العصر"
+                android:textSize="12sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textStyle="bold"
+                android:gravity="center" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:orientation="horizontal"
+                android:layoutDirection="ltr"
+                android:gravity="center">
+                <TextView
+                    android:id="@+id/tv_asr_am_pm"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="م"
+                    android:textSize="10sp"
+                    android:layout_marginEnd="2dp"
+                    android:textColor="?android:attr/textColorSecondary" />
+                <TextView
+                    android:id="@+id/tv_asr_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--:--"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="?android:attr/textColorPrimary" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layout_maghrib"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="2dp">
+            <TextView
+                android:id="@+id/tv_maghrib_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="المغرب"
+                android:textSize="12sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textStyle="bold"
+                android:gravity="center" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:orientation="horizontal"
+                android:layoutDirection="ltr"
+                android:gravity="center">
+                <TextView
+                    android:id="@+id/tv_maghrib_am_pm"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="م"
+                    android:textSize="10sp"
+                    android:layout_marginEnd="2dp"
+                    android:textColor="?android:attr/textColorSecondary" />
+                <TextView
+                    android:id="@+id/tv_maghrib_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--:--"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="?android:attr/textColorPrimary" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layout_isha"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="2dp">
+            <TextView
+                android:id="@+id/tv_isha_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="العشاء"
+                android:textSize="12sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textStyle="bold"
+                android:gravity="center" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:orientation="horizontal"
+                android:layoutDirection="ltr"
+                android:gravity="center">
+                <TextView
+                    android:id="@+id/tv_isha_am_pm"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="م"
+                    android:textSize="10sp"
+                    android:layout_marginEnd="2dp"
+                    android:textColor="?android:attr/textColorSecondary" />
+                <TextView
+                    android:id="@+id/tv_isha_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--:--"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="?android:attr/textColorPrimary" />
+            </LinearLayout>
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

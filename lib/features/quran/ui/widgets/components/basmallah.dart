@@ -1,0 +1,69 @@
+import 'package:flutter/material.dart';
+import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
+import 'package:ibad_al_rahmann/core/theme/app_images.dart';
+
+class Basmallah extends StatelessWidget {
+  final bool isFull;
+  final Color? color;
+  final double? widthMultiplier;
+
+  const Basmallah({
+    super.key,
+    required this.isFull,
+    this.color,
+    this.widthMultiplier,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final double paddingMult = widthMultiplier != null
+        ? (1.0 - widthMultiplier!) / 2
+        : (isFull ? .2 : .15);
+
+    return SizedBox(
+      width: context.screenWidth,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: (context.screenWidth * paddingMult),
+          right: (context.screenWidth * paddingMult),
+          top: 4,
+        ),
+        child: Image.asset(
+          AppImages.basmala,
+          width: context.screenWidth,
+          fit: BoxFit.contain,
+          color: color,
+          colorBlendMode: color != null ? BlendMode.srcIn : null,
+        ),
+      ),
+    );
+  }
+}
+
+class TabletBasmallah extends StatelessWidget {
+  final bool isFull;
+  final Color? color;
+
+  const TabletBasmallah({super.key, required this.isFull, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: context.screenWidth,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: (context.screenWidth * (isFull ? .2 : .1)),
+          right: (context.screenWidth * (isFull ? .2 : .1)),
+          top: 4,
+        ),
+        child: Image.asset(
+          AppImages.basmala,
+          width: context.screenWidth * .4,
+          fit: BoxFit.contain,
+          color: color,
+          colorBlendMode: color != null ? BlendMode.srcIn : null,
+        ),
+      ),
+    );
+  }
+}

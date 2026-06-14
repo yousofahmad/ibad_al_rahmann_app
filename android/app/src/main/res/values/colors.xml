@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Widget Backgrounds -->
+    <color name="widget_background">#F5F5F5</color>       <!-- Soft white -->
+    <color name="widget_inner_background">#0D000000</color> <!-- 5% Black tint -->
+    <color name="widget_card_bg">#FFFFFF</color>            <!-- Pure white card -->
+
+    <!-- Widget Text -->
+    <color name="widget_text_primary">#1A1A1A</color>       <!-- Near black -->
+    <color name="widget_text_secondary">#888888</color>     <!-- Muted grey -->
+
+    <!-- Widget Accents -->
+    <color name="widget_accent">#C9983D</color>             <!-- Warm deep gold -->
+    <color name="widget_accent_soft">#B89860</color>        <!-- Muted gold -->
+
+    <!-- Timeline -->
+    <color name="widget_dot_inactive">#D0D0D0</color>      <!-- Light grey dot -->
+    <color name="widget_dot_active">#D0A871</color>         <!-- Gold active dot -->
+    <color name="widget_timeline_line">#E0E0E0</color>      <!-- Line between dots -->
+
+    <!-- Misc -->
+    <color name="widget_divider">#12000000</color>          <!-- Subtle divider -->
+    <color name="widget_highlight_bg">#14D0A871</color>     <!-- Gold 8% tint -->
+</resources>
