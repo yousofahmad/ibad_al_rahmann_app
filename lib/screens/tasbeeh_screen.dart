@@ -2,9 +2,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/notification_service.dart';
 import 'package:flutter/services.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class TasbeehScreen extends StatefulWidget {
   const TasbeehScreen({super.key});
@@ -42,7 +42,7 @@ class _TasbeehScreenState extends State<TasbeehScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     setState(() {
       _vibrationEnabled = prefs.getBool('vibrate_tasbeeh') ?? true;
     });

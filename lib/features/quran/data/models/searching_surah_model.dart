@@ -1,4 +1,4 @@
-﻿import 'package:quran/quran.dart';
+import 'package:quran/quran.dart';
 
 class SearchingSurahModel {
   final String name, place;
@@ -17,7 +17,7 @@ class SearchingSurahModel {
 
     return SearchingSurahModel(
       name: map['arabic'],
-      place: getPlaceOfRevelation(surahNumber) == 'Makkah' ? 'مكية' : 'مدنية',
+      place: getPlaceOfRevelation(surahNumber) == 'Makkah' ? '????' : '?????',
       surahNumber: surahNumber,
       firstPage: getPageNumber(surahNumber, 1),
       juzNumber: getJuzNumber(surahNumber, 1),

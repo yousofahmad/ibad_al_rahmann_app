@@ -31,6 +31,13 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
         channel = MethodChannel(binding.binaryMessenger, CHANNEL)
         currentChannel = channel
         setup(channel!!)
+        // Flush any pending navigation payload that arrived before the channel was ready
+        val pending = MainActivity.pendingNavigationPayload
+        if (pending != null) {
+            android.util.Log.d("PrayerApp", "BackgroundPlugin: flushing pending payload '$pending' to Flutter")
+            channel!!.invokeMethod("onPayloadReceived", pending)
+            MainActivity.pendingNavigationPayload = null
+        }
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -42,6 +49,14 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
     private fun setup(methodChannel: MethodChannel) {
         methodChannel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "nativeLog" -> {
+                    val message = call.argument<String>("message") ?: ""
+                    NativeLogger.log(context, "[Flutter] $message")
+                    result.success(null)
+                }
+                "getLaunchPayload" -> {
+                    result.success(MainActivity.getAndClearLaunchPayload())
+                }
                 "cancelAlarm" -> {
                     val id = call.argument<Int>("id") ?: 1
                     val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -63,6 +78,13 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
                             val pendingIntent = PendingIntent.getBroadcast(context, id, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
                             alarmManager.cancel(pendingIntent)
                             editor.putBoolean("alarm_${id}_active", false)
+                            
+                            // Cancel legacy flutter_local_notifications if they exist
+                            try {
+                                val legacyIntent = Intent().setClassName(context, "com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver")
+                                val legacyPi = PendingIntent.getBroadcast(context, id, legacyIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+                                alarmManager.cancel(legacyPi)
+                            } catch (e: Exception) {}
                         }
                         editor.apply()
                     }
@@ -116,6 +138,30 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
                         editor.apply()
                     }
                     result.success("Batch Scheduled")
+                }
+                "printAllAlarms" -> {
+                    val prefs = context.getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE)
+                    val allEntries = prefs.all
+                    val activeAlarms = allEntries.keys.filter { it.endsWith("_active") && prefs.getBoolean(it, false) }
+                        .map { it.replace("alarm_", "").replace("_active", "") }
+                        
+                    val sb = java.lang.StringBuilder()
+                    sb.append("--- ALARM AUDIT LOG ---\n")
+                    for (id in activeAlarms) {
+                        val year = prefs.getInt("alarm_${id}_year", -1)
+                        val month = prefs.getInt("alarm_${id}_month", -1)
+                        val day = prefs.getInt("alarm_${id}_day", -1)
+                        val hour = prefs.getInt("alarm_${id}_hour", -1)
+                        val min = prefs.getInt("alarm_${id}_minute", -1)
+                        val sound = prefs.getString("alarm_${id}_sound", "default")
+                        val payload = prefs.getString("alarm_${id}_payload", "none")
+                        val title = prefs.getString("alarm_${id}_title", "No Title")
+                        
+                        sb.append("ID: $id | Time: $hour:$min | Date: $year-$month-$day | Sound: $sound | Payload: $payload | Title: $title\n")
+                    }
+                    sb.append("-----------------------\n")
+                    NativeLogger.log(context, sb.toString())
+                    result.success(sb.toString())
                 }
                 "updatePrayerNotification" -> {
                     try {
@@ -263,6 +309,49 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
                         } catch (e: Exception) { e.printStackTrace() }
                     }.start()
                     result.success("Native prayer engine started")
+                }
+                "checkOverlayPermission" -> {
+                    val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        android.provider.Settings.canDrawOverlays(context)
+                    } else { true }
+                    result.success(hasPermission)
+                }
+                "requestOverlayPermission" -> {
+                    val intent = Intent(
+                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        android.net.Uri.parse("package:${context.packageName}")
+                    ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+                    context.startActivity(intent)
+                    result.success(null)
+                }
+                "setPrayerFocusEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                        .edit().putBoolean("flutter.prayer_focus_enabled", enabled).apply()
+                    result.success(null)
+                }
+                "startScreenUnlockService" -> {
+                    // Save salawat unlock settings to FlutterSharedPreferences so
+                    // ScreenUnlockService can read them without a running Flutter engine.
+                    val mode   = call.argument<String>("mode")   ?: "saly_3ala_mo7amad"
+                    val volume = call.argument<Double>("volume") ?: 1.0
+                    val prefs  = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                    prefs.edit()
+                        .putString("flutter.salah_unlock_mode",   mode)
+                        .putFloat("flutter.salah_unlock_volume",  volume.toFloat())
+                        .apply()
+
+                    val intent = Intent(context, ScreenUnlockService::class.java)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(intent)
+                    } else {
+                        context.startService(intent)
+                    }
+                    result.success(null)
+                }
+                "stopScreenUnlockService" -> {
+                    ScreenUnlockService.stop(context)
+                    result.success(null)
                 }
                 else -> result.notImplemented()
             }

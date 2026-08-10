@@ -12,7 +12,7 @@ class ShareProvider extends ChangeNotifier {
 
   int _fromVerse;
   int _toVerse;
-  ShareMode _shareMode = ShareMode.image;
+  ShareMode _shareMode = ShareMode.text;
   bool _showLogo = true;
   bool _isMushafFormat = true;
 

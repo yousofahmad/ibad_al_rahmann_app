@@ -1,4 +1,4 @@
-﻿class Muezzin {
+class Muezzin {
   final String id;
   final String name;
   final String url;

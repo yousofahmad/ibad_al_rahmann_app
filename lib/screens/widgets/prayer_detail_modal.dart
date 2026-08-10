@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
 import 'package:ibad_al_rahmann/screens/muezzin_selection_screen.dart';
 import 'package:ibad_al_rahmann/core/constants/prayer_text_data.dart';
 import 'dart:async';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class PrayerDetailModal extends StatefulWidget {
   final ExtendedPrayer prayer;
@@ -35,7 +35,7 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
     String key =
         widget.prayer.id[0].toUpperCase() + widget.prayer.id.substring(1);
     int def = (key == 'Maghrib' ? 10 : (key == 'Fajr' ? 20 : 15));
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final iqamaBool = prefs.getBool('iqama_enabled_$key') ?? false;
     setState(() {
       _iqamaDelay = prefs.getInt('iqama_minutes_$key') ?? def;
@@ -81,7 +81,7 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
   }
 
   Future<void> _loadNotifStatus() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final key =
         widget.prayer.id[0].toUpperCase() + widget.prayer.id.substring(1);
     final legacyBool = prefs.getBool(_getNotifKey()) ?? _getNotifDefault();
@@ -92,7 +92,7 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
   }
 
   Future<void> _loadSound() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     String key = 'adhan_sound_${widget.prayer.id.toLowerCase()}';
     String? path = prefs.getString(key);
 
@@ -310,13 +310,13 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
                       ),
                       trailing: _buildModeSelector(_adhanMode, (v) async {
                         setState(() => _adhanMode = v);
-                        final prefs = await SharedPreferences.getInstance();
+                        final prefs = CacheHelper.prefs;
                         final capKey =
                             widget.prayer.id[0].toUpperCase() +
                             widget.prayer.id.substring(1);
                         await prefs.setString('adhan_mode_$capKey', v);
                         await prefs.setBool(_getNotifKey(), v != 'none');
-                        PrayerService().scheduleNotifications();
+                        PrayerService().scheduleNotificationsDebounced();
                       }),
                     ),
                     Divider(color: borderColor),
@@ -371,7 +371,7 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
                             ),
                           );
                           _loadSound(); // Refresh after return
-                          PrayerService().scheduleNotifications();
+                          PrayerService().scheduleNotificationsDebounced();
                         },
                       ),
                     ],
@@ -410,13 +410,13 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
                           final capKey =
                               widget.prayer.id[0].toUpperCase() +
                               widget.prayer.id.substring(1);
-                          final prefs = await SharedPreferences.getInstance();
+                          final prefs = CacheHelper.prefs;
                           await prefs.setString('iqama_mode_$capKey', v);
                           await prefs.setBool(
                             'iqama_enabled_$capKey',
                             v != 'none',
                           );
-                          PrayerService().scheduleNotifications();
+                          PrayerService().scheduleNotificationsDebounced();
                         }),
                       ),
                       if (_iqamaMode != 'none') ...[
@@ -458,13 +458,13 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
                                                   .toUpperCase() +
                                               widget.prayer.id.substring(1);
                                           final prefs =
-                                              await SharedPreferences.getInstance();
+                                              CacheHelper.prefs;
                                           await prefs.setInt(
                                             'iqama_minutes_$key',
                                             _iqamaDelay,
                                           );
                                           PrayerService()
-                                              .scheduleNotifications();
+                                              .scheduleNotificationsDebounced(isUserAction: true);
                                         }
                                       },
                                       child: const Icon(Icons.remove, size: 18),
@@ -490,13 +490,13 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
                                                   .toUpperCase() +
                                               widget.prayer.id.substring(1);
                                           final prefs =
-                                              await SharedPreferences.getInstance();
+                                              CacheHelper.prefs;
                                           await prefs.setInt(
                                             'iqama_minutes_$key',
                                             _iqamaDelay,
                                           );
                                           PrayerService()
-                                              .scheduleNotifications();
+                                              .scheduleNotificationsDebounced(isUserAction: true);
                                         }
                                       },
                                       child: const Icon(Icons.add, size: 18),

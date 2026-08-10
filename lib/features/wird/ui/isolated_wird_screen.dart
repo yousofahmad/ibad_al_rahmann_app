@@ -14,9 +14,10 @@ import 'package:ibad_al_rahmann/features/quran/data/repo/quran_repo.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/widgets/menus/single_tap_menu.dart';
 import 'package:ibad_al_rahmann/features/wird/bloc/khatma_cubit.dart';
 import 'package:ibad_al_rahmann/services/daily_tracker_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/widgets/core/wbw_page_widget.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 /// A completely isolated screen for reading the Daily Wird or Surah Al-Kahf.
 /// It creates its own QuranCubit with a localized state to avoid interfering
@@ -60,6 +61,9 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen> with TickerProv
   @override
   void initState() {
     super.initState();
+    // Enable wakelock to prevent screen from turning off while reading
+    WakelockPlus.enable();
+    
     // Hide status bar for immersive reading
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
@@ -80,7 +84,7 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen> with TickerProv
   }
 
   Future<void> _checkFirstTime(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final bool seen = prefs.getBool('seen_wird_instructions') ?? false;
     if (!seen) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -99,6 +103,7 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen> with TickerProv
   @override
   void dispose() {
     // Restore status bar
+    WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     
     _ticker?.dispose();
@@ -347,6 +352,7 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen> with TickerProv
                                       setState(() => _showOverlays = !_showOverlays);
                                     },
                                     child: PageView.builder(
+      allowImplicitScrolling: true,
                                       controller: _pageController,
                                       itemCount: _itemCount,
                                       reverse: false,

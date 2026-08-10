@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'prayer_alarms_screen.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 const _gold = Color(0xFFD0A871);
 
@@ -181,7 +182,7 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
   }
 
   Future<void> _loadPrefs() async {
-    _prefs = await SharedPreferences.getInstance();
+    _prefs = CacheHelper.prefs;
     setState(() {
       _qiyamMode =
           _prefs.getString('qiyam_mode_notif') ??
@@ -318,7 +319,7 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
       final prefix = isAdha ? 'eid_adha' : 'eid_fitr';
       await _prefs.setInt('${prefix}_hour', picked.hour);
       await _prefs.setInt('${prefix}_minute', picked.minute);
-      PrayerService().scheduleNotifications();
+      PrayerService().scheduleNotificationsDebounced();
     }
   }
 
@@ -355,7 +356,7 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
       final prefix = isStart ? 'quiet_hours_start' : 'quiet_hours_end';
       await _prefs.setInt('${prefix}_hour', picked.hour);
       await _prefs.setInt('${prefix}_minute', picked.minute);
-      PrayerService().scheduleNotifications();
+      PrayerService().scheduleNotificationsDebounced();
     }
   }
 
@@ -394,7 +395,7 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
           : 'takbeerat_quiet_hours_end';
       await _prefs.setInt('${prefix}_hour', picked.hour);
       await _prefs.setInt('${prefix}_minute', picked.minute);
-      PrayerService().scheduleNotifications();
+      PrayerService().scheduleNotificationsDebounced();
     }
   }
 
@@ -406,7 +407,7 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
     if (val is bool && val == true) {
       await _checkNotificationPermission(onToggle: true);
     }
-    PrayerService().scheduleNotifications();
+    PrayerService().scheduleNotificationsDebounced();
   }
 
   Future<void> _saveMode(String key, String legacyKey, String val) async {
@@ -415,7 +416,7 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
     if (val != 'none') {
       await _checkNotificationPermission(onToggle: true);
     }
-    PrayerService().scheduleNotifications();
+    PrayerService().scheduleNotificationsDebounced();
   }
 
   @override
@@ -835,7 +836,7 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
                       setState(() => _eidAdhaTime = null);
                       _prefs.remove('eid_adha_hour');
                       _prefs.remove('eid_adha_minute');
-                      PrayerService().scheduleNotifications();
+                      PrayerService().scheduleNotificationsDebounced();
                     },
                     child: const Text(
                       'العودة للحساب التلقائي (حسب الشروق)',
@@ -962,7 +963,7 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
                       setState(() => _eidFitrTime = null);
                       _prefs.remove('eid_fitr_hour');
                       _prefs.remove('eid_fitr_minute');
-                      PrayerService().scheduleNotifications();
+                      PrayerService().scheduleNotificationsDebounced();
                     },
                     child: const Text(
                       'العودة للحساب التلقائي (حسب الشروق)',
@@ -1280,9 +1281,9 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
                   _minutesPicker(
                     label: 'الدقائق قبل $prayer',
                     value: minutes,
-                    min: 5,
+                    min: 1,
                     max: 120,
-                    step: 5,
+                    step: 1,
                     onChanged: onMinutes,
                   ),
                   SizedBox(height: 12.h),
@@ -1557,9 +1558,9 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
                   ? 'الدقائق بعد الشروق'
                   : 'الدقائق قبل الظهر',
               value: _duhaCustomMins,
-              min: 5,
+              min: 1,
               max: 120,
-              step: 5,
+              step: 1,
               onChanged: (v) {
                 setState(() => _duhaCustomMins = v);
                 _save('duha_custom_minutes', v);

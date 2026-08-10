@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:hijri/hijri_calendar.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
 import 'package:flutter/services.dart';
 import 'qada_list_screen.dart';
@@ -15,6 +14,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 const _gold = Color(0xFFD0A871);
 
@@ -93,7 +93,7 @@ class _RamadanScreenState extends State<RamadanScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     int missed = 0;
     final hijriOffset = PrayerService().hijriOffset;
     final adjustedDate = DateTime.now().add(Duration(days: hijriOffset));
@@ -124,7 +124,7 @@ class _RamadanScreenState extends State<RamadanScreen> {
   }
 
   Future<void> _save(String key, dynamic val) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     if (val is bool) await prefs.setBool(key, val);
     if (val is int) await prefs.setInt(key, val);
     if (val is String) await prefs.setString(key, val);

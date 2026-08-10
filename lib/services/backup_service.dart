@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/widgets.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -14,35 +13,71 @@ import 'package:ibad_al_rahmann/features/quran/data/models/selected_verse_model.
 import 'package:ibad_al_rahmann/features/quran/data/services/bookmark_service.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
 import 'package:ibad_al_rahmann/services/notification_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 @pragma('vm:entry-point')
 Future<void> driveAutoSyncTask() async {
-  // Required for background tasks
-  WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter();
-  if (!Hive.isAdapterRegistered(0)) {
-    Hive.registerAdapter(VerseModelAdapter());
-  }
-  await BookmarkService.init();
+    try {
+      WidgetsFlutterBinding.ensureInitialized();
+      await CacheHelper.init();
+      // تهيئة Hive بالمسار الصحيح لمعالجة الخلفية
+      final dir = await getApplicationDocumentsDirectory();
+      Hive.init(dir.path);
+      if (!Hive.isAdapterRegistered(0)) {
+        Hive.registerAdapter(VerseModelAdapter());
+      }
+      try {
+        await BookmarkService.init();
+      } catch (_) {} // لا توقف لو فشلت المفاتيح — الإعدادات أهم
+      try {
+        if (!Hive.isBoxOpen('appDataBox')) await Hive.openBox('appDataBox');
+      } catch (_) {}
 
-  final success = await BackupService.syncToDrive(allowUI: false);
-  
-  // Log the result for debugging
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('last_auto_sync_status', '${DateTime.now().toIso8601String()}: $success');
-    
-    if (success) {
-      await NotificationService.showImmediateNotification(
-        title: "النسخ الاحتياطي",
-        body: "تمت مزامنة بياناتك مع جوجل درايف بنجاح.",
-        payload: "settings",
-      );
+      // 1. مزامنة مع مهلة دقيقتين للنت الضعيف
+      final success = await BackupService.syncToDrive(allowUI: false);
+
+      final prefs = CacheHelper.prefs;
+      await prefs.setString('last_auto_sync_status', '${DateTime.now().toIso8601String()}: $success');
+
+      // إشعار تأكيد المزامنة (مهم لتأكيد أن الميزة تعمل)
+      try {
+        final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+        const initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/launcher_icon');
+        const initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+        await flutterLocalNotificationsPlugin.initialize(settings: initializationSettings);
+
+        final title = success ? "المزامنة التلقائية ✓" : "فشل المزامنة التلقائية";
+        final body = success
+            ? "تمت مزامنة بياناتك مع جوجل درايف بنجاح."
+            : "تعذرت المزامنة، يرجى التحقق من الاتصال أو تسجيل الدخول.";
+
+        await flutterLocalNotificationsPlugin.show(
+          id: 99999,
+          title: title,
+          body: body,
+          notificationDetails: const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'strictly_silent_channel_v8',
+              'التنبيهات الصامتة',
+              importance: Importance.low,
+              priority: Priority.low,
+              silent: true,
+            ),
+          ),
+        );
+      } catch (e) {
+        debugPrint('Drive sync notification error: $e');
+      }
+
+      // جدولة المزامنة لليوم التالي بعد العشاء بساعة
+      await BackupService.scheduleNextAutoSync();
+
+      debugPrint('Auto-sync to Google Drive completed: $success');
+    } catch (e) {
+      debugPrint('driveAutoSyncTask error: $e');
     }
-  } catch (_) {}
-  
-  debugPrint('Auto-sync to Google Drive: $success');
-}
+  }
 
 class GoogleAuthClient extends http.BaseClient {
   final Map<String, String> _headers;
@@ -58,13 +93,16 @@ class GoogleAuthClient extends http.BaseClient {
 
 class BackupService {
   static const String _backupFileName = 'ibad_al_rahmann_backup.json';
-  static const String _currentVersion = '1.1.0';
+  static const String _currentVersion = '1.2.0';
 
-  static final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: [
-      drive.DriveApi.driveAppdataScope,
-    ],
-  );
+  static bool _isGoogleSignInInitialized = false;
+
+  static Future<void> _ensureInitialized() async {
+    if (!_isGoogleSignInInitialized) {
+      await GoogleSignIn.instance.initialize();
+      _isGoogleSignInInitialized = true;
+    }
+  }
 
   /// Helper to get backup data as a Map
   static Future<Map<String, dynamic>> _generateBackupData() async {
@@ -73,16 +111,17 @@ class BackupService {
       'timestamp': DateTime.now().toIso8601String(),
       'preferences': {},
       'bookmarks': [],
+      'khatmas': {},
     };
 
     // 1. Gather SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final allKeys = prefs.getKeys();
     
     // Blacklist transient or machine-specific keys
+    // ملاحظة: تم إزالة "temp_" للسماح بنسخ سجلات الصيام وصلاتي والأذكار
     final blacklist = {
       'last_sync_time', 
-      'temp_', 
       'cache_', 
       'lib_cash',
       'firebase_token',
@@ -103,7 +142,7 @@ class BackupService {
       }
     }
 
-    // 2. Gather Hive Bookmarks
+    // 2. Gather Hive Bookmarks (Quran)
     try {
       if (!BookmarkService.box.isOpen) await BookmarkService.init();
       final bookmarkBox = BookmarkService.box;
@@ -118,6 +157,25 @@ class BackupService {
       }).toList();
     } catch (e) {
       debugPrint('Backup bookmarks error: $e');
+    }
+
+    // 3. Gather Hive Khatmas (Wird progress) from appDataBox
+    try {
+      final appBox = Hive.box('appDataBox');
+      final Map<String, dynamic> khatmasMap = {};
+      for (var key in appBox.keys) {
+        final keyStr = key.toString();
+        if (keyStr.startsWith('khatma_')) {
+          final value = appBox.get(key);
+          if (value != null) {
+            khatmasMap[keyStr] = value; // stored as JSON string
+          }
+        }
+      }
+      backupData['khatmas'] = khatmasMap;
+      debugPrint('Backup: saved ${khatmasMap.length} khatmas');
+    } catch (e) {
+      debugPrint('Backup khatmas error: $e');
     }
 
     return backupData;
@@ -183,7 +241,7 @@ class BackupService {
       if (backupData['version'] == null) return false;
 
       // 1. Restore SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = CacheHelper.prefs;
       final Map<String, dynamic> preferences = backupData['preferences'] ?? {};
       
       for (var entry in preferences.entries) {
@@ -201,11 +259,16 @@ class BackupService {
           await prefs.setStringList(key, value.cast<String>());
         }
       }
+      
+      // Reschedule alarms with restored preferences
+      try {
+        PrayerService().scheduleNotificationsDebounced();
+      } catch (_) {}
 
-      // 2. Restore Hive Bookmarks
+      // 2. Restore Hive Bookmarks (Quran)
       if (backupData['bookmarks'] != null) {
         if (!BookmarkService.box.isOpen) await BookmarkService.init();
-        await BookmarkService.clearAllBookmarks(); // Clear old ones to prevent duplicates
+        await BookmarkService.clearAllBookmarks();
         final List<dynamic> bookmarksData = backupData['bookmarks'];
         for (var bData in bookmarksData) {
           final verse = VerseModel(
@@ -220,7 +283,23 @@ class BackupService {
         }
       }
 
-      // 3. Reschedule all notifications with newly restored settings
+      // 3. Restore Hive Khatmas (Wird progress)
+      if (backupData['khatmas'] != null) {
+        try {
+          final appBox = Hive.box('appDataBox');
+          final Map<String, dynamic> khatmasMap = Map<String, dynamic>.from(backupData['khatmas']);
+          for (var entry in khatmasMap.entries) {
+            if (entry.key.startsWith('khatma_')) {
+              await appBox.put(entry.key, entry.value);
+            }
+          }
+          debugPrint('Restore: restored ${khatmasMap.length} khatmas to appDataBox');
+        } catch (e) {
+          debugPrint('Restore khatmas error: $e');
+        }
+      }
+
+      // 4. Reschedule all notifications with newly restored settings
       PrayerService().scheduleNotifications();
       NotificationService.rescheduleWird();
       
@@ -235,19 +314,23 @@ class BackupService {
 
   static Future<GoogleSignInAccount?> _getSignedInAccount({bool allowUI = true}) async {
     try {
-      // 1. Try silent sign-in first
-      GoogleSignInAccount? account = await _googleSignIn.signInSilently();
+      await _ensureInitialized();
+      // 1. Try lightweight authentication first
+      GoogleSignInAccount? account = await GoogleSignIn.instance.attemptLightweightAuthentication();
       
       // 2. If silent failed and UI is allowed, try full sign-in
       if (account == null && allowUI) {
-        account = await _googleSignIn.signIn();
+        account = await GoogleSignIn.instance.authenticate(
+          scopeHint: [drive.DriveApi.driveAppdataScope],
+        );
       }
 
       if (account != null) {
         // Double check scopes
-        bool hasScope = await _googleSignIn.canAccessScopes([drive.DriveApi.driveAppdataScope]).catchError((_) => true);
+        final authClient = GoogleSignIn.instance.authorizationClient;
+        bool hasScope = (await authClient.authorizationForScopes([drive.DriveApi.driveAppdataScope])) != null;
         if (!hasScope && allowUI) {
-          await _googleSignIn.requestScopes([drive.DriveApi.driveAppdataScope]);
+          await authClient.authorizeScopes([drive.DriveApi.driveAppdataScope]);
         }
       }
       return account;
@@ -262,7 +345,11 @@ class BackupService {
   }
 
   static Future<void> signOut() async {
-    await _googleSignIn.signOut();
+    await _ensureInitialized();
+    await GoogleSignIn.instance.signOut();
+    final prefs = CacheHelper.prefs;
+    await prefs.remove('last_sync_email');
+    await prefs.remove('last_sync_time');
   }
 
   static Future<bool> syncToDrive({bool allowUI = true}) async {
@@ -274,7 +361,14 @@ class BackupService {
         return false;
       }
 
-      final authHeaders = await account.authHeaders;
+      final authHeaders = await GoogleSignIn.instance.authorizationClient.authorizationHeaders(
+        [drive.DriveApi.driveAppdataScope],
+        promptIfNecessary: allowUI,
+      );
+      if (authHeaders == null) {
+        debugPrint('Google Drive: Auth headers failed.');
+        return false;
+      }
       final authenticateClient = GoogleAuthClient(authHeaders);
       final driveApi = drive.DriveApi(authenticateClient);
 
@@ -285,22 +379,24 @@ class BackupService {
       final fileList = await driveApi.files.list(
         q: "name = '$_backupFileName' and 'appDataFolder' in parents",
         spaces: 'appDataFolder',
-      );
+      ).timeout(const Duration(minutes: 2));
 
       final media = drive.Media(Stream.value(bytes), bytes.length);
 
       if (fileList.files != null && fileList.files!.isNotEmpty) {
         final fileId = fileList.files!.first.id!;
         final driveFile = drive.File()..name = _backupFileName;
-        await driveApi.files.update(driveFile, fileId, uploadMedia: media);
+        await driveApi.files.update(driveFile, fileId, uploadMedia: media)
+            .timeout(const Duration(minutes: 2));
       } else {
         final driveFile = drive.File()
           ..name = _backupFileName
           ..parents = ['appDataFolder'];
-        await driveApi.files.create(driveFile, uploadMedia: media);
+        await driveApi.files.create(driveFile, uploadMedia: media)
+            .timeout(const Duration(minutes: 2));
       }
       
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = CacheHelper.prefs;
       await prefs.setString('last_sync_time', DateTime.now().toIso8601String());
       debugPrint('Google Drive: Sync Up Successful.');
       return true;
@@ -316,7 +412,14 @@ class BackupService {
       final account = await _getSignedInAccount(allowUI: allowUI);
       if (account == null) return false;
 
-      final authHeaders = await account.authHeaders;
+      final authHeaders = await GoogleSignIn.instance.authorizationClient.authorizationHeaders(
+        [drive.DriveApi.driveAppdataScope],
+        promptIfNecessary: allowUI,
+      );
+      if (authHeaders == null) {
+        debugPrint('Google Drive: Auth headers failed.');
+        return false;
+      }
       final authenticateClient = GoogleAuthClient(authHeaders);
       final driveApi = drive.DriveApi(authenticateClient);
 
@@ -342,7 +445,7 @@ class BackupService {
       final result = await _applyBackupData(jsonDecode(content));
       
       if (result) {
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = CacheHelper.prefs;
         await prefs.setString('last_sync_time', DateTime.now().toIso8601String());
         debugPrint('Google Drive: Sync Down Successful.');
       }
@@ -354,62 +457,71 @@ class BackupService {
   }
 
   static Future<bool> isGoogleSignedIn() async {
-    return await _googleSignIn.isSignedIn();
+    await _ensureInitialized();
+    return (await GoogleSignIn.instance.attemptLightweightAuthentication()) != null;
   }
 
   static Future<String?> getSignedInEmail() async {
     try {
-      final account = _googleSignIn.currentUser ?? await _googleSignIn.signInSilently();
+      await _ensureInitialized();
+      final account = await GoogleSignIn.instance.attemptLightweightAuthentication();
       if (account?.email != null) {
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = CacheHelper.prefs;
         await prefs.setString('last_sync_email', account!.email);
         return account.email;
       }
     } catch (_) {}
     
     // Fallback to cached email if offline or silent sign-in delayed
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     return prefs.getString('last_sync_email');
   }
 
   static Future<String?> getLastSyncTime() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
+    await prefs.reload();
     return prefs.getString('last_sync_time');
+  }
+
+  static Future<void> scheduleNextAutoSync() async {
+    const int autoSyncAlarmId = 888;
+    final times = await PrayerService.getPrayerTimesForDateStatic(DateTime.now());
+    DateTime scheduledTime;
+    
+    if (times != null) {
+      // One hour after Isha
+      scheduledTime = times.isha.add(const Duration(hours: 1));
+    } else {
+      // Fallback to 11:00 PM
+      scheduledTime = DateTime(
+        DateTime.now().year,
+        DateTime.now().month,
+        DateTime.now().day,
+        23,
+      );
+    }
+    
+    // If the scheduled time for today has already passed, schedule for tomorrow
+    if (scheduledTime.isBefore(DateTime.now())) {
+      scheduledTime = scheduledTime.add(const Duration(days: 1));
+    }
+
+    debugPrint('Google Drive: Auto-sync scheduled for $scheduledTime');
+
+    await AndroidAlarmManager.oneShotAt(
+      scheduledTime,
+      autoSyncAlarmId,
+      driveAutoSyncTask,
+      exact: true,
+      wakeup: true,
+      rescheduleOnReboot: true,
+    );
   }
 
   static Future<void> toggleAutoSync(bool enable) async {
     const int autoSyncAlarmId = 888;
     if (enable) {
-      final times = await PrayerService.getPrayerTimesForDateStatic(DateTime.now());
-      DateTime scheduledTime;
-      
-      if (times != null) {
-        // One hour after Isha
-        scheduledTime = times.isha.add(const Duration(hours: 1));
-      } else {
-        // Fallback to 11:00 PM
-        scheduledTime = DateTime(
-          DateTime.now().year,
-          DateTime.now().month,
-          DateTime.now().day,
-          23,
-        );
-      }
-      
-      // If the scheduled time for today has already passed, schedule for tomorrow
-      if (scheduledTime.isBefore(DateTime.now())) {
-        scheduledTime = scheduledTime.add(const Duration(days: 1));
-      }
-
-      await AndroidAlarmManager.periodic(
-        const Duration(hours: 24),
-        autoSyncAlarmId,
-        driveAutoSyncTask,
-        startAt: scheduledTime,
-        exact: false, // More reliable for periodic background tasks on some devices
-        wakeup: true,
-        rescheduleOnReboot: true,
-      );
+      await scheduleNextAutoSync();
     } else {
       await AndroidAlarmManager.cancel(autoSyncAlarmId);
     }

@@ -37,7 +37,7 @@ class FCMService {
       await _messaging.subscribeToTopic('all_users').catchError((_) {});
 
       final token = await _messaging.getToken().catchError((_) => null);
-      if (token != null) debugPrint('FCM token: $token');
+      if (token != null && kDebugMode) debugPrint('FCM token: $token');
     } catch (e) {
       debugPrint('FCM Init Error: $e');
     }

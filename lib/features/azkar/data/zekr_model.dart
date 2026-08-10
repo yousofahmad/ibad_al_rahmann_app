@@ -1,4 +1,4 @@
-﻿class ZekrModel {
+class ZekrModel {
   final String content;
   final int count;
 

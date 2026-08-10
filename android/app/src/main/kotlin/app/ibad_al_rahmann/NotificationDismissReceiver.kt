@@ -53,9 +53,13 @@ class NotificationDismissReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == "app.ibad_al_rahmann.ACTION_STOP_SOUND") {
+        val action = intent.action
+        val alarmId = intent.getIntExtra("alarm_id", -1)
+        if (action == "app.ibad_al_rahmann.ACTION_STOP_SOUND") {
+            NativeLogger.log(context, "NotificationDismissReceiver: Stopping sound manually. AlarmId: $alarmId")
             stopSound(context)
         } else {
+            NativeLogger.log(context, "NotificationDismissReceiver: User swiped/dismissed the notification. Action: $action. AlarmId: $alarmId")
             stopSound(context)
         }
     }

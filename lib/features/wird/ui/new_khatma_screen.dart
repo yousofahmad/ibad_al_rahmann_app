@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../bloc/khatma_cubit.dart';
 import '../utils/wird_calculator.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class NewKhatmaScreen extends StatefulWidget {
   const NewKhatmaScreen({super.key});
@@ -175,7 +175,7 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
     setState(() => _isLoading = true);
 
     final khatmaCubit = context.read<KhatmaCubit>();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
 
     // Save daily time if needed
     if (_reminderType == 'daily') {

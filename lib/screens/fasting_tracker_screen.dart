@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../widgets/app_skeleton.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class FastingTrackerScreen extends StatefulWidget {
   const FastingTrackerScreen({super.key});
@@ -25,7 +25,7 @@ class _FastingTrackerScreenState extends State<FastingTrackerScreen> {
 
   Future<void> _loadMonthData() async {
     setState(() => _isLoading = true);
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
 
     // Load data for current month (approximated range)
     // Actually we can just check existence of keys when building
@@ -75,7 +75,7 @@ class _FastingTrackerScreenState extends State<FastingTrackerScreen> {
       }
     });
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setBool('fasting_$key', newValue);
   }
 

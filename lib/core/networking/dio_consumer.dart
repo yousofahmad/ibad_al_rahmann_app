@@ -1,4 +1,4 @@
-﻿class DioConsumer {
+class DioConsumer {
   Future<dynamic> get(
     String url, {
     Map<String, dynamic>? queryParameters,

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
 import 'azkar_page.dart';
 import 'ruqyah_screen.dart';
 import 'azkar_statistics_screen.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class MuslimAzkarScreen extends StatelessWidget {
   const MuslimAzkarScreen({super.key});
@@ -249,7 +249,7 @@ class _AzkarAlertsSheetState extends State<_AzkarAlertsSheet> {
   }
 
   Future<void> _loadPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     setState(() {
       final morningLegacy = prefs.getBool('notif_azkar_morning') ?? true;
       _morningMode =
@@ -270,7 +270,7 @@ class _AzkarAlertsSheetState extends State<_AzkarAlertsSheet> {
   }
 
   Future<void> _savePrefs() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setString('azkar_morning_mode', _morningMode);
     await prefs.setBool('notif_azkar_morning', _morningMode != 'none');
 

@@ -2,12 +2,13 @@ import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:adhan/adhan.dart';
 import 'package:quran/quran.dart' as quran;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ibad_al_rahmann/services/notification_service.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
 import '../data/khatma_model.dart';
 import '../data/wird_model.dart';
 import '../utils/wird_calculator.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 part 'khatma_state.dart';
 
@@ -42,15 +43,36 @@ class KhatmaCubit extends Cubit<KhatmaState> {
   Future<void> loadKhatma({String? specificId}) async {
     emit(KhatmaLoading());
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = CacheHelper.prefs;
+      final box = Hive.box('appDataBox');
       List<KhatmaModel> loadedKhatmas = [];
 
+      // Migrate existing khatma keys from SharedPreferences to Hive
       final keys = prefs.getKeys();
-      int count = 0;
       for (String key in keys) {
         if (key.startsWith('khatma_')) {
           final data = prefs.getString(key);
           if (data != null) {
+            await box.put(key, data);
+            await prefs.remove(key); // Remove from SharedPreferences after migration
+          }
+        }
+      }
+
+      // Legacy fallback migration
+      final oldData = prefs.getString(_khatmaKey);
+      if (oldData != null) {
+        final k = KhatmaModel.fromJson(jsonDecode(oldData));
+        await box.put('khatma_${k.id}', oldData);
+        await prefs.remove(_khatmaKey);
+      }
+
+      // Load all Khatmas from Hive
+      int count = 0;
+      for (var key in box.keys) {
+        if (key.toString().startsWith('khatma_')) {
+          final data = box.get(key);
+          if (data != null && data is String) {
             loadedKhatmas.add(KhatmaModel.fromJson(jsonDecode(data)));
           }
         }
@@ -59,16 +81,6 @@ class KhatmaCubit extends Cubit<KhatmaState> {
         count++;
         if (count % 10 == 0) {
           await Future.delayed(Duration.zero);
-        }
-      }
-
-      // Legacy fallback
-      if (loadedKhatmas.isEmpty) {
-        final oldData = prefs.getString(_khatmaKey);
-        if (oldData != null) {
-          final k = KhatmaModel.fromJson(jsonDecode(oldData));
-          loadedKhatmas.add(k);
-          prefs.setString('khatma_${k.id}', oldData);
         }
       }
 
@@ -164,23 +176,22 @@ class KhatmaCubit extends Cubit<KhatmaState> {
             : 0,
       );
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = CacheHelper.prefs;
+      final box = Hive.box('appDataBox');
       final jsonData = jsonEncode(newKhatma.toJson());
-      await prefs.setString('khatma_$id', jsonData);
+      await box.put('khatma_$id', jsonData);
       await prefs.setString(_activeIdKey, id);
-      await prefs.setString(_khatmaKey, jsonData); // Legacy support
 
       await prefs.setString('${id}_wird_reminder_type', notificationType);
       await prefs.setInt('${id}_wird_days', newKhatma.days);
 
       List<KhatmaModel> currentList = [];
 
-      // We repull to be absolutely safe, or grab from state instead of clearing
-      final keys = prefs.getKeys();
-      for (String key in keys) {
-        if (key.startsWith('khatma_')) {
-          final data = prefs.getString(key);
-          if (data != null) {
+      // Pull from Hive
+      for (var key in box.keys) {
+        if (key.toString().startsWith('khatma_')) {
+          final data = box.get(key);
+          if (data != null && data is String) {
             currentList.add(KhatmaModel.fromJson(jsonDecode(data)));
           }
         }
@@ -225,9 +236,9 @@ class KhatmaCubit extends Cubit<KhatmaState> {
         return;
       }
 
-      final prefs = await SharedPreferences.getInstance();
+      final box = Hive.box('appDataBox');
       final jsonData = jsonEncode(updatedKhatma.toJson());
-      await prefs.setString('khatma_${updatedKhatma.id}', jsonData);
+      await box.put('khatma_${updatedKhatma.id}', jsonData);
 
       // Cancel only THIS khatma's notifications, then reschedule all
       await NotificationService.cancelKhatmaNotifications(khatmaId);
@@ -340,8 +351,11 @@ class KhatmaCubit extends Cubit<KhatmaState> {
 
   Future<void> deleteKhatma(String id) async {
     if (state is! KhatmaLoaded) return;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('khatma_$id');
+    final prefs = CacheHelper.prefs;
+    final box = Hive.box('appDataBox');
+    
+    await box.delete('khatma_$id');
+    await prefs.remove('khatma_$id'); // Fallback cleanup
 
     // Clear legacy active if deleting the legacy fallback
     if (prefs.getString(_activeIdKey) == id) {

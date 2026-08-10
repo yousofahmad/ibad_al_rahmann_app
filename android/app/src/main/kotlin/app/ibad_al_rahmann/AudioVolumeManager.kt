@@ -14,6 +14,9 @@ class AudioVolumeManager(private val context: Context) {
     private var originalRingerMode: Int = AudioManager.RINGER_MODE_NORMAL
     private var originalAlarmVolume: Int = 0
     private var originalMusicVolume: Int = 0
+    private var originalRingVolume: Int = 0
+    private var originalSpeakerphoneOn: Boolean = false
+    private var originalMode: Int = AudioManager.MODE_NORMAL
     private var isStateCaptured = false
 
     /**
@@ -25,13 +28,16 @@ class AudioVolumeManager(private val context: Context) {
         originalRingerMode = audioManager.ringerMode
         originalAlarmVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
         originalMusicVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        originalRingVolume = audioManager.getStreamVolume(AudioManager.STREAM_RING)
+        originalSpeakerphoneOn = audioManager.isSpeakerphoneOn
+        originalMode = audioManager.mode
         isStateCaptured = true
     }
 
     /**
      * يطبق إعدادات المستخدم (تخطى الصامت + مستوى الصوت المخصص).
      */
-    fun applySettings(targetVolumePercent: Int, bypassSilent: Boolean) {
+    fun applySettings(targetVolumePercent: Int, bypassSilent: Boolean, forceSpeaker: Boolean) {
         if (!isStateCaptured) captureState()
 
         try {
@@ -39,21 +45,37 @@ class AudioVolumeManager(private val context: Context) {
                 audioManager.ringerMode = AudioManager.RINGER_MODE_NORMAL
             }
         } catch (e: SecurityException) {
-            // Cannot change ringer mode without ACCESS_NOTIFICATION_POLICY permission
             e.printStackTrace()
         }
 
         try {
-            // تحويل النسبة المئوية إلى مستوى صوت فعلي
-            val maxAlarmVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-            val targetAlarmVol = (maxAlarmVol * (targetVolumePercent / 100.0)).toInt()
-            
-            val maxMusicVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            val targetMusicVol = (maxMusicVol * (targetVolumePercent / 100.0)).toInt()
+            if (forceSpeaker) {
+                // MODE_IN_COMMUNICATION forces audio to the earpiece on many phones!
+                // We MUST use MODE_NORMAL for the speaker.
+                // audioManager.mode = AudioManager.MODE_NORMAL
+                // audioManager.isSpeakerphoneOn = true is also not needed for STREAM_ALARM.
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
-            // تطبيق الصوت على القنوات المعنية (الأذان غالباً ALARM أو MUSIC)
-            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, targetAlarmVol, 0)
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetMusicVol, 0)
+        try {
+            if (targetVolumePercent >= 0) {
+                // تحويل النسبة المئوية إلى مستوى صوت فعلي
+                val maxAlarmVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+                val targetAlarmVol = (maxAlarmVol * (targetVolumePercent / 100.0)).toInt()
+                
+                val maxMusicVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                val targetMusicVol = (maxMusicVol * (targetVolumePercent / 100.0)).toInt()
+                
+                val maxRingVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_RING)
+                val targetRingVol = (maxRingVol * (targetVolumePercent / 100.0)).toInt()
+
+                // تطبيق الصوت على القنوات المعنية
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, targetAlarmVol, 0)
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetMusicVol, 0)
+                audioManager.setStreamVolume(AudioManager.STREAM_RING, targetRingVol, 0)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -66,9 +88,17 @@ class AudioVolumeManager(private val context: Context) {
         if (!isStateCaptured) return
 
         try {
+            audioManager.isSpeakerphoneOn = originalSpeakerphoneOn
+            audioManager.mode = originalMode
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        try {
             // استرجاع مستوى الصوت أولاً
             audioManager.setStreamVolume(AudioManager.STREAM_ALARM, originalAlarmVolume, 0)
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, originalMusicVolume, 0)
+            audioManager.setStreamVolume(AudioManager.STREAM_RING, originalRingVolume, 0)
         } catch (e: Exception) {
             e.printStackTrace()
         }

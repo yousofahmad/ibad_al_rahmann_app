@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:hijri/hijri_calendar.dart';
 
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class QadaaSettingsScreen extends StatefulWidget {
   final VoidCallback? onSettingsChanged;
@@ -41,7 +41,7 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     setState(() {
       _requiresPrayerQadaa = prefs.getBool('qadaa_requires_prayer') ?? true;
       _hasZakatWealth = prefs.getBool('qadaa_has_zakat') ?? false;
@@ -59,21 +59,21 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
   }
 
   Future<void> _saveInt(String key, int value) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setInt(key, value);
     PrayerService().scheduleNotifications();
     widget.onSettingsChanged?.call();
   }
 
   Future<void> _saveBool(String key, bool value) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setBool(key, value);
     PrayerService().scheduleNotifications();
     widget.onSettingsChanged?.call();
   }
 
   Future<void> _saveString(String key, String value) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setString(key, value);
     PrayerService().scheduleNotifications();
     widget.onSettingsChanged?.call();
@@ -178,7 +178,7 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                 },
               );
               if (picked != null) {
-                final prefs = await SharedPreferences.getInstance();
+                final prefs = CacheHelper.prefs;
                 await prefs.setString('qadaa_zakat_date', picked.toIso8601String());
                 setState(() {
                   _zakatDate = picked.toIso8601String();
@@ -258,7 +258,7 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                 try {
                   final temp = HijriCalendar();
                   final greg = temp.hijriToGregorian(year, month, day);
-                  final prefs = await SharedPreferences.getInstance();
+                  final prefs = CacheHelper.prefs;
                   await prefs.setString('qadaa_zakat_date', greg.toIso8601String());
                   setState(() {
                     _zakatDate = greg.toIso8601String();
@@ -333,7 +333,7 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
+              final prefs = CacheHelper.prefs;
               await prefs.remove('qadaa_fajr');
               await prefs.remove('qadaa_dhuhr');
               await prefs.remove('qadaa_asr');

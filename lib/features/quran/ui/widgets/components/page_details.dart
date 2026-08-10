@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
@@ -26,7 +26,7 @@ class FullPageDetails extends StatelessWidget {
           ),
         ),
         Text(
-          'سُورَةُ ${getSurahNameArabic(surahNumber)}',
+          '??????? ${getSurahNameArabic(surahNumber)}',
           style: context.labelSmall.copyWith(
             fontSize: context.isTablet ? 20.sp : 16.sp,
             fontFamily: 'SurahNames', // Use the new font
@@ -52,7 +52,7 @@ class FullPageDetails extends StatelessWidget {
 //           style: context.labelSmall.copyWith(fontSize: 15.sp),
 //         ),
 //         Text(
-//           'سورة ${getSurahNameArabic(surahNumber)}',
+//           '???? ${getSurahNameArabic(surahNumber)}',
 //           style: context.labelSmall.copyWith(fontSize: 15.sp),
 //         ),
 //       ],

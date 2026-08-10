@@ -6,6 +6,7 @@ import 'package:ibad_al_rahmann/widgets/app_skeleton.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'muezzin_selection_screen.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class PrayerAlarmsScreen extends StatefulWidget {
   const PrayerAlarmsScreen({super.key});
@@ -36,7 +37,7 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
   }
 
   Future<void> _loadPrefs() async {
-    _prefs = await SharedPreferences.getInstance();
+    _prefs = CacheHelper.prefs;
     setState(() {
       for (var key in _fardEnabled.keys) {
         final lower = key.toLowerCase();
@@ -84,7 +85,7 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
     await _prefs.setString(modeKey, value);
     await _prefs.setBool(legacyBoolKey, value != 'none');
     if (value != 'none') await _checkNotificationPermission();
-    PrayerService().scheduleNotifications();
+    PrayerService().scheduleNotificationsDebounced();
   }
 
   Future<void> _openSoundPicker(String prefsKey, String title) async {
@@ -98,7 +99,7 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
       ),
     );
     setState(() {}); // Refresh to show new sound name
-    PrayerService().scheduleNotifications();
+    PrayerService().scheduleNotificationsDebounced();
   }
 
   /// Maps a raw sound ID to a human-readable Arabic name for display.
@@ -334,13 +335,13 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
               child: _compactMinutesPicker(
                 prefix: 'قبل الأذان بـ',
                 value: preMins,
-                min: 5,
+                min: 1,
                 max: 60,
-                step: 5,
+                step: 1,
                 onChanged: (v) {
                   setState(() => _fardMinutes[key] = v);
                   _prefs.setInt('time_pre_$key', v);
-                  PrayerService().scheduleNotifications();
+                  PrayerService().scheduleNotificationsDebounced();
                 },
               ),
             ),
@@ -375,7 +376,7 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
                 onChanged: (v) {
                   setState(() => _adjustments[key] = v);
                   _prefs.setInt('adjust_$key', v);
-                  PrayerService().scheduleNotifications();
+                  PrayerService().scheduleNotificationsDebounced();
                 },
               ),
             ),
@@ -400,13 +401,13 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
               child: _compactMinutesPicker(
                 prefix: 'بعد الأذان بـ',
                 value: iqamaMins,
-                min: 5,
+                min: 1,
                 max: 60,
-                step: 5,
+                step: 1,
                 onChanged: (v) {
                   setState(() => _iqamaMinutes[key] = v);
                   _prefs.setInt('iqama_minutes_$key', v);
-                  PrayerService().scheduleNotifications();
+                  PrayerService().scheduleNotificationsDebounced();
                 },
               ),
             ),

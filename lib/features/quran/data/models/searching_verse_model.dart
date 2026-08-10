@@ -1,4 +1,4 @@
-﻿class SearchingVerseModel {
+class SearchingVerseModel {
   final int verseNumber, surahNumber;
   final String content;
 

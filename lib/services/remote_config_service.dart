@@ -1,8 +1,8 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:home_widget/home_widget.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class RemoteConfigService {
   static FirebaseRemoteConfig get _remoteConfig {
@@ -31,7 +31,7 @@ class RemoteConfigService {
       // Save remote offset under its OWN key – never overwrites the user's
       // manual 'hijri_offset' key stored by PrayerService.
       final offset = config.getInt("global_hijri_offset");
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = CacheHelper.prefs;
       await prefs.setInt("remote_hijri_offset", offset);
       await HomeWidget.saveWidgetData<int>("widget_hijri_offset", offset);
       await HomeWidget.updateWidget(

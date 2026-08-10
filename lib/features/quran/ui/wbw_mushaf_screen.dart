@@ -177,6 +177,7 @@ class _WbwMushafScreenState extends State<WbwMushafScreen> {
                               },
                             )
                           : PageView.builder(
+      allowImplicitScrolling: true,
                               controller: _pageController,
                               itemCount: 604,
                               reverse: true,

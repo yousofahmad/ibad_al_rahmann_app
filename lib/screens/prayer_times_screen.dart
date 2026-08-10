@@ -3,9 +3,9 @@ import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
+import 'package:ibad_al_rahmann/services/notification_service.dart';
 import 'package:intl/intl.dart';
 import 'package:hijri/hijri_calendar.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/prayer_service.dart';
 import 'widgets/prayer_detail_modal.dart';
 import 'widgets/prayer_ring_widget.dart';
@@ -14,6 +14,7 @@ import 'prayer_taqwim_screen.dart';
 import '../widgets/app_skeleton.dart';
 
 import 'package:ibad_al_rahmann/main.dart'; // To access scaffoldMessengerKey
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class PrayerTimesScreen extends StatefulWidget {
   const PrayerTimesScreen({super.key});
@@ -76,7 +77,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   }
 
   Future<void> _loadStatuses(List<ExtendedPrayer> all) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final Map<String, String> modes = {};
     final Map<String, String> names = {};
 
@@ -304,6 +305,10 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
 
     await PrayerService().updateLocation();
     await _loadData();
+    final times = PrayerService().getPrayerTimes();
+    if (times != null) {
+      await NotificationService.scheduleAll(times, isUserAction: true);
+    }
   }
 
   @override
@@ -377,7 +382,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                 children: [
                   if (isToday)
                     SizedBox(
-                      height: 240.w,
+                      height: 260.w,
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
@@ -396,15 +401,21 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                                   fontSize: 13.sp,
                                 ),
                               ),
-                              Text(
-                                _formatDuration(_timeToNext),
-                                style: TextStyle(
-                                  fontFamily: 'Courier',
-                                  color: Theme.of(
-                                    context,
-                                  ).textTheme.bodyLarge?.color,
-                                  fontSize: 30.sp,
-                                  fontWeight: FontWeight.bold,
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 24.w),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    _formatDuration(_timeToNext),
+                                    style: TextStyle(
+                                      fontFamily: 'Courier',
+                                      color: Theme.of(
+                                        context,
+                                      ).textTheme.bodyLarge?.color,
+                                      fontSize: 34.sp,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
                               ),
                               SizedBox(height: 8.h),

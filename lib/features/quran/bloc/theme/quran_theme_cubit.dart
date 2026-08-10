@@ -28,7 +28,9 @@ class QuranThemeCubit extends ThemeCubit {
         final hexString = savedThemeKey.replaceFirst('custom_', '');
         final color = Color(int.parse(hexString, radix: 16));
         _quranThemes[savedThemeKey] = AppThemes.createCustomTheme(color);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Error parsing color in _init: $e');
+      }
     }
 
     // Default to Blue for Mushaf per user request
@@ -72,7 +74,9 @@ class QuranThemeCubit extends ThemeCubit {
         final hexString = themeKey.replaceFirst('custom_', '');
         final color = Color(int.parse(hexString, radix: 16));
         _quranThemes[themeKey] = AppThemes.createCustomTheme(color);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Error parsing color in selectTheme: $e');
+      }
     }
 
     if (_quranThemes.containsKey(themeKey)) {

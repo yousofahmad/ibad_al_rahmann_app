@@ -3,7 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/features/adhan/models/muezzin_model.dart';
 import 'package:ibad_al_rahmann/features/adhan/services/adhan_manager.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class AdhanPickerScreen extends StatefulWidget {
   final String prefsKey; // e.g., 'adhan_sound_fajr'
@@ -37,7 +37,7 @@ class _AdhanPickerScreenState extends State<AdhanPickerScreen>
   }
 
   Future<void> _loadSelection() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     setState(() {
       _selectedPath = prefs.getString(widget.prefsKey);
     });
@@ -54,7 +54,7 @@ class _AdhanPickerScreenState extends State<AdhanPickerScreen>
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setString(widget.prefsKey, path);
     setState(() {
       _selectedPath = path;

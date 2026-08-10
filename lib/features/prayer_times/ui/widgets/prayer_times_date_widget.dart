@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/date_time_ext.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
@@ -73,13 +73,13 @@ class MobilePrayerTimesDateWidget extends StatelessWidget {
   String get title1 {
     String day = DateTime.now().day.toArabicNums;
     if (DateTime.now().day < 10) {
-      day = '٠$day';
+      day = '?$day';
     }
     return '$day ${DateTime.now().arabicMonth}';
   }
 
   String get title2 {
-    return '${prayers.hijriDate.day.toArabicNums} ${prayers.hijriDate.monthName} ${prayers.hijriDate.year.toArabicNums}هـ';
+    return '${prayers.hijriDate.day.toArabicNums} ${prayers.hijriDate.monthName} ${prayers.hijriDate.year.toArabicNums}??';
   }
 }
 
@@ -126,12 +126,12 @@ class TabletPrayerTimesDateWidget extends StatelessWidget {
   String get title1 {
     String day = DateTime.now().day.toArabicNums;
     if (DateTime.now().day < 10) {
-      day = '٠$day';
+      day = '?$day';
     }
     return '$day ${DateTime.now().arabicMonth}';
   }
 
   String get title2 {
-    return '${prayers.hijriDate.day.toArabicNums} ${prayers.hijriDate.monthName} ${prayers.hijriDate.year.toArabicNums}هـ';
+    return '${prayers.hijriDate.day.toArabicNums} ${prayers.hijriDate.monthName} ${prayers.hijriDate.year.toArabicNums}??';
   }
 }

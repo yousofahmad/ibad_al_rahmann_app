@@ -31,6 +31,8 @@ import java.util.Locale
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
+        val alarmIdForLog = intent.getIntExtra("notification_id", -1)
+        android.util.Log.d("PrayerApp", "AlarmReceiver triggered with action: $action, alarmId: $alarmIdForLog")
 
         if (action == Intent.ACTION_BOOT_COMPLETED || action == "android.intent.action.QUICKBOOT_POWERON") {
             rescheduleAllAlarms(context)
@@ -48,12 +50,29 @@ class AlarmReceiver : BroadcastReceiver() {
             return
         }
 
+        val payload = intent.getStringExtra("payload") ?: "home"
+        if (payload == "sync_only") {
+            android.util.Log.d("PrayerApp", "AlarmReceiver: sync_only payload received. Refreshing alarms.")
+            refreshFromStoredEpochs(context)
+            return
+        }
+
         val alarmId = intent.getIntExtra("alarm_id", 0)
 
         // ── محرك منتصف الليل (تحديث الويدجت والأذان لليوم الجديد ذاتياً) ──
         if (alarmId == 9999) {
-            refreshFromStoredEpochs(context) // سيجلب مواقيت اليوم الجديد من الـ 30 يوم
+            // CRITICAL: Regenerate 30-day cache FIRST so new month's prayer times are fresh.
+            // This prevents the "Fajr fires at 12am / 28-hour countdown" bug during month transitions.
+            try {
+                NativePrayerManager.generateThirtyDayCache(context)
+                NativeLogger.log(context, "Midnight: regenerated 30-day cache successfully.")
+            } catch (e: Exception) {
+                NativeLogger.log(context, "Midnight: generateThirtyDayCache failed: ${e.message}")
+            }
+            refreshFromStoredEpochs(context) // الآن يجلب مواقيت اليوم الجديد من الكاش المحدَّث
+            NativeHijriHelper.updateNativeHijriDate(context) // حساب وتحديث التاريخ الهجري ذاتياً
             WidgetUpdateHelper.scheduleMidnightRefresh(context) // جدولة منتصف الليل لليوم التالي
+            WidgetUpdateHelper.onPrayerAlarmFired(context, -1) // <--- CRITICAL: Refresh UI visually!
             return
         }
         
@@ -62,9 +81,30 @@ class AlarmReceiver : BroadcastReceiver() {
         // appears alongside normal alarms (like Adhan).
         if (alarmId == 0) return
         
-        // If it's a prayer alarm (100-105), update widget and notification autonomously
-        if (alarmId in 100..105) {
+        // If tomorrow's Fajr fires (110), reschedule all of the new day's prayers
+        if (alarmId == 110) {
+            NativeLogger.log(context, "AlarmReceiver: Tomorrow Fajr (110) fired — rescheduling today's prayers")
+            refreshFromStoredEpochs(context)
+        }
+
+        // If it's a prayer alarm (100-104), update widget and notification autonomously
+        if (alarmId in 100..104 || alarmId == 110) {
             WidgetUpdateHelper.onPrayerAlarmFired(context, alarmId)
+
+            // ── Prayer Focus Overlay (شاشة التركيز) ──────────────────────────
+            // PRAYER_IDS fixed: 100=Fajr, 101=Dhuhr, 102=Asr, 103=Maghrib, 104=Isha
+            val focusPrayerName = when (alarmId) {
+                100 -> "الفجر"
+                101 -> if (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY) "الجمعة" else "الظهر"
+                102 -> "العصر"
+                103 -> "المغرب"
+                104 -> "العشاء"
+                else -> null
+            }
+            if (focusPrayerName != null) {
+                try { PrayerFocusOverlay.show(context, focusPrayerName, alarmId) }
+                catch (e: Exception) { NativeLogger.log(context, "PrayerFocusOverlay ERROR: ${e}") }
+            }
 
             // Force-push widget update to beat Doze-mode throttling
             val widgetManager = android.appwidget.AppWidgetManager.getInstance(context)
@@ -87,6 +127,20 @@ class AlarmReceiver : BroadcastReceiver() {
             }
         }
 
+        // ── تذكير ما قبل الأذان (IDs 6000-6004) ──────────────────────────────────
+        if (alarmId in 6000..6004) {
+            val fp = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            if (fp.getBoolean("flutter.prayer_focus_enabled", false)) {
+                val mins = getSafeInt(fp, "flutter.pre_adhan_reminder_minutes", 0)
+                val name = when (alarmId) {
+                    6000 -> "الفجر"; 6001 -> "الظهر"; 6002 -> "العصر"
+                    6003 -> "المغرب"; else -> "العشاء"
+                }
+                if (mins > 0) PrayerFocusOverlay.showPreAdhan(context, name, alarmId, mins)
+            }
+            return // Overlay-only, no regular notification
+        }
+
         // --- Original Alarm Logic (Sound/Notification) ---
         val soundName = intent.getStringExtra("sound_name") ?: "default"
         val cleanSoundNameEarly = soundName.replace(".mp3", "").lowercase().trim()
@@ -94,13 +148,13 @@ class AlarmReceiver : BroadcastReceiver() {
         // Abort early only if truly disabled. Silent notifications should proceed.
         if (cleanSoundNameEarly == "none" || cleanSoundNameEarly == "null") return
         
+        val isFriday = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY
         val prayerNameFallback = when {
             alarmId == 100 || alarmId == 110 || alarmId == 1000 || alarmId == 3000 || alarmId == 4000 || alarmId == 5000 -> "الفجر"
-            alarmId == 101 || alarmId == 111 || alarmId == 3001 || alarmId == 4001 || alarmId == 5001 -> "الشروق"
-            alarmId == 102 || alarmId == 112 || alarmId == 1002 || alarmId == 3002 || alarmId == 4002 || alarmId == 5002 -> "الظهر"
-            alarmId == 103 || alarmId == 113 || alarmId == 1003 || alarmId == 3003 || alarmId == 4003 || alarmId == 5003 -> "العصر"
-            alarmId == 104 || alarmId == 114 || alarmId == 1004 || alarmId == 3004 || alarmId == 4004 || alarmId == 5004 -> "المغرب"
-            alarmId == 105 || alarmId == 115 || alarmId == 1005 || alarmId == 3005 || alarmId == 4005 || alarmId == 5005 -> "العشاء"
+            alarmId == 101 || alarmId == 111 || alarmId == 1001 || alarmId == 3001 || alarmId == 4001 || alarmId == 5001 -> if (isFriday) "الجمعة" else "الظهر"
+            alarmId == 102 || alarmId == 112 || alarmId == 1002 || alarmId == 3002 || alarmId == 4002 || alarmId == 5002 -> "العصر"
+            alarmId == 103 || alarmId == 113 || alarmId == 1003 || alarmId == 3003 || alarmId == 4003 || alarmId == 5003 -> "المغرب"
+            alarmId == 104 || alarmId == 114 || alarmId == 1004 || alarmId == 3004 || alarmId == 4004 || alarmId == 5004 -> "العشاء"
             else -> null
         }
 
@@ -112,10 +166,15 @@ class AlarmReceiver : BroadcastReceiver() {
                 else -> "صلاة $prayerNameFallback"
             }
         } else when (alarmId) {
-            1 -> "أذكار الصباح"
+            1 -> "لا تنس أذكار الصباح، مفتاح البركة والنشاط"
             2 -> "الرقية الشرعية"
-            3 -> "أذكار المساء"
+            3 -> "اجعل لسانك رطباً بذكر الله في المساء 💙"
             4 -> "الرقية الشرعية"
+            2000 -> "اغتنم وقت السحر بالدعاء 💙"
+            2001 -> "اغتنم وقت السحر بالدعاء 💙"
+            2002 -> "اغتنم وقت السحر بالدعاء 💙"
+            732 -> "صلاة الضحى"
+            736 -> "وقت الشروق"
             else -> ""
         }
 
@@ -141,40 +200,53 @@ class AlarmReceiver : BroadcastReceiver() {
                 else -> "حان الآن موعد صلاة $prayerNameFallback"
             }
         } else when (alarmId) {
-            1 -> "حان موعد أذكار الصباح .. حصن نفسك"
+            1 -> "أذكار الصباح تفتح لك أبواب الرزق والطمأنينة."
             2 -> "حصن نفسك الآن بالرقية الشرعية"
-            3 -> "حان موعد أذكار المساء .. ذكر الله طمأنينة"
+            3 -> "اللهم اجعل في هذا المساء نوراً في قلوبنا، وصفاءً في أرواحنا، وبركةً في أرزاقنا."
             4 -> "حصن نفسك الآن بالرقية الشرعية"
+            2000 -> "هذا الليل أوسع من حزنك، توضأ، واغسل شحوبك، زمل قلبك الباكي قرآناً."
+            2001 -> "هذا الليل أوسع من حزنك، توضأ، واغسل شحوبك، زمل قلبك الباكي قرآناً."
+            2002 -> "هذا الليل أوسع من حزنك، توضأ، واغسل شحوبك، زمل قلبك الباكي قرآناً."
+            732 -> "صلاة الأوابين .. حان الآن موعد صلاة الضحى"
+            736 -> "حان الآن وقت الشروق"
             else -> ""
         }
 
         val title = (intent.getStringExtra("title") ?: fallbackTitle).trim()
         val body = (intent.getStringExtra("body") ?: fallbackBody).trim()
-        val payload = intent.getStringExtra("payload") ?: "home"
+        // payload variable already extracted above
         val audioPath = intent.getStringExtra("audio_path")
         val customSoundName = intent.getStringExtra("custom_sound_name")
 
         if (title.isNotEmpty() && body.isNotEmpty()) {
-            // ── Day-of-week gate for weekly alarms (IDs 5, 6, 7) ──────────────
-            val todayDow = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
-            val wrongDay = when (alarmId) {
-                5 -> todayDow != Calendar.MONDAY && todayDow != Calendar.SUNDAY
-                6, 7, 8 -> todayDow != Calendar.THURSDAY && todayDow != Calendar.WEDNESDAY
-                else -> false
-            }
-            if (wrongDay) {
-                val targetDow = if (alarmId == 5) Calendar.MONDAY else Calendar.THURSDAY
-                val hour = intent.getIntExtra("hour", 0)
-                val minute = intent.getIntExtra("minute", 0)
-                val cal = Calendar.getInstance()
-                do { cal.add(Calendar.DAY_OF_YEAR, 1) } while (cal.get(Calendar.DAY_OF_WEEK) != targetDow)
-                MainActivity.scheduleAlarm(
-                    context, alarmId,
-                    cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH),
-                    hour, minute, soundName, title, body, payload, false, audioPath, 0, customSoundName
-                )
-                handleAlarmChaining(context, intent, alarmId, soundName, title, body, payload, audioPath)
-                return
+            val year = intent.getIntExtra("year", -1)
+            val month = intent.getIntExtra("month", -1)
+            val day = intent.getIntExtra("day", -1)
+
+            if (year != -1 && month != -1 && day != -1) {
+                val intendedCal = Calendar.getInstance().apply {
+                    set(Calendar.YEAR, year)
+                    set(Calendar.MONTH, month - 1)
+                    set(Calendar.DAY_OF_MONTH, day)
+                    set(Calendar.HOUR_OF_DAY, intent.getIntExtra("hour", 0))
+                    set(Calendar.MINUTE, intent.getIntExtra("minute", 0))
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                
+                // If the alarm fired more than 1 hour late (e.g. phone was off or Doze mode), drop it
+                // to prevent stale notifications (like Friday's notification arriving on Saturday).
+                // For repeating interval alarms, they will be rescheduled correctly by the chaining logic.
+                if (System.currentTimeMillis() - intendedCal.timeInMillis > 3600000L) {
+                    NativeLogger.log(context, "AlarmReceiver: Dropping stale notification $title. Was scheduled for ${intendedCal.time}")
+                    // We don't return here completely! We must still run the chaining logic below 
+                    // so the NEXT occurrence gets scheduled!
+                    val chainSoundName = soundName
+                    val chainPayload = payload
+                    val chainCustomSoundName = customSoundName
+                    handleAlarmChaining(context, intent, alarmId, chainSoundName, title, body, chainPayload, audioPath)
+                    return
+                }
             }
 
             // ── Quiet Hours Gate for Salawat and Takbeerat ──
@@ -266,8 +338,8 @@ class AlarmReceiver : BroadcastReceiver() {
                     val idStr = key.substring(6, key.length - 7)
                     val id = idStr.toIntOrNull() ?: continue
                     
-                    val hour = prefs.getInt("alarm_${id}_hour", 6)
-                    val minute = prefs.getInt("alarm_${id}_minute", 0)
+                    val hour = getSafeInt(prefs, "alarm_${id}_hour", 6)
+                    val minute = getSafeInt(prefs, "alarm_${id}_minute", 0)
                     val savedSound = prefs.getString("alarm_${id}_sound", null)
                     val soundName = savedSound ?: if (id in 100..105) "nafis" else "default"
                     val customSound = prefs.getString("alarm_${id}_custom_sound", null)
@@ -295,11 +367,11 @@ class AlarmReceiver : BroadcastReceiver() {
                     val body = prefs.getString("alarm_${id}_body", fallbackBody)
                     val payload = prefs.getString("alarm_${id}_payload", null)
                     val audioPath = prefs.getString("alarm_${id}_audioPath", null)
-                    val interval = prefs.getInt("alarm_${id}_interval", 0)
+                    val interval = getSafeInt(prefs, "alarm_${id}_interval", 0)
 
-                    val year = prefs.getInt("alarm_${id}_year", -1)
-                    val month = prefs.getInt("alarm_${id}_month", -1)
-                    val day = prefs.getInt("alarm_${id}_day", -1)
+                    val year = getSafeInt(prefs, "alarm_${id}_year", -1)
+                    val month = getSafeInt(prefs, "alarm_${id}_month", -1)
+                    val day = getSafeInt(prefs, "alarm_${id}_day", -1)
 
                     MainActivity.scheduleAlarm(context, id, year, month, day, hour, minute, soundName, title, body, payload, false, audioPath, interval, customSound)
                 } catch (e: Exception) {
@@ -330,7 +402,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 hour, minute, soundName, title, body, payload, false, audioPath, 0
             )
             return
-        } else if (alarmId < 1000 && alarmId !in 100..105 && alarmId !in 9..11) {
+        } else if (alarmId < 1000 && alarmId !in 100..105 && alarmId !in 9..11 && alarmId != 732 && alarmId != 736) {
             val isActive = prefs.getBoolean("alarm_${alarmId}_active", true)
             if (!isActive) return
 
@@ -376,6 +448,15 @@ class AlarmReceiver : BroadcastReceiver() {
         }
     }
 
+    private fun getSafeInt(prefs: android.content.SharedPreferences, key: String, defValue: Int): Int {
+        return try {
+            val bits = prefs.getLong(key, -1L)
+            if (bits != -1L) bits.toInt() else prefs.getInt(key, defValue)
+        } catch (e: Exception) {
+            try { prefs.getInt(key, defValue) } catch (e2: Exception) { defValue }
+        }
+    }
+
     private fun refreshFromStoredEpochs(context: Context) {
         // Clear ghost broadcast alarms from the old broken logic
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -390,15 +471,28 @@ class AlarmReceiver : BroadcastReceiver() {
         }
 
         NativePrayerScheduler.scheduleToday(context)
+        NativeAzkarScheduler.scheduleAzkar(context)
 
-        val svcIntent = Intent(context, PrayerNotificationService::class.java).apply {
-            action = "SYNC"
+        // START FIX: Start persistent notification service when alarm fires
+        try {
+            val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            val isPersistentEnabled = flutterPrefs.getBoolean("flutter.persistent_notification_enabled", true)
+            if (isPersistentEnabled) {
+                val svcIntent = Intent(context, PrayerNotificationService::class.java).apply {
+                    action = "SYNC"
+                }
+                // Use startForegroundService on Android 8+ (it works reliably from alarm receivers)
+                // On Android 12+ it may throw, which we catch below
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(svcIntent)
+                } else {
+                    context.startService(svcIntent)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(svcIntent)
-        } else {
-            context.startService(svcIntent)
-        }
+        // END FIX
 
         WidgetUpdateHelper.onPrayerAlarmFired(context, -1)
         WidgetUpdateHelper.scheduleMidnightRefresh(context)

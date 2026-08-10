@@ -1,4 +1,4 @@
-﻿part of 'quran_cubit.dart';
+part of 'quran_cubit.dart';
 
 sealed class QuranState {}
 

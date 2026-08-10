@@ -295,6 +295,7 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
                             },
                           )
                         : PageView.builder(
+      allowImplicitScrolling: true,
                             controller: _pageController,
                             physics: const BouncingScrollPhysics(
                               parent: PageScrollPhysics(),

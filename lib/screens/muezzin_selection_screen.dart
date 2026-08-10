@@ -2,12 +2,12 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/widgets/app_skeleton.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class MuezzinSelectionScreen extends StatefulWidget {
   final String? prefsKey; // If null, sets Global Default
@@ -236,7 +236,7 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
   }
 
   Future<void> _loadSelection() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     setState(() {
       if (widget.prefsKey != null) {
         // Load specific prayer sound
@@ -270,7 +270,7 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
       }
     }
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
 
     if (widget.prefsKey != null) {
       await prefs.setString(widget.prefsKey!, id);

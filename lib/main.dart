@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
@@ -22,12 +23,23 @@ import 'services/notification_service.dart';
 import 'services/daily_tracker_service.dart';
 import 'services/prayer_service.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
+import 'screens/tasbeeh_screen.dart';
+import 'services/backup_service.dart';
 
 import 'core/di/di.dart';
 import 'core/helpers/tafsir_helper.dart';
 import 'core/theme/theme_manager/theme_cubit.dart';
 
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+
+// Screens for Global Navigation
+import 'package:ibad_al_rahmann/screens/azkar_page.dart';
+import 'package:ibad_al_rahmann/screens/ruqyah_screen.dart';
+import 'package:ibad_al_rahmann/features/wird/ui/wird_dashboard_screen.dart';
+import 'package:ibad_al_rahmann/features/wird/ui/isolated_wird_screen.dart';
+import 'package:ibad_al_rahmann/screens/fasting_days_screen.dart';
+import 'package:ibad_al_rahmann/screens/prayer_times_screen.dart';
+
 import 'package:intl/date_symbol_data_local.dart';
 import 'quran_app.dart';
 
@@ -89,6 +101,7 @@ Future<void> main() async {
 
   // 1. Core Platform Inits
   await initializeDateFormatting('ar', null);
+  await CacheHelper.init();
   
   // 2. Initialize Firebase (CRITICAL: Must be before runApp if UI depends on it)
   try {
@@ -101,11 +114,16 @@ Future<void> main() async {
 
   // 3. Essential Hive & DI
   await Hive.initFlutter();
+  await Hive.openBox('appDataBox');
   await serviceLocatorInit();
   
   if (!Hive.isAdapterRegistered(0)) {
     Hive.registerAdapter(VerseModelAdapter());
   }
+
+  // 4. Init notification channel BEFORE runApp so the handler is ready
+  //    when SplashScreen calls checkLaunchPayload() during cold-start navigation
+  await NotificationService.init();
 
   runApp(
     MultiBlocProvider(
@@ -120,9 +138,10 @@ Future<void> main() async {
     ),
   );
 
-  // 4. Background non-critical inits
+  // 5. Background non-critical inits
   _runBackgroundInits();
 }
+
 
 Future<void> _runBackgroundInits() async {
   // CRITICAL: Wait for the app to be fully rendered and interactive
@@ -130,6 +149,27 @@ Future<void> _runBackgroundInits() async {
   
   // Wait a bit to ensure the splash screen is visible and system is quiet
   await Future.delayed(const Duration(milliseconds: 500));
+
+  NotificationService.nativeLog('_runBackgroundInits: registering listener');
+  NotificationService.onNotificationTap.addListener(() {
+    final payload = NotificationService.onNotificationTap.value;
+    NotificationService.nativeLog('listener fired: payload=$payload');
+    if (payload != null) {
+      handleGlobalNavigation(payload);
+      Future.microtask(() {
+        NotificationService.onNotificationTap.value = null;
+      });
+    }
+  });
+
+  // Handle payloads that arrived before the listener was registered (race condition)
+  final pendingPayload = NotificationService.onNotificationTap.value;
+  NotificationService.nativeLog('_runBackgroundInits: pendingPayload=$pendingPayload');
+  if (pendingPayload != null) {
+    debugPrint("Flushing pre-listener payload: $pendingPayload");
+    handleGlobalNavigation(pendingPayload);
+    NotificationService.onNotificationTap.value = null;
+  }
 
   // Phase 1: Essential Fast Data (Heavily staggered)
   await BookmarkService.init();
@@ -143,6 +183,12 @@ Future<void> _runBackgroundInits() async {
   await Future.delayed(const Duration(seconds: 1));
   await DailyTrackerService.initStatsForToday();
   
+  // Reschedule drive sync if enabled
+  final prefs = CacheHelper.prefs;
+  if (prefs.getBool('auto_sync_drive') == true) {
+    BackupService.scheduleNextAutoSync();
+  }
+
   await Future.delayed(const Duration(seconds: 1));
   await NotificationService.init();
 
@@ -167,19 +213,88 @@ Future<void> _runBackgroundInits() async {
   await Future.delayed(const Duration(seconds: 20));
   TafsirHelper.initTafsir().catchError((e) => debugPrint('Tafsir error: $e'));
   QuranWbwDbHelper.instance.preloadAllPagesInBackground();
-
-  NotificationService.onNotificationTap.addListener(() {
-    final payload = NotificationService.onNotificationTap.value;
-    if (payload != null) {
-      _handleGlobalNavigation(payload);
-      NotificationService.onNotificationTap.value = null;
-    }
-  });
 }
 
-Future<void> _handleGlobalNavigation(String payload) async {
-  // Navigation logic remains same...
-  // (Assuming navigatorKey is used inside QuranApp which it isn't currently, 
-  // but for now we focus on the crash fix)
-  debugPrint("Global Navigation: $payload");
+/// Public so that SplashScreen can call it directly on cold start.
+Future<void> handleGlobalNavigation(String payload) async {
+  NotificationService.nativeLog('handleGlobalNavigation: payload=$payload, state=${navigatorKey.currentState != null ? "ready" : "null"}');
+
+  // Use currentState directly — more reliable than context lookup mid-transition
+  if (navigatorKey.currentState == null) {
+    NotificationService.nativeLog('handleGlobalNavigation: state null, retrying in 500ms');
+    Future.delayed(const Duration(milliseconds: 500), () {
+      handleGlobalNavigation(payload);
+    });
+    return;
+  }
+
+  final nav = navigatorKey.currentState!;
+  NotificationService.nativeLog('handleGlobalNavigation: calling nav.push for $payload');
+  switch (payload) {
+    case 'sabah':
+    case 'morning':
+      nav.push(MaterialPageRoute(builder: (_) => const AzkarPage(title: 'أذكار الصباح', jsonFile: 'morning.json', image: 'assets/images/morning.jpg')));
+      break;
+    case 'masaa':
+    case 'night':
+      nav.push(MaterialPageRoute(builder: (_) => const AzkarPage(title: 'أذكار المساء', jsonFile: 'evening.json', image: 'assets/images/night.jpg')));
+      break;
+    case 'ruqyah':
+      nav.push(MaterialPageRoute(builder: (_) => const RuqyahScreen()));
+      break;
+    case 'khatma':
+    case 'wird':
+      nav.push(MaterialPageRoute(builder: (_) => const WirdDashboardScreen()));
+      break;
+    case 'jumuah':
+    case 'kahf':
+      nav.push(MaterialPageRoute(builder: (_) => const IsolatedWirdScreen(isKahfMode: true, targetStartPage: 293, targetEndPage: 304)));
+      break;
+    case 'fasting':
+      nav.push(MaterialPageRoute(builder: (_) => const FastingDaysScreen()));
+      break;
+    case 'salawat':
+      nav.push(MaterialPageRoute(builder: (_) => const TasbeehScreen()));
+      break;
+    case 'prayer':
+    case 'prayer_times':
+      nav.push(MaterialPageRoute(builder: (_) => const PrayerTimesScreen()));
+      break;
+
+    case 'home':
+    default:
+      if (payload.startsWith('khatma_')) {
+        // Payload format: khatma_{id}_{wirdIdx}_{startPage}_{endPage}
+        // The khatma ID itself may contain underscores (e.g. a timestamp like 1783413467488),
+        // so we split from the right: last 3 segments are wirdIdx, startPage, endPage.
+        final parts = payload.substring('khatma_'.length).split('_');
+        if (parts.length >= 4) {
+          final endPage   = int.tryParse(parts.last)              ?? 604;
+          final startPage = int.tryParse(parts[parts.length - 2]) ?? 1;
+          final wirdIdx   = int.tryParse(parts[parts.length - 3]) ?? 0;
+          final khatmaId  = parts.sublist(0, parts.length - 3).join('_');
+          nav.push(MaterialPageRoute(
+            builder: (_) => IsolatedWirdScreen(
+              isWirdMode: true,
+              khatmaId: khatmaId,
+              wirdIndex: wirdIdx,
+              targetStartPage: startPage,
+              targetEndPage: endPage,
+            ),
+          ));
+        } else {
+          // Fallback for old-format payloads without page info
+          final khatmaId = parts.join('_');
+          nav.push(MaterialPageRoute(
+            builder: (_) => IsolatedWirdScreen(
+              isWirdMode: true,
+              khatmaId: khatmaId,
+            ),
+          ));
+        }
+      } else {
+        nav.popUntil((route) => route.isFirst);
+      }
+      break;
+  }
 }

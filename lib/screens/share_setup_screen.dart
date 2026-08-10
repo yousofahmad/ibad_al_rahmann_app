@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gal/gal.dart';
@@ -141,7 +142,8 @@ class _ShareSheetBodyState extends State<_ShareSheetBody>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    final initialMode = context.read<ShareProvider>().shareMode;
+    _tabController = TabController(length: 2, vsync: this, initialIndex: initialMode == ShareMode.text ? 1 : 0);
     _tabController.addListener(() {
       final provider = context.read<ShareProvider>();
       final mode = _tabController.index == 0 ? ShareMode.image : ShareMode.text;
@@ -492,6 +494,13 @@ class _ShareSheetBodyState extends State<_ShareSheetBody>
                     : () => _shareText(provider),
                 onSave: provider.shareMode == ShareMode.image ? _saveImage : null,
                 onToggleColor: provider.shareMode == ShareMode.image ? _cyclePaperColor : null,
+                onCopy: provider.shareMode == ShareMode.text
+                    ? () {
+                        final text = provider.buildShareText(withLogo: provider.showLogo);
+                        Clipboard.setData(ClipboardData(text: text));
+                        ShareHelper.showTopNotification(context, 'تم نسخ النص ✓');
+                      }
+                    : null,
               ),
             ],
           ),
@@ -1023,6 +1032,7 @@ class _Toolbar extends StatelessWidget {
   final VoidCallback onShare;
   final VoidCallback? onSave;
   final VoidCallback? onToggleColor;
+  final VoidCallback? onCopy;
 
   const _Toolbar({
     required this.primary,
@@ -1031,6 +1041,7 @@ class _Toolbar extends StatelessWidget {
     required this.onShare,
     this.onSave,
     this.onToggleColor,
+    this.onCopy,
   });
 
   @override
@@ -1065,6 +1076,15 @@ class _Toolbar extends StatelessWidget {
                 label: 'لون الورقة',
                 primary: primary,
                 onTap: isCapturing ? null : onToggleColor,
+              ),
+              SizedBox(width: 8.w),
+            ],
+            if (onCopy != null) ...[
+              _ToolbarButton(
+                icon: Icons.copy_rounded,
+                label: 'نسخ',
+                primary: primary,
+                onTap: isCapturing ? null : onCopy,
               ),
               SizedBox(width: 8.w),
             ],

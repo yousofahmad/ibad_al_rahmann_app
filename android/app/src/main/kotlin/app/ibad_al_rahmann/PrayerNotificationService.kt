@@ -23,8 +23,11 @@ import android.content.ContentResolver
 class PrayerNotificationService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
+    private var salahUnlockMediaPlayer: MediaPlayer? = null
     private lateinit var audioVolumeManager: AudioVolumeManager
     private var flipToMuteManager: FlipToMuteManager? = null
+    private var lastUnlockPlayTime: Long = 0
+    private var unlockReceiver: android.content.BroadcastReceiver? = null
     
     private val refreshHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val refreshRunnable = object : Runnable {
@@ -38,6 +41,56 @@ class PrayerNotificationService : Service() {
         super.onCreate()
         audioVolumeManager = AudioVolumeManager(this)
         flipToMuteManager = FlipToMuteManager(this)
+        registerUnlockReceiver()
+    }
+
+    private fun registerUnlockReceiver() {
+        unlockReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == Intent.ACTION_USER_PRESENT) {
+                    val now = System.currentTimeMillis()
+                    // Debounce: prevent playing more than once every 5 seconds
+                    if (now - lastUnlockPlayTime < 5000) return
+                    lastUnlockPlayTime = now
+
+                    val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                    val mode = flutterPrefs.getString("flutter.salah_unlock_mode", "none") ?: "none"
+                    if (mode == "none") return
+
+                    val soundToPlay = if (mode == "both") {
+                        if (Math.random() > 0.5) "salah_2" else "saly_3ala_mo7amad"
+                    } else {
+                        mode
+                    }
+
+                    val volumeLevel = PrayerNotificationService.readFlutterDouble(flutterPrefs, "flutter.salah_unlock_volume", 1.0).toFloat().coerceIn(0.0f, 1.0f)
+
+                    val resId = context.resources.getIdentifier(soundToPlay, "raw", context.packageName)
+                    if (resId != 0) {
+                        try {
+                            salahUnlockMediaPlayer?.release()
+                            salahUnlockMediaPlayer = MediaPlayer.create(context, resId)
+                            salahUnlockMediaPlayer?.setAudioAttributes(
+                                AudioAttributes.Builder()
+                                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                                    .build()
+                            )
+                            salahUnlockMediaPlayer?.setVolume(volumeLevel, volumeLevel)
+                            salahUnlockMediaPlayer?.setOnCompletionListener {
+                                it.release()
+                                salahUnlockMediaPlayer = null
+                            }
+                            salahUnlockMediaPlayer?.start()
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            }
+        }
+        val filter = android.content.IntentFilter(Intent.ACTION_USER_PRESENT)
+        registerReceiver(unlockReceiver, filter)
     }
 
     private fun startForegroundSafe(id: Int, notification: android.app.Notification) {
@@ -51,10 +104,10 @@ class PrayerNotificationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // ALWAYS satisfy Android 8+ foreground service requirements immediately
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channelId = "persistent_prayer_v11"
+            val channelId = "persistent_prayer_v14"
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             if (nm.getNotificationChannel(channelId) == null) {
-                val ch = NotificationChannel(channelId, "شريط وقت الصلاة", NotificationManager.IMPORTANCE_MAX)
+                val ch = NotificationChannel(channelId, "شريط وقت الصلاة", NotificationManager.IMPORTANCE_DEFAULT)
                 ch.setShowBadge(false); ch.setSound(null, null); ch.enableVibration(false)
                 nm.createNotificationChannel(ch)
             }
@@ -62,7 +115,8 @@ class PrayerNotificationService : Service() {
                 .setSmallIcon(R.mipmap.launcher_icon)
                 .setContentTitle("")
                 .setContentText("")
-                .setPriority(NotificationCompat.PRIORITY_MIN)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setSortKey("00_prayer")
                 .setOngoing(true)
                 .build()
             startForegroundSafe(777, placeholderNotif)
@@ -121,8 +175,9 @@ class PrayerNotificationService : Service() {
         }
 
         audioVolumeManager.captureState()
-        if (useCustomVolume || overrideSilent) {
-            audioVolumeManager.applySettings(volumePercent, overrideSilent)
+        val forceSpeaker = flutterPrefs.getBoolean("flutter.force_speaker", false)
+        if (useCustomVolume || overrideSilent || forceSpeaker) {
+            audioVolumeManager.applySettings(volumePercent, overrideSilent, forceSpeaker)
         }
 
         val soundUri = resolveSoundUri(soundName, audioPath, customSoundName, alarmId)
@@ -230,27 +285,31 @@ class PrayerNotificationService : Service() {
         val customSoundName = intent.getStringExtra("custom_sound_name")
         val audioPath = intent.getStringExtra("audio_path")
 
-        val stopIntent = Intent(this, NotificationActionReceiver::class.java).apply { action = "STOP_SOUND" }
+        val stopIntent = Intent(this, NotificationActionReceiver::class.java).apply {
+            action = "STOP_SOUND"
+            putExtra("notification_id", alarmId)
+        }
         val stopPendingIntent = PendingIntent.getBroadcast(this, alarmId + 10000, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         val fullIntent = Intent(this, MainActivity::class.java).apply {
             putExtra("payload", payload)
+            putExtra("from_notification", true)   // ← marks a real notification tap
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
         val fullPendingIntent = PendingIntent.getActivity(this, alarmId, fullIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channelId = "prayer_sound_channel_v10"
+        val channelId = "prayer_sound_channel_v12"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             // Create Groups
             notificationManager.createNotificationChannelGroup(android.app.NotificationChannelGroup("prayer_group", "إشعارات الصلاة"))
             notificationManager.createNotificationChannelGroup(android.app.NotificationChannelGroup("general_group", "إشعارات عامة"))
 
-            // Create Channel and assign to Prayer Group
-            val channel = NotificationChannel(channelId, "صوت الأذان والتنبيهات", NotificationManager.IMPORTANCE_HIGH).apply {
-                setSound(null, null) 
+            // Create Channel and assign to Prayer Group — IMPORTANCE_MAX for heads-up display
+            val channel = NotificationChannel(channelId, "صوت الأذان والتنبيهات", NotificationManager.IMPORTANCE_MAX).apply {
+                setSound(null, null)
                 enableVibration(true)
-                group = "prayer_group" // Assign to group
+                group = "prayer_group"
             }
             notificationManager.createNotificationChannel(channel)
         }
@@ -265,38 +324,51 @@ class PrayerNotificationService : Service() {
             .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setOngoing(false) // User can swipe it
-            .setAutoCancel(false) // But it won't disappear automatically
+            .setOngoing(false)
+            .setAutoCancel(true)
+            .setGroup(notifGroup)
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .addAction(android.R.drawable.ic_media_pause, "إيقاف الصوت", stopPendingIntent)
             .setContentIntent(fullPendingIntent)
-            .setGroup(notifGroup)
-            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_ALL)
 
         // For Adhans, we can still use full screen intent to show over lock screen
         if (isAdhan(alarmId)) {
-            builder.setFullScreenIntent(fullPendingIntent, true)
+            val flutterPrefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            val isOverlayEnabled = flutterPrefs.getBoolean("flutter.prayer_focus_enabled", false)
+            
+            if (!isOverlayEnabled) {
+                val powerManager = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+                val isScreenOn = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT_WATCH) {
+                    powerManager.isInteractive
+                } else {
+                    @Suppress("DEPRECATION")
+                    powerManager.isScreenOn
+                }
+                if (!isScreenOn) {
+                    builder.setFullScreenIntent(fullPendingIntent, true)
+                }
+            }
         }
 
         val bitmap = getLargeIconForPayload(payload, alarmId)
         if (bitmap != null) builder.setLargeIcon(bitmap)
 
-        if (isSilent) {
-            notificationManager.notify(alarmId, builder.build())
-        } else {
-            notificationManager.notify(alarmId, builder.build())
-        }
+        notificationManager.notify(alarmId, builder.build())
 
-        // Update the appropriate notification group summary (Prayer or General)
-        val summaryId    = if (isPrayerGroup) 666 else 667
+        // Group summary — setOngoing(true) prevents swiping it (which would dismiss ALL notifications)
+        // setSilent(true) prevents the summary itself from making noise
+        val summaryId = if (isPrayerGroup) 666 else 667
         val groupSummary = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.mipmap.launcher_icon)
             .setContentTitle(summaryTitle)
             .setSubText(summaryTitle)
             .setGroup(notifGroup)
             .setGroupSummary(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setSortKey("00_prayer")
+            .setOngoing(true)
             .setSilent(true)
-            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_ALL)
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .build()
         notificationManager.notify(summaryId, groupSummary)
     }
@@ -308,8 +380,27 @@ class PrayerNotificationService : Service() {
             payload.contains("fasting") || alarmId in 720..729 -> "ic_fasting"
             payload.contains("khatma") || payload.contains("wird") -> "ic_wird"
             payload == "salawat" || alarmId in 8000..9500 -> "ic_salawat"
-            payload == "jumuah" || payload == "kahf" || alarmId in 705..719 -> "ic_jumuah"
-            isAdhan(alarmId) -> "logo" // Default logo for Adhan
+            payload == "kahf" || alarmId in 705..719 -> "ic_jumuah" // General Jumuah stuff (not the prayer itself)
+            
+            payload.contains("prayer") || payload == "jumuah" || isAdhan(alarmId) -> {
+                val baseId = if (alarmId in 100..104) alarmId - 100 
+                             else if (alarmId in 3000..3004) alarmId - 3000 
+                             else if (alarmId in 5000..5004) alarmId - 5000 
+                             else if (alarmId in 6000..6004) alarmId - 6000 
+                             else if (alarmId == 110) 0 else -1
+                
+                when (baseId) {
+                    0 -> "ic_fajr"
+                    1 -> {
+                        val calendar = java.util.Calendar.getInstance()
+                        if (calendar.get(java.util.Calendar.DAY_OF_WEEK) == java.util.Calendar.FRIDAY) "ic_jumuah_prayer" else "ic_dhuhr"
+                    }
+                    2 -> "ic_asr"
+                    3 -> "ic_maghrib"
+                    4 -> "ic_isha"
+                    else -> if (payload == "jumuah") "ic_jumuah" else "logo"
+                }
+            }
             else -> "logo"
         }
         if (resName != null) {
@@ -322,8 +413,9 @@ class PrayerNotificationService : Service() {
     }
 
     private fun isPersistentNotificationEnabled(): Boolean {
-        val prefs = getSharedPreferences("HomeWidgetPreferences", Context.MODE_PRIVATE)
-        return prefs.getBoolean("persistent_notification_enabled", true)
+        // Flutter writes to FlutterSharedPreferences with "flutter." prefix
+        val flutterPrefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        return flutterPrefs.getBoolean("flutter.persistent_notification_enabled", true)
     }
 
     private fun handleUpdateIntent(intent: Intent) {
@@ -365,7 +457,7 @@ class PrayerNotificationService : Service() {
         // CRITICAL: On Android 8+, startForeground() MUST be called within 5 seconds
         // of startForegroundService(). We call it immediately with a minimal notification
         // to satisfy Android, then update it with real data below.
-        val channelId = "persistent_prayer_v11"
+        val channelId = "persistent_prayer_v14"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val ch = NotificationChannel(channelId, "شريط وقت الصلاة", NotificationManager.IMPORTANCE_MAX)
@@ -377,7 +469,8 @@ class PrayerNotificationService : Service() {
             .setContentTitle("عباد الرحمن")
             .setContentText("جاري تحميل مواقيت الصلاة...")
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setSortKey("00_prayer")
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setSilent(true)
             .build()
         startForegroundSafe(777, placeholderNotif)
@@ -425,12 +518,17 @@ class PrayerNotificationService : Service() {
         var targetEpoch = 0L
         var activeIndex = 0
 
+        val cal2 = java.util.Calendar.getInstance()
+        cal2.timeInMillis = now
+        val isFriday = cal2.get(java.util.Calendar.DAY_OF_WEEK) == java.util.Calendar.FRIDAY
+        val dhuhrName = if (isFriday) "الجمعة" else "الظهر"
+
         when {
             now < fajrThreshold -> {
                 targetName = "الفجر"; targetEpoch = fajr; activeIndex = 0
             }
             now < dhuhrThreshold -> {
-                targetName = "الظهر"; targetEpoch = dhuhr; activeIndex = 1
+                targetName = dhuhrName; targetEpoch = dhuhr; activeIndex = 1
             }
             now < asrThreshold -> {
                 targetName = "العصر"; targetEpoch = asr; activeIndex = 2
@@ -454,12 +552,14 @@ class PrayerNotificationService : Service() {
         val is24H = flutterPrefs.getBoolean("flutter.is_24_hour", false)
         val fmt = java.text.SimpleDateFormat(if (is24H) "HH:mm" else "hh:mm a", java.util.Locale(if (is24H) "en" else "ar"))
 
-        val notification = if (times != null) {
-            buildPersistentNotification(fmt.format(times.fajr), fmt.format(times.dhuhr), fmt.format(times.asr), fmt.format(times.maghrib), fmt.format(times.isha), statusName, "", hijriStr, activeIndex, targetEpoch, isCountingUp)
-        } else {
-            // Fallback to stored strings
-            buildPersistentNotification(prefs.getString("fajr", "--:--")!!, prefs.getString("dhuhr", "--:--")!!, prefs.getString("asr", "--:--")!!, prefs.getString("maghrib", "--:--")!!, prefs.getString("isha", "--:--")!!, statusName, "", hijriStr, activeIndex, targetEpoch, isCountingUp)
-        }
+        val notification = buildPersistentNotification(
+            if (fajr > 0L) fmt.format(java.util.Date(fajr)) else if (times != null) fmt.format(times.fajr) else prefs.getString("fajr", "--:--")!!,
+            if (dhuhr > 0L) fmt.format(java.util.Date(dhuhr)) else if (times != null) fmt.format(times.dhuhr) else prefs.getString("dhuhr", "--:--")!!,
+            if (asr > 0L) fmt.format(java.util.Date(asr)) else if (times != null) fmt.format(times.asr) else prefs.getString("asr", "--:--")!!,
+            if (maghrib > 0L) fmt.format(java.util.Date(maghrib)) else if (times != null) fmt.format(times.maghrib) else prefs.getString("maghrib", "--:--")!!,
+            if (isha > 0L) fmt.format(java.util.Date(isha)) else if (times != null) fmt.format(times.isha) else prefs.getString("isha", "--:--")!!,
+            statusName, "", hijriStr, activeIndex, targetEpoch, isCountingUp
+        )
         
         startForegroundSafe(777, notification)
         scheduleNextUpdate(activeIndex, targetEpoch, isCountingUp)
@@ -511,7 +611,7 @@ class PrayerNotificationService : Service() {
     }
 
     private fun buildPersistentNotification(fajr: String, dhuhr: String, asr: String, maghrib: String, isha: String, nextName: String, countdown: String, hijri: String, activeIndex: Int, nextPrayerEpoch: Long, isCountUp: Boolean): Notification {
-        val channelId = "persistent_prayer_v11"
+        val channelId = "persistent_prayer_v14"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(channelId, "شريط وقت الصلاة", NotificationManager.IMPORTANCE_MAX)
             channel.setShowBadge(false); channel.setSound(null, null); channel.enableVibration(false)
@@ -550,13 +650,16 @@ class PrayerNotificationService : Service() {
             expandedView.setTextColor(tIds[i], c); expandedView.setTextColor(aIds[i], c); expandedView.setTextColor(lIds[i], c)
         }
         expandedView.setTextColor(R.id.tv_next_prayer_name, accent); expandedView.setTextColor(R.id.tv_next_prayer_countdown, accent)
-        val intent = Intent(this, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK }
-        val pi = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val intent = Intent(this, MainActivity::class.java).apply { 
+            putExtra("payload", "prayer")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK 
+        }
+        val pi = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         
         collapsedView.setOnClickPendingIntent(R.id.root_collapsed, pi)
         expandedView.setOnClickPendingIntent(R.id.root_expanded, pi)
 
-        return NotificationCompat.Builder(this, channelId).setSmallIcon(R.mipmap.launcher_icon).setCustomContentView(collapsedView).setCustomBigContentView(expandedView).setStyle(NotificationCompat.DecoratedCustomViewStyle()).setOngoing(true).setPriority(NotificationCompat.PRIORITY_MAX).setCategory(NotificationCompat.CATEGORY_STATUS).setWhen(System.currentTimeMillis()).setSilent(true).setShowWhen(false).setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE).setContentIntent(pi).build()
+        return NotificationCompat.Builder(this, channelId).setSmallIcon(R.mipmap.launcher_icon).setCustomContentView(collapsedView).setCustomBigContentView(expandedView).setStyle(NotificationCompat.DecoratedCustomViewStyle()).setOngoing(true).setPriority(NotificationCompat.PRIORITY_MAX).setCategory(NotificationCompat.CATEGORY_STATUS).setWhen(System.currentTimeMillis()).setShowWhen(false).setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE).setContentIntent(pi).build()
     }
 
     private fun toArabicDigits(input: String): String {
@@ -571,7 +674,32 @@ class PrayerNotificationService : Service() {
         stopAudio()
         audioVolumeManager.restoreState() // Safety guarantee
         refreshHandler.removeCallbacks(refreshRunnable)
+        unlockReceiver?.let { unregisterReceiver(it) }
         super.onDestroy()
     }
     override fun onBind(intent: Intent?): IBinder? = null
+
+    companion object {
+        /**
+         * Flutter's shared_preferences plugin stores doubles on Android as raw Long bits
+         * (Double.doubleToRawLongBits). However, some plugin versions or manual saves
+         * may store them as Float or even String. This helper tries all formats.
+         */
+        fun readFlutterDouble(prefs: android.content.SharedPreferences, key: String, default: Double): Double {
+            return try {
+                val raw = prefs.all[key]
+                when (raw) {
+                    is Long   -> java.lang.Double.longBitsToDouble(raw)
+                    is Float  -> raw.toDouble()
+                    is Double -> raw
+                    is Int    -> raw.toDouble()
+                    is String -> raw.toDoubleOrNull() ?: default
+                    null      -> default
+                    else      -> default
+                }
+            } catch (e: Exception) {
+                default
+            }
+        }
+    }
 }

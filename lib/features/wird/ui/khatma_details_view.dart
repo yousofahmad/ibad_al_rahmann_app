@@ -8,6 +8,7 @@ import 'package:gal/gal.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/core/di/di.dart';
+import 'package:ibad_al_rahmann/core/theme/quran_theme_extension.dart';
 import 'package:ibad_al_rahmann/core/services/cache_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/share_helper.dart';
 import 'package:quran/quran.dart' as quran;
@@ -1355,22 +1356,26 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
     final Color? savedColor = (wirdColorVal != null && wirdColorVal != -1)
         ? Color(wirdColorVal)
         : null;
-    final brightness = Theme.of(context).brightness;
-    final paperColor =
-        savedColor ??
-        (brightness == Brightness.dark ? Colors.black : Colors.white);
-    final textColor = paperColor.computeLuminance() < 0.5
+    
+    final quranTheme = Theme.of(context).extension<QuranThemeColors>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    final Color effectivePaperColor = savedColor ??
+        (isDark ? (quranTheme?.paperColorDark ?? Colors.black) : (quranTheme?.paperColorLight ?? Colors.white));
+        
+    final textColor = effectivePaperColor.computeLuminance() < 0.5
         ? Colors.white
         : Colors.black;
 
     final (sSura, sAyah, eSura, eAyah) = _getWirdBounds(context);
 
     return Scaffold(
-      backgroundColor: paperColor,
+      backgroundColor: effectivePaperColor,
       body: SizedBox(
         width: MediaQuery.of(context).size.width,
         height: MediaQuery.of(context).size.height,
         child: PageView.builder(
+      allowImplicitScrolling: true,
           controller: _pageController,
           itemCount: _totalPages,
           physics: const NeverScrollableScrollPhysics(),
@@ -1384,7 +1389,7 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
               endAyah: eAyah,
               collapseOutOfRange: true, // Focus only on the Rub' content
               isZoomEnabled: false,
-              paperColorOverride: paperColor,
+              paperColorOverride: savedColor, // Pass null to allow default creamy colors
               textColorOverride: textColor,
             );
           },

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/date_time_ext.dart';
 
 import '../../../../core/theme/app_images.dart';
@@ -48,7 +48,7 @@ class PrayerTimeWidget extends StatelessWidget {
             Text(prayer.title, style: AppStyles.style24harmattan),
             Text(prayer.date.toPrayerTime, style: AppStyles.style24harmattan),
             Text(
-              '${prayer.prayerType == PrayerType.sunrise ? 'الإشراق' : 'الإقامة'}: ${prayer.iqamaDate.toPrayerTime}',
+              '${prayer.prayerType == PrayerType.sunrise ? '???????' : '???????'}: ${prayer.iqamaDate.toPrayerTime}',
               style: AppStyles.style14harmattan,
             ),
           ],

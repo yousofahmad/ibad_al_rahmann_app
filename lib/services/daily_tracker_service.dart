@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'prayer_service.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class DailyTrackerService {
   static const String _lastStreakDateKey = 'last_streak_date';
@@ -35,7 +36,7 @@ class DailyTrackerService {
 
   /// Marks a specific category as started for today.
   static Future<void> markAsStarted(String category) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final String dateStr = await _getCycleDate(category);
     final String key = '$_dailyPrefix${dateStr}_${category}_started';
     await prefs.setBool(key, true);
@@ -43,7 +44,7 @@ class DailyTrackerService {
 
   /// Checks if a category is started today.
   static Future<bool> isStarted(String category) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final String dateStr = await _getCycleDate(category);
     return prefs.getBool('$_dailyPrefix${dateStr}_${category}_started') ??
         false;
@@ -51,7 +52,7 @@ class DailyTrackerService {
 
   /// Marks a specific Azkar category as done for today.
   static Future<void> markAsDone(String category) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final String dateStr = await _getCycleDate(category);
     final String key = '$_dailyPrefix${dateStr}_$category';
 
@@ -65,7 +66,7 @@ class DailyTrackerService {
 
   /// Checks if a category is done today.
   static Future<bool> isDone(String category) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final String dateStr = await _getCycleDate(category);
     return prefs.getBool('$_dailyPrefix${dateStr}_$category') ?? false;
   }
@@ -108,7 +109,7 @@ class DailyTrackerService {
 
   /// Returns current streak count.
   static Future<int> getStreak(String azkarType) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final int storedStreak = prefs.getInt('streak_$azkarType') ?? 0;
     final String lastDateKey = '${_lastStreakDateKey}_$azkarType';
     final String? lastDateStr = prefs.getString(lastDateKey);
@@ -146,7 +147,7 @@ class DailyTrackerService {
 
   /// Sets the progress for a specific session (e.g. Wird or Azkar)
   static Future<void> saveProgress(String key, dynamic value) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     if (value is int) {
       await prefs.setInt('progress_$key', value);
     } else if (value is String) {
@@ -158,13 +159,13 @@ class DailyTrackerService {
 
   /// Gets the progress for a specific session
   static Future<dynamic> getProgress(String key) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     return prefs.get('progress_$key');
   }
 
   /// Clears progress for a specific key
   static Future<void> clearProgress(String key) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.remove('progress_$key');
   }
 
@@ -201,7 +202,7 @@ class DailyTrackerService {
   }
 
   static Future<int?> getKahfProgress() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final weekId = getKahfWeekId();
     final lastWeek = prefs.getString('kahf_last_week_reset');
     
@@ -216,25 +217,25 @@ class DailyTrackerService {
   }
 
   static Future<void> saveKahfProgress(int page) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setInt('progress_kahf_page', page);
     await prefs.setString('kahf_last_week_reset', getKahfWeekId());
   }
 
   static Future<void> markKahfDone() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setBool('kahf_done_${getKahfWeekId()}', true);
   }
 
   static Future<bool> isKahfDone() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     return prefs.getBool('kahf_done_${getKahfWeekId()}') ?? false;
   }
 
   /// Initializes a daily entry with 0% if it doesn't exist.
   /// Also handles resetting temporary progress keys for the new day.
   static Future<void> initStatsForToday() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final String today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
     // 1. Handle Reset of Temporary Keys

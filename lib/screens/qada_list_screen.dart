@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:hijri/hijri_calendar.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class QadaListScreen extends StatefulWidget {
   const QadaListScreen({super.key});
@@ -26,7 +26,7 @@ class _QadaListScreenState extends State<QadaListScreen> {
   }
 
   Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     setState(() {
       for (int i = 1; i <= 30; i++) {
         _missedDays[i] =
@@ -37,7 +37,7 @@ class _QadaListScreenState extends State<QadaListScreen> {
 
   Future<void> _toggleDay(int day, bool? value) async {
     if (value == null) return;
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setBool('qada_${_currentRamadanYear}_$day', value);
     setState(() {
       _missedDays[day] = value;

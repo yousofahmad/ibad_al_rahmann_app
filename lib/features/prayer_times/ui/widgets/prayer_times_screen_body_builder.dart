@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:ibad_al_rahmann/core/helpers/time_handler.dart';
@@ -44,7 +44,7 @@ class PrayerTimesScreenBodyBuilder extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'تعذر جلب مواعيد الصلاة، يرجى السماح بالوصول إلى الموقع من الإعدادات',
+                    '???? ??? ?????? ??????? ???? ?????? ??????? ??? ?????? ?? ?????????',
                     style: context.titleSmall,
                     textAlign: TextAlign.center,
                   ),
@@ -53,7 +53,7 @@ class PrayerTimesScreenBodyBuilder extends StatelessWidget {
                     onPressed: () {
                       context.read<PrayerTimesCubit>().getPrayerTimes();
                     },
-                    child: Text('إعادة المحاولة', style: context.labelMedium),
+                    child: Text('????? ????????', style: context.labelMedium),
                   ),
                 ],
               ),
@@ -62,7 +62,7 @@ class PrayerTimesScreenBodyBuilder extends StatelessWidget {
         } else {
           return Center(
             child: Text(
-              'عذرًا يرجى المحاولة مرة أخرى',
+              '????? ???? ???????? ??? ????',
               style: context.headlineLarge,
             ),
           );

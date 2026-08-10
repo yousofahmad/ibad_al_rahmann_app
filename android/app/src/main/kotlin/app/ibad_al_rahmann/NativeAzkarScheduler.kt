@@ -84,6 +84,145 @@ object NativeAzkarScheduler {
         }
 
         editor.apply()
+
+        // ── ورد الختمة (Khatma Wird notifications) ──────────────────────────
+        // These are scheduled from Dart but lost on reboot. We reschedule them natively here.
+        scheduleWird(context)
+    }
+
+    /**
+     * Reads all KhatmaModel entries and schedules their Wird notifications natively.
+     * Looks in TWO places:
+     *  1. Regular SharedPreferences: key = "khatma_<id>" (written as mirror by Flutter's rescheduleWird)
+     *  2. FlutterSharedPreferences:  key = "flutter.khatma_<id>" (legacy / direct Flutter writes)
+     * Called after every reboot / scheduleAzkar call.
+     */
+    fun scheduleWird(context: Context) {
+        val prefs = context.getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        val now = System.currentTimeMillis()
+
+        // Collect all khatma entries from both sources
+        val khatmaEntries = mutableMapOf<String, String>() // cleanKey -> json
+
+        // Source 1: FlutterSharedPreferences - handles both flutter.khatma_ and plain khatma_ keys
+        val spFlutter = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        for ((key, value) in spFlutter.all) {
+            val cleanKey = if (key.startsWith("flutter.")) key.removePrefix("flutter.") else key
+            if (cleanKey.startsWith("khatma_") && value is String) {
+                khatmaEntries[cleanKey] = value
+            }
+        }
+        // Source 2: AzkarNativePrefs (written directly by native mirror logic)
+        val spPlain = context.getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE)
+        for ((key, value) in spPlain.all) {
+            if (key.startsWith("khatma_") && value is String) {
+                if (!khatmaEntries.containsKey(key)) khatmaEntries[key] = value
+            }
+        }
+
+        NativeLogger.log(context, "scheduleWird: found ${khatmaEntries.size} khatma entries to process")
+
+        if (khatmaEntries.isEmpty()) {
+            NativeLogger.log(context, "scheduleWird: no khatma data found in SharedPreferences — Wird alarms NOT scheduled. Ensure Flutter has run rescheduleWird() at least once.")
+        }
+
+        var scheduledCount = 0
+        for ((khatmaKey, value) in khatmaEntries) {
+            try {
+                val json = org.json.JSONObject(value)
+                if (!json.optBoolean("enableNotifications", true)) {
+                    NativeLogger.log(context, "scheduleWird: $khatmaKey — notifications disabled, skipping")
+                    continue
+                }
+
+                val khatmaName = json.optString("name", "الختمة")
+                val notifType  = json.optString("notificationType", "daily")
+                val offsetMins = json.optInt("notificationOffsetMinutes", 30)
+                val khatmaId   = json.optString("id", khatmaKey)
+                val idBase     = 100000 + (khatmaId.hashCode().let { if (it < 0) -it else it } % 40000) * 10
+                val payload = "khatma_$khatmaId"
+
+                NativeLogger.log(context, "scheduleWird: processing '$khatmaName' (type=$notifType, id=$khatmaId, idBase=$idBase)")
+
+                if (notifType == "daily") {
+                    val timeStr = json.optString("dailyTime", "22:00")
+                    val (h, m) = parseTime(timeStr)
+                    for (i in 0..2) {
+                        val cal = java.util.Calendar.getInstance()
+                        cal.set(java.util.Calendar.HOUR_OF_DAY, h)
+                        cal.set(java.util.Calendar.MINUTE, m)
+                        cal.set(java.util.Calendar.SECOND, 0)
+                        cal.set(java.util.Calendar.MILLISECOND, 0)
+                        cal.add(java.util.Calendar.DAY_OF_YEAR, i)
+                        if (cal.timeInMillis <= now) continue
+                        val scheduledId = idBase + cal.get(java.util.Calendar.DAY_OF_WEEK)
+                        MainActivity.scheduleAlarmInternal(
+                            context, editor, scheduledId,
+                            year = cal.get(java.util.Calendar.YEAR),
+                            month = cal.get(java.util.Calendar.MONTH) + 1,
+                            day = cal.get(java.util.Calendar.DAY_OF_MONTH),
+                            hour = h, minute = m,
+                            soundName = "ibad_al_rahmann_tone",
+                            title = "ورد $khatmaName",
+                            body = "حان وقت وردك اليومي",
+                            payload = payload,
+                            isRepeating = false,
+                            audioPath = null,
+                            intervalMinutes = 0,
+                            customSoundName = "ibad_al_rahmann_tone"
+                        )
+                        scheduledCount++
+                        NativeLogger.log(context, "scheduleWird: scheduled daily wird for '$khatmaName' day+$i at $h:$m (id=$scheduledId)")
+                    }
+                } else if (notifType == "prayer") {
+                    val prayerNames = arrayOf("الفجر", "الظهر", "العصر", "المغرب", "العشاء")
+                    for (i in 0..1) {
+                        val targetDate = java.util.Date(now + i * 86_400_000L)
+                        val times = NativePrayerManager.calculatePrayerTimes(context, targetDate)
+                        if (times == null) {
+                            NativeLogger.log(context, "scheduleWird: prayer times null for day+$i, skipping")
+                            continue
+                        }
+                        val prayerTimes = arrayOf(
+                            times.fajr.time, times.dhuhr.time, times.asr.time,
+                            times.maghrib.time, times.isha.time
+                        )
+                        val dayCal = java.util.Calendar.getInstance()
+                        dayCal.time = targetDate
+                        for (pIdx in 0..4) {
+                            val pEpoch = prayerTimes[pIdx] + offsetMins * 60_000L
+                            if (pEpoch <= now) continue
+                            val pCal = java.util.Calendar.getInstance()
+                            pCal.timeInMillis = pEpoch
+                            val scheduledId = idBase + (dayCal.get(java.util.Calendar.DAY_OF_WEEK) * 10) + pIdx
+                            MainActivity.scheduleAlarmInternal(
+                                context, editor, scheduledId,
+                                year = pCal.get(java.util.Calendar.YEAR),
+                                month = pCal.get(java.util.Calendar.MONTH) + 1,
+                                day = pCal.get(java.util.Calendar.DAY_OF_MONTH),
+                                hour = pCal.get(java.util.Calendar.HOUR_OF_DAY),
+                                minute = pCal.get(java.util.Calendar.MINUTE),
+                                soundName = "ibad_al_rahmann_tone",
+                                title = "ورد $khatmaName",
+                                body = "حان وقت وردك بعد صلاة ${prayerNames[pIdx]}",
+                                payload = payload,
+                                isRepeating = false,
+                                audioPath = null,
+                                intervalMinutes = 0,
+                                customSoundName = "ibad_al_rahmann_tone"
+                            )
+                            scheduledCount++
+                        }
+                    }
+                    NativeLogger.log(context, "scheduleWird: scheduled prayer-based wird for '$khatmaName'")
+                }
+            } catch (e: Exception) {
+                NativeLogger.log(context, "scheduleWird: ERROR processing $khatmaKey — ${e.message}")
+            }
+        }
+        editor.apply()
+        NativeLogger.log(context, "scheduleWird: DONE. Scheduled $scheduledCount wird alarms total.")
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

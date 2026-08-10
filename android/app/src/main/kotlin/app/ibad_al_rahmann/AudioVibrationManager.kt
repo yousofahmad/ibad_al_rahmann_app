@@ -28,7 +28,8 @@ object AudioVibrationManager {
         return when (audioManager.ringerMode) {
             AudioManager.RINGER_MODE_SILENT -> false
             AudioManager.RINGER_MODE_VIBRATE -> {
-                triggerVibration(context)
+                // Vibration is handled by the notification channel (prayer_vibrate_channel_v2).
+                // No manual triggerVibration needed — the channel's pattern fires on notify().
                 false
             }
             else -> {

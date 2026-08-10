@@ -1,4 +1,4 @@
-﻿class AppImages {
+class AppImages {
   // Images
   static const imagesAyaFrame = "assets/images/aya_frame.png";
   static const imagesBasmala = "assets/images/basmala.png";

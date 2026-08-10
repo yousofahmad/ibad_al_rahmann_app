@@ -63,7 +63,12 @@ object PrayerDataPatcher {
                 "HomeWidgetData-app.ibad_al_rahmann", Context.MODE_PRIVATE
             )
             val hwFajr = getSafeLong(hwPrefs, "fajr_epoch", 0L)
-            if (hwFajr > 0L) {
+            
+            // CRITICAL FIX: Only use Flutter's cached widget data if it belongs to TODAY or later!
+            // If hwFajr is less than today's start of day, it's stuck/old data.
+            val startOfToday = System.currentTimeMillis() - 86400000L // Roughly 24h ago buffer
+            
+            if (hwFajr > startOfToday) {
                 edit.putLong("fajr_epoch",      hwFajr)
                 edit.putLong("dhuhr_epoch",     getSafeLong(hwPrefs, "dhuhr_epoch",     0L))
                 edit.putLong("asr_epoch",       getSafeLong(hwPrefs, "asr_epoch",       0L))

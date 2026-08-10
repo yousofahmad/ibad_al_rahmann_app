@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 

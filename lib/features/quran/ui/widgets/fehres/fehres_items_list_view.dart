@@ -41,7 +41,10 @@ class FehresItemsListView extends StatelessWidget {
         final bool isPrimaryDark = ThemeData.estimateBrightnessForColor(Theme.of(context).primaryColor) == Brightness.dark;
         final Color activeTextColor = isPrimaryDark ? Colors.white : Colors.black87;
 
-        final Color primaryColored = isActive ? activeTextColor : Theme.of(context).primaryColor;
+        final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        final Color primaryColored = isActive 
+            ? activeTextColor 
+            : (isDarkMode ? Colors.white70 : Theme.of(context).primaryColor);
 
         return GestureDetector(
           onTap: () {

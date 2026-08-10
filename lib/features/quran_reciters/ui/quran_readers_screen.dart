@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/widgets_ext.dart';
 import 'package:ibad_al_rahmann/features/quran_reciters/logic/quran_readers_cubit.dart';

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import '../bloc/khatma_cubit.dart';
 import '../utils/wird_calculator.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class QuranWirdScreen extends StatefulWidget {
   const QuranWirdScreen({super.key});
@@ -33,11 +34,13 @@ class _QuranWirdScreenState extends State<QuranWirdScreen> {
   @override
   void initState() {
     super.initState();
+    WakelockPlus.enable();
+    super.initState();
     _loadData();
   }
 
   Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     setState(() {
       int days = prefs.getInt('${_currentKhatmaId}_wird_days') ?? 30;
       _daysController.text = days.toString();
@@ -86,7 +89,7 @@ class _QuranWirdScreenState extends State<QuranWirdScreen> {
         unit: days == 30 ? WirdUnit.juz : WirdUnit.page,
       );
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = CacheHelper.prefs;
       await prefs.setInt('${_currentKhatmaId}_wird_days', days);
       await prefs.setString(
         '${_currentKhatmaId}_wird_reminder_type',

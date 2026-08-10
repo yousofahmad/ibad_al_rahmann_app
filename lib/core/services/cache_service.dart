@@ -1,4 +1,5 @@
-﻿import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 /// A reusable cache service built on top of SharedPreferences.
 class CacheService {
@@ -10,7 +11,7 @@ class CacheService {
   /// Initialize the cache service (call this before using it).
   Future<void> init() async {
     if (!_isInitialized) {
-      _prefs = await SharedPreferences.getInstance();
+      _prefs = CacheHelper.prefs;
       _isInitialized = true;
     }
   }

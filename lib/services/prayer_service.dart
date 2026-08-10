@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'dart:async';
 import 'package:adhan/adhan.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +16,7 @@ import 'package:geocoding/geocoding.dart';
 import 'remote_config_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../../firebase_options.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 @pragma('vm:entry-point')
 Future<void> backgroundWidgetUpdateCallback() async {
@@ -140,7 +142,7 @@ class PrayerService extends ChangeNotifier {
   DateTime? _lastInitTime;
 
   Future<void> saveSettingsToPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     if (_coordinates != null) {
       await prefs.setDouble('latitude', _coordinates!.latitude);
       await prefs.setDouble('longitude', _coordinates!.longitude);
@@ -149,7 +151,8 @@ class PrayerService extends ChangeNotifier {
     // Sync current calculation settings for native
     await prefs.setString('calculation_method', _activeCity?.calculationMethod ?? _method.name.toUpperCase());
     await prefs.setString('madhab', _activeCity?.madhab ?? _madhab.name.toUpperCase());
-    await prefs.setInt('hijri_offset', _hijriOffset + _localHijriDelta);
+    // Save total offset (manual + delta + firebase) for Native Android to use
+    await prefs.setInt('hijri_offset', hijriOffset);
     await prefs.setInt('firebase_hijri_offset', RemoteConfigService.globalHijriOffset);
   }
 
@@ -183,6 +186,8 @@ class PrayerService extends ChangeNotifier {
       Future.delayed(const Duration(seconds: 1), () {
         if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
           _refreshLocationInBackground();
+          // Also check if GPS is stale (> 7 days) and silently refresh in background
+          refreshLocationIfStale();
         } else {
           scheduleNotifications(isUserAction: false);
         }
@@ -193,7 +198,7 @@ class PrayerService extends ChangeNotifier {
   }
 
   Future<void> _initializeLocationFromCache() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     double? lat = prefs.getDouble('last_lat');
     double? lng = prefs.getDouble('last_lng');
 
@@ -224,19 +229,25 @@ class PrayerService extends ChangeNotifier {
         return;
       }
 
+      // Use high accuracy so we match other apps to within ~5 metres.
+      // 20s timeout is generous enough for a cold GPS fix while still non-blocking.
       Position position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.low,
-          timeLimit: Duration(seconds: 5),
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 20),
         ),
       );
+
+      // Record timestamp of successful GPS fix for periodic refresh logic
+      final prefs2 = CacheHelper.prefs;
+      await prefs2.setInt('last_gps_update_ms', DateTime.now().millisecondsSinceEpoch);
 
       final oldLat = _coordinates?.latitude;
       final oldLng = _coordinates?.longitude;
 
       _coordinates = Coordinates(position.latitude, position.longitude);
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = CacheHelper.prefs;
       await prefs.setDouble('last_lat', position.latitude);
       await prefs.setDouble('last_lng', position.longitude);
 
@@ -282,10 +293,66 @@ class PrayerService extends ChangeNotifier {
     }
   }
 
+  // ── Periodic Location Refresh ─────────────────────────────────────────────
+  // Called on every app open (via init()) to refresh GPS if stale (> 7 days).
+  // Falls back to cached coordinates on failure — never blocks the UI.
+  Future<void> refreshLocationIfStale() async {
+    // Skip when an active city is selected (user's explicit override)
+    if (_activeCity != null) return;
+
+    final prefs = CacheHelper.prefs;
+    final lastMs = prefs.getInt('last_gps_update_ms') ?? 0;
+    final daysSinceLast = DateTime.now().difference(
+      DateTime.fromMillisecondsSinceEpoch(lastMs),
+    ).inDays;
+
+    if (daysSinceLast < 7) return; // Still fresh — no need to refresh
+
+    debugPrint('PrayerService: GPS stale ($daysSinceLast days old). Requesting fresh fix...');
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.deniedForever ||
+          permission == LocationPermission.denied) {
+        return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 30),
+        ),
+      );
+
+      final oldLat = _coordinates?.latitude;
+      final oldLng = _coordinates?.longitude;
+      _coordinates = Coordinates(position.latitude, position.longitude);
+
+      await prefs.setDouble('last_lat', position.latitude);
+      await prefs.setDouble('last_lng', position.longitude);
+      await prefs.setDouble('latitude', position.latitude);
+      await prefs.setDouble('longitude', position.longitude);
+      await prefs.setInt('last_gps_update_ms', DateTime.now().millisecondsSinceEpoch);
+
+      debugPrint('PrayerService: Periodic refresh done: ${position.latitude}, ${position.longitude}');
+
+      // Reschedule only if location moved more than 1km
+      if (oldLat != null && oldLng != null) {
+        final dist = Geolocator.distanceBetween(oldLat, oldLng, position.latitude, position.longitude);
+        if (dist > 1000) await scheduleNotifications(isUserAction: false);
+      }
+    } catch (e) {
+      // Non-fatal: keep using cached coordinates
+      debugPrint('PrayerService: Periodic location refresh failed (using cache): $e');
+    }
+  }
+
   DateTime? _lastScheduleTime;
 
   Future<void> _syncNativeEngineConfig() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     
     // Write effective coordinates so NativePrayerManager can read them even if an active city is selected
     if (_activeCity != null) {
@@ -309,10 +376,6 @@ class PrayerService extends ChangeNotifier {
   }
 
   Future<void> scheduleNotifications({bool isUserAction = true}) async {
-    if (_lastScheduleTime != null && 
-        DateTime.now().difference(_lastScheduleTime!) < const Duration(seconds: 10)) {
-      return;
-    }
     _lastScheduleTime = DateTime.now();
 
     await _syncNativeEngineConfig();
@@ -470,7 +533,7 @@ class PrayerService extends ChangeNotifier {
     countdownStr = toArabicDigits(countdownStr);
     hijriStr = toArabicDigits(hijriStr);
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final persistentEnabled = prefs.getBool('persistent_notification_enabled') ?? true;
 
     DateTime nextTriggerTime;
@@ -621,7 +684,7 @@ class PrayerService extends ChangeNotifier {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await _loadCities(prefs);
     await _loadActiveCity(prefs);
     _hijriOffset = prefs.getInt(keyHijriOffset) ?? 0;
@@ -675,7 +738,7 @@ class PrayerService extends ChangeNotifier {
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
       );
       _coordinates = Coordinates(position.latitude, position.longitude);
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = CacheHelper.prefs;
       await prefs.setDouble('last_lat', position.latitude);
       await prefs.setDouble('last_lng', position.longitude);
       try {
@@ -691,7 +754,7 @@ class PrayerService extends ChangeNotifier {
         }
       } catch (_) {}
     } catch (e) {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = CacheHelper.prefs;
       double lat = prefs.getDouble('last_lat') ?? 30.0444;
       double lng = prefs.getDouble('last_lng') ?? 31.2357;
       _coordinates = Coordinates(lat, lng);
@@ -753,7 +816,7 @@ class PrayerService extends ChangeNotifier {
   }
 
   static Future<PrayerTimes?> getPrayerTimesForDateStatic(DateTime date) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     String? activeCityId = prefs.getString(keyActiveCityId);
     if (activeCityId != null) {
       String? jsonStr = prefs.getString(keySavedCities);
@@ -788,28 +851,37 @@ class PrayerService extends ChangeNotifier {
   }
 
   Future<void> saveMethod(String methodKey) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setString(keyMethod, methodKey);
     _method = _getMethodFromKey(methodKey);
     await scheduleNotifications(isUserAction: true);
   }
 
   Future<void> saveMadhab(String madhabKey) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setString(keyMadhab, madhabKey);
     _madhab = madhabKey == 'hanafi' ? Madhab.hanafi : Madhab.shafi;
     await scheduleNotifications(isUserAction: true);
   }
 
+  Timer? _debounceTimer;
+
+  Future<void> scheduleNotificationsDebounced({bool isUserAction = true}) async {
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 1000), () {
+      scheduleNotifications(isUserAction: isUserAction);
+    });
+  }
+
   Future<void> saveAdjustment(String prayer, int minutes) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setInt('$keyAdjustPrefix$prayer', minutes);
     _adjustments[prayer] = minutes;
-    await scheduleNotifications(isUserAction: true);
+    scheduleNotificationsDebounced(isUserAction: true);
   }
 
   Future<void> saveRamadanIshaDelay(int mode) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setInt(keyRamadanCycle, mode);
     _ramadanIshaDelayMode = mode;
     await scheduleNotifications(isUserAction: true);
@@ -843,14 +915,14 @@ class PrayerService extends ChangeNotifier {
     await _saveCities();
     if (_activeCity?.id == id) {
       _activeCity = null;
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = CacheHelper.prefs;
       await prefs.remove(keyActiveCityId);
       await scheduleNotifications(isUserAction: true);
     }
   }
 
   Future<void> setActiveCity(String? id) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     if (id == null) { _activeCity = null; await prefs.remove(keyActiveCityId); }
     else { try { _activeCity = _savedCities.firstWhere((c) => c.id == id); await prefs.setString(keyActiveCityId, id); } catch (_) { _activeCity = null; } }
     await scheduleNotifications(isUserAction: true);
@@ -862,7 +934,7 @@ class PrayerService extends ChangeNotifier {
   }
 
   Future<void> _saveCities() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setString(keySavedCities, jsonEncode(_savedCities.map((e) => e.toJson()).toList()));
   }
 
@@ -911,15 +983,31 @@ class PrayerService extends ChangeNotifier {
   }
 
   static HijriCalendar getHijriWithOffset(int offsetDays, [DateTime? date]) {
-    HijriCalendar hDate = HijriCalendar.fromDate(date ?? DateTime.now());
-    if (offsetDays == 0) return hDate;
-    hDate.hDay += offsetDays;
-    if (hDate.hDay <= 0) { hDate.hMonth -= 1; if (hDate.hMonth <= 0) { hDate.hMonth = 12; hDate.hYear -= 1; } hDate.hDay += 30; }
-    else if (hDate.hDay > hDate.lengthOfMonth) { if (!(hDate.hDay == 30 && hDate.lengthOfMonth == 29)) { hDate.hDay -= hDate.lengthOfMonth; hDate.hMonth += 1; if (hDate.hMonth > 12) { hDate.hMonth = 1; hDate.hYear += 1; } } }
-    var temp = HijriCalendar();
-    var finalH = HijriCalendar.fromDate(temp.hijriToGregorian(hDate.hYear, hDate.hMonth, 1));
-    finalH.hDay = hDate.hDay;
-    return finalH;
+    final baseDate = date ?? DateTime.now();
+    final adjustedDate = baseDate.add(Duration(days: offsetDays));
+    final h = HijriCalendar.fromDate(adjustedDate);
+    // ── تصحيح يوم 29 → 30 ──────────────────────────────────────────────
+    // بعض الأشهر الهجرية 29 يوماً لكن المكتبة تُرجع 29 حتى لو اليوم هو 30
+    // نتحقق: لو اليوم 29 وبكرا هيكون أول الشهر الجاي → نعرض 30
+    if (h.hDay == 29) {
+      final tomorrow = adjustedDate.add(const Duration(days: 1));
+      final tomorrowH = HijriCalendar.fromDate(tomorrow);
+      if (tomorrowH.hMonth != h.hMonth || tomorrowH.hYear != h.hYear) {
+        // اليوم آخر الشهر — تحقق هل الشهر 29 فعلاً أم المكتبة قصّرته
+        // نُرجع نفس الكائن مع تعديل hDay لـ 30 إذا كان الشهر الجاي بدأ مبكراً
+        final lastDayCheck = adjustedDate.add(const Duration(days: 1));
+        final nextH = HijriCalendar.fromDate(lastDayCheck);
+        if (nextH.hDay == 1) {
+          // المكتبة انتقلت للشهر الجديد بعد 29 — نعرض 30 للمستخدم
+          final corrected = HijriCalendar();
+          corrected.hYear = h.hYear;
+          corrected.hMonth = h.hMonth;
+          corrected.hDay = 30;
+          return corrected;
+        }
+      }
+    }
+    return h;
   }
 
   int get hijriOffset => RemoteConfigService.globalHijriOffset + _hijriOffset + _localHijriDelta;
@@ -929,16 +1017,17 @@ class PrayerService extends ChangeNotifier {
 
   Future<void> setHijriOffset(int offset) async {
     _hijriOffset = offset;
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setInt(keyHijriOffset, offset);
-    await prefs.setInt(keyHijriOffsetMonth, HijriCalendar.fromDate(DateTime.now()).hMonth);
+    // احفظ الشهر الهجري المُعدَّل (مع الـ offset) وليس raw الشهر
+    await prefs.setInt(keyHijriOffsetMonth, getHijriWithOffset(offset).hMonth);
     notifyListeners();
     await scheduleNotifications(isUserAction: true);
   }
 
   Future<void> setLocalHijriDelta(int delta) async {
     _localHijriDelta = delta;
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setInt(keyLocalHijriDelta, delta);
     notifyListeners();
     await scheduleNotifications(isUserAction: true);
@@ -946,7 +1035,7 @@ class PrayerService extends ChangeNotifier {
 
   HijriCalendar getAdjustedHijri() => getHijriWithOffset(hijriOffset);
   String getAdjustedHijriString() { HijriCalendar.setLocal('ar'); final h = getAdjustedHijri(); return '${h.hDay} ${h.longMonthName} ${h.hYear} هـ'; }
-  Future<void> setIs24Hour(bool value) async { _is24Hour = value; final prefs = await SharedPreferences.getInstance(); await prefs.setBool(keyIs24Hour, value); notifyListeners(); }
+  Future<void> setIs24Hour(bool value) async { _is24Hour = value; final prefs = CacheHelper.prefs; await prefs.setBool(keyIs24Hour, value); notifyListeners(); }
   String formatTime(DateTime time) => _is24Hour ? DateFormat('HH:mm').format(time) : DateFormat.jm('ar').format(time);
 }
 

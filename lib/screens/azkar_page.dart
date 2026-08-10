@@ -7,10 +7,10 @@ import 'package:ibad_al_rahmann/widgets/app_skeleton.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/notification_service.dart';
 import '../services/daily_tracker_service.dart';
 import '../services/prayer_service.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class ZekrData {
   final String text;
@@ -112,7 +112,7 @@ class _AzkarPageState extends State<AzkarPage> {
   }
 
   Future<void> _loadProgressAndData() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final keyIndex = await _getSessionKey('azkar_progress');
     final savedIndex = prefs.getInt(keyIndex) ?? 0;
 
@@ -145,7 +145,7 @@ class _AzkarPageState extends State<AzkarPage> {
   }
 
   Future<void> _saveProgress(int index) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final keyIndex = await _getSessionKey('azkar_progress');
     final keyCounts = await _getSessionKey('azkar_counts');
     await prefs.setInt(keyIndex, index);
@@ -157,7 +157,7 @@ class _AzkarPageState extends State<AzkarPage> {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     setState(() {
       _vibrationEnabled = prefs.getBool('vibrate_azkar') ?? true;
     });

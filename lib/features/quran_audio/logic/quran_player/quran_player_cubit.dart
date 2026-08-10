@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -31,7 +31,7 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
   Future<void> playNextSurah(BuildContext context) async {
     try {
       if (selectedSurah! == 114) {
-        emit(QuranPlayerFailure(errMessage: 'لا يوجد سورة بعد الناس'));
+        emit(QuranPlayerFailure(errMessage: '?? ???? ???? ??? ?????'));
         emit(QuranBottomSheetShowed());
         return;
       }
@@ -40,14 +40,14 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
       await init(nextSurah);
       playSurah(nextSurah);
     } catch (e) {
-      emit(QuranPlayerFailure(errMessage: 'حدث خطأ ما'));
+      emit(QuranPlayerFailure(errMessage: '??? ??? ??'));
     }
   }
 
   Future<void> playPreviousSurah(BuildContext context) async {
     try {
       if (selectedSurah! == 1) {
-        emit(QuranPlayerFailure(errMessage: 'لا يوجد سورة قبل الفاتحة'));
+        emit(QuranPlayerFailure(errMessage: '?? ???? ???? ??? ???????'));
         emit(QuranBottomSheetShowed());
         return;
       }
@@ -56,7 +56,7 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
       await init(previousSurah);
       playSurah(previousSurah);
     } catch (e) {
-      emit(QuranPlayerFailure(errMessage: 'حدث خطأ ما'));
+      emit(QuranPlayerFailure(errMessage: '??? ??? ??'));
     }
   }
 
@@ -78,7 +78,7 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
 
       emit(QuranBottomSheetShowed());
     } catch (e) {
-      emit(QuranPlayerFailure(errMessage: 'حدث خطأ ما'));
+      emit(QuranPlayerFailure(errMessage: '??? ??? ??'));
     }
   }
 

@@ -1,11 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../core/app_colors.dart';
 import 'gradient_icons.dart';
 
 /// A small reusable card used in the services grid.
 /// Displays a gradient icon and a title, and notifies via [onTap] when tapped.
-/// Intended for use on the HomeScreen to represent app features (e.g. أذكار الصباح).
+/// Intended for use on the HomeScreen to represent app features (e.g. ????? ??????).
 class ServiceCard extends StatelessWidget {
   final String name;
   final IconData icon;

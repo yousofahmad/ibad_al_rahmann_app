@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/widgets/app_skeleton.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class NawawiScreen extends StatefulWidget {
   const NawawiScreen({super.key});
@@ -52,14 +52,14 @@ class _NawawiScreenState extends State<NawawiScreen> {
   }
 
   Future<void> _loadFavorites() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     setState(() {
       _favoriteHadiths = prefs.getStringList('nawawi_favorites') ?? [];
     });
   }
 
   Future<void> _toggleFavorite(String title) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     setState(() {
       if (_favoriteHadiths.contains(title)) {
         _favoriteHadiths.remove(title);

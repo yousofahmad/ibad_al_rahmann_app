@@ -35,10 +35,30 @@ class MainActivity: AudioServiceFragmentActivity() {
         var methodChannel: MethodChannel? = null
         var launchPayload: String? = null
 
+        // Queued payload when the Flutter channel isn't ready yet
+        var pendingNavigationPayload: String? = null
+
         fun getAndClearLaunchPayload(): String? {
             val p = launchPayload
             launchPayload = null
             return p
+        }
+
+        /**
+         * Delivers payload to Flutter immediately if the channel is ready,
+         * otherwise stores it so it can be flushed when the channel attaches.
+         * Logs every attempt to NativeLogger.
+         */
+        fun deliverPayloadToFlutter(context: android.content.Context, payload: String) {
+            val channel = BackgroundMethodChannelPlugin.currentChannel
+            if (channel != null) {
+                channel.invokeMethod("onPayloadReceived", payload)
+                NativeLogger.log(context, "Navigation: payload '$payload' delivered to Flutter channel ✓")
+                pendingNavigationPayload = null
+            } else {
+                NativeLogger.log(context, "Navigation: Flutter channel null — queuing payload '$payload' for retry")
+                pendingNavigationPayload = payload
+            }
         }
 
         fun scheduleAlarm(context: Context, id: Int, year: Int, month: Int, day: Int, hour: Int, minute: Int, soundName: String, title: String?, body: String?, payload: String?, isRepeating: Boolean, audioPath: String?, intervalMinutes: Int = 0, customSoundName: String? = null) {
@@ -153,11 +173,23 @@ class MainActivity: AudioServiceFragmentActivity() {
         // Disable state restoration to ensure app starts fresh on Home
         intent?.removeExtra("androidx.lifecycle.InstanceStateSavedStateRegistry.Key")
         super.onCreate(null)
-        launchPayload = intent?.getStringExtra("target_page") ?: intent?.getStringExtra("payload")
+        // Only accept payloads that come from a real notification tap.
+        // Widget taps and PrayerFocusOverlay internal navigation do NOT set from_notification,
+        // so they won't trigger spurious warm-restart deliveries on subsequent app opens.
+        val fromNotification = intent?.getBooleanExtra("from_notification", false) ?: false
+        launchPayload = if (fromNotification) {
+            intent?.getStringExtra("target_page") ?: intent?.getStringExtra("payload")
+        } else {
+            null
+        }
+        NativeLogger.log(this, "MainActivity.onCreate payload detected: $launchPayload (fromNotif=$fromNotification)")
 
-        if (launchPayload == "prayer" || launchPayload == "jumuah") {
+
+        val stopSound = intent?.getBooleanExtra("stop_sound_on_open", true) ?: true
+        if (stopSound && (launchPayload == "prayer" || launchPayload == "jumuah")) {
             val stopIntent = Intent(this, PrayerNotificationService::class.java).apply { action = "STOP_SOUND" }
             startService(stopIntent)
+            NativeLogger.log(this, "MainActivity: Sent STOP_SOUND to PrayerNotificationService")
         }
 
         handleMigrationCleanup()
@@ -174,6 +206,18 @@ class MainActivity: AudioServiceFragmentActivity() {
                     action = "android.intent.action.BOOT_COMPLETED"
                 }
                 sendBroadcast(intent)
+
+                val fp = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+
+                // Start PrayerNotificationService (صلاتي bar) if enabled
+                val isPersistentEnabled = fp.getBoolean("flutter.persistent_notification_enabled", true)
+                if (isPersistentEnabled) {
+                    val svcIntent = Intent(this, PrayerNotificationService::class.java).apply { action = "SYNC" }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(svcIntent)
+                    else startService(svcIntent)
+                }
+
+                // Screen unlock receiver is now managed dynamically inside PrayerNotificationService
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -182,7 +226,7 @@ class MainActivity: AudioServiceFragmentActivity() {
 
     private fun handleMigrationCleanup() {
         val prefs = getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE)
-        val currentMigrationVersion = 10 // Increment this when a major notification change happens
+        val currentMigrationVersion = 11 // Bump to cancel old fasting alarm ID 2003
         val lastMigrationVersion = prefs.getInt("migration_version", 0)
 
         if (lastMigrationVersion < currentMigrationVersion) {
@@ -197,6 +241,7 @@ class MainActivity: AudioServiceFragmentActivity() {
             idsToCancel.addAll(1000..1100) // Reminders
             idsToCancel.addAll(3000..6000) // Pre-prayer/Iqama
             idsToCancel.addAll(8000..9500) // Salawat/Takbeerat
+            idsToCancel.add(2003) // Old native fasting alarm (now handled by Flutter only)
             
             // Wipe standard IDs
             for (id in idsToCancel) {
@@ -224,19 +269,81 @@ class MainActivity: AudioServiceFragmentActivity() {
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         flutterEngine.plugins.add(BackgroundMethodChannelPlugin())
-        
         createNotificationChannels()
+
+        // Handle screen unlock service start/stop from Flutter
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.ibad_al_rahmann/background")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "startScreenUnlockService" -> {
+                        val svcIntent = Intent(this, PrayerNotificationService::class.java)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(svcIntent)
+                        else startService(svcIntent)
+                        result.success(null)
+                    }
+                    "stopScreenUnlockService" -> {
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        // ── Warm-restart payload delivery ──────────────────────────────────────
+        // When the Android process is still alive (common on Samsung / MIUI),
+        // swiping from Recent + tapping a notification triggers a NEW Activity
+        // (onCreate fires) but reuses the existing Flutter engine. This means
+        // SplashScreen._checkUser() never re-runs and launchPayload is never
+        // consumed by Dart's getLaunchPayload().
+        //
+        // Strategy: read launchPayload AFTER a 1.5 s delay.
+        //   • Cold start  → SplashScreen calls getLaunchPayload() at ~1 s,
+        //     which calls getAndClearLaunchPayload() and sets launchPayload=null.
+        //     At 1.5 s the callback finds null → no-op (navigation already handled).
+        //   • Warm restart → getLaunchPayload() is never called, so launchPayload
+        //     still holds the value at 1.5 s → we deliver it via onPayloadReceived,
+        //     which the already-running Dart listener picks up immediately.
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            val payload = launchPayload          // read AFTER delay, not before
+            if (payload != null) {
+                NativeLogger.log(this,
+                    "configureFlutterEngine: warm-restart delivery of '$payload'")
+                deliverPayloadToFlutter(this, payload)
+                launchPayload = null             // prevent double delivery on next configure
+            }
+        }, 1500)
     }
+
+
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         val target = intent.getStringExtra("target_page") ?: intent.getStringExtra("payload")
+        NativeLogger.log(this, "MainActivity.onNewIntent payload detected: $target | channel ready: ${BackgroundMethodChannelPlugin.currentChannel != null}")
         if (target != null) {
-            BackgroundMethodChannelPlugin.currentChannel?.invokeMethod("onPayloadReceived", target)
-            if (target == "prayer" || target == "jumuah") {
+            val stopSound = intent.getBooleanExtra("stop_sound_on_open", true)
+            if (stopSound && (target == "prayer" || target == "jumuah")) {
                 val stopIntent = Intent(this, PrayerNotificationService::class.java).apply { action = "STOP_SOUND" }
                 startService(stopIntent)
+            }
+            // Deliver with retry — if channel is null now, queue it for when it becomes ready
+            deliverPayloadToFlutter(this, target)
+            if (pendingNavigationPayload != null) {
+                // Schedule a retry after 500ms to cover Flutter engine startup delay
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    val queued = pendingNavigationPayload
+                    if (queued != null) {
+                        deliverPayloadToFlutter(this, queued)
+                    }
+                }, 500)
+                // And one more retry after 1.5s in case of slow startup
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    val queued = pendingNavigationPayload
+                    if (queued != null) {
+                        NativeLogger.log(this, "Navigation: 1.5s retry for payload '$queued' — channel: ${BackgroundMethodChannelPlugin.currentChannel != null}")
+                        deliverPayloadToFlutter(this, queued)
+                    }
+                }, 1500)
             }
         }
     }

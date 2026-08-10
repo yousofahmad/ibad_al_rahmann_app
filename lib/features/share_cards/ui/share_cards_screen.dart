@@ -22,6 +22,7 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
   List<ShareCardCategory> _categories = [];
   bool _isLoading = true;
   int _selectedCategoryIndex = 0;
+  final Set<String> _downloadingUrls = {};
 
   @override
   void initState() {
@@ -40,6 +41,7 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
   }
 
   Future<void> _downloadAndShare(String url) async {
+    setState(() => _downloadingUrls.add(url));
     try {
       final tempDir = await getTemporaryDirectory();
       final path = "${tempDir.path}/share_image.jpg";
@@ -64,10 +66,13 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
           const SnackBar(content: Text('فشل في مشاركة الصورة')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _downloadingUrls.remove(url));
     }
   }
 
   Future<void> _saveToGallery(String url) async {
+    setState(() => _downloadingUrls.add(url));
     try {
       final tempDir = await getTemporaryDirectory();
       final path = "${tempDir.path}/temp_save.jpg";
@@ -91,7 +96,39 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
           const SnackBar(content: Text('فشل في حفظ الصورة')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _downloadingUrls.remove(url));
     }
+  }
+
+  void _showFullScreenImage(String url) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            InteractiveViewer(
+              child: CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.contain,
+                placeholder: (context, url) => const CircularProgressIndicator(color: Color(0xFFD0A871)),
+              ),
+            ),
+            Positioned(
+              top: 40.h,
+              right: 20.w,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -187,6 +224,7 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
     const gold = Color(0xFFD0A871);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
+    final isDownloading = _downloadingUrls.contains(url);
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
@@ -203,17 +241,21 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12.r)),
-              child: CachedNetworkImage(
-                imageUrl: url,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Shimmer.fromColors(
-                  baseColor: Colors.grey[300]!,
-                  highlightColor: Colors.grey[100]!,
-                  child: Container(color: Colors.white),
+            child: GestureDetector(
+              onTap: () => _showFullScreenImage(url),
+              child: ClipRRect(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(12.r)),
+                child: CachedNetworkImage(
+                  imageUrl: url,
+                  fit: BoxFit.cover,
+                  memCacheWidth: 400, // Optimize memory usage for grid images
+                  placeholder: (context, url) => Shimmer.fromColors(
+                    baseColor: Colors.grey[300]!,
+                    highlightColor: Colors.grey[100]!,
+                    child: Container(color: Colors.white),
+                  ),
+                  errorWidget: (context, url, error) => const Icon(Icons.error),
                 ),
-                errorWidget: (context, url, error) => const Icon(Icons.error),
               ),
             ),
           ),
@@ -222,18 +264,22 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.share_outlined, color: gold, size: 20),
-                  onPressed: () => _downloadAndShare(url),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.save_alt_rounded, color: gold, size: 20),
-                  onPressed: () => _saveToGallery(url),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
+                isDownloading 
+                  ? SizedBox(width: 20.w, height: 20.w, child: const CircularProgressIndicator(color: gold, strokeWidth: 2))
+                  : IconButton(
+                      icon: const Icon(Icons.share_outlined, color: gold, size: 20),
+                      onPressed: () => _downloadAndShare(url),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                isDownloading 
+                  ? SizedBox(width: 20.w, height: 20.w, child: const CircularProgressIndicator(color: gold, strokeWidth: 2))
+                  : IconButton(
+                      icon: const Icon(Icons.save_alt_rounded, color: gold, size: 20),
+                      onPressed: () => _saveToGallery(url),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
               ],
             ),
           ),

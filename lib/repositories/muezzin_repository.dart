@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/muezzin_model.dart';
@@ -9,103 +9,103 @@ class MuezzinRepository {
   final List<Muezzin> _muezzins = [
     Muezzin(
       id: 'makkah_ali_mulla',
-      name: 'الحرم المكي - علي ملا',
+      name: '????? ????? - ??? ???',
       url: 'https://download.media.islamweb.net/audio/download/mp3/1.mp3',
       fileName: 'azan_makkah_ali_mulla.mp3',
     ),
     Muezzin(
       id: 'makkah_hadrawi',
-      name: 'الحرم المكي - فاروق حضراوي',
+      name: '????? ????? - ????? ??????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/85173.mp3',
       fileName: 'azan_makkah_hadrawi.mp3',
     ),
     Muezzin(
       id: 'makkah_fida',
-      name: 'الحرم المكي - نايف فيده',
+      name: '????? ????? - ???? ????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/85149.mp3',
       fileName: 'azan_makkah_fida.mp3',
     ),
     Muezzin(
       id: 'madina_essam',
-      name: 'الحرم المدني - عصام بخاري',
+      name: '????? ?????? - ???? ?????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/5.mp3',
       fileName: 'azan_madina_essam.mp3',
     ),
     Muezzin(
       id: 'aqsa_naji',
-      name: 'المسجد الأقصى - ناجي قزاز',
+      name: '?????? ?????? - ???? ????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/7.mp3',
       fileName: 'azan_aqsa_naji.mp3',
     ),
     Muezzin(
       id: 'egypt_abdulbasit',
-      name: 'مصر - عبد الباسط عبد الصمد',
+      name: '??? - ??? ?????? ??? ?????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/122664.mp3',
       fileName: 'azan_egypt_abdulbasit.mp3',
     ),
     Muezzin(
       id: 'egypt_mustafa',
-      name: 'مصر - مصطفى إسماعيل',
+      name: '??? - ????? ???????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/176760.mp3',
       fileName: 'azan_egypt_mustafa.mp3',
     ),
     Muezzin(
       id: 'egypt_husari',
-      name: 'مصر - محمود خليل الحصري',
+      name: '??? - ????? ???? ??????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/122667.mp3',
       fileName: 'azan_egypt_husari.mp3',
     ),
     Muezzin(
       id: 'egypt_minshawi',
-      name: 'مصر - محمد صديق المنشاوي',
+      name: '??? - ???? ???? ????????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/88639.mp3',
       fileName: 'azan_egypt_minshawi.mp3',
     ),
     Muezzin(
       id: 'egypt_rifaat',
-      name: 'مصر - محمد رفعت',
+      name: '??? - ???? ????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/122665.mp3',
       fileName: 'azan_egypt_rifaat.mp3',
     ),
     Muezzin(
       id: 'kuwait_mishary',
-      name: 'الكويت - مشاري العفاسي',
+      name: '?????? - ????? ???????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/206930.mp3',
       fileName: 'azan_kuwait_mishary.mp3',
     ),
     Muezzin(
       id: 'qatar_emadi',
-      name: 'قطر - أحمد العمادي',
+      name: '??? - ???? ???????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/11.mp3',
       fileName: 'azan_qatar_emadi.mp3',
     ),
     Muezzin(
       id: 'turkey',
-      name: 'تركيا',
+      name: '?????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/122644.mp3',
       fileName: 'azan_turkey.mp3',
     ),
     Muezzin(
       id: 'algeria',
-      name: 'الجزائر - رياض الجزائري',
+      name: '??????? - ???? ????????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/317698.mp3',
       fileName: 'azan_algeria.mp3',
     ),
     Muezzin(
       id: 'palestine',
-      name: 'فلسطين - صهيب هاني',
+      name: '?????? - ???? ????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/200190.mp3',
       fileName: 'azan_palestine.mp3',
     ),
     Muezzin(
       id: 'malaysia',
-      name: 'ماليزيا',
+      name: '???????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/122660.mp3',
       fileName: 'azan_malaysia.mp3',
     ),
     Muezzin(
       id: 'bosnia',
-      name: 'البوسنة',
+      name: '???????',
       url: 'https://download.media.islamweb.net/audio/download/mp3/203248.mp3',
       fileName: 'azan_bosnia.mp3',
     ),

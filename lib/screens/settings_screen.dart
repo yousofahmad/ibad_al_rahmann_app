@@ -12,10 +12,10 @@ import 'package:ibad_al_rahmann/screens/prayer_alarms_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:ibad_al_rahmann/main.dart'; // To access scaffoldMessengerKey
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -24,8 +24,23 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObserver {
   final PrayerService _prayerService = PrayerService();
+
+
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadSettings();
+    }
+  }
 
   Future<void> _showNativeLog(BuildContext context) async {
     try {
@@ -35,6 +50,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (await file.exists()) {
         content = await file.readAsString();
       }
+      if (!context.mounted) return;
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -46,6 +62,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextButton(
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: content));
+                if (!context.mounted) return;
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('تم نسخ السجل كله', textDirection: TextDirection.rtl)),
@@ -61,6 +78,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
     } catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e")));
     }
   }
@@ -74,12 +92,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _overrideSilent = false;
   bool _useCustomVolume = false;
   int _customVolume = 100;
+  String _audioStream = 'alarm';
+  bool _forceSpeaker = false;
+  bool _enableNativeLogging = true;
   String? _googleEmail;
   String? _lastSyncTime;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _is24Hour = _prayerService.is24Hour;
     _hijriOffset = _prayerService.manualHijriOffset;
     _localHijriDelta = _prayerService.localHijriDelta;
@@ -87,7 +109,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final email = await BackupService.getSignedInEmail();
     final syncTime = await BackupService.getLastSyncTime();
     if (context.mounted) {
@@ -99,6 +121,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _overrideSilent = prefs.getBool('override_silent_mode') ?? false;
         _useCustomVolume = prefs.getBool('use_custom_notif_volume') ?? false;
         _customVolume = prefs.getInt('custom_notif_volume_level') ?? 100;
+        _audioStream = prefs.getString('audio_stream_channel') ?? 'alarm';
+        _forceSpeaker = prefs.getBool('force_speaker') ?? false;
+        _enableNativeLogging = prefs.getBool('enable_native_logging') ?? true;
         _googleEmail = email;
         _lastSyncTime = syncTime;
       });
@@ -457,7 +482,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: _flipToMute,
               activeThumbColor: const Color(0xFFD0A871),
               onChanged: (val) async {
-                final prefs = await SharedPreferences.getInstance();
+                final prefs = CacheHelper.prefs;
                 await prefs.setBool('flip_to_mute', val);
                 setState(() => _flipToMute = val);
               },
@@ -471,8 +496,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: _persistentNotification,
               activeThumbColor: const Color(0xFFD0A871),
               onChanged: (val) async {
-                final prefs = await SharedPreferences.getInstance();
+                final prefs = CacheHelper.prefs;
                 await prefs.setBool('persistent_notification_enabled', val);
+                await prefs.setBool('flutter.persistent_notification_enabled', val);
                 setState(() => _persistentNotification = val);
                 _prayerService.scheduleNotifications();
               },
@@ -506,7 +532,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: _overrideSilent,
               activeThumbColor: const Color(0xFFD0A871),
               onChanged: (val) async {
-                final prefs = await SharedPreferences.getInstance();
+                final prefs = CacheHelper.prefs;
                 await prefs.setBool('override_silent_mode', val);
                 setState(() => _overrideSilent = val);
               },
@@ -520,7 +546,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: _useCustomVolume,
               activeThumbColor: const Color(0xFFD0A871),
               onChanged: (val) async {
-                final prefs = await SharedPreferences.getInstance();
+                final prefs = CacheHelper.prefs;
                 await prefs.setBool('use_custom_notif_volume', val);
                 setState(() => _useCustomVolume = val);
               },
@@ -541,7 +567,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       activeColor: const Color(0xFFD0A871),
                       label: "$_customVolume%",
                       onChanged: (val) async {
-                        final prefs = await SharedPreferences.getInstance();
+                        final prefs = CacheHelper.prefs;
                         await prefs.setInt('custom_notif_volume_level', val.toInt());
                         setState(() => _customVolume = val.toInt());
                       },
@@ -551,7 +577,91 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "قناة تشغيل الأذان الأساسية",
+                    style: TextStyle(
+                      fontFamily: AppConsts.cairo,
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    "اختر القناة التي سيعمل عليها الأذان. (ملاحظة: اختيار قناة الإشعارات سيجعل الأذان يعمل خارج السماعات أيضاً).",
+                    style: TextStyle(
+                      fontFamily: AppConsts.cairo,
+                      fontSize: 12.sp,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  DropdownButtonFormField<String>(
+                    initialValue: _audioStream,
+                    decoration: InputDecoration(
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'alarm', child: Text("قناة المنبه (الافتراضي)", style: TextStyle(fontFamily: AppConsts.cairo))),
+                      DropdownMenuItem(value: 'media', child: Text("قناة الوسائط (الميديا)", style: TextStyle(fontFamily: AppConsts.cairo))),
+                      DropdownMenuItem(value: 'ringtone', child: Text("قناة الرنين / الإشعارات", style: TextStyle(fontFamily: AppConsts.cairo))),
+                    ],
+                    onChanged: (val) async {
+                      if (val != null) {
+                        setState(() => _audioStream = val);
+                        final prefs = CacheHelper.prefs;
+                        await prefs.setString('audio_stream_channel', val);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
 
+          // 5. Backup & Data
+          
+            
+            _buildListTile(
+              "تفعيل سجل الإشعارات",
+              "تسجيل الإشعارات للمساعدة في حل المشاكل (يُنصح بتفعيله)",
+              Icons.receipt_long_rounded,
+              trailing: Switch(
+                value: _enableNativeLogging,
+                activeThumbColor: const Color(0xFFD0A871),
+                onChanged: (val) async {
+                  final prefs = CacheHelper.prefs;
+                  await prefs.setBool('enable_native_logging', val);
+                  if (val) {
+                    try {
+                      final dir = await getApplicationSupportDirectory();
+                      final file = File('${dir.path}/native_prayer_log.txt');
+                      if (await file.exists()) {
+                        await file.delete();
+                      }
+                    } catch (_) {}
+                  }
+                  setState(() => _enableNativeLogging = val);
+                },
+              ),
+            ),
+            if (_enableNativeLogging)
+              _buildListTile(
+                "عرض سجل الإشعارات",
+                "قراءة السجل الخاص بالإشعارات وتصديره",
+                Icons.bug_report_outlined,
+                onTap: () => _showNativeLog(context),
+              ),
+            _buildListTile(
+              "تشخيص دقة أوقات الصلاة",
+              "عرض الإحداثيات وطريقة الحساب للمقارنة مع التطبيقات الأخرى",
+              Icons.my_location_outlined,
+              onTap: () => _showAccuracyDialog(context),
+            ),
           // 5. Backup & Data
           _buildSectionHeader("النسخ الاحتياطي والبيانات"),
           _buildListTile(
@@ -701,6 +811,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
               }
             },
           ),
+          if (_googleEmail != null)
+            _buildListTile(
+              "إدارة حساب المزامنة",
+              "تسجيل الخروج أو تبديل الحساب",
+              Icons.manage_accounts,
+              onTap: () async {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text("تسجيل الخروج", style: TextStyle(fontFamily: AppConsts.cairo)),
+                    content: const Text("هل تريد تسجيل الخروج من حساب جوجل درايف الحالي؟", style: TextStyle(fontFamily: AppConsts.cairo)),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text("إلغاء", style: TextStyle(fontFamily: AppConsts.cairo)),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          await BackupService.signOut();
+                          setState(() {
+                            _googleEmail = null;
+                            _lastSyncTime = null;
+                          });
+                          scaffoldMessengerKey.currentState?.showSnackBar(
+                            const SnackBar(content: Text('تم تسجيل الخروج من حساب المزامنة')),
+                          );
+                        },
+                        child: const Text("تسجيل الخروج", style: TextStyle(fontFamily: AppConsts.cairo, color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           _buildListTile(
             "استعادة من جوجل درايف",
             "تحميل آخر نسخة محفوظة من السحابة",
@@ -750,13 +895,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: _autoSyncDrive,
               activeThumbColor: const Color(0xFFD0A871),
               onChanged: (val) async {
-                final prefs = await SharedPreferences.getInstance();
+                final prefs = CacheHelper.prefs;
                 await prefs.setBool('auto_sync_drive', val);
                 await BackupService.toggleAutoSync(val);
                 setState(() => _autoSyncDrive = val);
                 if (val && context.mounted) {
+                  final times = await PrayerService.getPrayerTimesForDateStatic(DateTime.now());
+                  DateTime sTime = times != null ? times.isha.add(const Duration(hours: 1)) : DateTime.now().add(const Duration(hours: 1));
+                  if (sTime.isBefore(DateTime.now())) sTime = sTime.add(const Duration(days: 1));
+                  final timeStr = "${sTime.hour > 12 ? sTime.hour - 12 : sTime.hour}:${sTime.minute.toString().padLeft(2, '0')} ${sTime.hour >= 12 ? 'م' : 'ص'}";
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('تم تفعيل المزامنة التلقائية اليومية')),
+                    SnackBar(content: Text('تم تفعيل المزامنة التلقائية. ستعمل القادمة يوم ${sTime.day}/${sTime.month} الساعة $timeStr')),
                   );
                 }
               },
@@ -773,13 +922,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           _buildListTile(
             "عن التطبيق",
-            "الإصدار 1.1.0",
+            "الإصدار 1.1.4",
             Icons.info_outline,
             onTap: () {
               showAboutDialog(
                 context: context,
                 applicationName: "عباد الرحمن",
-                applicationVersion: "1.1.0",
+                applicationVersion: "1.1.3",
                 applicationIcon: Image.asset(
                   "assets/images/logo.png",
                   width: 50.w,
@@ -1092,6 +1241,142 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing ??
             Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16.sp),
         onTap: onTap,
+      ),
+    );
+  }
+
+  Future<void> _showAccuracyDialog(BuildContext context) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const gold = Color(0xFFD0A871);
+    final ps = _prayerService;
+    final prefs = CacheHelper.prefs;
+
+    // Gather current settings
+    final lat = prefs.getDouble('latitude') ?? prefs.getDouble('last_lat') ?? 0.0;
+    final lng = prefs.getDouble('longitude') ?? prefs.getDouble('last_lng') ?? 0.0;
+    final method = prefs.getString('calculation_method') ?? 'EGYPTIAN';
+    final madhab = prefs.getString('madhab') ?? 'SHAFI';
+    final lastGpsMs = prefs.getInt('last_gps_update_ms') ?? 0;
+    final lastGpsDate = lastGpsMs == 0
+        ? 'لم يتم بعد'
+        : '${DateTime.fromMillisecondsSinceEpoch(lastGpsMs).day}/'  
+          '${DateTime.fromMillisecondsSinceEpoch(lastGpsMs).month}/'  
+          '${DateTime.fromMillisecondsSinceEpoch(lastGpsMs).year}';
+
+    final offsets = ps.adjustments;
+    final times = ps.getPrayerTimes();
+
+    String fmt(DateTime? dt) {
+      if (dt == null) return '--:--';
+      final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final m = dt.minute.toString().padLeft(2, '0');
+      final s = dt.second.toString().padLeft(2, '0');
+      final ampm = dt.hour >= 12 ? 'م' : 'ص';
+      return '$h:$m:$s $ampm';
+    }
+
+    final rows = [
+      ['الفجر',   fmt(times?.fajr),    offsets['Fajr'] ?? 0],
+      ['الشروق',  fmt(times?.sunrise),  offsets['Sunrise'] ?? 0],
+      ['الظهر',   fmt(times?.dhuhr),    offsets['Dhuhr'] ?? 0],
+      ['العصر',   fmt(times?.asr),      offsets['Asr'] ?? 0],
+      ['المغرب',  fmt(times?.maghrib),  offsets['Maghrib'] ?? 0],
+      ['العشاء',  fmt(times?.isha),     offsets['Isha'] ?? 0],
+    ];
+
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
+        title: Row(
+          children: [
+            const Icon(Icons.gps_fixed, color: gold),
+            SizedBox(width: 8.w),
+            Text('دقة أوقات الصلاة',
+              style: TextStyle(fontFamily: 'Cairo', fontSize: 16.sp, color: gold)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Coordinates
+              _diagCard(isDark, 'الإحداثيات المستخدمة',
+                '${lat.toStringAsFixed(6)}° ،  ${lng.toStringAsFixed(6)}°\n'
+                'آخر تحديث GPS: $lastGpsDate'),
+              SizedBox(height: 8.h),
+              // Method
+              _diagCard(isDark, 'طريقة الحساب والمذهب',
+                '${_getMethodName(method.toLowerCase())}\n'
+                'المذهب: ${madhab == 'HANAFI' ? 'الحنفي' : 'الشافعي (الجمهور)'}'),
+              SizedBox(height: 8.h),
+              // Times table
+              Container(
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: Border.all(color: gold.withValues(alpha: 0.3)),
+                ),
+                padding: EdgeInsets.all(10.w),
+                child: Column(
+                  children: rows.map<Widget>((r) => Padding(
+                    padding: EdgeInsets.symmetric(vertical: 3.h),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(r[0] as String, style: TextStyle(fontFamily: 'Cairo', fontSize: 13.sp,
+                          color: isDark ? Colors.white : Colors.black87)),
+                        Text(r[1] as String, style: TextStyle(fontFamily: 'Cairo', fontSize: 13.sp,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87)),
+                        Text((r[2] as int) == 0 ? '—' : '${(r[2] as int) > 0 ? '+' : ''}${r[2]} د',
+                          style: TextStyle(fontFamily: 'Cairo', fontSize: 11.sp, color: Colors.grey)),
+                      ],
+                    ),
+                  )).toList(),
+                ),
+              ),
+              SizedBox(height: 8.h),
+              Text(
+                'ملاحظة: إذا كانت هناك فروق مع تطبيقات أخرى، تحقق من:\n'
+                '• تطابق الإحداثيات\n'
+                '• تطابق طريقة الحساب\n'
+                '• التعديلات اليدوية (العمود الأيسر)',
+                style: TextStyle(fontFamily: 'Cairo', fontSize: 11.sp, color: Colors.grey),
+                textDirection: TextDirection.rtl,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إغلاق', style: TextStyle(color: gold, fontFamily: 'Cairo')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _diagCard(bool isDark, String title, String body) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(10.w),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: const Color(0xFFD0A871).withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: TextStyle(fontFamily: 'Cairo', fontSize: 12.sp,
+            color: const Color(0xFFD0A871), fontWeight: FontWeight.bold)),
+          SizedBox(height: 4.h),
+          Text(body, style: TextStyle(fontFamily: 'Cairo', fontSize: 12.sp,
+            color: isDark ? Colors.white70 : Colors.black87)),
+        ],
       ),
     );
   }

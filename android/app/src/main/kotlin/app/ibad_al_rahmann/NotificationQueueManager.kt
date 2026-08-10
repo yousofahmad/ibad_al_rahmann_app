@@ -124,7 +124,8 @@ object NotificationQueueManager {
         val title = intent.getStringExtra("title") ?: ""
         val body = intent.getStringExtra("body") ?: ""
         val payload = intent.getStringExtra("target_page") ?: "home"
-        val soundName = intent.getStringExtra("sound_name") ?: "silent"
+        // Force silent sound!
+        val soundName = "silent" 
         
         AlarmReceiver.buildAndShowNotification(context, id, title, body, soundName, payload, null, null)
     }

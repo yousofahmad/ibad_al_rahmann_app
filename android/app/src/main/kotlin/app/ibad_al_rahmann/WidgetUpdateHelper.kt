@@ -74,6 +74,8 @@ object WidgetUpdateHelper {
     fun onPrayerAlarmFired(context: Context, alarmId: Int) {
         try {
             PrayerDataPatcher.patchTodayEpochsFrom30d(context)
+            NativeHijriHelper.updateNativeHijriDate(context)
+            
             val activeWidgetData = context.getSharedPreferences("HomeWidgetPreferences", Context.MODE_PRIVATE)
             val now = System.currentTimeMillis()
 
@@ -143,8 +145,10 @@ object WidgetUpdateHelper {
     }
 
     private fun updateNotification(context: Context) {
-        // Disabled: Widgets should NOT randomly sync the notification service
-        // It causes ForegroundServiceDidNotStartInTimeException if main thread is blocked.
+        try {
+            val intent = Intent(context, PrayerNotificationService::class.java).apply { action = "SYNC" }
+            context.startService(intent) // Safe because the service is already running in foreground
+        } catch (e: Exception) { e.printStackTrace() }
     }
 
     private fun scheduleNextWidgetUpdate(context: Context, triggerAtMillis: Long) {

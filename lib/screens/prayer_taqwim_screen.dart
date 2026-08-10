@@ -7,13 +7,13 @@ import 'package:hijri/hijri_calendar.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../services/prayer_service.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../core/constants/daily_wisdoms.dart';
 import '../widgets/app_skeleton.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class PrayerTaqwimScreen extends StatefulWidget {
   const PrayerTaqwimScreen({super.key});
@@ -48,7 +48,7 @@ class _PrayerTaqwimScreenState extends State<PrayerTaqwimScreen> {
   }
 
   Future<void> _loadBgColor() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     final colorVal = prefs.getInt('taqwim_bg_color');
     if (colorVal != null) {
       setState(() => _customBgColor = Color(colorVal));
@@ -56,7 +56,7 @@ class _PrayerTaqwimScreenState extends State<PrayerTaqwimScreen> {
   }
 
   Future<void> _saveBgColor(Color color) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setInt('taqwim_bg_color', color.toARGB32());
     setState(() => _customBgColor = color);
   }

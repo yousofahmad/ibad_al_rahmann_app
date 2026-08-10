@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
@@ -25,7 +26,9 @@ class QuranDbHelper {
       // Make sure the parent directory exists
       try {
         await Directory(dirname(path)).create(recursive: true);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Error creating DB directory: $e');
+      }
 
       // Copy from asset
       ByteData data = await rootBundle.load(

@@ -82,12 +82,9 @@ object NativePrayerManager {
     fun getHijriDate(context: Context, date: Date = Date()): String {
         val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         
-        // Pull manual offset or Firebase override
-        // Priority: firebase_hijri_offset > manual_hijri_offset
-        val firebaseOffset = prefs.all["flutter.firebase_hijri_offset"] as? Long ?: 0L
-        val manualOffset = prefs.all["flutter.hijri_offset"] as? Long ?: 0L
-        
-        val totalOffset = firebaseOffset + manualOffset
+        // Pull the total offset calculated and saved by Flutter
+        // (Flutter's 'hijri_offset' already contains firebaseOffset + manualOffset)
+        val totalOffset = prefs.all["flutter.hijri_offset"] as? Long ?: 0L
         
         val calendar = Calendar.getInstance()
         calendar.time = date
@@ -144,11 +141,21 @@ object NativePrayerManager {
 }
 
 object HijriCalendarHelper {
-    fun getArabicDate(date: Date): String {
+    fun getHijriDateComponents(date: Date): Triple<Int, Int, Int> {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            val icuCal = android.icu.util.IslamicCalendar()
+            icuCal.calculationType = android.icu.util.IslamicCalendar.CalculationType.ISLAMIC_CIVIL
+            icuCal.time = date
+            val hDay = icuCal.get(android.icu.util.IslamicCalendar.DAY_OF_MONTH)
+            val hMonth = icuCal.get(android.icu.util.IslamicCalendar.MONTH) + 1
+            val hYear = icuCal.get(android.icu.util.IslamicCalendar.YEAR)
+            return Triple(hDay, hMonth, hYear)
+        }
+
         val cal = Calendar.getInstance()
         cal.time = date
         
-        var day = cal.get(Calendar.DAY_OF_MONTH)
+        val day = cal.get(Calendar.DAY_OF_MONTH)
         var month = cal.get(Calendar.MONTH) + 1
         var year = cal.get(Calendar.YEAR)
 
@@ -159,17 +166,17 @@ object HijriCalendarHelper {
             m += 12
         }
 
-        var a = Math.floor(y / 100.0).toInt()
-        var b = 2 - a + Math.floor(a / 4.0).toInt()
+        val a = Math.floor(y / 100.0).toInt()
+        val b = 2 - a + Math.floor(a / 4.0).toInt()
         
-        var jd = Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + day + b - 1524.5
+        val jd = Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + day + b - 1524.5
 
-        var z = jd + 0.5
-        var cyc = Math.floor((z - 1948439.5) / 10631.0).toInt()
-        var rem = z - 1948439.5 - cyc * 10631.0
+        val z = jd + 0.5
+        val cyc = Math.floor((z - 1948439.5) / 10631.0).toInt()
+        val rem = z - 1948439.5 - cyc * 10631.0
         
-        var j = Math.floor((rem - 0.12) / 354.3666).toInt()
-        var res = rem - Math.floor(j * 354.3666 + 0.5)
+        val j = Math.floor((rem - 0.12) / 354.3666).toInt()
+        val res = rem - Math.floor(j * 354.3666 + 0.5)
         
         var hYear = cyc * 30 + j + 1
         var hMonth = Math.floor((res + 28.5001) / 29.5).toInt()
@@ -178,6 +185,17 @@ object HijriCalendarHelper {
         var hDay = (res - Math.floor(hMonth * 29.5 - 28.999)).toInt()
         if (hDay == 0) hDay = 1
 
+        if (hMonth == 0) {
+            hMonth = 12
+            hYear -= 1
+            hDay = 30
+        }
+
+        return Triple(hDay, hMonth, hYear)
+    }
+
+    fun getArabicDate(date: Date): String {
+        val (hDay, hMonth, hYear) = getHijriDateComponents(date)
         val monthsAr = arrayOf(
             "محرم", "صفر", "ربيع الأول", "ربيع الثاني", "جمادى الأولى", "جمادى الآخرة",
             "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"

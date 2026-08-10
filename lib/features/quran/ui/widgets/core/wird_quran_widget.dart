@@ -226,6 +226,7 @@ class _WirdQuranWidgetState extends State<WirdQuranWidget>
                       Expanded(
                         child: (!state.isAutoScrolling)
                             ? PageView.builder(
+      allowImplicitScrolling: true,
                                 controller: _controller,
                                 physics: const BouncingScrollPhysics(
                                   parent: PageScrollPhysics(),

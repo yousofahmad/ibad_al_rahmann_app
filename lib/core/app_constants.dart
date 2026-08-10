@@ -1,4 +1,4 @@
-﻿class AppConsts {
+class AppConsts {
   static const prayersTime = 'prayersTime';
 
   static const uthmanic = 'uthmanic';
@@ -15,7 +15,7 @@
   static const cairo = 'Cairo';
   static const amiri = 'AmiriQuran';
   static const motoNastaliq = 'NotoNastaliqUrdu';
-  // خطوط رموز القرآن
+  // ???? ???? ??????
   static const surahNames = 'SurahNames'; // surah-name-v4.ttf
   static const quranCommon = 'QuranCommon'; // quran-common.ttf
 

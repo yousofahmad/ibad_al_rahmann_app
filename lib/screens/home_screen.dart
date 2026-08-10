@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/theme/app_images.dart';
@@ -25,13 +25,14 @@ import 'widgets/prayer_ring_widget.dart';
 import 'more_screen.dart'; // Import More Screen
 import 'accountability_screen.dart';
 import '../features/qadaa/ui/qadaa_screen.dart';
-import 'time_for_allah_screen.dart';
+import 'prayer_focus_screen.dart';
 import '../features/quran/ui/quran_screen.dart';
 import '../features/wird/ui/wird_dashboard_screen.dart';
 import '../features/wird/ui/isolated_wird_screen.dart';
 import '../features/wird/bloc/khatma_cubit.dart';
 import '../services/daily_tracker_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class HomeScreen extends StatefulWidget {
   final int initialIndex;
@@ -83,7 +84,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // Small delay to ensure UI is stable
       await Future.delayed(const Duration(seconds: 2));
       if (mounted && WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-        NotificationService.checkAndRequestBatteryPermission(context);
+        // Request essential permissions on startup
+        try {
+          await Permission.notification.request();
+          if (await Permission.scheduleExactAlarm.isDenied) {
+            await Permission.scheduleExactAlarm.request();
+          }
+        } catch (e) {
+          debugPrint("Failed to request permissions: ");
+        }
+        if (mounted) {
+          NotificationService.checkAndRequestBatteryPermission(context);
+        }
       }
     });
 
@@ -493,14 +505,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   isDelayed: true,
                 ),
               );
-            } else if (delayedWirds == 0) {
+            } else if (delayedWirds <= 0) {
               final target = context.read<KhatmaCubit>().getCurrentTargetWird(
                 khatma.id,
               );
               if (target != null && !target.isCompleted) {
                 inProgressWirdCards.add(
                   _buildReminderCard(
-                    "أكمل قراءة الورد الحالي: ${khatma.name}",
+                    delayedWirds < 0 
+                        ? "أنت متقدم في ${khatma.name} بمقدار ${-delayedWirds} ورد"
+                        : "أكمل قراءة الورد الحالي: ${khatma.name}",
                     () {
                       final w = khatma.wirds[khatma.currentWirdIndex];
                       final cubit = context.read<KhatmaCubit>();
@@ -776,10 +790,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     hideTitle: true,
                   ),
                   _buildGridItem(
-                    "وقت لله",
-                    Icons.hourglass_bottom_rounded,
-                    const TimeForAllahScreen(),
-                    imagePath: "assets/images/time_for_allah_card.png",
+                    "صلاتي",
+                    Icons.mosque_rounded,
+                    const PrayerFocusScreen(),
+                    imagePath: "assets/images/salati_card.png",
                   ),
                   _buildGridItem(
                     "حصن المسلم",
@@ -860,7 +874,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 _currentIndex = index;
                 if (index == 0) _loadPrayerTimes();
               });
-              final prefs = await SharedPreferences.getInstance();
+              final prefs = CacheHelper.prefs;
               await prefs.setInt('last_home_tab_index', index);
             },
             items: const [

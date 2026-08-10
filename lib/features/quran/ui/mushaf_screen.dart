@@ -8,6 +8,7 @@ import 'layouts/mobile_quran_top_bar.dart';
 import 'layouts/mobile_min_quran_bottom_section.dart';
 import 'widgets/menus/single_tap_menu.dart';
 import '../bloc/quran/quran_cubit.dart';
+import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import '../../../widgets/app_skeleton.dart';
 
 class MushafScreen extends StatefulWidget {
@@ -131,6 +132,7 @@ class _MushafScreenState extends State<MushafScreen> {
                               },
                             )
                           : PageView.builder(
+      allowImplicitScrolling: true,
                               controller: _pageController,
                               itemCount: 604,
                               reverse: true,
@@ -267,10 +269,11 @@ class _MushafScreenState extends State<MushafScreen> {
                   alignment: Alignment.center,
                   child: Padding(
                     padding: EdgeInsets.symmetric(
-                      horizontal: context
-                          .watch<QuranCubit>()
-                          .state
-                          .quranPageMargin,
+                      horizontal: (context.isTablet ? 24.0 : 0.0) +
+                          context
+                              .watch<QuranCubit>()
+                              .state
+                              .quranPageMargin,
                     ),
                     child: SizedBox(
                       width: 1000,

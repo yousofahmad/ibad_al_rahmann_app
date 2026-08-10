@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/alert_helper.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/app_navigator.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cubit.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:quran/quran.dart' as quran;
 import '../../../../../screens/share_setup_screen.dart';
 
 import './verse_details_bottom_sheet.dart';
@@ -129,6 +131,19 @@ class _VerseBottomSheetState extends State<VerseBottomSheet> {
                     ),
                   )
                 : const Icon(Icons.share_rounded, color: Colors.white),
+          ),
+          IconButton(
+            iconSize: 32.w,
+            onPressed: _isOpeningShare
+                ? null
+                : () {
+                    final currentVerse = cubit.currnetVerse;
+                    if (currentVerse == null) return;
+                    final text = quran.getVerse(currentVerse.surahNumber, currentVerse.verseNumber, verseEndSymbol: true);
+                    Clipboard.setData(ClipboardData(text: text));
+                    AlertHelper.showSuccessAlert(context, message: 'تم نسخ الآية');
+                  },
+            icon: const Icon(Icons.copy_rounded, color: Colors.white),
           ),
           IconButton(
             iconSize: 40.w,

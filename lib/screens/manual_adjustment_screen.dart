@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class ManualAdjustmentScreen extends StatefulWidget {
   const ManualAdjustmentScreen({super.key});
@@ -41,7 +41,7 @@ class _ManualAdjustmentScreenState extends State<ManualAdjustmentScreen> {
   }
 
   Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     setState(() {
       for (var p in _prayers) {
         // Adhan: standard adjustment keys from PrayerService
@@ -62,7 +62,7 @@ class _ManualAdjustmentScreenState extends State<ManualAdjustmentScreen> {
   }
 
   Future<void> _saveIqama(String prayer, int val) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setInt('iqama_minutes_$prayer', val);
     setState(() => _iqamaAdjustments[prayer] = val);
   }

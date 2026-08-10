@@ -1,4 +1,4 @@
-﻿import 'package:ibad_al_rahmann/core/networking/api_keys.dart';
+import 'package:ibad_al_rahmann/core/networking/api_keys.dart';
 
 class ReciterMoshaf {
   final int id, surahTotal;
@@ -39,11 +39,11 @@ class ReciterModel {
   factory ReciterModel.fromJson(Map<String, dynamic> json) {
     // String? handleStyle(String? style) {
     //   if (style == 'Mujawwad') {
-    //     return 'مجود';
+    //     return '????';
     //   } else if (style == 'Murattal') {
-    //     return 'مرتل';
+    //     return '????';
     //   } else if (style == 'Muallim') {
-    //     return 'مُعلم';
+    //     return '?????';
     //   } else {
     //     return null;
     //   }

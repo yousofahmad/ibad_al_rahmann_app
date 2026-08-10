@@ -50,4 +50,8 @@ build/
 **/ios/Flutter/app.flx
 **/ios/Flutter/app.zip
 **/ios/ServiceDefinitions.json
-**/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/Runner/GeneratedPluginRegistrant.* 
+# Firebase
+lib/firebase_options.dart
+**/google-services.json
+

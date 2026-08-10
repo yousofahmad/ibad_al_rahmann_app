@@ -9,6 +9,7 @@ import 'stats_screen.dart';
 import '../services/daily_tracker_service.dart';
 
 import 'package:ibad_al_rahmann/main.dart'; // To access scaffoldMessengerKey
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class AccountabilityScreen extends StatefulWidget {
   const AccountabilityScreen({super.key});
@@ -63,10 +64,24 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
 
   // 🔥 دالة تحميل البيانات المحفوظة لليوم الحالي 🔥
   Future<void> _loadDailyProgress() async {
+    final prefs = CacheHelper.prefs;
+    // 🔥 ضروري: نجيب البيانات من الديسك أولاً BEFORE أي reset منطق
+    // عشان البيانات اللي كتبها الأندرويد النيتف (PrayerFocusOverlay) متتمسحش
+    await prefs.reload();
+
+    // ✅ احفظ البيانات النيتف المهمة قبل أي reset
+    final nativeTempPrayers = prefs.getString('temp_prayers');
+
     // ✅ التأكد من تهيئة بيانات اليوم وعمل Reset لو يوم جديد
     await DailyTrackerService.initStatsForToday();
 
-    final prefs = await SharedPreferences.getInstance();
+    // ✅ لو DailyTracker مسح temp_prayers (يوم جديد) ارجع للبيانات النيتف لو موجودة
+    // (ممكن تكون كتبها PrayerFocusOverlay قبل ما الفلاتر يفتح)
+    if (nativeTempPrayers != null && prefs.getString('temp_prayers') == null) {
+      await prefs.setString('temp_prayers', nativeTempPrayers);
+    }
+
+    await prefs.reload(); // Reload مرة تانية بعد initStatsForToday
 
     // ✅ استرجاع العلامات التي علمناها لليوم الحالي
     _loadMapFromPrefs(prefs, 'temp_prayers', _prayers);
@@ -104,8 +119,12 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
     if (jsonStr != null) {
       Map<String, dynamic> decoded = json.decode(jsonStr);
       decoded.forEach((k, v) {
-        if (targetMap.containsKey(k)) {
-          targetMap[k] = v;
+        String actualKey = k;
+        if (k == 'الجمعة' && targetMap.containsKey('الظهر')) {
+          actualKey = 'الظهر';
+        }
+        if (targetMap.containsKey(actualKey)) {
+          targetMap[actualKey] = v;
         }
       });
     }
@@ -122,7 +141,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
       map[itemKey] = value;
     });
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     // بنحول الماب لنص JSON ونحفظها في مفتاح مؤقت
     await prefs.setString(key, json.encode(map));
 
@@ -167,8 +186,18 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
       'total': totalScore,
     };
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setString('stats_$dateKey', json.encode(dailyData));
+
+    // ✅ Streak بنسبة 50%: لو الأذكار وصلت 50%+ تُحسب في الاستريك حتى لو ما اكتملت
+    // هذا يمنع الإحباط ويشجع على الاستمرار
+    if (azkarScore >= 50.0) {
+      final morningDone = _azkar['أذكار الصباح'] ?? false;
+      final eveningDone = _azkar['أذكار المساء'] ?? false;
+      // لو عدلها من شاشة حاسب نفسك ولم يدخل صفحة الأذكار، نسجل الاستريك
+      if (morningDone) await DailyTrackerService.markAsDone('morning_azkar');
+      if (eveningDone) await DailyTrackerService.markAsDone('evening_azkar');
+    }
   }
 
   // دالة حفظ السجل التاريخي (الإحصائيات النهائية)
@@ -237,7 +266,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
       // تصليح بسيط عشان يتوافق مع صيغة DateFormat اللي فوق
       final String formattedKey = DateFormat('yyyy-MM-dd').format(pickedDate);
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = CacheHelper.prefs;
       // بنجرب الصيغتين عشان التوافق
       String? jsonStr =
           prefs.getString('stats_$formattedKey') ??

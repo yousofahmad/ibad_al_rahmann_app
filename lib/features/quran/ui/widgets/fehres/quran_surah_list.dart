@@ -30,6 +30,7 @@ class _QuranSurahListState extends State<QuranSurahList> {
   @override
   Widget build(BuildContext context) {
     return PageView.builder(
+      allowImplicitScrolling: true,
       controller: context.read<QuranCubit>().surahsController,
       scrollDirection: Axis.horizontal,
       clipBehavior: Clip.none, // دي مهمة عشان لو الكلمة كبيرة متتقصش

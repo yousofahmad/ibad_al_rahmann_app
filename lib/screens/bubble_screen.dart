@@ -1,4 +1,4 @@
-﻿// Using logo.png as verified. No changes needed if already correct.
+// Using logo.png as verified. No changes needed if already correct.
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
@@ -13,21 +13,21 @@ class _BubbleScreenState extends State<BubbleScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent, // ضروري عشان تبان كدايرة بس
+      backgroundColor: Colors.transparent, // ????? ???? ???? ?????? ??
       body: Center(
         child: GestureDetector(
           onTap: () async {
-            // 1. لما يدوس عليها، نبعت رسالة للتطبيق الرئيسي
+            // 1. ??? ???? ?????? ???? ????? ??????? ???????
             await FlutterOverlayWindow.shareData("OPEN_AZKAR");
-            // 2. نقفل الفقاعة (اختياري، لو عايزها تفضل موجودة شيل السطر ده)
+            // 2. ???? ??????? (???????? ?? ?????? ???? ?????? ??? ????? ??)
             // await FlutterOverlayWindow.closeOverlay();
           },
           child: Container(
-            width: 70, // حجم الدايرة
+            width: 70, // ??? ???????
             height: 70,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFFD0A871), // لون ذهبي
+              color: const Color(0xFFD0A871), // ??? ????
               border: Border.all(color: Colors.white, width: 2),
               boxShadow: [
                 BoxShadow(
@@ -36,13 +36,13 @@ class _BubbleScreenState extends State<BubbleScreen> {
                   spreadRadius: 2,
                 ),
               ],
-              // هنا ممكن تحط صورة اللوجو بتاعك
+              // ??? ???? ??? ???? ?????? ?????
               image: const DecorationImage(
                 image: AssetImage('assets/images/logo.png'),
                 fit: BoxFit.cover,
               ),
             ),
-            // لو الصورة مش موجودة أو لسه، الأيقونة دي هتظهر
+            // ?? ?????? ?? ?????? ?? ???? ???????? ?? ?????
             child: const Icon(Icons.touch_app, color: Colors.white, size: 30),
           ),
         ),

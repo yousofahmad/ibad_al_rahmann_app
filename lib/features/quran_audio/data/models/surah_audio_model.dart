@@ -1,4 +1,4 @@
-﻿import 'package:ibad_al_rahmann/core/networking/api_keys.dart';
+import 'package:ibad_al_rahmann/core/networking/api_keys.dart';
 
 import '../surah_list.dart';
 

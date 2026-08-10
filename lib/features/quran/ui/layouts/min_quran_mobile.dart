@@ -64,6 +64,7 @@ class _MinQuranMobileState extends State<MinQuranMobile> {
             ),
             Expanded(
               child: PageView.builder(
+      allowImplicitScrolling: true,
                 controller: context.read<QuranCubit>().minQuranController,
                 itemCount: 604,
                 onPageChanged: (value) =>

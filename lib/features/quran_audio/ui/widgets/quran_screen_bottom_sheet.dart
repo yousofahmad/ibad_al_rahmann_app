@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import 'package:ibad_al_rahmann/core/theme/app_assets.dart';
@@ -32,7 +32,7 @@ class SurahOverlayPlayer extends StatelessWidget {
         child: Column(
           children: [
             Text(
-              'سورة ${quranSurahs[cubit.selectedSurah! - 1]}',
+              '???? ${quranSurahs[cubit.selectedSurah! - 1]}',
               style: AppStyles.style26expo,
               overflow: TextOverflow.ellipsis,
             ),

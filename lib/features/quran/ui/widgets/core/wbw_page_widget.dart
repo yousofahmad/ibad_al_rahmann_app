@@ -188,7 +188,9 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
       }
       await QuranWbwDbHelper.instance.getPageLines(page);
       await QuranWbwDbHelper.instance.getPageWords(page);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error preloading neighbor page: $e');
+    }
   }
 
   Future<void> _fetchDbData() async {
@@ -221,7 +223,9 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
           if (!playerCubit.state.showed) {
             playerCubit.hide();
           }
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Error hiding player cubit on timer: $e');
+        }
         if (mounted) {
           setState(() {
             _selectedWord = null;
@@ -801,8 +805,8 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
             ? maxWidthAllowed
             : screenWidth;
         final double sidePadding = screenWidth > maxWidthAllowed
-            ? (screenWidth - maxWidthAllowed) / 2
-            : (widget.isLandscape ? 0.0 : 2.0);
+            ? ((screenWidth - maxWidthAllowed) / 2)
+            : (widget.isLandscape ? 0.0 : (context.isTablet ? 24.0 : 2.0));
 
         final double margin = context.select<QuranCubit, double>((c) => c.state.quranPageMargin);
 

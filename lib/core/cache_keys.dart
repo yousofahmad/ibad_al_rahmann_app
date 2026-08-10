@@ -1,4 +1,4 @@
-﻿class CacheKeys {
+class CacheKeys {
   static const themeMode = 'themeMode';
   static const lightTheme = 'lightTheme';
   static const darkTheme = 'darkTheme';

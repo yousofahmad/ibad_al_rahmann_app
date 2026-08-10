@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 // تأكد إن أسماء الملفات دي مطابقة للي عندك بالظبط (ممكن تكون بشرطة - أو underscore _)
 import 'package:permission_handler/permission_handler.dart';
 import '../services/notification_service.dart';
-import 'azkar_page.dart';
 import 'permissions_screen.dart';
 import 'onboarding_screen.dart';
 import 'home_screen.dart';
-import 'package:ibad_al_rahmann/features/qadaa/ui/qadaa_screen.dart';
-import 'package:ibad_al_rahmann/features/quran/ui/quran_screen.dart';
-import 'ramadan_screen.dart';
+import 'package:ibad_al_rahmann/main.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -33,15 +30,25 @@ class _SplashScreenState extends State<SplashScreen> {
     super.didChangeDependencies();
     if (!_initialized) {
       _initialized = true;
-      // Remove native splash as early as possible to show the custom lanterns
-      FlutterNativeSplash.remove();
-      _checkUser();
+      
+      // Precache the heavy background image first
+      precacheImage(const AssetImage('assets/images/mosque_bottom.webp'), context).then((_) {
+        // Remove native splash only after the image is fully decoded and ready
+        FlutterNativeSplash.remove();
+        _checkUser();
+      }).catchError((e) {
+        debugPrint("Splash image precache error: $e");
+        FlutterNativeSplash.remove();
+        _checkUser();
+      });
     }
   }
 
   Future<void> _checkUser() async {
-    // 1. Minimum visibility timer for the Lanterns splash
-    final timerFuture = Future.delayed(const Duration(milliseconds: 500));
+    NotificationService.nativeLog('SplashScreen._checkUser: started');
+
+    // 1. Minimum visibility timer for the custom splash (increased to 800ms)
+    final timerFuture = Future.delayed(const Duration(milliseconds: 800));
 
     // 2. Check Launch Payload (Parallel)
     final payloadFuture = NotificationService.checkLaunchPayload();
@@ -59,58 +66,32 @@ class _SplashScreenState extends State<SplashScreen> {
     // Extract results
     final String? startPayload = results[1] as String?;
     final PermissionStatus notificationStatus = results[2] as PermissionStatus;
-    
+
+    NotificationService.nativeLog('SplashScreen._checkUser: startPayload=$startPayload');
+
     // Defer SharedPreferences a bit to avoid CPU spike
     await Future.delayed(const Duration(milliseconds: 100));
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
 
-    if (!mounted) return;
+    if (!mounted) {
+      NotificationService.nativeLog('SplashScreen._checkUser: not mounted, abort');
+      return;
+    }
 
     // A. Handle Payload (Click from terminated)
     if (startPayload != null) {
+      final payload = startPayload;
+      NotificationService.nativeLog('SplashScreen: pushing HomeScreen for payload=$payload');
+      // Push HomeScreen first (clears all previous routes)
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false,
       );
-      // Wait a bit then push payload
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (!mounted) return;
-        if (startPayload == 'morning' || startPayload == 'sabah') {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const AzkarPage(
-                title: 'أذكار الصباح',
-                jsonFile: 'morning.json',
-                image: 'assets/images/morning.jpg',
-              ),
-            ),
-          );
-        } else if (startPayload == 'evening' || startPayload == 'masaa') {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const AzkarPage(
-                title: 'أذكار المساء',
-                jsonFile: 'evening.json',
-                image: 'assets/images/night.jpg',
-              ),
-            ),
-          );
-        } else if (startPayload == 'qadaa') {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const QadaaScreen()),
-          );
-        } else if (startPayload == 'kahf') {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const QuranScreen(isKahfMode: true),
-            ),
-          );
-        } else if (startPayload == 'fasting') {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const RamadanScreen()),
-          );
-        }
-      });
+      // Wait for HomeScreen to fully render before pushing the target screen
+      await Future.delayed(const Duration(milliseconds: 600));
+      NotificationService.nativeLog('SplashScreen: 600ms done, navigating to $payload');
+      // Call handleGlobalNavigation DIRECTLY — no ValueNotifier indirection
+      handleGlobalNavigation(payload);
       return;
     }
 

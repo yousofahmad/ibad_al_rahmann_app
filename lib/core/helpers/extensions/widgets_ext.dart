@@ -1,4 +1,4 @@
-﻿import 'package:flutter/widgets.dart';
+import 'package:flutter/widgets.dart';
 
 extension WidgetsExt on Widget {
   Widget withSafeArea() {

@@ -20,7 +20,7 @@ import java.util.Date
 object NativePrayerScheduler {
 
     // Today's alarm IDs — must match Flutter's existing ID scheme exactly
-    private val PRAYER_IDS  = intArrayOf(100, 102, 103, 104, 105) // Fajr, Dhuhr, Asr, Maghrib, Isha
+    private val PRAYER_IDS  = intArrayOf(100, 101, 102, 103, 104) // Fajr, Dhuhr, Asr, Maghrib, Isha
     private val PRE_IDS     = intArrayOf(3000, 3001, 3002, 3003, 3004)
     private val IQAMA_IDS   = intArrayOf(5000, 5001, 5002, 5003, 5004)
     // Tomorrow's Fajr uses ID 110 (matches Flutter: 100 + 0 + 10)
@@ -54,7 +54,8 @@ object NativePrayerScheduler {
                     todayTimes.dhuhr.time,
                     todayTimes.asr.time,
                     todayTimes.maghrib.time,
-                    todayTimes.isha.time
+                    todayTimes.isha.time,
+                    todayTimes.sunrise.time
                 )
                 val tomorrowTimes = NativePrayerManager.calculatePrayerTimes(context, Date(now + 86_400_000L))
                 if (tomorrowTimes != null) {
@@ -93,100 +94,144 @@ object NativePrayerScheduler {
         
         var scheduledCount = 0
 
+        // Pre-calculate tomorrow's epochs — used as fallback when today's prayer already passed
+        val tomorrowEpochsFallback: LongArray? = try {
+            val tomDate = java.util.Date(now + 86_400_000L)
+            val tomTimes = NativePrayerManager.calculatePrayerTimes(context, tomDate)
+            if (tomTimes != null) longArrayOf(
+                tomTimes.fajr.time, tomTimes.dhuhr.time, tomTimes.asr.time,
+                tomTimes.maghrib.time, tomTimes.isha.time
+            ) else getEpochsFromCache(context, tomDate)
+        } catch (e: Exception) { null }
+
         for (i in 0..4) {
-            var engName = PRAYER_NAMES_EN[i]
-            var arName  = PRAYER_NAMES_AR[i]
-            var payload = "prayer"
-            val epoch   = todayEpochs[i]
+            val todayEpochRaw = (todayEpochs[i] / 60_000L) * 60_000L
+            val tomEpochRaw = tomorrowEpochsFallback?.getOrNull(i)?.let { (it / 60_000L) * 60_000L }
 
-            // Jumuah Check: If it's Dhuhr and today is Friday
-            val calendar = java.util.Calendar.getInstance()
-            calendar.timeInMillis = epoch
-            if (i == 1 && calendar.get(java.util.Calendar.DAY_OF_WEEK) == java.util.Calendar.FRIDAY) {
-                engName = "Jumuah"
-                arName = "الجمعة"
-                payload = "jumuah"
-            }
+            val candidates = listOfNotNull(todayEpochRaw, tomEpochRaw)
+            
+            var adhanScheduled = false
+            var preScheduled = false
+            var iqamaScheduled = false
 
-            val adhanBody = when (engName) {
-                "Fajr" -> "من صلى الفجر في جماعة فهو في ذمة الله"
-                "Dhuhr" -> "لا تجعل عملك يلهيك عن أداء الصلاة"
-                "Jumuah" -> "فيه ساعة لا يوافقها عبد مسلم يسأل الله شيئا إلا أعطاه إياه"
-                "Asr" -> "حافظوا على الصلوات والصلاة الوسطى"
-                "Maghrib" -> "لا يزال الناس بخير ما عجلوا الفطر"
-                "Isha" -> "صلاة العشاء في جماعة كقيام نصف الليل"
-                else -> "حان موعد صلاة $arName"
-            }
+            for (epoch in candidates) {
+                var engName = PRAYER_NAMES_EN[i]
+                var arName  = PRAYER_NAMES_AR[i]
+                var payload = "prayer"
 
-            val iqamaBody = if (engName == "Fajr") "تقام الآن صلاة الفجر .. أفلح من صلى" else "تقام الآن صلاة $arName .. استووا واعتدلوا"
-            val preBody = "الدعاء لا يرد بين الأذان والإقامة .. استعد للصلاة"
+                // Jumuah Check: If it's Dhuhr and the epoch is Friday
+                val calendar = java.util.Calendar.getInstance()
+                calendar.timeInMillis = epoch
+                if (i == 1 && calendar.get(java.util.Calendar.DAY_OF_WEEK) == java.util.Calendar.FRIDAY) {
+                    engName = "Jumuah"
+                    arName = "الجمعة"
+                    payload = "jumuah"
+                }
 
-            // ── ADHAN ─────────────────────────────────────────────────────────
-            val adhanMode = flutterPrefs.getString("flutter.adhan_mode_$engName", null)
-                ?: if (flutterPrefs.getBoolean("flutter.notif_prayer_${engName.lowercase()}", true)) "sound" else "none"
-            if (adhanMode != "none") {
-                val sound = flutterPrefs.getString("flutter.adhan_sound_$engName", null) ?: globalDefault
-                scheduleSingleAlarm(
-                    context, alarmManager,
-                    id              = PRAYER_IDS[i],
-                    epochMs         = epoch,
-                    title           = "أذان $arName",
-                    body            = adhanBody,
-                    soundName       = if (adhanMode == "silent_notif") "silent_notif" else sound,
-                    customSoundName = sound,
-                    payload         = payload,
-                    audioPath       = adhanDirPath + sound + ".mp3"
-                )
-                scheduledCount++
-            }
+                val adhanBody = when (engName) {
+                    "Fajr" -> "من صلى الفجر في جماعة فهو في ذمة الله"
+                    "Dhuhr" -> "لا تجعل عملك يلهيك عن أداء الصلاة"
+                    "Jumuah" -> "فيه ساعة لا يوافقها عبد مسلم يسأل الله شيئا إلا أعطاه إياه"
+                    "Asr" -> "حافظوا على الصلوات والصلاة الوسطى"
+                    "Maghrib" -> "لا يزال الناس بخير ما عجلوا الفطر"
+                    "Isha" -> "صلاة العشاء في جماعة كقيام نصف الليل"
+                    else -> "حان موعد صلاة $arName"
+                }
 
-            // ── PRE-PRAYER ─────────────────────────────────────────────────────
-            val preMode = flutterPrefs.getString("flutter.pre_mode_$engName", null)
-                ?: if (flutterPrefs.getBoolean("flutter.notif_pre_$engName", false)) "sound" else "none"
-            if (preMode != "none") {
+                val iqamaBody = if (engName == "Fajr") "تقام الآن صلاة الفجر .. أفلح من صلى" else "تقام الآن صلاة $arName .. استووا واعتدلوا"
+                val preBody = "الدعاء لا يرد بين الأذان والإقامة .. استعد للصلاة"
+
+                // ── ADHAN ─────────────────────────────────────────────────────────
+                if (!adhanScheduled && epoch > now) {
+                    val adhanMode = flutterPrefs.getString("flutter.adhan_mode_$engName", null)
+                        ?: if (flutterPrefs.getBoolean("flutter.notif_prayer_${engName.lowercase()}", true)) "sound" else "none"
+                    if (adhanMode != "none") {
+                        val sound = flutterPrefs.getString("flutter.adhan_sound_$engName", null) ?: globalDefault
+                        scheduleSingleAlarm(
+                            context, alarmManager,
+                            id              = PRAYER_IDS[i],
+                            epochMs         = epoch,
+                            title           = "أذان $arName",
+                            body            = adhanBody,
+                            soundName       = if (adhanMode == "silent_notif") "silent_notif" else sound,
+                            customSoundName = sound,
+                            payload         = payload,
+                            audioPath       = adhanDirPath + sound + ".mp3"
+                        )
+                        scheduledCount++
+                        
+                        // ── التذكير المبكر قبل الأذان (overlay فقط) ─────────────────
+                        val preAdhanReminderMins = getSafeInt(flutterPrefs, "flutter.pre_adhan_reminder_minutes", 0)
+                        if (preAdhanReminderMins > 0) {
+                            val preAdhanEpoch = epoch - (preAdhanReminderMins * 60_000L)
+                            if (preAdhanEpoch > now) {
+                                scheduleSingleAlarm(
+                                    context, alarmManager,
+                                    id              = 6000 + i,
+                                    epochMs         = preAdhanEpoch,
+                                    title           = "تذكير صلاة $arName",
+                                    body            = "باقي $preAdhanReminderMins دقيقة على أذان $arName",
+                                    soundName       = "silent_notif",
+                                    customSoundName = null,
+                                    payload         = "prayer",
+                                    audioPath       = null
+                                )
+                                scheduledCount++
+                            }
+                        }
+                    }
+                    adhanScheduled = true
+                }
+
+                // ── PRE-PRAYER ─────────────────────────────────────────────────────
                 val preMins  = getSafeInt(flutterPrefs, "flutter.time_pre_$engName", 15)
                 val preEpoch = epoch - (preMins * 60_000L)
-                if (preEpoch > now) {
-                    val defaultPreSound = "pre_${engName.lowercase()}"
-                    val preSound = flutterPrefs.getString("flutter.pre_sound_$engName", null)
-                        ?.takeIf { it.isNotBlank() }
-                        ?: defaultPreSound
-                    scheduleSingleAlarm(
-                        context, alarmManager,
-                        id              = PRE_IDS[i],
-                        epochMs         = preEpoch,
-                        title           = "تنبيه $arName",
-                        body            = preBody,
-                        soundName       = if (preMode == "silent_notif") "silent_notif" else preSound,
-                        customSoundName = preSound,
-                        payload         = payload,
-                        audioPath       = null
-                    )
-                    scheduledCount++
+                if (!preScheduled && preEpoch > now) {
+                    val preMode = flutterPrefs.getString("flutter.pre_mode_$engName", null)
+                        ?: if (flutterPrefs.getBoolean("flutter.notif_pre_$engName", false)) "sound" else "none"
+                    if (preMode != "none") {
+                        val defaultPreSound = "pre_${engName.lowercase()}"
+                        val preSound = flutterPrefs.getString("flutter.pre_sound_$engName", null)
+                            ?.takeIf { it.isNotBlank() }
+                            ?: defaultPreSound
+                        scheduleSingleAlarm(
+                            context, alarmManager,
+                            id              = PRE_IDS[i],
+                            epochMs         = preEpoch,
+                            title           = "تنبيه $arName",
+                            body            = preBody,
+                            soundName       = if (preMode == "silent_notif") "silent_notif" else preSound,
+                            customSoundName = preSound,
+                            payload         = payload,
+                            audioPath       = null
+                        )
+                        scheduledCount++
+                    }
+                    preScheduled = true
                 }
-            }
 
-            // ── IQAMA ──────────────────────────────────────────────────────────
-            val iqamaModeFallback = if (flutterPrefs.getBoolean("flutter.iqama_enabled_$engName", false)) "sound" else "none"
-            val iqamaMode = flutterPrefs.getString("flutter.iqama_mode_$engName", null) ?: iqamaModeFallback
-            
-            if (iqamaMode != "none") {
+                // ── IQAMA ──────────────────────────────────────────────────────────
                 val iqamaMins  = getSafeInt(flutterPrefs, "flutter.iqama_minutes_$engName", 15)
                 val iqamaEpoch = epoch + (iqamaMins * 60_000L)
-                if (iqamaEpoch > now) {
-                    val iqamaSound = flutterPrefs.getString("flutter.iqama_sound_$engName", "iqama") ?: "iqama"
-                    scheduleSingleAlarm(
-                        context, alarmManager,
-                        id              = IQAMA_IDS[i],
-                        epochMs         = iqamaEpoch,
-                        title           = "إقامة $arName",
-                        body            = iqamaBody,
-                        soundName       = if (iqamaMode == "silent_notif") "silent_notif" else iqamaSound,
-                        customSoundName = iqamaSound,
-                        payload         = payload,
-                        audioPath       = null
-                    )
-                    scheduledCount++
+                if (!iqamaScheduled && iqamaEpoch > now) {
+                    val iqamaModeFallback = if (flutterPrefs.getBoolean("flutter.iqama_enabled_$engName", false)) "sound" else "none"
+                    val iqamaMode = flutterPrefs.getString("flutter.iqama_mode_$engName", null) ?: iqamaModeFallback
+                    if (iqamaMode != "none") {
+                        val iqamaSound = flutterPrefs.getString("flutter.iqama_sound_$engName", "iqama") ?: "iqama"
+                        scheduleSingleAlarm(
+                            context, alarmManager,
+                            id              = IQAMA_IDS[i],
+                            epochMs         = iqamaEpoch,
+                            title           = "إقامة $arName",
+                            body            = iqamaBody,
+                            soundName       = if (iqamaMode == "silent_notif") "silent_notif" else iqamaSound,
+                            customSoundName = iqamaSound,
+                            payload         = payload,
+                            audioPath       = null
+                        )
+                        scheduledCount++
+                    }
+                    iqamaScheduled = true
                 }
             }
         }
@@ -197,10 +242,11 @@ object NativePrayerScheduler {
                 ?: if (flutterPrefs.getBoolean("flutter.notif_prayer_fajr", true)) "sound" else "none"
             if (tFajrMode != "none") {
                 val sound = flutterPrefs.getString("flutter.adhan_sound_Fajr", null) ?: globalDefault
+                val epoch = (tomorrowFajrEpoch / 60_000L) * 60_000L
                 scheduleSingleAlarm(
                     context, alarmManager,
                     id              = 110,
-                    epochMs         = tomorrowFajrEpoch,
+                    epochMs         = epoch,
                     title           = "أذان الفجر",
                     body            = "حان موعد صلاة الفجر",
                     soundName       = if (tFajrMode == "silent_notif") "silent_notif" else sound,
@@ -212,6 +258,129 @@ object NativePrayerScheduler {
             }
         }
 
+        // ── SUNRISE (الشروق) ───────────────────────────────────────────────
+        val todaySunriseEpoch = if (todayEpochs.size >= 6) todayEpochs[5] else null
+        if (todaySunriseEpoch != null) {
+            val sunriseMode = flutterPrefs.getString("flutter.sunrise_mode", null)
+                ?: if (flutterPrefs.getBoolean("flutter.notif_sunrise", true)) "sound" else "none"
+            val sunriseEpochMs = (todaySunriseEpoch / 60_000L) * 60_000L
+            if (sunriseMode != "none") {
+                if (sunriseEpochMs > now) {
+                    // Today's shurooq hasn't happened yet → schedule it
+                    scheduleSingleAlarm(
+                        context, alarmManager,
+                        id              = 736,
+                        epochMs         = sunriseEpochMs,
+                        title           = "الشروق",
+                        body            = "حان موعد الشروق",
+                        soundName       = if (sunriseMode == "silent_notif") "silent_notif" else "time_shurooq",
+                        customSoundName = "time_shurooq",
+                        payload         = "home",
+                        audioPath       = null
+                    )
+                    scheduledCount++
+                } else {
+                    // Today's shurooq already passed → schedule tomorrow's using cache
+                    val tomorrowDate = Date(now + 86_400_000L)
+                    val tomorrowEpochs = getEpochsFromCache(context, tomorrowDate)
+                    val tomorrowSunriseMs = if (tomorrowEpochs != null && tomorrowEpochs.size >= 6)
+                        (tomorrowEpochs[5] / 60_000L) * 60_000L else null
+                    if (tomorrowSunriseMs != null && tomorrowSunriseMs > now) {
+                        scheduleSingleAlarm(
+                            context, alarmManager,
+                            id              = 736,
+                            epochMs         = tomorrowSunriseMs,
+                            title           = "الشروق",
+                            body            = "حان موعد الشروق",
+                            soundName       = if (sunriseMode == "silent_notif") "silent_notif" else "time_shurooq",
+                            customSoundName = "time_shurooq",
+                            payload         = "home",
+                            audioPath       = null
+                        )
+                        scheduledCount++
+                    }
+                }
+            }
+
+            // ── DUHA (الضحى) ────────────────────────────────────────────────
+            val duhaModeNotif = flutterPrefs.getString("flutter.duha_mode_notif", "none") ?: "none"
+            if (duhaModeNotif != "none") {
+                val mode = flutterPrefs.getString("flutter.duha_mode", "start") ?: "start"
+                val duhaTimeMs = when (mode) {
+                    "start" -> sunriseEpochMs + (15 * 60_000L)
+                    "mid" -> sunriseEpochMs + ((todayEpochs[1] - sunriseEpochMs) / 2) // Halfway to Dhuhr (todayEpochs[1])
+                    "after_mins" -> {
+                        val mins = getSafeInt(flutterPrefs, "flutter.duha_custom_minutes", 15)
+                        sunriseEpochMs + (mins * 60_000L)
+                    }
+                    "before_dhuhr_mins" -> {
+                        val mins = getSafeInt(flutterPrefs, "flutter.duha_custom_minutes", 15)
+                        todayEpochs[1] - (mins * 60_000L)
+                    }
+                    else -> sunriseEpochMs + (15 * 60_000L)
+                }
+
+                if (duhaTimeMs > now) {
+                    scheduleSingleAlarm(
+                        context, alarmManager,
+                        id              = 732,
+                        epochMs         = (duhaTimeMs / 60_000L) * 60_000L,
+                        title           = "صلاة الضحى",
+                        body            = "صلاة الأوابين",
+                        soundName       = if (duhaModeNotif == "silent_notif") "silent_notif" else "time_duha",
+                        customSoundName = "time_duha",
+                        payload         = "home",
+                        audioPath       = null
+                    )
+                    scheduledCount++
+                } else {
+                    // Today's Duha already passed → schedule tomorrow's Duha
+                    val tomorrowDate = Date(now + 86_400_000L)
+                    val tomorrowEpochs = getEpochsFromCache(context, tomorrowDate)
+                    val tomorrowSunriseMs = if (tomorrowEpochs != null && tomorrowEpochs.size >= 6) (tomorrowEpochs[5] / 60_000L) * 60_000L else null
+                    if (tomorrowSunriseMs != null) {
+                        val tomorrowDhuhrMs = tomorrowEpochs!![1]
+                        val tomorrowDuhaTimeMs = when (mode) {
+                            "start" -> tomorrowSunriseMs + (15 * 60_000L)
+                            "mid" -> tomorrowSunriseMs + ((tomorrowDhuhrMs - tomorrowSunriseMs) / 2)
+                            "after_mins" -> {
+                                val mins = getSafeInt(flutterPrefs, "flutter.duha_custom_minutes", 15)
+                                tomorrowSunriseMs + (mins * 60_000L)
+                            }
+                            "before_dhuhr_mins" -> {
+                                val mins = getSafeInt(flutterPrefs, "flutter.duha_custom_minutes", 15)
+                                tomorrowDhuhrMs - (mins * 60_000L)
+                            }
+                            else -> tomorrowSunriseMs + (15 * 60_000L)
+                        }
+                        if (tomorrowDuhaTimeMs > now) {
+                            scheduleSingleAlarm(
+                                context, alarmManager,
+                                id              = 732,
+                                epochMs         = (tomorrowDuhaTimeMs / 60_000L) * 60_000L,
+                                title           = "صلاة الضحى",
+                                body            = "صلاة الأوابين",
+                                soundName       = if (duhaModeNotif == "silent_notif") "silent_notif" else "time_duha",
+                                customSoundName = "time_duha",
+                                payload         = "home",
+                                audioPath       = null
+                            )
+                            scheduledCount++
+                        }
+                    }
+                }
+            }
+        }
+
+        if (todayEpochs.size >= 5 && tomorrowFajrEpoch != null) {
+            try {
+                NativeEventScheduler.scheduleEvents(context, todayEpochs, tomorrowFajrEpoch)
+                NativeLogger.log(context, "Successfully scheduled NativeEventScheduler alarms.")
+            } catch (e: Exception) {
+                NativeLogger.log(context, "Exception scheduling NativeEventScheduler alarms: ${e.message}")
+            }
+        }
+
         NativeLogger.log(context, "Completed scheduleToday. Successfully scheduled $scheduledCount alarms.")
     }
 
@@ -220,7 +389,7 @@ object NativePrayerScheduler {
      * FLAG_UPDATE_CURRENT cancels the existing alarm for this ID before setting the new one.
      * Also persists metadata to AzkarNativePrefs so the boot-reschedule chain is maintained.
      */
-    private fun scheduleSingleAlarm(
+    fun scheduleSingleAlarm(
         context: Context,
         alarmManager: AlarmManager,
         id: Int,
@@ -258,6 +427,13 @@ object NativePrayerScheduler {
         } else {
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, epochMs, pi)
         }
+
+        // Cancel any legacy flutter_local_notifications alarms with the same ID
+        try {
+            val legacyIntent = Intent().setClassName(context, "com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver")
+            val legacyPi = PendingIntent.getBroadcast(context, id, legacyIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            alarmManager.cancel(legacyPi)
+        } catch (e: Exception) {}
 
         // Persist so the boot-reschedule chain knows this alarm was active
         context.getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE).edit().apply {
@@ -298,7 +474,8 @@ object NativePrayerScheduler {
                     dayObj.getLong("d"),
                     dayObj.getLong("a"),
                     dayObj.getLong("m"),
-                    dayObj.getLong("i")
+                    dayObj.getLong("i"),
+                    dayObj.getLong("s")
                 )
             }
         } catch (e: Exception) {

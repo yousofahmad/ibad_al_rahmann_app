@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_qiblah/flutter_qiblah.dart';
+import 'package:flutter_compass_v2/flutter_compass_v2.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:ibad_al_rahmann/core/app_colors.dart';
@@ -38,6 +39,10 @@ class _QiblahCompassState extends State<QiblahCompass>
   static const double _alignmentThreshold = 2.0;
 
   bool? _deviceSupport;
+
+  // Accuracy (in degrees) from the raw compass sensor — null = unsupported
+  double? _accuracy;
+  StreamSubscription<CompassEvent>? _accuracySub;
 
   Future<void> _refreshStatus() async {
     try {
@@ -143,6 +148,14 @@ class _QiblahCompassState extends State<QiblahCompass>
       duration: const Duration(milliseconds: 500),
     );
     animation = Tween(begin: 0.0, end: 0.0).animate(_animationController!);
+
+    // Subscribe to raw compass events to get the accuracy reading
+    _accuracySub = FlutterCompass.events?.listen((event) {
+      final acc = event.accuracy;
+      if (mounted && acc != null && acc >= 0) {
+        setState(() => _accuracy = acc);
+      }
+    });
   }
 
   Future<void> _initializePermissions() async {
@@ -166,6 +179,7 @@ class _QiblahCompassState extends State<QiblahCompass>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _animationController?.dispose();
+    _accuracySub?.cancel();
     super.dispose();
   }
 
@@ -332,12 +346,123 @@ class _QiblahCompassState extends State<QiblahCompass>
                       ),
                     ),
                   ),
+                  // ── Accuracy Indicator ──────────────────────────────────
+                  _buildAccuracyBadge(),
+                  SizedBox(height: 8.h),
                 ],
               );
             },
           ),
         );
       },
+    );
+  }
+}
+
+// ── Accuracy Badge ──────────────────────────────────────────────────────────
+extension _AccuracyBadge on _QiblahCompassState {
+  /// _accuracy is the sensor's estimated heading error in degrees.
+  /// Android returns: 0-15 = high, 15-30 = medium, >30 = low / needs calibration.
+  /// null / -1 = unavailable.
+  Widget _buildAccuracyBadge() {
+    final acc = _accuracy;
+
+    final Color color;
+    final String label;
+    final IconData icon;
+    final bool needsCalibration;
+
+    if (acc == null) {
+      color = Colors.grey;
+      label = 'دقة البوصلة: غير متاحة';
+      icon = Icons.help_outline;
+      needsCalibration = false;
+    } else if (acc <= 15) {
+      color = const Color(0xFF4CAF50); // green
+      label = 'دقة البوصلة: قوية';
+      icon = Icons.gps_fixed;
+      needsCalibration = false;
+    } else if (acc <= 30) {
+      color = const Color(0xFFFFA726); // orange
+      label = 'دقة البوصلة: معتدلة';
+      icon = Icons.gps_not_fixed;
+      needsCalibration = true;
+    } else {
+      color = const Color(0xFFEF5350); // red
+      label = 'دقة البوصلة: ضعيفة — تحتاج معايرة';
+      icon = Icons.gps_off;
+      needsCalibration = true;
+    }
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Accuracy chip
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 400),
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(30.r),
+              border: Border.all(color: color.withValues(alpha: 0.5), width: 1.2),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: color, size: 16.sp),
+                SizedBox(width: 6.w),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 12.sp,
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Calibration hint
+          if (needsCalibration) ...[
+            SizedBox(height: 8.h),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '∞',
+                    style: TextStyle(
+                      fontSize: 20.sp,
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  Flexible(
+                    child: Text(
+                      'حرّك جهازك بشكل ∞ (لا نهاية) في الهواء لمعايرة البوصلة',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 11.sp,
+                        color: color,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

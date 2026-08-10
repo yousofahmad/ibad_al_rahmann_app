@@ -2,7 +2,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -10,6 +9,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:ibad_al_rahmann/core/theme/app_images.dart';
 import 'package:ibad_al_rahmann/services/notification_service.dart';
 import 'home_screen.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -89,7 +89,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
 
     // 3. حفظ أن المستخدم شاف الـ onboarding
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setBool('seenOnboarding', true);
 
     if (!mounted) return;

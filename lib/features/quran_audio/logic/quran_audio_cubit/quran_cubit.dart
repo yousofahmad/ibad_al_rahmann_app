@@ -1,4 +1,4 @@
-﻿import 'dart:developer';
+import 'dart:developer';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -38,7 +38,7 @@ class QuranAudioCubit extends Cubit<QuranState> {
 
       return quran;
     } on DioException catch (e) {
-      emit(QuranFailure(errMessage: e.message ?? 'هناك خطأ'));
+      emit(QuranFailure(errMessage: e.message ?? '???? ???'));
       return [];
     }
   }

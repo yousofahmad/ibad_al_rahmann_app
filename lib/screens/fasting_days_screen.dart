@@ -581,9 +581,6 @@ class _FastingShareDesign extends StatelessWidget {
     return Container(
       width: width,
       decoration: BoxDecoration(color: backgroundColor),
-      // Use minHeight to keep the professional look for few items,
-      // but allow it to grow if there are many days.
-      constraints: const BoxConstraints(minHeight: width * 1.5),
       child: Stack(
         children: [
           Positioned.fill(
@@ -611,7 +608,7 @@ class _FastingShareDesign extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 100, vertical: 120),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 Column(
                   mainAxisSize: MainAxisSize.min,
@@ -715,20 +712,6 @@ class _FastingShareDesign extends StatelessWidget {
               ],
             ),
           ),
-
-          ...[
-            const Alignment(-0.85, -0.9),
-            const Alignment(0.85, -0.9),
-            const Alignment(-0.85, 0.9),
-            const Alignment(0.85, 0.9),
-          ].map((align) => Align(
-                alignment: align,
-                child: const Icon(
-                  Icons.star_border_rounded,
-                  color: Color(0xFFD0A871),
-                  size: 50,
-                ),
-              )),
         ],
       ),
     );

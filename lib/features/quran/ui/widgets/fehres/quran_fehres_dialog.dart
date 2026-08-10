@@ -37,7 +37,9 @@ void _navigateToVerseKey(BuildContext context, String verseKey) {
       surahNumber: surahNum,
       verseNumber: verseNum,
     );
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('Error navigating to verse key: $e');
+  }
 }
 
 /// Returns the first [wordCount] words of an Arabic string.
@@ -163,7 +165,9 @@ class _QuranFehresDialogState extends State<QuranFehresDialog> {
           if (p <= cp) activeHizb = i + 1;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error calculating active hizb/rub: $e');
+    }
 
     const TextStyle tabLabel = TextStyle(
       fontFamily: 'Cairo',
@@ -466,7 +470,9 @@ List<_RubEntry> _buildRubEntries(List<Map<String, dynamic>> rubData) {
       pageNum = quran.getPageNumber(surahNum, verseNum);
       final raw = quran.getVerse(surahNum, verseNum, verseEndSymbol: false);
       verseText = _firstWords(raw, wordCount: 8);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error fetching Rub verse text: $e');
+    }
 
     final surahName = quran.getSurahNameArabic(surahNum);
     final juzNum = (i ~/ 8) + 1;
@@ -945,7 +951,9 @@ List<_HizbEntry> _buildHizbEntries(List<Map<String, dynamic>> hizbData) {
       pageNum = quran.getPageNumber(surahNum, verseNum);
       final raw = quran.getVerse(surahNum, verseNum, verseEndSymbol: false);
       verseText = _firstWords(raw, wordCount: 8);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error fetching Hizb verse text: $e');
+    }
 
     final surahName = quran.getSurahNameArabic(surahNum);
     final juzNum = (i ~/ 2) + 1;

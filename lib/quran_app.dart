@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
@@ -26,7 +26,7 @@ class QuranApp extends StatelessWidget {
               debugShowCheckedModeBanner: false,
               scaffoldMessengerKey: scaffoldMessengerKey, // Use global key
               navigatorKey: navigatorKey,
-              title: 'القرآن الكريم',
+              title: '?????? ??????',
               theme: state.theme.light,
               darkTheme: state.theme.dark,
               themeMode: state.mode,

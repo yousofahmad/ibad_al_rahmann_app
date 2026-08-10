@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
@@ -9,6 +8,7 @@ import 'package:hijri/hijri_calendar.dart';
 import 'package:ibad_al_rahmann/screens/qada_list_screen.dart';
 import 'fiqh_screen.dart';
 import 'qadaa_settings_screen.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class QadaaScreen extends StatefulWidget {
   const QadaaScreen({super.key});
@@ -40,7 +40,7 @@ class _QadaaScreenState extends State<QadaaScreen> {
   }
 
   Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     
     // Load Ramadan Qada Count (linked to Ramadan Screen)
     int missed = 0;
@@ -78,7 +78,7 @@ class _QadaaScreenState extends State<QadaaScreen> {
   }
 
   Future<void> _saveData() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     await prefs.setInt('qadaa_fajr', fajr);
     await prefs.setInt('qadaa_dhuhr', dhuhr);
     await prefs.setInt('qadaa_asr', asr);
@@ -100,7 +100,7 @@ class _QadaaScreenState extends State<QadaaScreen> {
   }
 
   Future<void> _updateFastingCount(bool increment) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = CacheHelper.prefs;
     List<int> missedDays = [];
     for (int i = 1; i <= 30; i++) {
       if (prefs.getBool('qada_${_currentRamadanYear}_$i') ?? false) {

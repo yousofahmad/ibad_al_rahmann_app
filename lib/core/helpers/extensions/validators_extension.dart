@@ -1,4 +1,4 @@
-﻿extension ValidatorsExtension on String {
+extension ValidatorsExtension on String {
   bool get isValidEmail {
     const pattern =
         r"(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'"

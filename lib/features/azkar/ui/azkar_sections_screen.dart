@@ -1,4 +1,4 @@
-﻿enum AzkarSection { morning, evening, afterPrayer }
+enum AzkarSection { morning, evening, afterPrayer }
 
 class AzkarSectionsScreen {
   // Stub

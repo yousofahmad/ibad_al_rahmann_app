@@ -418,7 +418,6 @@ class _PageActionBarState extends State<PageActionBar>
     await _showQualityPicker((selectedQuality) async {
       setState(() => _isBusy = true);
       final quranCubit = context.read<QuranCubit>();
-      quranCubit.toggleExporting(true);
 
       try {
         final key = quranCubit.getPageKey(widget.pageNumber);
@@ -432,7 +431,6 @@ class _PageActionBarState extends State<PageActionBar>
       } catch (e) {
         debugPrint('Error in _onSaveImage: $e');
       } finally {
-        quranCubit.toggleExporting(false);
         if (mounted) setState(() => _isBusy = false);
       }
     });
@@ -444,7 +442,6 @@ class _PageActionBarState extends State<PageActionBar>
     await _showQualityPicker((selectedQuality) async {
       setState(() => _isBusy = true);
       final quranCubit = context.read<QuranCubit>();
-      quranCubit.toggleExporting(true);
 
       try {
         final key = quranCubit.getPageKey(widget.pageNumber);
@@ -458,7 +455,6 @@ class _PageActionBarState extends State<PageActionBar>
       } catch (e) {
         debugPrint('Error in _onShare: $e');
       } finally {
-        quranCubit.toggleExporting(false);
         if (mounted) setState(() => _isBusy = false);
       }
     });

@@ -13,11 +13,14 @@ class PrayerRingWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 200,
-      height: 200,
-      child: CustomPaint(
-        painter: RingPainter(percent: percent, color: color),
+    return Center(
+      child: AspectRatio(
+        aspectRatio: 1.0,
+        child: SizedBox.expand(
+          child: CustomPaint(
+            painter: RingPainter(percent: percent, color: color),
+          ),
+        ),
       ),
     );
   }
