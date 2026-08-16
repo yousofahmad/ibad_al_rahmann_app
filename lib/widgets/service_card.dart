@@ -5,7 +5,7 @@ import 'gradient_icons.dart';
 
 /// A small reusable card used in the services grid.
 /// Displays a gradient icon and a title, and notifies via [onTap] when tapped.
-/// Intended for use on the HomeScreen to represent app features (e.g. ????? ??????).
+/// Intended for use on the HomeScreen to represent app features (e.g. أذكار الصباح).
 class ServiceCard extends StatelessWidget {
   final String name;
   final IconData icon;

@@ -108,6 +108,7 @@ class _MinQuranTabletState extends State<MinQuranTablet> {
                         child: WbwPageWidget(
                           pageNumber: index + 1,
                           showHeader: false,
+                          showPageNumber: false,
                           paperColorOverride: effectivePaperColor,
                           textColorOverride: textColor,
                         ),

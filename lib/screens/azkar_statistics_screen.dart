@@ -67,7 +67,7 @@ class _AzkarStatisticsScreenState extends State<AzkarStatisticsScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          const Text("???", style: TextStyle(color: Colors.grey, fontSize: 12)),
+          const Text("مرة", style: TextStyle(color: Colors.grey, fontSize: 12)),
         ],
       ),
     );
@@ -79,7 +79,7 @@ class _AzkarStatisticsScreenState extends State<AzkarStatisticsScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
-          "???????? ???????",
+          "إحصائيات الأذكار",
           style: TextStyle(
             color: Theme.of(context).textTheme.bodyLarge?.color,
             fontFamily: 'Cairo',
@@ -101,13 +101,13 @@ class _AzkarStatisticsScreenState extends State<AzkarStatisticsScreen> {
               child: Column(
                 children: [
                   // Only showing Accountability (Hasib Nafsak) Button since user requested it
-                  _buildStatCard("????? ??????", _morningCount, Icons.wb_sunny),
+                  _buildStatCard("أذكار الصباح", _morningCount, Icons.wb_sunny),
                   _buildStatCard(
-                    "????? ??????",
+                    "أذكار المساء",
                     _eveningCount,
                     Icons.nights_stay,
                   ),
-                  _buildStatCard("????? ??????", _prayerCount, Icons.mosque),
+                  _buildStatCard("أذكار الصلاة", _prayerCount, Icons.mosque),
                   // Note: User said "Azkar stats is not Hasib Nafsak stats". He likely wants Hasib Nafsak stats HERE.
                   // Since I cannot link directly to Hasib Nafsak Logic without refactoring, I will show a placeholder or
                   // try to link it if possible. But for now I'm making it theme aware first.

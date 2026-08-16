@@ -39,11 +39,11 @@ class ReciterModel {
   factory ReciterModel.fromJson(Map<String, dynamic> json) {
     // String? handleStyle(String? style) {
     //   if (style == 'Mujawwad') {
-    //     return '????';
+    //     return 'مجود';
     //   } else if (style == 'Murattal') {
-    //     return '????';
+    //     return 'مرتل';
     //   } else if (style == 'Muallim') {
-    //     return '?????';
+    //     return 'مُعلم';
     //   } else {
     //     return null;
     //   }

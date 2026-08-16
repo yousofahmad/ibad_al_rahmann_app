@@ -13,6 +13,8 @@ import 'package:ibad_al_rahmann/core/services/cache_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/share_helper.dart';
 import 'package:quran/quran.dart' as quran;
 import 'package:share_plus/share_plus.dart';
+import 'package:ibad_al_rahmann/core/helpers/fonts_helper.dart';
+import 'package:ibad_al_rahmann/features/quran/data/db_helper.dart';
 import '../bloc/khatma_cubit.dart';
 import '../../quran/bloc/quran/quran_cubit.dart';
 import '../../quran/ui/widgets/core/wbw_page_widget.dart';
@@ -1310,18 +1312,28 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
     final cubit = context.read<QuranCubit>();
     final List<String> capturedPaths = [];
 
+    // Preload all fonts and DB data for all pages before capturing to ensure zero white/blank glyphs
+    for (int p = widget.startPage; p <= widget.endPage; p++) {
+      final family = FontsHelper.getFontFamily(p);
+      if (!FontsHelper.isFontLoaded(family)) {
+        await FontsHelper.loadFontFromFamily(family);
+      }
+      await QuranWbwDbHelper.instance.getPageLines(p);
+      await QuranWbwDbHelper.instance.getPageWords(p);
+    }
+
+    cubit.toggleExporting(true);
+
     for (int i = 0; i < _totalPages; i++) {
       try {
         if (_pageController.hasClients) {
           _pageController.jumpToPage(i);
         }
 
-        // Rule 2: Breathing Room (Delay) BEFORE capturing
-        // Ensure framework has time to paint the RepaintBoundary
-        await Future<void>.delayed(const Duration(milliseconds: 500));
+        // Wait for font decoding, layout, and repaint to fully stabilize
+        await Future<void>.delayed(const Duration(milliseconds: 350));
         await WidgetsBinding.instance.endOfFrame;
-        // Additional stabilizing delay
-        await Future<void>.delayed(const Duration(milliseconds: 300));
+        await Future<void>.delayed(const Duration(milliseconds: 250));
 
         final realPage = widget.startPage + i;
         final key = cubit.getPageKey(realPage);
@@ -1343,6 +1355,8 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
 
       widget.onProgress(i + 1, _totalPages);
     }
+
+    cubit.toggleExporting(false);
 
     if (mounted) {
       Navigator.of(context).pop();
@@ -1387,7 +1401,7 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
               startAyah: sAyah,
               endSuraNumber: eSura,
               endAyah: eAyah,
-              collapseOutOfRange: true, // Focus only on the Rub' content
+              collapseOutOfRange: sSura != null,
               isZoomEnabled: false,
               paperColorOverride: savedColor, // Pass null to allow default creamy colors
               textColorOverride: textColor,

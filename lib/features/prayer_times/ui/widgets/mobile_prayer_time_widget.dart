@@ -78,7 +78,7 @@ class MobilePrayerTimeWidget extends StatelessWidget {
               style: AppStyles.style20harmattan.copyWith(color: Colors.white),
             ),
             Text(
-              '${prayer.prayerType == PrayerType.sunrise ? '???????' : '???????'}: ${prayer.iqamaDate.toPrayerTime}',
+              '${prayer.prayerType == PrayerType.sunrise ? 'الإشراق' : 'الإقامة'}: ${prayer.iqamaDate.toPrayerTime}',
               style: AppStyles.style14harmattan.copyWith(
                 fontSize: context.isTablet ? 12.sp : null,
               ),
@@ -136,7 +136,7 @@ class TabletPrayerTimeWidget extends StatelessWidget {
             ),
             Text(prayer.date.toPrayerTime, style: AppStyles.style18harmattan),
             Text(
-              '${prayer.prayerType == PrayerType.sunrise ? '???????' : '???????'}: ${prayer.iqamaDate.toPrayerTime}',
+              '${prayer.prayerType == PrayerType.sunrise ? 'الإشراق' : 'الإقامة'}: ${prayer.iqamaDate.toPrayerTime}',
               style: AppStyles.style14harmattan.copyWith(
                 fontSize: context.isTablet ? 12.sp : null,
               ),

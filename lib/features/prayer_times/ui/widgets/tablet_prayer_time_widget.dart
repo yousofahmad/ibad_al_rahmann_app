@@ -48,7 +48,7 @@ class PrayerTimeWidget extends StatelessWidget {
             Text(prayer.title, style: AppStyles.style24harmattan),
             Text(prayer.date.toPrayerTime, style: AppStyles.style24harmattan),
             Text(
-              '${prayer.prayerType == PrayerType.sunrise ? '???????' : '???????'}: ${prayer.iqamaDate.toPrayerTime}',
+              '${prayer.prayerType == PrayerType.sunrise ? 'الإشراق' : 'الإقامة'}: ${prayer.iqamaDate.toPrayerTime}',
               style: AppStyles.style14harmattan,
             ),
           ],

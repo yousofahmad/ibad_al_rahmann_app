@@ -17,7 +17,7 @@ class SearchingSurahModel {
 
     return SearchingSurahModel(
       name: map['arabic'],
-      place: getPlaceOfRevelation(surahNumber) == 'Makkah' ? '????' : '?????',
+      place: getPlaceOfRevelation(surahNumber) == 'Makkah' ? 'مكية' : 'مدنية',
       surahNumber: surahNumber,
       firstPage: getPageNumber(surahNumber, 1),
       juzNumber: getJuzNumber(surahNumber, 1),

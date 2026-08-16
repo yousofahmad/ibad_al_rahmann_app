@@ -387,7 +387,7 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen> with TickerProv
                                             final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
                                             return WbwPageWidget(
                                               pageNumber: widget.targetStartPage + index,
-                                              showHeader: true,
+                                              showHeader: !_showOverlays,
                                               showPageNumber: true,
                                               paperColorOverride: bgColor,
                                               textColorOverride: isActuallyDark ? Colors.white : Colors.black,

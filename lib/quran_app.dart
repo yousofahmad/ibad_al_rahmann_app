@@ -26,7 +26,7 @@ class QuranApp extends StatelessWidget {
               debugShowCheckedModeBanner: false,
               scaffoldMessengerKey: scaffoldMessengerKey, // Use global key
               navigatorKey: navigatorKey,
-              title: '?????? ??????',
+              title: 'القرآن الكريم',
               theme: state.theme.light,
               darkTheme: state.theme.dark,
               themeMode: state.mode,

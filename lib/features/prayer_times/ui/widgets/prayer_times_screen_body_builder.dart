@@ -44,7 +44,7 @@ class PrayerTimesScreenBodyBuilder extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '???? ??? ?????? ??????? ???? ?????? ??????? ??? ?????? ?? ?????????',
+                    'تعذر جلب مواعيد الصلاة، يرجى السماح بالوصول إلى الموقع من الإعدادات',
                     style: context.titleSmall,
                     textAlign: TextAlign.center,
                   ),
@@ -53,7 +53,7 @@ class PrayerTimesScreenBodyBuilder extends StatelessWidget {
                     onPressed: () {
                       context.read<PrayerTimesCubit>().getPrayerTimes();
                     },
-                    child: Text('????? ????????', style: context.labelMedium),
+                    child: Text('إعادة المحاولة', style: context.labelMedium),
                   ),
                 ],
               ),
@@ -62,7 +62,7 @@ class PrayerTimesScreenBodyBuilder extends StatelessWidget {
         } else {
           return Center(
             child: Text(
-              '????? ???? ???????? ??? ????',
+              'عذرًا يرجى المحاولة مرة أخرى',
               style: context.headlineLarge,
             ),
           );

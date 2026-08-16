@@ -38,7 +38,7 @@ class QuranAudioCubit extends Cubit<QuranState> {
 
       return quran;
     } on DioException catch (e) {
-      emit(QuranFailure(errMessage: e.message ?? '???? ???'));
+      emit(QuranFailure(errMessage: e.message ?? 'هناك خطأ'));
       return [];
     }
   }

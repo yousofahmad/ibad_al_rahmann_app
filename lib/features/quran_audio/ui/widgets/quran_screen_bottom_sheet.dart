@@ -32,7 +32,7 @@ class SurahOverlayPlayer extends StatelessWidget {
         child: Column(
           children: [
             Text(
-              '???? ${quranSurahs[cubit.selectedSurah! - 1]}',
+              'سورة ${quranSurahs[cubit.selectedSurah! - 1]}',
               style: AppStyles.style26expo,
               overflow: TextOverflow.ellipsis,
             ),

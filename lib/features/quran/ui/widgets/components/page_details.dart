@@ -26,7 +26,7 @@ class FullPageDetails extends StatelessWidget {
           ),
         ),
         Text(
-          '??????? ${getSurahNameArabic(surahNumber)}',
+          'سُورَةُ ${getSurahNameArabic(surahNumber)}',
           style: context.labelSmall.copyWith(
             fontSize: context.isTablet ? 20.sp : 16.sp,
             fontFamily: 'SurahNames', // Use the new font
@@ -52,7 +52,7 @@ class FullPageDetails extends StatelessWidget {
 //           style: context.labelSmall.copyWith(fontSize: 15.sp),
 //         ),
 //         Text(
-//           '???? ${getSurahNameArabic(surahNumber)}',
+//           'سورة ${getSurahNameArabic(surahNumber)}',
 //           style: context.labelSmall.copyWith(fontSize: 15.sp),
 //         ),
 //       ],

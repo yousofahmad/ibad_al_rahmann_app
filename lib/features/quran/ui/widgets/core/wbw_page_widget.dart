@@ -527,7 +527,7 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
 
             final double headerH = isPage1or2 
                 ? (isMinimized ? 60.h : 85.h) 
-                : 90.h;
+                : (isMinimized ? 65.h : 90.h);
 
             lineContent = (widget.isLandscape || isPage1or2 || !hasBoundedHeightInner)
                 ? SizedBox(
@@ -571,7 +571,7 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
 
             final double basmallahH = isPage1or2 
                 ? (isMinimized ? 30.h : 50.h) 
-                : 60.h;
+                : (isMinimized ? 42.h : 60.h);
 
             lineContent = (widget.isLandscape || isPage1or2 || !hasBoundedHeightInner)
                 ? SizedBox(
