@@ -400,25 +400,28 @@ class NotificationService {
         }
 
         // Fasting Reminders (Scheduled the night before)
+        // Use date-based IDs (day of week 1-7) to prevent duplicate scheduling
+        // when scheduleAll is called multiple times rapidly.
+        final dayId = targetDate.weekday; // 1=Mon..7=Sun, always unique per weekday
         // Monday Fasting (Reminder on Sunday night)
         if (targetDate.weekday == DateTime.sunday && (prefs.getBool('notif_fasting_monday') ?? true)) {
           final reminderTime = dayTimes.isha.add(const Duration(minutes: 60));
           if (reminderTime.isAfter(now)) {
-            await _scheduleNative(2400 + i, 'غداً الإثنين,, صوم يقربك لله 🤲', 'اغتنم سنة الحبيب ﷺ.. فالصيام طريق للبركة والنور 🥰', reminderTime.hour, reminderTime.minute, 'default', payload: 'fasting', year: reminderTime.year, month: reminderTime.month, day: reminderTime.day);
+            await _scheduleNative(2400 + dayId, 'غداً الإثنين,, صوم يقربك لله 🤲', 'اغتنم سنة الحبيب ﷺ.. فالصيام طريق للبركة والنور 🥰', reminderTime.hour, reminderTime.minute, 'default', payload: 'fasting', year: reminderTime.year, month: reminderTime.month, day: reminderTime.day);
           }
         }
         // Thursday Fasting (Reminder on Wednesday night)
         if (targetDate.weekday == DateTime.wednesday && (prefs.getBool('notif_fasting_thursday') ?? true)) {
           final reminderTime = dayTimes.isha.add(const Duration(minutes: 60));
           if (reminderTime.isAfter(now)) {
-            await _scheduleNative(2450 + i, 'غداً الخميس,, صوم يقربك لله 🤲', 'اغتنم سنة الحبيب ﷺ.. فالصيام طريق للبركة والنور 🥰', reminderTime.hour, reminderTime.minute, 'default', payload: 'fasting', year: reminderTime.year, month: reminderTime.month, day: reminderTime.day);
+            await _scheduleNative(2450 + dayId, 'غداً الخميس,, صوم يقربك لله 🤲', 'اغتنم سنة الحبيب ﷺ.. فالصيام طريق للبركة والنور 🥰', reminderTime.hour, reminderTime.minute, 'default', payload: 'fasting', year: reminderTime.year, month: reminderTime.month, day: reminderTime.day);
           }
         }
         // White Days Fasting (13, 14, 15 of Hijri month - Remind on 12, 13, 14 night)
         if ((hDay == 12 || hDay == 13 || hDay == 14) && (prefs.getBool('notif_fasting_white_days') ?? true)) {
           final reminderTime = dayTimes.isha.add(const Duration(minutes: 60));
           if (reminderTime.isAfter(now)) {
-            await _scheduleNative(2500 + i, 'غداً الأيام البيض,, صوم يقربك لله 🤲', 'اغتنم سنة الحبيب ﷺ.. فالصيام طريق للبركة والنور 🥰', reminderTime.hour, reminderTime.minute, 'default', payload: 'fasting', year: reminderTime.year, month: reminderTime.month, day: reminderTime.day);
+            await _scheduleNative(2500 + dayId, 'غداً الأيام البيض,, صوم يقربك لله 🤲', 'اغتنم سنة الحبيب ﷺ.. فالصيام طريق للبركة والنور 🥰', reminderTime.hour, reminderTime.minute, 'default', payload: 'fasting', year: reminderTime.year, month: reminderTime.month, day: reminderTime.day);
           }
         }
 
@@ -432,10 +435,10 @@ class NotificationService {
             final firstThird  = dayTimes.maghrib.add(Duration(seconds: (nightDuration.inSeconds / 3).round()));
             final midNight    = dayTimes.maghrib.add(Duration(seconds: (nightDuration.inSeconds / 2).round()));
 
-            // Last third (Qiyam)
+            // Last third (Qiyam) — Use date-based ID to prevent duplicate from rapid calls
             if (lastThird.isAfter(now)) {
               await _scheduleNative(
-                2550 + i, 'قيام الليل', 'حان وقت ثلث الليل الأخير',
+                2550 + targetDate.weekday, 'قيام الليل', 'حان وقت ثلث الليل الأخير',
                 lastThird.hour, lastThird.minute,
                 qiyamMode == 'silent_notif' ? 'silent_notif' : 'night_last',
                 customSoundName: 'night_last',
@@ -503,7 +506,12 @@ class NotificationService {
         List.generate(200, (i) => 400 + i) +
         List.generate(20, (i) => 500 + i) + // Eid/Ramadan
         List.generate(100, (i) => 700 + i) + // 700-799 (Jumua 705, Kahf 710, Fasting 720-724, Qiyam 730, FirstThird 734, Duha 732, Sunrise 736, Midnight 738)
-        List.generate(100, (i) => 800 + i); // 800-899 (Qadaa)
+        List.generate(100, (i) => 800 + i) + // 800-899 (Qadaa)
+        // ── Legacy / Ghost IDs from old versions (must cancel on every reschedule) ──
+        // Old qiyam system used IDs 2000-2009 (now replaced by 2550+i)
+        List.generate(20, (i) => 2000 + i) +
+        // New multi-day scheduling ranges (2100-2800)
+        List.generate(700, (i) => 2100 + i);
 
     if (!excludeIntervalAlarms) {
       ids += List.generate(500, (i) => 8000 + i);

@@ -141,9 +141,18 @@ object NativeAzkarScheduler {
                 val offsetMins = json.optInt("notificationOffsetMinutes", 30)
                 val khatmaId   = json.optString("id", khatmaKey)
                 val idBase     = 100000 + (khatmaId.hashCode().let { if (it < 0) -it else it } % 40000) * 10
-                val payload = "khatma_$khatmaId"
 
-                NativeLogger.log(context, "scheduleWird: processing '$khatmaName' (type=$notifType, id=$khatmaId, idBase=$idBase)")
+                // Build a full deep-link payload that includes the current wird index + page range
+                // so handleGlobalNavigation() opens IsolatedWirdScreen directly on the right pages
+                val wirdsArray   = json.optJSONArray("wirds")
+                val wirdIdx      = json.optInt("currentWirdIndex", 0)
+                val clampedIdx   = if (wirdsArray != null) wirdIdx.coerceIn(0, wirdsArray.length() - 1) else 0
+                val currentWird  = wirdsArray?.optJSONObject(clampedIdx)
+                val startPage    = currentWird?.optInt("startPage", 1) ?: 1
+                val endPage      = currentWird?.optInt("endPage", 604) ?: 604
+                val payload      = "khatma_${khatmaId}_${clampedIdx}_${startPage}_${endPage}"
+
+                NativeLogger.log(context, "scheduleWird: processing '$khatmaName' (type=$notifType, id=$khatmaId, idBase=$idBase, payload=$payload)")
 
                 if (notifType == "daily") {
                     val timeStr = json.optString("dailyTime", "22:00")

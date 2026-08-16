@@ -28,13 +28,33 @@ object NativePrayerScheduler {
     private val PRAYER_NAMES_AR = arrayOf("الفجر", "الظهر", "العصر", "المغرب", "العشاء")
     private val PRAYER_NAMES_EN = arrayOf("Fajr", "Dhuhr", "Asr", "Maghrib", "Isha")
 
+    // Debounce: prevent storm of concurrent scheduleToday calls (e.g. on app open)
+    @Volatile private var lastScheduleMs = 0L
+    private const val DEBOUNCE_MS = 12_000L // 12 seconds minimum between calls
+    private val scheduleLock = Any()
+
     /**
      * Main entry point. Reads user settings from FlutterSharedPreferences,
      * calculates today's prayer times via NativePrayerManager, and schedules
      * all alarms using setAlarmClock(). Safe to call repeatedly —
      * FLAG_UPDATE_CURRENT replaces existing alarms without creating duplicates.
+     *
+     * Debounced: rapid consecutive calls within 12s are ignored to prevent the
+     * scheduling storm that causes app freezes and double notifications.
      */
     fun scheduleToday(context: Context) {
+        val now = System.currentTimeMillis()
+        synchronized(scheduleLock) {
+            if (now - lastScheduleMs < DEBOUNCE_MS) {
+                NativeLogger.log(context, "scheduleToday: debounced (${now - lastScheduleMs}ms since last call, min=${DEBOUNCE_MS}ms)")
+                return
+            }
+            lastScheduleMs = now
+        }
+        _scheduleTodayInternal(context)
+    }
+
+    private fun _scheduleTodayInternal(context: Context) {
         val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val now          = System.currentTimeMillis()
@@ -43,6 +63,7 @@ object NativePrayerScheduler {
         var tomorrowFajrEpoch: Long? = null
 
         NativeLogger.log(context, "--- Starting scheduleToday ---")
+
 
         // Try to calculate natively first (highest priority and freshest)
         try {
@@ -178,7 +199,12 @@ object NativePrayerScheduler {
                                 )
                                 scheduledCount++
                             }
+                        } else {
+                            cancelSingleAlarm(context, alarmManager, 6000 + i)
                         }
+                    } else {
+                        cancelSingleAlarm(context, alarmManager, PRAYER_IDS[i])
+                        cancelSingleAlarm(context, alarmManager, 6000 + i)
                     }
                     adhanScheduled = true
                 }
@@ -206,6 +232,8 @@ object NativePrayerScheduler {
                             audioPath       = null
                         )
                         scheduledCount++
+                    } else {
+                        cancelSingleAlarm(context, alarmManager, PRE_IDS[i])
                     }
                     preScheduled = true
                 }
@@ -230,6 +258,8 @@ object NativePrayerScheduler {
                             audioPath       = null
                         )
                         scheduledCount++
+                    } else {
+                        cancelSingleAlarm(context, alarmManager, IQAMA_IDS[i])
                     }
                     iqamaScheduled = true
                 }
@@ -255,6 +285,8 @@ object NativePrayerScheduler {
                     audioPath       = adhanDirPath + sound + ".mp3"
                 )
                 scheduledCount++
+            } else {
+                cancelSingleAlarm(context, alarmManager, 110)
             }
         }
 
@@ -300,6 +332,8 @@ object NativePrayerScheduler {
                         scheduledCount++
                     }
                 }
+            } else {
+                cancelSingleAlarm(context, alarmManager, 736)
             }
 
             // ── DUHA (الضحى) ────────────────────────────────────────────────
@@ -369,6 +403,8 @@ object NativePrayerScheduler {
                         }
                     }
                 }
+            } else {
+                cancelSingleAlarm(context, alarmManager, 732)
             }
         }
 
@@ -445,6 +481,27 @@ object NativePrayerScheduler {
             if (customSoundName != null) putString("alarm_${id}_custom_sound", customSoundName)
             apply()
         }
+    }
+
+    private fun cancelSingleAlarm(context: Context, alarmManager: AlarmManager, id: Int) {
+        try {
+            val intent = Intent(context, AlarmReceiver::class.java)
+            val pi = PendingIntent.getBroadcast(
+                context, id, intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            alarmManager.cancel(pi)
+            
+            // Also cancel legacy
+            val legacyIntent = Intent().setClassName(context, "com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver")
+            val legacyPi = PendingIntent.getBroadcast(context, id, legacyIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            alarmManager.cancel(legacyPi)
+            
+            context.getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE).edit().apply {
+                remove("alarm_${id}_active")
+                apply()
+            }
+        } catch (e: Exception) {}
     }
 
     /**
