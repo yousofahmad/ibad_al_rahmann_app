@@ -796,17 +796,21 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
 
     final pageContent = LayoutBuilder(
       builder: (context, constraints) {
-        final double screenWidth = constraints.maxWidth;
+        final double screenWidth  = constraints.maxWidth;
+        final double screenHeight = constraints.maxHeight > 0 ? constraints.maxHeight : MediaQuery.of(context).size.height;
         final bool hasBoundedHeight = constraints.hasBoundedHeight;
-        final double maxWidthAllowed = context.isTablet
+        final bool isTablet = context.isTablet;
+
+        // On tablet: use full available width; on phone: cap at 650 logical pixels
+        final double maxWidthAllowed = isTablet
             ? screenWidth
             : (widget.isLandscape ? screenWidth : 650.0);
-        final double baseWidth = screenWidth > maxWidthAllowed
-            ? maxWidthAllowed
-            : screenWidth;
+        final double baseWidth = screenWidth > maxWidthAllowed ? maxWidthAllowed : screenWidth;
+
+        // On tablet, the margin slider is the ONLY padding — no extra sidePadding
         final double sidePadding = screenWidth > maxWidthAllowed
             ? ((screenWidth - maxWidthAllowed) / 2)
-            : (widget.isLandscape ? 0.0 : (context.isTablet ? 24.0 : 2.0));
+            : (widget.isLandscape ? 0.0 : (isTablet ? 0.0 : 2.0));
 
         final double margin = context.select<QuranCubit, double>((c) => c.state.quranPageMargin);
 
@@ -814,6 +818,13 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
           padding: EdgeInsets.symmetric(horizontal: margin),
           child: versesColumn,
         );
+
+        // On tablet: use the actual screen aspect ratio so the FittedBox doesn't
+        // shrink the text trying to fit an arbitrary 1.95 multiplier that was
+        // designed for phone portrait dimensions.
+        final double pageAspectHeight = isTablet
+            ? (hasBoundedHeight && screenHeight > 0 ? screenHeight : baseWidth * 1.42)
+            : baseWidth * 1.95;
 
         Widget innerContentWithoutMargin = Container(
           width: double.infinity,
@@ -825,28 +836,23 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                   alignment: Alignment.center,
                   child: SizedBox(
                     width: baseWidth,
-                    height: isPage1or2 ? null : baseWidth * 1.95, // Remove strict height for page 1 & 2 to allow true centering
-                    child: isPage1or2 
-                      ? Center(child: textColumnWithMargin) 
-                      : textColumnWithMargin,
+                    height: isPage1or2 ? null : pageAspectHeight,
+                    child: isPage1or2
+                        ? Center(child: textColumnWithMargin)
+                        : textColumnWithMargin,
                   ),
                 )
               : SizedBox(
                   width: baseWidth,
-                  child: isPage1or2 
-                    ? Center(child: textColumnWithMargin) 
-                    : textColumnWithMargin,
+                  child: isPage1or2
+                      ? Center(child: textColumnWithMargin)
+                      : textColumnWithMargin,
                 ),
         );
 
         if (isExporting) {
           final bool hasRange = widget.startSuraNumber != null;
-          
-          if (hasRange) {
-            return Center(
-              child: innerContentWithoutMargin,
-            );
-          }
+          if (hasRange) return Center(child: innerContentWithoutMargin);
           return Center(
             child: AspectRatio(
               aspectRatio: 1 / 1.72,
@@ -856,9 +862,7 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
         }
 
         return Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: sidePadding,
-          ),
+          padding: EdgeInsets.symmetric(horizontal: sidePadding),
           child: innerContentWithoutMargin,
         );
       },

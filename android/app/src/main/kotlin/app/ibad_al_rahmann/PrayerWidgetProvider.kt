@@ -26,17 +26,26 @@ class PrayerWidgetProvider : HomeWidgetProvider() {
     }
 
     private fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
-        // 1. Centralized Data Source (HomeWidgetPreferences)
         val activeWidgetData = context.getSharedPreferences("HomeWidgetPreferences", Context.MODE_PRIVATE)
-        
-        // Trigger a refresh if data is missing
-        if (PrayerDataPatcher.getSafeLong(activeWidgetData, "fajr_epoch", 0L) == 0L) {
+        val now = System.currentTimeMillis()
+
+        // ── تحقق إن البيانات المخزنة للويدجيت هي لليوم الحالي ────────────────
+        val storedFajr = PrayerDataPatcher.getSafeLong(activeWidgetData, "fajr_epoch", 0L)
+        val todayStart = run {
+            val c = Calendar.getInstance()
+            c.set(Calendar.HOUR_OF_DAY, 0); c.set(Calendar.MINUTE, 0)
+            c.set(Calendar.SECOND, 0); c.set(Calendar.MILLISECOND, 0)
+            c.timeInMillis
+        }
+        val storedIsToday = storedFajr in todayStart..(todayStart + 24 * 3600 * 1000L)
+
+        NativeLogger.log(context, "Widget.update: storedFajr=$storedFajr isToday=$storedIsToday")
+
+        // لو البيانات مش لليوم الحالي → احسب من النيتيف وخزّن
+        if (!storedIsToday || storedFajr == 0L) {
+            NativeLogger.log(context, "Widget.update: stale data → patching from native")
             PrayerDataPatcher.patchTodayEpochsFrom30d(context)
         }
-        
-        val now = System.currentTimeMillis()
-        
-
 
         val views = RemoteViews(context.packageName, R.layout.prayer_widget)
 
@@ -47,7 +56,6 @@ class PrayerWidgetProvider : HomeWidgetProvider() {
         val iEpoch = PrayerDataPatcher.getSafeLong(activeWidgetData, "isha_epoch", 0L)
         val nextFajrEpoch = PrayerDataPatcher.getSafeLong(activeWidgetData, "next_fajr_epoch", 0L)
 
-        // 3. Fix the "Open App" Check
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
@@ -55,12 +63,13 @@ class PrayerWidgetProvider : HomeWidgetProvider() {
         views.setOnClickPendingIntent(R.id.widget_root, pi)
 
         if (fEpoch == 0L) {
-            // Data not ready, show setup layout
+            NativeLogger.log(context, "Widget.update: fajr_epoch still 0 after patch → showing setup")
             views.setTextViewText(R.id.tv_prayer_name, "افتح التطبيق للتفعيل")
             views.setTextViewText(R.id.tv_countdown, "--:--")
             appWidgetManager.updateAppWidget(appWidgetId, views)
             return
         }
+
 
         // Fix next_fajr_epoch if missing
         val finalNextFajr = if (nextFajrEpoch == 0L) fEpoch + 86400000L else nextFajrEpoch

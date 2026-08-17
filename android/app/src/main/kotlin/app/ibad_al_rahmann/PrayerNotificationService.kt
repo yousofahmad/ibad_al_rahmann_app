@@ -94,10 +94,14 @@ class PrayerNotificationService : Service() {
     }
 
     private fun startForegroundSafe(id: Int, notification: android.app.Notification) {
-        if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(id, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        } else {
-            startForeground(id, notification)
+        try {
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(id, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(id, notification)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -111,15 +115,16 @@ class PrayerNotificationService : Service() {
                 ch.setShowBadge(false); ch.setSound(null, null); ch.enableVibration(false)
                 nm.createNotificationChannel(ch)
             }
-            val placeholderNotif = NotificationCompat.Builder(this, channelId)
-                .setSmallIcon(R.mipmap.launcher_icon)
-                .setContentTitle("")
-                .setContentText("")
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                .setSortKey("00_prayer")
-                .setOngoing(true)
-                .build()
-            startForegroundSafe(777, placeholderNotif)
+        val placeholderNotif = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.mipmap.launcher_icon)
+            .setContentTitle("")
+            .setContentText("")
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setSortKey("!prayer_bar")  // '!' sorts before all letters → top of list
+            .setOngoing(true)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .build()
+        startForegroundSafe(777, placeholderNotif)
         }
 
         val action = intent?.action ?: "SYNC"
@@ -366,7 +371,7 @@ class PrayerNotificationService : Service() {
             .setGroupSummary(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setSortKey("00_prayer")
-            .setOngoing(true)
+            .setAutoCancel(true)
             .setSilent(true)
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .build()
@@ -469,8 +474,9 @@ class PrayerNotificationService : Service() {
             .setContentTitle("عباد الرحمن")
             .setContentText("جاري تحميل مواقيت الصلاة...")
             .setOngoing(true)
-            .setSortKey("00_prayer")
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setSortKey("!prayer_bar")
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setSilent(true)
             .build()
         startForegroundSafe(777, placeholderNotif)
@@ -478,29 +484,39 @@ class PrayerNotificationService : Service() {
         val now = System.currentTimeMillis()
         val prefs = getSharedPreferences("HomeWidgetPreferences", Context.MODE_PRIVATE)
 
-        // Retrieve today's epoch times from prefs or calculate them
-        var fajr = PrayerDataPatcher.getSafeLong(prefs, "fajr_epoch", 0L)
+        // ── تحقق من أن البيانات المخزنة هي لليوم الحالي فعلاً ──────────────
+        // إذا كان الـ fajr_epoch من أمس أو قديم → نحسب من النيتيف مباشرةً
+        val storedFajr = PrayerDataPatcher.getSafeLong(prefs, "fajr_epoch", 0L)
+        val todayStart = run {
+            val c = java.util.Calendar.getInstance()
+            c.set(java.util.Calendar.HOUR_OF_DAY, 0); c.set(java.util.Calendar.MINUTE, 0)
+            c.set(java.util.Calendar.SECOND, 0); c.set(java.util.Calendar.MILLISECOND, 0)
+            c.timeInMillis
+        }
+        val todayEnd = todayStart + 24 * 3600 * 1000L
+        // الـ fajr صالح لو كان في نطاق اليوم (بين منتصف الليل ونهايته)
+        val storedFajrIsToday = storedFajr in todayStart..todayEnd
 
-        if (fajr <= 0L) {
-            // Attempt native calculation. If it fails, leave the placeholder notification and return.
-            val times = NativePrayerManager.calculatePrayerTimes(this)
-            if (times != null) {
-                fajr = times.fajr.time
-            } else {
-                // startForeground already called above — service stays alive with placeholder
-                return 
-            }
+        NativeLogger.log(this, "syncFromSharedPrefs: storedFajr=$storedFajr isToday=$storedFajrIsToday now=$now")
+
+        // ── جلب أوقات الصلاة: نُفضّل الحساب المحلي دائماً للدقة ────────────
+        var fajr = if (storedFajrIsToday) storedFajr else 0L
+
+        val nativeTimes = NativePrayerManager.calculatePrayerTimes(this)
+        if (nativeTimes != null) {
+            // استخدم الحساب المحلي كمصدر أساسي دائماً (أحدث وأدق)
+            fajr    = nativeTimes.fajr.time
+            NativeLogger.log(this, "syncFromSharedPrefs: using native times fajr=${nativeTimes.fajr}")
+        } else if (fajr <= 0L) {
+            NativeLogger.log(this, "syncFromSharedPrefs: native calc failed + no valid stored epoch → placeholder")
+            return
         }
 
-        var dhuhr = PrayerDataPatcher.getSafeLong(prefs, "dhuhr_epoch", 0L)
-        var asr = PrayerDataPatcher.getSafeLong(prefs, "asr_epoch", 0L)
-        var maghrib = PrayerDataPatcher.getSafeLong(prefs, "maghrib_epoch", 0L)
-        var isha = PrayerDataPatcher.getSafeLong(prefs, "isha_epoch", 0L)
-
-        val times = NativePrayerManager.calculatePrayerTimes(this)
-        if (dhuhr == 0L && times != null) {
-            dhuhr = times.dhuhr.time; asr = times.asr.time; maghrib = times.maghrib.time; isha = times.isha.time
-        }
+        // إذا نجح الحساب المحلي استخدمه، وإلا استخدم المخزون (لو صالح)
+        var dhuhr   = if (nativeTimes != null) nativeTimes.dhuhr.time   else PrayerDataPatcher.getSafeLong(prefs, "dhuhr_epoch", 0L)
+        var asr     = if (nativeTimes != null) nativeTimes.asr.time     else PrayerDataPatcher.getSafeLong(prefs, "asr_epoch", 0L)
+        var maghrib = if (nativeTimes != null) nativeTimes.maghrib.time else PrayerDataPatcher.getSafeLong(prefs, "maghrib_epoch", 0L)
+        var isha    = if (nativeTimes != null) nativeTimes.isha.time    else PrayerDataPatcher.getSafeLong(prefs, "isha_epoch", 0L)
 
         val cal = java.util.Calendar.getInstance()
         cal.add(java.util.Calendar.DAY_OF_YEAR, 1)
@@ -552,12 +568,13 @@ class PrayerNotificationService : Service() {
         val is24H = flutterPrefs.getBoolean("flutter.is_24_hour", false)
         val fmt = java.text.SimpleDateFormat(if (is24H) "HH:mm" else "hh:mm a", java.util.Locale(if (is24H) "en" else "ar"))
 
+        NativeLogger.log(this, "syncFromSharedPrefs: hijri=$hijriStr next=$targetName epoch=$targetEpoch countUp=$isCountingUp")
         val notification = buildPersistentNotification(
-            if (fajr > 0L) fmt.format(java.util.Date(fajr)) else if (times != null) fmt.format(times.fajr) else prefs.getString("fajr", "--:--")!!,
-            if (dhuhr > 0L) fmt.format(java.util.Date(dhuhr)) else if (times != null) fmt.format(times.dhuhr) else prefs.getString("dhuhr", "--:--")!!,
-            if (asr > 0L) fmt.format(java.util.Date(asr)) else if (times != null) fmt.format(times.asr) else prefs.getString("asr", "--:--")!!,
-            if (maghrib > 0L) fmt.format(java.util.Date(maghrib)) else if (times != null) fmt.format(times.maghrib) else prefs.getString("maghrib", "--:--")!!,
-            if (isha > 0L) fmt.format(java.util.Date(isha)) else if (times != null) fmt.format(times.isha) else prefs.getString("isha", "--:--")!!,
+            fmt.format(java.util.Date(fajr)),
+            fmt.format(java.util.Date(dhuhr)),
+            fmt.format(java.util.Date(asr)),
+            fmt.format(java.util.Date(maghrib)),
+            fmt.format(java.util.Date(isha)),
             statusName, "", hijriStr, activeIndex, targetEpoch, isCountingUp
         )
         
@@ -659,7 +676,20 @@ class PrayerNotificationService : Service() {
         collapsedView.setOnClickPendingIntent(R.id.root_collapsed, pi)
         expandedView.setOnClickPendingIntent(R.id.root_expanded, pi)
 
-        return NotificationCompat.Builder(this, channelId).setSmallIcon(R.mipmap.launcher_icon).setCustomContentView(collapsedView).setCustomBigContentView(expandedView).setStyle(NotificationCompat.DecoratedCustomViewStyle()).setOngoing(true).setPriority(NotificationCompat.PRIORITY_MAX).setCategory(NotificationCompat.CATEGORY_STATUS).setWhen(System.currentTimeMillis()).setShowWhen(false).setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE).setContentIntent(pi).build()
+        return NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.mipmap.launcher_icon)
+            .setCustomContentView(collapsedView)
+            .setCustomBigContentView(expandedView)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setWhen(System.currentTimeMillis())
+            .setShowWhen(false)
+            .setSortKey("!prayer_bar")  // '!' sorts before letters → always first
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .setContentIntent(pi)
+            .build()
     }
 
     private fun toArabicDigits(input: String): String {
