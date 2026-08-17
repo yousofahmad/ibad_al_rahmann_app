@@ -10,8 +10,13 @@ import 'package:quran/quran.dart';
 import 'package:ibad_al_rahmann/widgets/app_skeleton.dart';
 
 class FehresItemsListView extends StatelessWidget {
-  const FehresItemsListView({super.key, required this.surahs});
+  const FehresItemsListView({
+    super.key,
+    required this.surahs,
+    this.onSurface,
+  });
   final List<SearchingSurahModel> surahs;
+  final Color? onSurface;
 
   @override
   Widget build(BuildContext context) {
@@ -22,29 +27,29 @@ class FehresItemsListView extends StatelessWidget {
       );
     }
     final cubit = context.read<QuranCubit>();
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final defaultOnSurface = onSurface ?? (isDarkMode ? Colors.white : Colors.black87);
+
     return ListView.separated(
       itemCount: surahs.length,
       separatorBuilder: (context, index) => Divider(
-        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
-        height: 3,
+        color: defaultOnSurface.withValues(alpha: 0.12),
+        height: 1,
       ),
       itemBuilder: (context, index) {
-        // final surahFirstPage = getSurahPages(index + 1).first;
-        // final juzNumber = getJuzNumber(index + 1, 1);
         final bool isActive =
             surahs.length == 114 && cubit.currentSurahIndex == index;
-        final Color bgColor = isActive
-            ? Theme.of(context).primaryColor
-            : Colors.transparent;
+        final Color primary = Theme.of(context).primaryColor;
+        final Color bgColor = isActive ? primary : Colors.transparent;
 
         // Force high contrast for active items based on primary color brightness
-        final bool isPrimaryDark = ThemeData.estimateBrightnessForColor(Theme.of(context).primaryColor) == Brightness.dark;
+        final bool isPrimaryDark = ThemeData.estimateBrightnessForColor(primary) == Brightness.dark;
         final Color activeTextColor = isPrimaryDark ? Colors.white : Colors.black87;
 
-        final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
-        final Color primaryColored = isActive 
-            ? activeTextColor 
-            : (isDarkMode ? Colors.white70 : Theme.of(context).primaryColor);
+        final Color textColor = isActive ? activeTextColor : defaultOnSurface;
+        final Color subTextColor = isActive
+            ? activeTextColor.withValues(alpha: 0.75)
+            : defaultOnSurface.withValues(alpha: 0.65);
 
         return GestureDetector(
           onTap: () {
@@ -57,19 +62,21 @@ class FehresItemsListView extends StatelessWidget {
           child: ColoredBox(
             color: bgColor,
             child: Padding(
-              padding: const EdgeInsets.only(right: 20, left: 20, top: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Directionality(
                 textDirection: TextDirection.rtl,
                 child: Row(
                   children: [
                     Text(
                       surahs[index].surahNumber.toArabicNums,
-                      style: AppStyles.style24u.copyWith(
-                        fontSize: 24,
-                        color: primaryColored,
+                      style: TextStyle(
+                        fontFamily: AppConsts.uthmanic,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
                       ),
                     ),
-                    const SizedBox(width: 20),
+                    const SizedBox(width: 16),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -77,16 +84,17 @@ class FehresItemsListView extends StatelessWidget {
                           'surah${surahs[index].surahNumber.toString().padLeft(3, '0')}',
                           style: TextStyle(
                             fontFamily: 'SurahNames',
-                            color: primaryColored,
-                            fontSize: 32,
+                            color: textColor,
+                            fontSize: 30,
                             height: 1.0,
                           ),
                         ),
                         Text(
                           surahs[index].place,
-                          style: AppStyles.style18u.copyWith(
-                            color: primaryColored,
-                            fontSize: 16,
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            color: subTextColor,
+                            fontSize: 13,
                           ),
                         ),
                       ],
@@ -94,20 +102,22 @@ class FehresItemsListView extends StatelessWidget {
                     const Spacer(),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
-                      spacing: 6,
                       children: [
                         Text(
                           'صفحة ${surahs[index].firstPage.toArabicNums}',
-                          style: AppStyles.style14u.copyWith(
-                            fontSize: 14,
-                            color: primaryColored,
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontSize: 13,
+                            color: subTextColor,
                           ),
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           'الجزء ${surahs[index].juzNumber.toArabicNums}',
-                          style: AppStyles.style14u.copyWith(
-                            color: primaryColored,
-                            fontSize: 14,
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontSize: 13,
+                            color: subTextColor,
                           ),
                         ),
                       ],

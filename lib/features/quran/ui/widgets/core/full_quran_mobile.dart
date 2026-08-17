@@ -250,16 +250,9 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
             right: true,
             child: Stack(
               children: [
-                Listener(
+                GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onPointerDown: (e) => _tapDownPosition = e.position,
-                  onPointerUp: (e) {
-                    final down = _tapDownPosition;
-                    _tapDownPosition = null;
-                    if (down == null) return;
-                    final delta = (e.position - down).distance;
-                    if (delta > _maxTapDelta) return;
-
+                  onTap: () {
                     if (state.isAutoScrolling) {
                       context.read<QuranCubit>().setAutoScrollPaused(true);
                       setState(() => _showAutoScrollMenu = true);
@@ -269,10 +262,9 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
                       _toggleOverlays();
                     }
                   },
-                  child: GestureDetector(
-                    onDoubleTap: () =>
-                        context.read<QuranCubit>().changeLayout(),
-                    child: state.isAutoScrolling
+                  onDoubleTap: () =>
+                      context.read<QuranCubit>().changeLayout(),
+                  child: state.isAutoScrolling
                         ? ListView.builder(
                             controller: _autoScrollController,
                             scrollDirection: Axis.vertical,
@@ -319,7 +311,6 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
                               );
                             },
                           ),
-                  ),
                 ),
                 if (_showOverlays && !state.isAutoScrolling)
                   Positioned(

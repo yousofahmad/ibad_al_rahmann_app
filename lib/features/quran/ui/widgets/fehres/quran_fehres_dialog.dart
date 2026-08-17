@@ -332,7 +332,7 @@ class _SurahTab extends StatelessWidget {
           child: ValueListenableBuilder<List<SearchingSurahModel>>(
             valueListenable: notifier,
             builder: (context, surahs, _) =>
-                FehresItemsListView(surahs: surahs),
+                FehresItemsListView(surahs: surahs, onSurface: onSurface),
           ),
         ),
       ],

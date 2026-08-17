@@ -148,8 +148,6 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
   }
 
   Future<void> _fetchAsync() async {
-    // Optimization: minimal delay to maintain smoothness while skipping fast flicking
-    await Future.delayed(const Duration(milliseconds: 20));
     if (!mounted) return;
 
     // Trigger neighbor preloading immediately in parallel

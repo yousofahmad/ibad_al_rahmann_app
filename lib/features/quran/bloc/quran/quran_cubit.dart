@@ -8,6 +8,7 @@ import 'package:ibad_al_rahmann/features/quran/data/repo/quran_repo.dart';
 import 'package:ibad_al_rahmann/features/quran/data/quran_word.dart';
 import 'package:ibad_al_rahmann/features/quran/data/db_helper.dart'; // Ensure db helper import
 import 'package:ibad_al_rahmann/services/daily_tracker_service.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:quran/quran.dart';
 
 part 'quran_state.dart';
@@ -259,6 +260,7 @@ class QuranCubit extends Cubit<QuranState> {
       verseNumber: pageData[0]['start'],
     );
 
+    AppLogger.log('Quran', 'Page changed to $pageNumber (Juz $juzNum)');
     emit(state.copyWith(juzNumber: juzNum, currentPage: pageIndex));
     clearHighlightedVerse();
 
@@ -356,6 +358,9 @@ class QuranCubit extends Cubit<QuranState> {
   }
 
   void changeLayout() {
+    final nextLayout = state.layout == QuranLayout.min ? QuranLayout.full : QuranLayout.min;
+    AppLogger.log('Quran', 'Double-tap layout switched to ${nextLayout.name}');
+
     if (state.layout == QuranLayout.min) {
       emit(
         state.copyWith(

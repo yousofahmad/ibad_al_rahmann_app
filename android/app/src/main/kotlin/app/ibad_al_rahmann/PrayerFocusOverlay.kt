@@ -184,11 +184,14 @@ object PrayerFocusOverlay {
         val dm = context.resources.displayMetrics
         val screenW = dm.widthPixels
 
-        val cardBg     = if (isDark) 0xF51A1816.toInt() else 0xF8FFFFFF.toInt()
-        val textColor  = if (isDark) 0xFFFFFFFF.toInt() else 0xFF1A1A1A.toInt()
-        val subColor   = if (isDark) 0xFFAAAAAA.toInt() else 0xFF666666.toInt()
-        val goldColor  = 0xFFD0A871.toInt()
-        val goldDark   = 0xFF8B5E1A.toInt()
+        // Semi-transparent frosted background matching app theme
+        val cardBg     = if (isDark) 0xDD181716.toInt() else 0xEEFAF8F5.toInt()
+        val textColor  = if (isDark) 0xFFF0EAE1.toInt() else 0xFF1C1A18.toInt()
+        val subColor   = if (isDark) 0xFFA89F94.toInt() else 0xFF6E655C.toInt()
+        val goldColor  = if (isDark) 0xFFE0B880.toInt() else 0xFF9E6E2E.toInt()
+        val goldDark   = if (isDark) 0xFF9E6E2E.toInt() else 0xFF8A5A1E.toInt()
+        val snoozeBg   = if (isDark) 0x24D0A871.toInt() else 0x18000000.toInt()
+        val snoozeText = if (isDark) 0xFFE0B880.toInt() else 0xFF8A5A1E.toInt()
 
         // ── Full-screen FrameLayout (يمرر اللمسات خارج البطاقة) ──────
         val root = android.widget.FrameLayout(context)
@@ -281,7 +284,7 @@ object PrayerFocusOverlay {
 
         val snoozeButton = buildFullWidthButton(
             context, "ذكرني بعد $snoozeMins دقائق (5)",
-            0x22D0A871.toInt(), goldColor, 14f, 0
+            snoozeBg, snoozeText, 14f, 0
         )
         snoozeButton.isEnabled = false
         snoozeButton.alpha = 0.4f
@@ -309,6 +312,7 @@ object PrayerFocusOverlay {
         }
 
         prayedButton.setOnClickListener {
+            countdownHandler.removeCallbacks(countdownRunnable)
             showConfirmationButtons(context, card, prayedButton, snoozeButton, prayerName, alarmId,
                 goldColor, goldDark, subColor, textColor, isDark)
         }
@@ -324,7 +328,7 @@ object PrayerFocusOverlay {
         return root
     }
 
-    /** يُظهر زرّي التأكيد: "في وقتها" و"متأخراً" مع إبقاء زر التذكير متاحاً */
+    /** يُظهر زرّي التأكيد: "في وقتها" و"متأخراً" ويخفي زر التذكير بناءً على رغبة المستخدم */
     private fun showConfirmationButtons(
         context: Context,
         card: android.widget.LinearLayout,
@@ -335,6 +339,7 @@ object PrayerFocusOverlay {
         goldColor: Int, goldDark: Int, subColor: Int, textColor: Int, isDark: Boolean
     ) {
         prayedButton.visibility = View.GONE
+        snoozeButton.visibility = View.GONE
         val dm = context.resources.displayMetrics
 
         val confirmLabel = android.widget.TextView(context).apply {
@@ -347,11 +352,11 @@ object PrayerFocusOverlay {
         val row = android.widget.LinearLayout(context).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, dpToPx(dm, 10))
+            setPadding(0, 0, 0, 0)
         }
 
         val onTimeBtn = buildHalfButton(context, "في وقتها ✓", 0xFF2E7D32.toInt(), 0xFFFFFFFF.toInt(), 14f)
-        val lateBtn   = buildHalfButton(context, "متأخراً  ⏳", 0xFFE65100.toInt(), 0xFFFFFFFF.toInt(), 14f)
+        val lateBtn   = buildHalfButton(context, "متأخراً  ⏳", 0xFFD84315.toInt(), 0xFFFFFFFF.toInt(), 14f)
 
         val halfP1 = android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             .apply { setMargins(0, 0, dpToPx(dm, 6), 0) }
@@ -370,7 +375,6 @@ object PrayerFocusOverlay {
         val prayedIndex = card.indexOfChild(prayedButton)
         card.addView(confirmLabel, prayedIndex + 1)
         card.addView(row, prayedIndex + 2)
-        // Note: snoozeButton remains at the bottom of the card!
     }
 
     // ─── Actions ──────────────────────────────────────────────────────────────
@@ -402,8 +406,9 @@ object PrayerFocusOverlay {
     ) {
         val dm = context.resources.displayMetrics
         val isDark = isDarkMode(context)
-        val subColor = if (isDark) 0xFFAAAAAA.toInt() else 0xFF666666.toInt()
-        val textColor = if (isDark) 0xFFFFFFFF.toInt() else 0xFF1A1A1A.toInt()
+        val textColor = if (isDark) 0xFFF0EAE1.toInt() else 0xFF1C1A18.toInt()
+        val goldDark = if (isDark) 0xFF9E6E2E.toInt() else 0xFF8A5A1E.toInt()
+        val streakBg = if (isDark) 0x33D0A871.toInt() else 0x14000000.toInt()
 
         card.removeAllViews()
 
@@ -429,7 +434,7 @@ object PrayerFocusOverlay {
             gravity = Gravity.CENTER
             setPadding(dpToPx(dm, 16), dpToPx(dm, 12), dpToPx(dm, 16), dpToPx(dm, 16))
             background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(if (isDark) 0x33D0A871.toInt() else 0x22D0A871.toInt())
+                setColor(streakBg)
                 cornerRadius = 16f * dm.density
             }
         }
@@ -461,7 +466,7 @@ object PrayerFocusOverlay {
 
         // ── زر "متابعة" ───────────────────────────────────────────────────────
         val continueBtn = buildFullWidthButton(
-            context, "متابعة", 0xFF8B5E1A.toInt(), 0xFFFFFFFF.toInt(), 16f, 0
+            context, "متابعة", goldDark, 0xFFFFFFFF.toInt(), 16f, 0
         )
         continueBtn.setOnClickListener { dismiss(context) }
 
