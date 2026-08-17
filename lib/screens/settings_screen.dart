@@ -16,6 +16,8 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:ibad_al_rahmann/main.dart'; // To access scaffoldMessengerKey
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
+import 'package:ibad_al_rahmann/services/background_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -914,6 +916,42 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
 
           // 6. Support
           _buildSectionHeader("الدعم"),
+          // ─ مشاركة اللوغ — يعمل بدون USB ────────────────────
+          _buildListTile(
+            "مشاركة سجل التطبيق",
+            "إرسال ملف اللوج لتشخيص مشاكل التهنيج — يعمل بدون اتصال بالكمبيوتر",
+            Icons.bug_report_outlined,
+            onTap: () async {
+              final snack = ScaffoldMessenger.of(context);
+              snack.showSnackBar(
+                const SnackBar(content: Text('جاري تجميع اللوج...')),
+              );
+              try {
+                final nativeLog = await BackgroundService.getNativeLog(lines: 500);
+                await AppLogger.shareLog(nativeLogContent: nativeLog);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('خطأ: $e')),
+                  );
+                }
+              }
+            },
+          ),
+          _buildListTile(
+            "مسح ملف اللوج",
+            "احذف ملفات السجل لتوفير مساحة",
+            Icons.delete_sweep_outlined,
+            onTap: () async {
+              await AppLogger.clear();
+              await BackgroundService.clearNativeLog();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('تم مسح ملفات اللوج ✓')),
+                );
+              }
+            },
+          ),
           _buildListTile(
             "تواصل معنا",
             "أرسل لنا ملاحظاتك أو استفساراتك",

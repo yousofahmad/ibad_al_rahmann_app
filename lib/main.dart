@@ -25,6 +25,7 @@ import 'services/prayer_service.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'screens/tasbeeh_screen.dart';
 import 'services/backup_service.dart';
+import 'services/app_logger.dart';
 
 import 'core/di/di.dart';
 import 'core/helpers/tafsir_helper.dart';
@@ -102,6 +103,8 @@ Future<void> main() async {
   // 1. Core Platform Inits
   await initializeDateFormatting('ar', null);
   await CacheHelper.init();
+  await AppLogger.init(); // ← يجب أن يكون بعد CacheHelper مباشرةً
+  AppLogger.log('main', 'app started — Flutter init complete');
   
   // 2. Initialize Firebase (CRITICAL: Must be before runApp if UI depends on it)
   try {
@@ -144,16 +147,16 @@ Future<void> main() async {
 
 
 Future<void> _runBackgroundInits() async {
-  // CRITICAL: Wait for the app to be fully rendered and interactive
   await WidgetsBinding.instance.endOfFrame;
-  
-  // Wait a bit to ensure the splash screen is visible and system is quiet
   await Future.delayed(const Duration(milliseconds: 500));
+
+  AppLogger.log('BgInit', 'start');
 
   NotificationService.nativeLog('_runBackgroundInits: registering listener');
   NotificationService.onNotificationTap.addListener(() {
     final payload = NotificationService.onNotificationTap.value;
     NotificationService.nativeLog('listener fired: payload=$payload');
+    AppLogger.log('NavListener', 'payload=$payload');
     if (payload != null) {
       handleGlobalNavigation(payload);
       Future.microtask(() {
@@ -162,52 +165,73 @@ Future<void> _runBackgroundInits() async {
     }
   });
 
-  // Handle payloads that arrived before the listener was registered (race condition)
   final pendingPayload = NotificationService.onNotificationTap.value;
   NotificationService.nativeLog('_runBackgroundInits: pendingPayload=$pendingPayload');
   if (pendingPayload != null) {
     debugPrint("Flushing pre-listener payload: $pendingPayload");
+    AppLogger.log('BgInit', 'flushing pre-listener payload=$pendingPayload');
     handleGlobalNavigation(pendingPayload);
     NotificationService.onNotificationTap.value = null;
   }
 
-  // Phase 1: Essential Fast Data (Heavily staggered)
+  AppLogger.log('BgInit', 'BookmarkService.init start');
   await BookmarkService.init();
+  AppLogger.log('BgInit', 'BookmarkService.init done');
 
   await Future.delayed(const Duration(seconds: 1));
+  AppLogger.log('BgInit', 'AlarmManager.initialize start');
   AndroidAlarmManager.initialize().catchError((e) {
+    AppLogger.log('BgInit', 'AlarmManager error: $e');
     debugPrint('AlarmManager error: $e');
     return false;
   });
-  
+  AppLogger.log('BgInit', 'AlarmManager.initialize triggered');
+
   await Future.delayed(const Duration(seconds: 1));
+  AppLogger.log('BgInit', 'DailyTrackerService.initStatsForToday start');
   await DailyTrackerService.initStatsForToday();
-  
-  // Reschedule drive sync if enabled
+  AppLogger.log('BgInit', 'DailyTrackerService.initStatsForToday done');
+
   final prefs = CacheHelper.prefs;
   if (prefs.getBool('auto_sync_drive') == true) {
     BackupService.scheduleNextAutoSync();
   }
 
   await Future.delayed(const Duration(seconds: 1));
+  AppLogger.log('BgInit', 'NotificationService.init start');
   await NotificationService.init();
+  AppLogger.log('BgInit', 'NotificationService.init done');
 
-  // Phase 2: Staggered background services (SM-T585 friendly)
   await Future.delayed(const Duration(seconds: 5));
+  AppLogger.log('BgInit', 'PrayerService.init start');
   PrayerService().init();
+  AppLogger.log('BgInit', 'PrayerService.init triggered');
 
   await Future.delayed(const Duration(seconds: 2));
-  RemoteConfigService.init().catchError((e) => debugPrint('RemoteConfig error: $e'));
-  
-  await Future.delayed(const Duration(seconds: 2));
-  FCMService.init().catchError((e) => debugPrint('FCM error: $e'));
+  AppLogger.log('BgInit', 'RemoteConfigService.init start');
+  RemoteConfigService.init().catchError((e) {
+    AppLogger.log('BgInit', 'RemoteConfig error: $e');
+    debugPrint('RemoteConfig error: $e');
+  });
 
   await Future.delayed(const Duration(seconds: 2));
+  AppLogger.log('BgInit', 'FCMService.init start');
+  FCMService.init().catchError((e) {
+    AppLogger.log('BgInit', 'FCM error: $e');
+    debugPrint('FCM error: $e');
+  });
+
+  await Future.delayed(const Duration(seconds: 2));
+  AppLogger.log('BgInit', 'JustAudioBackground.init start');
   JustAudioBackground.init(
     androidNotificationChannelId: 'app.ibad_al_rahmann.audio',
     androidNotificationChannelName: 'Audio playback',
     androidNotificationOngoing: true,
-  ).catchError((e) => debugPrint('JustAudio error: $e'));
+  ).catchError((e) {
+    AppLogger.log('BgInit', 'JustAudio error: $e');
+    debugPrint('JustAudio error: $e');
+  });
+
 
   // Phase 3: Background Heavy Preloading
   await Future.delayed(const Duration(seconds: 20));
