@@ -109,7 +109,100 @@ class AppLogger {
     }
   }
 
-  /// يمسح الملف
+  /// تنظيف ذكي — يحذف السطور الروتينية ويحتفظ بالمهمة فقط:
+  /// • أي سطر يحتوي على خطأ / استثناء / warning
+  /// • أي سطر تأخر أكثر من 2 ثانية عن السابق (يدل على تهنيج)
+  /// • أول وآخر سطر في كل جلسة تشغيل
+  /// • السطور المكررة: يحتفظ بنسخة واحدة فقط
+  static Future<Map<String, int>> smartClean() async {
+    await _flushBuffer();
+    final file = _logFile;
+    if (file == null || !await file.exists()) return {'total': 0, 'kept': 0, 'removed': 0};
+
+    final lines = await file.readAsLines();
+    final total = lines.length;
+    if (total == 0) return {'total': 0, 'kept': 0, 'removed': 0};
+
+    // الكلمات الدالة على مشكلة — نحتفظ بهذه دائماً
+    const errorKeywords = [
+      'error', 'exception', 'fail', 'crash', 'timeout',
+      'null', 'fatal', 'IOException', 'ANR',
+      'خطأ', 'فشل', 'تعذر',
+    ];
+
+    // السطور الروتينية الصرفة التي نحذفها إذا لم يكن هناك تأخير أو خطأ
+    final routinePatterns = [
+      RegExp(r'\[BgInit\] .*(start|triggered|done)', caseSensitive: false),
+      RegExp(r'\[AppLogger\] initialized'),
+    ];
+
+    DateTime? prevTime;
+    final kept = <String>[];
+    final seen = <String>{};
+
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      if (line.trim().isEmpty) continue;
+
+      // استخرج الوقت من السطر: [MM-DD HH:mm:ss.mmm]
+      DateTime? lineTime;
+      final timeMatch = RegExp(r'\[(\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})\]').firstMatch(line);
+      if (timeMatch != null) {
+        try {
+          final parts = timeMatch.group(1)!.split(RegExp(r'[ :.]'));
+          final now = DateTime.now();
+          lineTime = DateTime(
+            now.year,
+            int.parse(parts[0]),
+            int.parse(parts[1]),
+            int.parse(parts[2]),
+            int.parse(parts[3]),
+            int.parse(parts[4]),
+            int.parse(parts[5]),
+          );
+        } catch (_) {}
+      }
+
+      // 1. هل السطر يحتوي على كلمة مهمة؟
+      final lower = line.toLowerCase();
+      final isImportant = errorKeywords.any((kw) => lower.contains(kw.toLowerCase()));
+
+      // 2. هل هناك تأخير كبير منذ السطر السابق؟ (> 2 ثانية = تهنيج محتمل)
+      bool isSlowStep = false;
+      if (lineTime != null && prevTime != null) {
+        final gapMs = lineTime.difference(prevTime!).inMilliseconds;
+        if (gapMs > 2000) {
+          isSlowStep = true;
+          kept.add('⚠️  [SLOW ${gapMs}ms gap before this line]');
+        }
+      }
+
+      // 3. أول وآخر سطر = دائماً مهم
+      final isFirstOrLast = (i == 0 || i == lines.length - 1);
+
+      // 4. هل هو روتيني صرف؟
+      final isRoutine = !isImportant && !isSlowStep && !isFirstOrLast &&
+          routinePatterns.any((p) => p.hasMatch(line));
+
+      // 5. هل مكرر (نفس المحتوى بدون الطابع الزمني)؟
+      final msgKey = line.replaceAll(RegExp(r'\[\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\]'), '').trim();
+      final isDuplicate = !isImportant && seen.contains(msgKey);
+
+      if (!isRoutine && !isDuplicate) {
+        kept.add(line);
+        seen.add(msgKey);
+      }
+
+      if (lineTime != null) prevTime = lineTime;
+    }
+
+    await file.writeAsString('${kept.join('\n')}\n');
+    final removed = total - kept.length;
+    log('AppLogger', 'smartClean done: total=$total kept=${kept.length} removed=$removed');
+    return {'total': total, 'kept': kept.length, 'removed': removed};
+  }
+
+  /// يمسح الملف بالكامل (استخدام داخلي)
   static Future<void> clear() async {
     await _flushBuffer();
     try {
@@ -118,6 +211,7 @@ class AppLogger {
       debugPrint('AppLogger.clear error: $e');
     }
   }
+
 
   /// يشارك ملف اللوغ (Flutter + Native مدمجَين)
   static Future<void> shareLog({String? nativeLogContent}) async {

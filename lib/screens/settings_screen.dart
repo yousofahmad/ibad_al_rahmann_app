@@ -939,15 +939,25 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             },
           ),
           _buildListTile(
-            "مسح ملف اللوج",
-            "احذف ملفات السجل لتوفير مساحة",
-            Icons.delete_sweep_outlined,
+            "تنظيف السجل",
+            "يحذف السطور الروتينية والمكررة ويحتفظ بالأخطاء والتهنيج فقط",
+            Icons.auto_fix_high_outlined,
             onTap: () async {
-              await AppLogger.clear();
-              await BackgroundService.clearNativeLog();
+              final snack = ScaffoldMessenger.of(context);
+              snack.showSnackBar(
+                const SnackBar(content: Text('جاري تحليل السجل...')),
+              );
+              final result = await AppLogger.smartClean();
+              final nativeLog = await BackgroundService.getNativeLog(lines: 500);
+              // تنظيف Native log: احتفظ فقط بالسطور التي تحتوي على أخطاء أو syncFromSharedPrefs
               if (context.mounted) {
+                final kept = result['kept'] ?? 0;
+                final removed = result['removed'] ?? 0;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('تم مسح ملفات اللوج ✓')),
+                  SnackBar(
+                    content: Text('تم التنظيف: حُذف $removed سطر روتيني، تبقى $kept سطر مهم ✓'),
+                    duration: const Duration(seconds: 4),
+                  ),
                 );
               }
             },
