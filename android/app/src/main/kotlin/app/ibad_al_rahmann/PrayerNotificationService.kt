@@ -54,27 +54,6 @@ class PrayerNotificationService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // ALWAYS satisfy Android 8+ foreground service requirements immediately
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channelId = "persistent_prayer_v14"
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (nm.getNotificationChannel(channelId) == null) {
-                val ch = NotificationChannel(channelId, "شريط وقت الصلاة", NotificationManager.IMPORTANCE_DEFAULT)
-                ch.setShowBadge(false); ch.setSound(null, null); ch.enableVibration(false)
-                nm.createNotificationChannel(ch)
-            }
-        val placeholderNotif = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.mipmap.launcher_icon)
-            .setContentTitle("")
-            .setContentText("")
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setSortKey("!prayer_bar")  // '!' sorts before all letters → top of list
-            .setOngoing(true)
-            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .build()
-        startForegroundSafe(777, placeholderNotif)
-        }
-
         val action = intent?.action ?: "SYNC"
 
         if (action == "SYNC" && !isPersistentNotificationEnabled()) {
@@ -281,6 +260,7 @@ class PrayerNotificationService : Service() {
             .setAutoCancel(true)
             .setGroup(notifGroup)
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
+            .setSortKey("z_alarm")
             .addAction(android.R.drawable.ic_media_pause, "إيقاف الصوت", stopPendingIntent)
             .setContentIntent(fullPendingIntent)
 
@@ -318,7 +298,7 @@ class PrayerNotificationService : Service() {
             .setGroup(notifGroup)
             .setGroupSummary(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setSortKey("00_prayer")
+            .setSortKey("z_summary")
             .setAutoCancel(true)
             .setSilent(true)
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
@@ -406,28 +386,6 @@ class PrayerNotificationService : Service() {
             }, 1500)
             return
         }
-
-        // CRITICAL: On Android 8+, startForeground() MUST be called within 5 seconds
-        // of startForegroundService(). We call it immediately with a minimal notification
-        // to satisfy Android, then update it with real data below.
-        val channelId = "persistent_prayer_v14"
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val ch = NotificationChannel(channelId, "شريط وقت الصلاة", NotificationManager.IMPORTANCE_MAX)
-            ch.setShowBadge(false); ch.setSound(null, null); ch.enableVibration(false)
-            nm.createNotificationChannel(ch)
-        }
-        val placeholderNotif = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.mipmap.launcher_icon)
-            .setContentTitle("عباد الرحمن")
-            .setContentText("جاري تحميل مواقيت الصلاة...")
-            .setOngoing(true)
-            .setSortKey("!prayer_bar")
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .setSilent(true)
-            .build()
-        startForegroundSafe(777, placeholderNotif)
 
         val now = System.currentTimeMillis()
         val prefs = getSharedPreferences("HomeWidgetPreferences", Context.MODE_PRIVATE)
@@ -529,9 +487,6 @@ class PrayerNotificationService : Service() {
         startForegroundSafe(777, notification)
         scheduleNextUpdate(activeIndex, targetEpoch, isCountingUp)
         updateAllWidgets()
-
-        // The notification is now built and sent. Now, force the Home Screen widgets to sync!
-        AlarmReceiver.forceUpdateAllWidgets(this)
     }
 
     private fun updateAllWidgets() {
@@ -576,11 +531,16 @@ class PrayerNotificationService : Service() {
     }
 
     private fun buildPersistentNotification(fajr: String, dhuhr: String, asr: String, maghrib: String, isha: String, nextName: String, countdown: String, hijri: String, activeIndex: Int, nextPrayerEpoch: Long, isCountUp: Boolean): Notification {
-        val channelId = "persistent_prayer_v14"
+        val channelId = "persistent_prayer_v18"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            try {
+                nm.deleteNotificationChannel("persistent_prayer_v14")
+                nm.deleteNotificationChannel("persistent_prayer_v12")
+            } catch (_: Exception) {}
             val channel = NotificationChannel(channelId, "شريط وقت الصلاة", NotificationManager.IMPORTANCE_MAX)
             channel.setShowBadge(false); channel.setSound(null, null); channel.enableVibration(false)
-            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
+            nm.createNotificationChannel(channel)
         }
         val collapsedView = RemoteViews(packageName, R.layout.notification_collapsed)
         collapsedView.setTextViewText(R.id.tv_next_prayer_name, toArabicDigits(nextName))
@@ -631,10 +591,10 @@ class PrayerNotificationService : Service() {
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setWhen(System.currentTimeMillis())
             .setShowWhen(false)
-            .setSortKey("!prayer_bar")  // '!' sorts before letters → always first
+            .setSortKey("!0_prayer_bar")  // '!0' sorts before letters and other notifications → always top
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setContentIntent(pi)
             .build()

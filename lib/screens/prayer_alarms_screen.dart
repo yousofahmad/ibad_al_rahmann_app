@@ -36,6 +36,12 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
     _loadPrefs();
   }
 
+  @override
+  void dispose() {
+    PrayerService().scheduleNotifications(isUserAction: true);
+    super.dispose();
+  }
+
   Future<void> _loadPrefs() async {
     _prefs = CacheHelper.prefs;
     setState(() {

@@ -12,7 +12,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
             val serviceIntent = Intent(context, PrayerNotificationService::class.java).apply {
                 this.action = "STOP_SOUND"
             }
-            androidx.core.content.ContextCompat.startForegroundService(context, serviceIntent)
+            try { androidx.core.content.ContextCompat.startForegroundService(context, serviceIntent) } catch (e: Exception) { e.printStackTrace() }
         }
     }
 }

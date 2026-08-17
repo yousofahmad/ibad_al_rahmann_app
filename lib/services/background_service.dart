@@ -2,19 +2,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 
 class BackgroundService {
-  // اسم القناة لازم يكون مطابق للموجود في الكوتلين
   static const _channel = MethodChannel(
     'app.ibad_al_rahmann/native_notifications',
   );
 
   static Future<void> init() async {}
 
-  // دالة الجدولة: تستقبل ID وساعة ودقيقة واسم ملف الصوت
+  // دالة الجدولة
   static Future<void> scheduleAlarm({
     required int id,
     required int hour,
     required int minute,
-    required String soundName, // (sabah, masaa, ruqyah)
+    required String soundName,
   }) async {
     try {
       await _channel.invokeMethod('scheduleAlarm', {
@@ -23,7 +22,6 @@ class BackgroundService {
         'minute': minute,
         'soundName': soundName,
       });
-      // debugPrint("✅ تم جدولة المنبه $id الساعة $hour:$minute بصوت $soundName");
     } catch (e) {
       debugPrint("❌ خطأ في الجدولة: $e");
     }
@@ -36,6 +34,36 @@ class BackgroundService {
       debugPrint("✅ تم إلغاء المنبه رقم $id");
     } catch (e) {
       debugPrint("❌ خطأ في الإلغاء: $e");
+    }
+  }
+
+  // ── Log helpers ──────────────────────────────────────────────────────────
+
+  /// يُعيد آخر [lines] سطراً من ملف اللوغ النيتيف
+  static Future<String> getNativeLog({int lines = 300}) async {
+    try {
+      final result = await _channel.invokeMethod<String>('getNativeLog', {'lines': lines});
+      return result ?? '(فارغ)';
+    } catch (e) {
+      return '❌ خطأ في قراءة اللوغ: $e';
+    }
+  }
+
+  /// يمسح ملف اللوغ النيتيف
+  static Future<void> clearNativeLog() async {
+    try {
+      await _channel.invokeMethod('clearNativeLog');
+    } catch (e) {
+      debugPrint('clearNativeLog error: $e');
+    }
+  }
+
+  /// يُعيد مسار ملف اللوغ على الجهاز
+  static Future<String?> getNativeLogPath() async {
+    try {
+      return await _channel.invokeMethod<String>('getNativeLogPath');
+    } catch (_) {
+      return null;
     }
   }
 }

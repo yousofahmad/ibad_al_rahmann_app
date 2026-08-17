@@ -410,7 +410,7 @@ class PrayerService extends ChangeNotifier {
 
   static const String _ltr = '\u200E';
 
-  Future<void> updatePersistentElements() async {
+  Future<void> updatePersistentElements({bool updateThirtyDays = false}) async {
     final times = getPrayerTimes();
     if (times == null) return;
 
@@ -629,32 +629,34 @@ class PrayerService extends ChangeNotifier {
       highlightedPrayerIndex,
     );
 
-    Future.delayed(const Duration(milliseconds: 500), () async {
-      Map<String, dynamic> thirtyDays = {};
-      for (int i = 0; i < 30; i++) {
-        DateTime d = now.add(Duration(days: i));
-        var t = getPrayerTimesForDate(d);
-        if (t != null) {
-          String dateKey = DateFormat('yyyy-MM-dd', 'en').format(d);
-          thirtyDays[dateKey] = {
-            "f": t.fajr.millisecondsSinceEpoch,
-            "d": t.dhuhr.millisecondsSinceEpoch,
-            "a": t.asr.millisecondsSinceEpoch,
-            "m": t.maghrib.millisecondsSinceEpoch,
-            "i": t.isha.millisecondsSinceEpoch,
-            "s": t.sunrise.millisecondsSinceEpoch,
-            "f_str": toArabicDigits(_ltrWrap(formatTime(t.fajr))),
-            "d_str": toArabicDigits(_ltrWrap(formatTime(t.dhuhr))),
-            "a_str": toArabicDigits(_ltrWrap(formatTime(t.asr))),
-            "m_str": toArabicDigits(_ltrWrap(formatTime(t.maghrib))),
-            "i_str": toArabicDigits(_ltrWrap(formatTime(t.isha))),
-            "s_str": toArabicDigits(_ltrWrap(formatTime(t.sunrise))),
-          };
+    if (updateThirtyDays) {
+      Future.delayed(const Duration(milliseconds: 500), () async {
+        Map<String, dynamic> thirtyDays = {};
+        for (int i = 0; i < 30; i++) {
+          DateTime d = now.add(Duration(days: i));
+          var t = getPrayerTimesForDate(d);
+          if (t != null) {
+            String dateKey = DateFormat('yyyy-MM-dd', 'en').format(d);
+            thirtyDays[dateKey] = {
+              "f": t.fajr.millisecondsSinceEpoch,
+              "d": t.dhuhr.millisecondsSinceEpoch,
+              "a": t.asr.millisecondsSinceEpoch,
+              "m": t.maghrib.millisecondsSinceEpoch,
+              "i": t.isha.millisecondsSinceEpoch,
+              "s": t.sunrise.millisecondsSinceEpoch,
+              "f_str": toArabicDigits(_ltrWrap(formatTime(t.fajr))),
+              "d_str": toArabicDigits(_ltrWrap(formatTime(t.dhuhr))),
+              "a_str": toArabicDigits(_ltrWrap(formatTime(t.asr))),
+              "m_str": toArabicDigits(_ltrWrap(formatTime(t.maghrib))),
+              "i_str": toArabicDigits(_ltrWrap(formatTime(t.isha))),
+              "s_str": toArabicDigits(_ltrWrap(formatTime(t.sunrise))),
+            };
+          }
+          if (i % 5 == 0) await Future.delayed(Duration.zero);
         }
-        if (i % 5 == 0) await Future.delayed(Duration.zero);
-      }
-      await HomeWidgetService.updateThirtyDaysData(jsonEncode(thirtyDays));
-    });
+        await HomeWidgetService.updateThirtyDaysData(jsonEncode(thirtyDays));
+      });
+    }
   }
 
   String _ltrWrap(String value) => '$_ltr$value$_ltr';
@@ -868,7 +870,7 @@ class PrayerService extends ChangeNotifier {
 
   Future<void> scheduleNotificationsDebounced({bool isUserAction = true}) async {
     if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 1000), () {
+    _debounceTimer = Timer(const Duration(milliseconds: 2500), () {
       scheduleNotifications(isUserAction: isUserAction);
     });
   }

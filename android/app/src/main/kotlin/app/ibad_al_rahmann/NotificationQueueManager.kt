@@ -86,7 +86,7 @@ object NotificationQueueManager {
             
             // Force update persistent notification and widgets after Adhan finishes
             val syncIntent = Intent(context, PrayerNotificationService::class.java).apply { action = "SYNC" }
-            androidx.core.content.ContextCompat.startForegroundService(context, syncIntent)
+            try { androidx.core.content.ContextCompat.startForegroundService(context, syncIntent) } catch (e: Exception) { e.printStackTrace() }
 
             val nextRequest = queue.poll()
             if (nextRequest != null) {
@@ -105,7 +105,7 @@ object NotificationQueueManager {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(serviceIntent)
+            try { context.startForegroundService(serviceIntent) } catch (e: Exception) { e.printStackTrace() }
         } else {
             context.startService(serviceIntent)
         }
@@ -115,7 +115,7 @@ object NotificationQueueManager {
         val stopIntent = Intent(context, PrayerNotificationService::class.java).apply {
             action = "STOP_SOUND"
         }
-        androidx.core.content.ContextCompat.startForegroundService(context, stopIntent)
+        try { androidx.core.content.ContextCompat.startForegroundService(context, stopIntent) } catch (e: Exception) { e.printStackTrace() }
     }
 
     private fun showVisualNotification(context: Context, intent: Intent) {

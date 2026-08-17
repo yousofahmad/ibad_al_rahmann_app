@@ -212,11 +212,20 @@ class AlarmReceiver : BroadcastReceiver() {
             else -> ""
         }
 
-        val title = (intent.getStringExtra("title") ?: fallbackTitle).trim()
-        val body = (intent.getStringExtra("body") ?: fallbackBody).trim()
+        var title = (intent.getStringExtra("title") ?: fallbackTitle).trim()
+        var body = (intent.getStringExtra("body") ?: fallbackBody).trim()
         // payload variable already extracted above
         val audioPath = intent.getStringExtra("audio_path")
         val customSoundName = intent.getStringExtra("custom_sound_name")
+        
+        if (payload.startsWith("khatma_")) {
+            val parts = payload.split("_")
+            if (parts.size >= 2) {
+                val khatmaId = parts[1]
+                val delayText = KhatmaHelper.getDelayText(context, khatmaId)
+                body = delayText + body
+            }
+        }
 
         if (title.isNotEmpty() && body.isNotEmpty()) {
             val year = intent.getIntExtra("year", -1)

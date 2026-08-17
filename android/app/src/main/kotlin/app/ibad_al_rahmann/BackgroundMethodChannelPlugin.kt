@@ -54,6 +54,19 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
                     NativeLogger.log(context, "[Flutter] $message")
                     result.success(null)
                 }
+                // ── Log helpers ─────────────────────────────────────────────
+                "getNativeLog" -> {
+                    val lines = call.argument<Int>("lines") ?: 300
+                    result.success(NativeLogger.tail(context, lines))
+                }
+                "clearNativeLog" -> {
+                    NativeLogger.clear(context)
+                    result.success(null)
+                }
+                "getNativeLogPath" -> {
+                    result.success(NativeLogger.getLogFile(context).absolutePath)
+                }
+                // ────────────────────────────────────────────────────────────
                 "getLaunchPayload" -> {
                     result.success(MainActivity.getAndClearLaunchPayload())
                 }
@@ -222,9 +235,9 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
                         }
 
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            context.startForegroundService(intent)
+                            try { context.startForegroundService(intent) } catch (e: Exception) { e.printStackTrace() }
                         } else {
-                            androidx.core.content.ContextCompat.startForegroundService(context, intent)
+                            try { androidx.core.content.ContextCompat.startForegroundService(context, intent) } catch (e: Exception) { e.printStackTrace() }
                         }
                         result.success(null)
                     } catch (e: Exception) {
@@ -235,7 +248,7 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
                     val intent = Intent(context, PrayerNotificationService::class.java).apply {
                         action = "STOP_PRAYER_NOTIFICATION"
                     }
-                    androidx.core.content.ContextCompat.startForegroundService(context, intent)
+                    try { androidx.core.content.ContextCompat.startForegroundService(context, intent) } catch (e: Exception) { e.printStackTrace() }
                     result.success(null)
                 }
                 "getLaunchPayload" -> {
@@ -343,7 +356,7 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
 
                     val intent = Intent(context, ScreenUnlockService::class.java)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        context.startForegroundService(intent)
+                        try { context.startForegroundService(intent) } catch (e: Exception) { e.printStackTrace() }
                     } else {
                         context.startService(intent)
                     }
