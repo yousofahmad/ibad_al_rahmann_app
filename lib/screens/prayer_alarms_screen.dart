@@ -338,14 +338,15 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
           if (preEnabled)
             Padding(
               padding: EdgeInsets.only(left: 14.w, right: 14.w, bottom: 10.h),
-              child: _compactMinutesPicker(
+              child: CompactMinutesPickerWidget(
                 prefix: 'قبل الأذان بـ',
-                value: preMins,
+                initialValue: preMins,
                 min: 1,
                 max: 60,
                 step: 1,
+                goldColor: _gold,
                 onChanged: (v) {
-                  setState(() => _fardMinutes[key] = v);
+                  _fardMinutes[key] = v;
                   _prefs.setInt('time_pre_$key', v);
                   PrayerService().scheduleNotificationsDebounced();
                 },
