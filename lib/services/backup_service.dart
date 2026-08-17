@@ -16,6 +16,7 @@ import 'package:ibad_al_rahmann/services/prayer_service.dart';
 import 'package:ibad_al_rahmann/services/notification_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 
 @pragma('vm:entry-point')
 Future<void> driveAutoSyncTask() async {
@@ -239,74 +240,121 @@ class BackupService {
 
   static Future<bool> _applyBackupData(Map<String, dynamic> backupData) async {
     try {
-      if (backupData['version'] == null) return false;
+      if (backupData['version'] == null) {
+        debugPrint('Restore: ❌ invalid backup — missing version');
+        return false;
+      }
+      debugPrint('Restore: starting from backup version ${backupData['version']}');
 
-      // 1. Restore SharedPreferences
+      // 1. Restore SharedPreferences ────────────────────────────────────────
       final prefs = CacheHelper.prefs;
-      final Map<String, dynamic> preferences = backupData['preferences'] ?? {};
-      
-      for (var entry in preferences.entries) {
-        final key = entry.key;
+      final Map<String, dynamic> preferences =
+          (backupData['preferences'] as Map<String, dynamic>?) ?? {};
+
+      int restoredCount = 0;
+      int skippedCount  = 0;
+
+      for (final entry in preferences.entries) {
+        final key   = entry.key;
         final value = entry.value;
-        if (value is String) {
-          await prefs.setString(key, value);
-        } else if (value is bool) {
-          await prefs.setBool(key, value);
-        } else if (value is int) {
-          await prefs.setInt(key, value);
-        } else if (value is double) {
-          await prefs.setDouble(key, value);
-        } else if (value is List) {
-          await prefs.setStringList(key, value.cast<String>());
+        try {
+          if (value == null) {
+            await prefs.remove(key);
+          } else if (value is bool) {
+            await prefs.setBool(key, value);
+          } else if (value is String) {
+            await prefs.setString(key, value);
+          } else if (value is int) {
+            await prefs.setInt(key, value);
+          } else if (value is double) {
+            await prefs.setDouble(key, value);
+          } else if (value is num) {
+            // JSON decode يرجع num — نقرر int أو double بناءً على القيمة
+            if (value == value.toInt()) {
+              await prefs.setInt(key, value.toInt());
+            } else {
+              await prefs.setDouble(key, value.toDouble());
+            }
+          } else if (value is List) {
+            // نتأكد إن كل عناصر الـ List نصوص قبل الحفظ
+            final strList = value.map((e) => e?.toString() ?? '').toList();
+            await prefs.setStringList(key, strList);
+          } else {
+            debugPrint('Restore: ⚠️ skipped key "$key" — unknown type ${value.runtimeType}');
+            skippedCount++;
+            continue;
+          }
+          restoredCount++;
+        } catch (e) {
+          debugPrint('Restore: ❌ error writing key "$key": $e');
+          skippedCount++;
         }
       }
-      
-      // Reschedule alarms with restored preferences
-      try {
-        PrayerService().scheduleNotificationsDebounced();
-      } catch (_) {}
+      debugPrint('Restore: ✅ preferences — $restoredCount restored, $skippedCount skipped');
 
-      // 2. Restore Hive Bookmarks (Quran)
+      // 2. Restore Hive Bookmarks (Quran) ───────────────────────────────────
       if (backupData['bookmarks'] != null) {
-        if (!BookmarkService.box.isOpen) await BookmarkService.init();
-        await BookmarkService.clearAllBookmarks();
-        final List<dynamic> bookmarksData = backupData['bookmarks'];
-        for (var bData in bookmarksData) {
-          final verse = VerseModel(
-            surahNumber: bData['surahNumber'],
-            verseNumber: bData['verseNumber'],
-            verse: bData['verse'],
-            fontFamily: bData['fontFamily'],
-            bookmarkedAt: DateTime.parse(bData['bookmarkedAt']),
-            label: bData['label'],
-          );
-          await BookmarkService.addBookmark(verse);
+        try {
+          if (!BookmarkService.box.isOpen) await BookmarkService.init();
+          await BookmarkService.clearAllBookmarks();
+          final List<dynamic> bookmarksData = backupData['bookmarks'] as List;
+          for (var bData in bookmarksData) {
+            try {
+              final verse = VerseModel(
+                surahNumber: (bData['surahNumber'] as num).toInt(),
+                verseNumber: (bData['verseNumber'] as num).toInt(),
+                verse: bData['verse']?.toString() ?? '',
+                fontFamily: bData['fontFamily']?.toString() ?? '',
+                bookmarkedAt: DateTime.parse(bData['bookmarkedAt'].toString()),
+                label: bData['label']?.toString(),
+              );
+              await BookmarkService.addBookmark(verse);
+            } catch (e) {
+              debugPrint('Restore: ❌ bookmark error: $e');
+            }
+          }
+          debugPrint('Restore: ✅ bookmarks — ${bookmarksData.length} restored');
+        } catch (e) {
+          debugPrint('Restore: ❌ bookmarks section error: $e');
         }
       }
 
-      // 3. Restore Hive Khatmas (Wird progress)
+      // 3. Restore Hive Khatmas (Wird progress) ─────────────────────────────
       if (backupData['khatmas'] != null) {
         try {
           final appBox = Hive.box('appDataBox');
-          final Map<String, dynamic> khatmasMap = Map<String, dynamic>.from(backupData['khatmas']);
-          for (var entry in khatmasMap.entries) {
+          final Map<String, dynamic> khatmasMap =
+              Map<String, dynamic>.from(backupData['khatmas'] as Map);
+          int kCount = 0;
+          for (final entry in khatmasMap.entries) {
             if (entry.key.startsWith('khatma_')) {
               await appBox.put(entry.key, entry.value);
+              kCount++;
             }
           }
-          debugPrint('Restore: restored ${khatmasMap.length} khatmas to appDataBox');
+          debugPrint('Restore: ✅ khatmas — $kCount restored to appDataBox');
         } catch (e) {
-          debugPrint('Restore khatmas error: $e');
+          debugPrint('Restore: ❌ khatmas section error: $e');
         }
       }
 
-      // 4. Reschedule all notifications with newly restored settings
-      PrayerService().scheduleNotifications();
-      NotificationService.rescheduleWird();
-      
+      // 4. Re-schedule notifications once (debounced to avoid storm) ────────
+      try {
+        await PrayerService().scheduleNotificationsDebounced();
+        debugPrint('Restore: ✅ notifications rescheduled');
+      } catch (e) {
+        debugPrint('Restore: ⚠️ reschedule error: $e');
+      }
+      try {
+        NotificationService.rescheduleWird();
+      } catch (e) {
+        debugPrint('Restore: ⚠️ rescheduleWird error: $e');
+      }
+
+      debugPrint('Restore: ✅ complete');
       return true;
     } catch (e) {
-      debugPrint('Apply backup error: $e');
+      debugPrint('Restore: ❌ fatal error: $e');
       return false;
     }
   }
@@ -324,29 +372,36 @@ class BackupService {
             .attemptLightweightAuthentication() ?? Future.value(null))
             .timeout(const Duration(seconds: 10));
         if (account != null) {
+          AppLogger.log('GoogleDrive', 'silent auth OK: ${account.email}');
           debugPrint('Google Sign-In: silent auth OK — ${account.email}');
         } else {
+          AppLogger.log('GoogleDrive', 'silent auth: no cached session');
           debugPrint('Google Sign-In: silent auth returned null (no cached session)');
         }
       } on TimeoutException {
+        AppLogger.log('GoogleDrive', 'silent auth timed-out (10s)');
         debugPrint('Google Sign-In: silent auth timed-out after 10s');
         account = null;
       } catch (e) {
+        AppLogger.log('GoogleDrive', 'silent auth error: $e');
         debugPrint('Google Sign-In: silent auth error — $e');
         account = null;
       }
 
       // 2. If silent failed and UI is allowed, trigger interactive sign-in
       if (account == null && allowUI) {
+        AppLogger.log('GoogleDrive', 'triggering interactive authenticate()');
         debugPrint('Google Sign-In: triggering interactive authenticate()');
         account = await GoogleSignIn.instance.authenticate(
           scopeHint: [drive.DriveApi.driveAppdataScope],
         );
+        AppLogger.log('GoogleDrive', 'interactive auth OK: ${account.email}');
         debugPrint('Google Sign-In: interactive auth OK — ${account.email}');
       }
       return account;
-    } catch (e) {
-      debugPrint('Google Sign-In Error: $e');
+    } catch (e, st) {
+      AppLogger.log('GoogleDrive', 'Google Sign-In Error: $e');
+      debugPrint('Google Sign-In Error: $e\n$st');
       return null;
     }
   }
@@ -356,6 +411,7 @@ class BackupService {
     try {
       final account = await _getSignedInAccount(allowUI: allowUI);
       if (account == null) {
+        AppLogger.log('GoogleDrive', 'No signed-in account — cannot get DriveApi');
         debugPrint('Google Drive: No signed-in account — cannot get DriveApi');
         return null;
       }
@@ -372,14 +428,17 @@ class BackupService {
             )
             .timeout(duration);
       } on TimeoutException {
+        AppLogger.log('GoogleDrive', 'authorizationHeaders timed-out (${duration.inSeconds}s)');
         debugPrint('Google Drive: authorizationHeaders timed-out (${duration.inSeconds}s)');
         authHeaders = null;
       } catch (e) {
+        AppLogger.log('GoogleDrive', 'authorizationHeaders error: $e');
         debugPrint('Google Drive: authorizationHeaders error — $e');
         authHeaders = null;
       }
 
       if (authHeaders == null) {
+        AppLogger.log('GoogleDrive', 'authorizationHeaders null — trying forced re-authorize');
         debugPrint('Google Drive: authorizationHeaders null — trying forced re-authorize');
         if (allowUI) {
           try {
@@ -388,18 +447,22 @@ class BackupService {
             authHeaders = await GoogleSignIn.instance.authorizationClient
                 .authorizationHeaders([drive.DriveApi.driveAppdataScope]);
           } catch (e) {
+            AppLogger.log('GoogleDrive', 'forced re-authorize failed: $e');
             debugPrint('Google Drive: forced re-authorize failed — $e');
           }
         }
         if (authHeaders == null) {
+          AppLogger.log('GoogleDrive', 'giving up — no valid auth headers');
           debugPrint('Google Drive: giving up — no valid auth headers');
           return null;
         }
       }
 
+      AppLogger.log('GoogleDrive', 'DriveApi client ready for ${account.email}');
       debugPrint('Google Drive: DriveApi client ready');
       return drive.DriveApi(GoogleAuthClient(authHeaders));
     } catch (e) {
+      AppLogger.log('GoogleDrive', '_getDriveApi error: $e');
       debugPrint('Google Drive: _getDriveApi error: $e');
       return null;
     }
