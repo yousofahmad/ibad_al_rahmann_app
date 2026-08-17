@@ -381,63 +381,66 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
               child: Column(
                 children: [
                   if (isToday)
-                    SizedBox(
-                      height: 260.w,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          PrayerRingWidget(
-                            percent: _progressValue,
-                            color: _goldColor,
-                          ),
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                "المتبقي لـ ${_nextPrayer?.name ?? ''}",
-                                style: TextStyle(
-                                  fontFamily: AppConsts.expoArabic,
-                                  color: Colors.grey,
-                                  fontSize: 13.sp,
+                    Padding(
+                      padding: EdgeInsets.only(top: 14.h, bottom: 8.h),
+                      child: SizedBox(
+                        height: 250.w,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            PrayerRingWidget(
+                              percent: _progressValue,
+                              color: _goldColor,
+                            ),
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  "المتبقي لـ ${_nextPrayer?.name ?? ''}",
+                                  style: TextStyle(
+                                    fontFamily: AppConsts.expoArabic,
+                                    color: Colors.grey,
+                                    fontSize: 13.sp,
+                                  ),
                                 ),
-                              ),
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 24.w),
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    _formatDuration(_timeToNext),
-                                    style: TextStyle(
-                                      fontFamily: 'Courier',
-                                      color: Theme.of(
-                                        context,
-                                      ).textTheme.bodyLarge?.color,
-                                      fontSize: 34.sp,
-                                      fontWeight: FontWeight.bold,
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 24.w),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      _formatDuration(_timeToNext),
+                                      style: TextStyle(
+                                        fontFamily: 'Courier',
+                                        color: Theme.of(
+                                          context,
+                                        ).textTheme.bodyLarge?.color,
+                                        fontSize: 34.sp,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              SizedBox(height: 8.h),
-                              Text(
-                                hijriStr,
-                                style: TextStyle(
-                                  fontFamily: AppConsts.expoArabic,
-                                  color: _goldColor,
-                                  fontSize: 13.sp,
+                                SizedBox(height: 8.h),
+                                Text(
+                                  hijriStr,
+                                  style: TextStyle(
+                                    fontFamily: AppConsts.expoArabic,
+                                    color: _goldColor,
+                                    fontSize: 13.sp,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                gregStr,
-                                style: TextStyle(
-                                  fontFamily: AppConsts.expoArabic,
-                                  color: Colors.grey,
-                                  fontSize: 12.sp,
+                                Text(
+                                  gregStr,
+                                  style: TextStyle(
+                                    fontFamily: AppConsts.expoArabic,
+                                    color: Colors.grey,
+                                    fontSize: 12.sp,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
 

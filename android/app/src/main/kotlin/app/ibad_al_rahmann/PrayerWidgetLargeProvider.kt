@@ -107,7 +107,11 @@ class PrayerWidgetLargeProvider : AppWidgetProvider() {
         }
 
         // ─── Native Hijri Calculation ───
-        val hijriStr = activeWidgetData.getString("hijri", "-- --") ?: "-- --"
+        val hijriStr = try {
+            NativePrayerManager.getHijriDate(context)
+        } catch (_: Exception) {
+            activeWidgetData.getString("hijri", "-- --") ?: "-- --"
+        }
         val gregorian = SimpleDateFormat("dd MMMM yyyy", Locale("ar")).format(Date())
         views.setTextViewText(R.id.tv_large_date, toArabicDigits(hijriStr))
         views.setTextViewText(R.id.tv_large_location, toArabicDigits(gregorian))

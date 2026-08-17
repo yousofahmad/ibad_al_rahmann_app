@@ -373,14 +373,15 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
           if (adhanEnabled)
             Padding(
               padding: EdgeInsets.only(left: 14.w, right: 14.w, bottom: 10.h),
-              child: _compactMinutesPicker(
+              child: CompactMinutesPickerWidget(
                 prefix: 'تعديل الوقت (دقيقة)',
-                value: _adjustments[key] ?? 0,
+                initialValue: _adjustments[key] ?? 0,
                 min: -60,
                 max: 60,
                 step: 1,
+                goldColor: _gold,
                 onChanged: (v) {
-                  setState(() => _adjustments[key] = v);
+                  _adjustments[key] = v;
                   _prefs.setInt('adjust_$key', v);
                   PrayerService().scheduleNotificationsDebounced();
                 },
@@ -404,14 +405,15 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
           if (iqamaEnabled)
             Padding(
               padding: EdgeInsets.only(left: 14.w, right: 14.w, bottom: 10.h),
-              child: _compactMinutesPicker(
+              child: CompactMinutesPickerWidget(
                 prefix: 'بعد الأذان بـ',
-                value: iqamaMins,
+                initialValue: iqamaMins,
                 min: 1,
                 max: 60,
                 step: 1,
+                goldColor: _gold,
                 onChanged: (v) {
-                  setState(() => _iqamaMinutes[key] = v);
+                  _iqamaMinutes[key] = v;
                   _prefs.setInt('iqama_minutes_$key', v);
                   PrayerService().scheduleNotificationsDebounced();
                 },
@@ -475,63 +477,6 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
               ),
             ),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _compactMinutesPicker({
-    required String prefix,
-    required int value,
-    required int min,
-    required int max,
-    required int step,
-    required Function(int) onChanged,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.03)
-            : Colors.grey.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(8.r),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            prefix,
-            style: TextStyle(
-              fontFamily: AppConsts.cairo,
-              fontSize: 12.sp,
-              color: Colors.grey,
-            ),
-          ),
-          const Spacer(),
-          InkWell(
-            onTap: () {
-              if (value > min) onChanged(value - step);
-            },
-            child: Icon(Icons.remove_circle_outline, color: _gold, size: 20.sp),
-          ),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8.w),
-            child: Text(
-              '$value دق',
-              style: TextStyle(
-                fontFamily: AppConsts.cairo,
-                fontSize: 13.sp,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          InkWell(
-            onTap: () {
-              if (value < max) onChanged(value + step);
-            },
-            child: Icon(Icons.add_circle_outline, color: _gold, size: 20.sp),
-          ),
         ],
       ),
     );
@@ -610,6 +555,105 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class CompactMinutesPickerWidget extends StatefulWidget {
+  final String prefix;
+  final int initialValue;
+  final int min;
+  final int max;
+  final int step;
+  final Color goldColor;
+  final ValueChanged<int> onChanged;
+
+  const CompactMinutesPickerWidget({
+    super.key,
+    required this.prefix,
+    required this.initialValue,
+    required this.min,
+    required this.max,
+    required this.step,
+    required this.goldColor,
+    required this.onChanged,
+  });
+
+  @override
+  State<CompactMinutesPickerWidget> createState() => _CompactMinutesPickerWidgetState();
+}
+
+class _CompactMinutesPickerWidgetState extends State<CompactMinutesPickerWidget> {
+  late int _val;
+
+  @override
+  void initState() {
+    super.initState();
+    _val = widget.initialValue;
+  }
+
+  @override
+  void didUpdateWidget(covariant CompactMinutesPickerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialValue != widget.initialValue) {
+      _val = widget.initialValue;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.03)
+            : Colors.grey.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(8.r),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            widget.prefix,
+            style: TextStyle(
+              fontFamily: AppConsts.cairo,
+              fontSize: 12.sp,
+              color: Colors.grey,
+            ),
+          ),
+          const Spacer(),
+          InkWell(
+            onTap: () {
+              if (_val > widget.min) {
+                setState(() => _val -= widget.step);
+                widget.onChanged(_val);
+              }
+            },
+            child: Icon(Icons.remove_circle_outline, color: widget.goldColor, size: 20.sp),
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8.w),
+            child: Text(
+              '$_val دق',
+              style: TextStyle(
+                fontFamily: AppConsts.cairo,
+                fontSize: 13.sp,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: () {
+              if (_val < widget.max) {
+                setState(() => _val += widget.step);
+                widget.onChanged(_val);
+              }
+            },
+            child: Icon(Icons.add_circle_outline, color: widget.goldColor, size: 20.sp),
+          ),
+        ],
+      ),
     );
   }
 }

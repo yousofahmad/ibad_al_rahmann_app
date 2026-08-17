@@ -108,8 +108,12 @@ class PrayerWidgetProvider : HomeWidgetProvider() {
             views.setChronometerCountDown(R.id.tv_countdown, !isCountingUp)
         }
 
-        // Hijri Date
-        val hijriStr = activeWidgetData.getString("hijri", "-- --") ?: "-- --"
+        // Hijri Date — Calculated natively so it updates immediately at midnight
+        val hijriStr = try {
+            NativePrayerManager.getHijriDate(context)
+        } catch (_: Exception) {
+            activeWidgetData.getString("hijri", "-- --") ?: "-- --"
+        }
         views.setTextViewText(R.id.tv_hijri_date, toArabicDigits(hijriStr))
 
         // Prayer Times

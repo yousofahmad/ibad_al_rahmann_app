@@ -35,7 +35,7 @@ class RingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
+    final radius = (size.width / 2) - 8;
 
     // Background Circle (Dark Grey)
     final bgPaint = Paint()
