@@ -93,6 +93,14 @@ class GoogleAuthClient extends http.BaseClient {
   }
 }
 
+enum BackupCategory {
+  bookmarks,
+  khatmas,
+  prayers,
+  tracker,
+  settings,
+}
+
 class BackupService {
   static const String _backupFileName = 'ibad_al_rahmann_backup.json';
   static const String _currentVersion = '1.2.0';
@@ -109,8 +117,8 @@ class BackupService {
     }
   }
 
-  /// Helper to get backup data as a Map
-  static Future<Map<String, dynamic>> _generateBackupData() async {
+  /// Helper to get backup data as a Map (supports full or selective backup)
+  static Future<Map<String, dynamic>> _generateBackupData({Set<BackupCategory>? categories}) async {
     final Map<String, dynamic> backupData = {
       'version': _currentVersion,
       'timestamp': DateTime.now().toIso8601String(),
@@ -119,12 +127,18 @@ class BackupService {
       'khatmas': {},
     };
 
+    final includeAll = categories == null;
+    final includeBookmarks = includeAll || categories.contains(BackupCategory.bookmarks);
+    final includeKhatmas = includeAll || categories.contains(BackupCategory.khatmas);
+    final includePrayers = includeAll || categories.contains(BackupCategory.prayers);
+    final includeTracker = includeAll || categories.contains(BackupCategory.tracker);
+    final includeSettings = includeAll || categories.contains(BackupCategory.settings);
+
     // 1. Gather SharedPreferences
     final prefs = CacheHelper.prefs;
     final allKeys = prefs.getKeys();
     
     // Blacklist transient or machine-specific keys
-    // ملاحظة: تم إزالة "temp_" للسماح بنسخ سجلات الصيام وصلاتي والأذكار
     final blacklist = {
       'last_sync_time', 
       'cache_', 
@@ -141,55 +155,65 @@ class BackupService {
           break;
         }
       }
-      
-      if (!isBlacklisted) {
+      if (isBlacklisted) continue;
+
+      bool isPrayerKey = key.startsWith('adhan_') || key.startsWith('iqama_') || key.startsWith('notif_prayer_') || key.startsWith('adjust_') || key.startsWith('sound_') || key.startsWith('calc_method') || key.startsWith('asr_calc') || key.startsWith('city_') || key.startsWith('lat') || key.startsWith('long');
+      bool isTrackerKey = key.startsWith('temp_') || key.startsWith('prayer_focus_log_') || key.startsWith('accountability_') || key.startsWith('fasting_') || key.startsWith('sabah_') || key.startsWith('masaa_') || key.startsWith('daily_tracker_') || key.startsWith('prayer_streak_');
+      bool isSettingsKey = !isPrayerKey && !isTrackerKey;
+
+      if ((isPrayerKey && includePrayers) ||
+          (isTrackerKey && includeTracker) ||
+          (isSettingsKey && includeSettings)) {
         backupData['preferences'][key] = prefs.get(key);
       }
     }
 
     // 2. Gather Hive Bookmarks (Quran)
-    try {
-      if (!BookmarkService.box.isOpen) await BookmarkService.init();
-      final bookmarkBox = BookmarkService.box;
-      final List<VerseModel> bookmarks = bookmarkBox.values.toList();
-      backupData['bookmarks'] = bookmarks.map((b) => {
-        'surahNumber': b.surahNumber,
-        'verseNumber': b.verseNumber,
-        'verse': b.verse,
-        'fontFamily': b.fontFamily,
-        'bookmarkedAt': b.bookmarkedAt.toIso8601String(),
-        'label': b.label,
-      }).toList();
-    } catch (e) {
-      debugPrint('Backup bookmarks error: $e');
+    if (includeBookmarks) {
+      try {
+        if (!BookmarkService.box.isOpen) await BookmarkService.init();
+        final bookmarkBox = BookmarkService.box;
+        final List<VerseModel> bookmarks = bookmarkBox.values.toList();
+        backupData['bookmarks'] = bookmarks.map((b) => {
+          'surahNumber': b.surahNumber,
+          'verseNumber': b.verseNumber,
+          'verse': b.verse,
+          'fontFamily': b.fontFamily,
+          'bookmarkedAt': b.bookmarkedAt.toIso8601String(),
+          'label': b.label,
+        }).toList();
+      } catch (e) {
+        debugPrint('Backup bookmarks error: $e');
+      }
     }
 
     // 3. Gather Hive Khatmas (Wird progress) from appDataBox
-    try {
-      final appBox = Hive.box('appDataBox');
-      final Map<String, dynamic> khatmasMap = {};
-      for (var key in appBox.keys) {
-        final keyStr = key.toString();
-        if (keyStr.startsWith('khatma_')) {
-          final value = appBox.get(key);
-          if (value != null) {
-            khatmasMap[keyStr] = value; // stored as JSON string
+    if (includeKhatmas) {
+      try {
+        final appBox = Hive.box('appDataBox');
+        final Map<String, dynamic> khatmasMap = {};
+        for (var key in appBox.keys) {
+          final keyStr = key.toString();
+          if (keyStr.startsWith('khatma_')) {
+            final value = appBox.get(key);
+            if (value != null) {
+              khatmasMap[keyStr] = value;
+            }
           }
         }
+        backupData['khatmas'] = khatmasMap;
+      } catch (e) {
+        debugPrint('Backup khatmas error: $e');
       }
-      backupData['khatmas'] = khatmasMap;
-      debugPrint('Backup: saved ${khatmasMap.length} khatmas');
-    } catch (e) {
-      debugPrint('Backup khatmas error: $e');
     }
 
     return backupData;
   }
 
-  /// Export all settings and bookmarks to a JSON file and share it.
-  static Future<bool> exportBackup() async {
+  /// Export settings and bookmarks to a JSON file and share it (supports selective backup).
+  static Future<bool> exportBackup({Set<BackupCategory>? categories}) async {
     try {
-      final backupData = await _generateBackupData();
+      final backupData = await _generateBackupData(categories: categories);
       final tempDir = await getTemporaryDirectory();
       final file = File('${tempDir.path}/$_backupFileName');
       await file.writeAsString(jsonEncode(backupData));
@@ -202,10 +226,10 @@ class BackupService {
     }
   }
 
-  /// Save backup to device manually using file picker.
-  static Future<bool> saveBackupToDevice() async {
+  /// Save backup to device manually using file picker (supports selective backup).
+  static Future<bool> saveBackupToDevice({Set<BackupCategory>? categories}) async {
     try {
-      final backupData = await _generateBackupData();
+      final backupData = await _generateBackupData(categories: categories);
       final content = jsonEncode(backupData);
       final bytes = utf8.encode(content);
       

@@ -677,67 +677,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
                 ),
+                isScrollControlled: true,
                 builder: (context) {
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ListTile(
-                        leading: Icon(Icons.share_rounded, color: const Color(0xFFD0A871), size: 24.sp),
-                        title: Text("مشاركة الملف", style: TextStyle(fontFamily: 'Cairo', fontSize: 14.sp)),
-                        onTap: () async {
-                          if (mounted) Navigator.pop(context); // Close the bottom sheet first
-                          
-                          // Show loading
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (context) => Center(child: CircularProgressIndicator(color: const Color(0xFFD0A871), strokeWidth: 3.w)),
-                          );
-
-                          final success = await BackupService.exportBackup();
-                          
-                          // ignore: use_build_context_synchronously
-                          if (mounted) Navigator.pop(context); // Close loading
-
-                          if (success) {
-                            scaffoldMessengerKey.currentState?.showSnackBar(
-                              const SnackBar(content: Text('تم فتح نافذة المشاركة')),
-                            );
-                          } else {
-                             scaffoldMessengerKey.currentState?.showSnackBar(
-                              const SnackBar(content: Text('فشل تصدير البيانات')),
-                            );
-                          }
-                        },
-                      ),
-                      ListTile(
-                        leading: Icon(Icons.save_alt_rounded, color: const Color(0xFFD0A871), size: 24.sp),
-                        title: Text("حفظ على الجهاز", style: TextStyle(fontFamily: 'Cairo', fontSize: 14.sp)),
-                        onTap: () async {
-                          if (mounted) Navigator.pop(context);
-
-                          // Show loading
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (context) => Center(child: CircularProgressIndicator(color: const Color(0xFFD0A871), strokeWidth: 3.w)),
-                          );
-
-                          final success = await BackupService.saveBackupToDevice();
-
-                          // ignore: use_build_context_synchronously
-                          if (mounted) Navigator.pop(context); // Close loading
-
-                          if (success) {
-                            scaffoldMessengerKey.currentState?.showSnackBar(
-                              const SnackBar(content: Text('تم حفظ البيانات بنجاح')),
-                            );
-                          }
-                        },
-                      ),
-                      SizedBox(height: 16.h),
-                    ],
-                  );
+                  return _ExportSelectionBottomSheet(isDark: isDark);
                 },
               );
             },
@@ -1526,6 +1468,209 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
           }).toList(),
         );
       },
+    );
+  }
+}
+
+class _ExportSelectionBottomSheet extends StatefulWidget {
+  final bool isDark;
+  const _ExportSelectionBottomSheet({required this.isDark});
+
+  @override
+  State<_ExportSelectionBottomSheet> createState() => _ExportSelectionBottomSheetState();
+}
+
+class _ExportSelectionBottomSheetState extends State<_ExportSelectionBottomSheet> {
+  final Set<BackupCategory> _selected = {
+    BackupCategory.bookmarks,
+    BackupCategory.khatmas,
+    BackupCategory.prayers,
+    BackupCategory.tracker,
+    BackupCategory.settings,
+  };
+
+  void _toggleAll(bool select) {
+    setState(() {
+      if (select) {
+        _selected.addAll(BackupCategory.values);
+      } else {
+        _selected.clear();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const goldColor = Color(0xFFD0A871);
+    final isDark = widget.isDark;
+    final allSelected = _selected.length == BackupCategory.values.length;
+
+    final categories = [
+      (BackupCategory.bookmarks, 'علامات القرآن المرجعية', Icons.bookmark_added_rounded),
+      (BackupCategory.khatmas, 'الختمات والورد القرآني', Icons.menu_book_rounded),
+      (BackupCategory.prayers, 'مواقيت الصلاة والأذان والتنبيهات', Icons.mosque_rounded),
+      (BackupCategory.tracker, 'سجل المحاسبة والصلوات والعبادات', Icons.checklist_rounded),
+      (BackupCategory.settings, 'إعدادات التطبيق العامة والمظهر', Icons.settings_suggest_rounded),
+    ];
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20.w,
+        right: 20.w,
+        top: 20.h,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24.h,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'تصدير نسخة احتياطية',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.bold,
+                  color: goldColor,
+                ),
+              ),
+              TextButton(
+                onPressed: () => _toggleAll(!allSelected),
+                child: Text(
+                  allSelected ? 'إلغاء التحديد' : 'تحديد الكل',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 12.sp,
+                    color: goldColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Text(
+            'اختر الأقسام التي ترغب في تضمينها داخل النسخة الاحتياطية:',
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 12.sp,
+              color: Colors.grey,
+            ),
+          ),
+          SizedBox(height: 12.h),
+          ...categories.map((item) {
+            final cat = item.$1;
+            final title = item.$2;
+            final icon = item.$3;
+            final isChecked = _selected.contains(cat);
+
+            return InkWell(
+              onTap: () {
+                setState(() {
+                  if (isChecked) {
+                    _selected.remove(cat);
+                  } else {
+                    _selected.add(cat);
+                  }
+                });
+              },
+              borderRadius: BorderRadius.circular(10.r),
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 6.h, horizontal: 4.w),
+                child: Row(
+                  children: [
+                    Icon(icon, color: isChecked ? goldColor : Colors.grey, size: 20.sp),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 13.sp,
+                          color: isChecked
+                              ? (isDark ? Colors.white : Colors.black87)
+                              : Colors.grey,
+                        ),
+                      ),
+                    ),
+                    Checkbox(
+                      value: isChecked,
+                      activeColor: goldColor,
+                      onChanged: (val) {
+                        setState(() {
+                          if (val == true) {
+                            _selected.add(cat);
+                          } else {
+                            _selected.remove(cat);
+                          }
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          SizedBox(height: 16.h),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: goldColor,
+                    foregroundColor: Colors.black87,
+                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                  ),
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                  label: Text('مشاركة الملف', style: TextStyle(fontFamily: 'Cairo', fontSize: 13.sp, fontWeight: FontWeight.bold)),
+                  onPressed: _selected.isEmpty
+                      ? null
+                      : () async {
+                          Navigator.pop(context);
+                          final categoriesToExport = Set<BackupCategory>.from(_selected);
+                          final success = await BackupService.exportBackup(categories: categoriesToExport);
+                          if (success) {
+                            scaffoldMessengerKey.currentState?.showSnackBar(
+                              const SnackBar(content: Text('تم فتح نافذة المشاركة')),
+                            );
+                          } else {
+                            scaffoldMessengerKey.currentState?.showSnackBar(
+                              const SnackBar(content: Text('فشل تصدير البيانات')),
+                            );
+                          }
+                        },
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: goldColor,
+                    side: const BorderSide(color: goldColor),
+                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                  ),
+                  icon: const Icon(Icons.save_alt_rounded, size: 18),
+                  label: Text('حفظ بالجهاز', style: TextStyle(fontFamily: 'Cairo', fontSize: 13.sp, fontWeight: FontWeight.bold)),
+                  onPressed: _selected.isEmpty
+                      ? null
+                      : () async {
+                          Navigator.pop(context);
+                          final categoriesToExport = Set<BackupCategory>.from(_selected);
+                          final success = await BackupService.saveBackupToDevice(categories: categoriesToExport);
+                          if (success) {
+                            scaffoldMessengerKey.currentState?.showSnackBar(
+                              const SnackBar(content: Text('تم حفظ البيانات بنجاح')),
+                            );
+                          }
+                        },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
