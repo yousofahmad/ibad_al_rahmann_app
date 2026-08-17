@@ -23,11 +23,8 @@ import android.content.ContentResolver
 class PrayerNotificationService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
-    private var salahUnlockMediaPlayer: MediaPlayer? = null
     private lateinit var audioVolumeManager: AudioVolumeManager
     private var flipToMuteManager: FlipToMuteManager? = null
-    private var lastUnlockPlayTime: Long = 0
-    private var unlockReceiver: android.content.BroadcastReceiver? = null
     
     private val refreshHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val refreshRunnable = object : Runnable {
@@ -41,57 +38,8 @@ class PrayerNotificationService : Service() {
         super.onCreate()
         audioVolumeManager = AudioVolumeManager(this)
         flipToMuteManager = FlipToMuteManager(this)
-        registerUnlockReceiver()
     }
 
-    private fun registerUnlockReceiver() {
-        unlockReceiver = object : android.content.BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                if (intent.action == Intent.ACTION_USER_PRESENT) {
-                    val now = System.currentTimeMillis()
-                    // Debounce: prevent playing more than once every 5 seconds
-                    if (now - lastUnlockPlayTime < 5000) return
-                    lastUnlockPlayTime = now
-
-                    val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                    val mode = flutterPrefs.getString("flutter.salah_unlock_mode", "none") ?: "none"
-                    if (mode == "none") return
-
-                    val soundToPlay = if (mode == "both") {
-                        if (Math.random() > 0.5) "salah_2" else "saly_3ala_mo7amad"
-                    } else {
-                        mode
-                    }
-
-                    val volumeLevel = PrayerNotificationService.readFlutterDouble(flutterPrefs, "flutter.salah_unlock_volume", 1.0).toFloat().coerceIn(0.0f, 1.0f)
-
-                    val resId = context.resources.getIdentifier(soundToPlay, "raw", context.packageName)
-                    if (resId != 0) {
-                        try {
-                            salahUnlockMediaPlayer?.release()
-                            salahUnlockMediaPlayer = MediaPlayer.create(context, resId)
-                            salahUnlockMediaPlayer?.setAudioAttributes(
-                                AudioAttributes.Builder()
-                                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                                    .build()
-                            )
-                            salahUnlockMediaPlayer?.setVolume(volumeLevel, volumeLevel)
-                            salahUnlockMediaPlayer?.setOnCompletionListener {
-                                it.release()
-                                salahUnlockMediaPlayer = null
-                            }
-                            salahUnlockMediaPlayer?.start()
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
-                    }
-                }
-            }
-        }
-        val filter = android.content.IntentFilter(Intent.ACTION_USER_PRESENT)
-        registerReceiver(unlockReceiver, filter)
-    }
 
     private fun startForegroundSafe(id: Int, notification: android.app.Notification) {
         try {
@@ -704,7 +652,6 @@ class PrayerNotificationService : Service() {
         stopAudio()
         audioVolumeManager.restoreState() // Safety guarantee
         refreshHandler.removeCallbacks(refreshRunnable)
-        unlockReceiver?.let { unregisterReceiver(it) }
         super.onDestroy()
     }
     override fun onBind(intent: Intent?): IBinder? = null

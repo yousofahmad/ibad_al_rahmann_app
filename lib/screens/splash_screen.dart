@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
-// تأكد إن أسماء الملفات دي مطابقة للي عندك بالظبط (ممكن تكون بشرطة - أو underscore _)
 import 'package:permission_handler/permission_handler.dart';
 import '../services/notification_service.dart';
+import '../services/app_logger.dart';
 import 'permissions_screen.dart';
 import 'onboarding_screen.dart';
 import 'home_screen.dart';
@@ -19,11 +19,6 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   bool _initialized = false;
-
-  @override
-  void initState() {
-    super.initState();
-  }
 
   @override
   void didChangeDependencies() {
@@ -47,7 +42,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _checkUser() async {
     NotificationService.nativeLog('SplashScreen._checkUser: started');
 
-    // 1. Minimum visibility timer for the custom splash (increased to 800ms)
+    // 1. Minimum visibility timer for the custom splash (800ms for normal launch)
     final timerFuture = Future.delayed(const Duration(milliseconds: 800));
 
     // 2. Check Launch Payload (Parallel)
@@ -69,8 +64,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
     NotificationService.nativeLog('SplashScreen._checkUser: startPayload=$startPayload');
 
-    // Defer SharedPreferences a bit to avoid CPU spike
-    await Future.delayed(const Duration(milliseconds: 100));
     final prefs = CacheHelper.prefs;
 
     if (!mounted) {
@@ -78,20 +71,20 @@ class _SplashScreenState extends State<SplashScreen> {
       return;
     }
 
-    // A. Handle Payload (Click from terminated)
+    // A. Handle Payload (Click from notification) — FAST PATH (instant navigation)
     if (startPayload != null) {
       final payload = startPayload;
-      NotificationService.nativeLog('SplashScreen: pushing HomeScreen for payload=$payload');
-      // Push HomeScreen first (clears all previous routes)
+      NotificationService.nativeLog('SplashScreen: fast-path navigation for payload=$payload');
+      AppLogger.log('SplashScreen', 'fast-path navigation for payload=$payload');
+      // Push HomeScreen underneath
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false,
       );
-      // Wait for HomeScreen to fully render before pushing the target screen
-      await Future.delayed(const Duration(milliseconds: 600));
-      NotificationService.nativeLog('SplashScreen: 600ms done, navigating to $payload');
-      // Call handleGlobalNavigation DIRECTLY — no ValueNotifier indirection
-      handleGlobalNavigation(payload);
+      // Immediately navigate to payload on next frame without waiting
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        handleGlobalNavigation(payload);
+      });
       return;
     }
 
@@ -123,16 +116,15 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // لون أبيض احتياطي
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
-          // 1. الخلفية (صورة المسجد الأصلية بتاعتك)
+          // 1. الخلفية
           SizedBox(
             width: double.infinity,
             height: double.infinity,
             child: Image.asset(
-              'assets/images/mosque_bottom.webp', // تأكد إن الصورة دي موجودة في مجلد الصور
+              'assets/images/mosque_bottom.webp',
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return Container(color: Colors.white);
@@ -140,7 +132,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
           ),
 
-          // 2. المحتوى (الاسم والآية) زي ما كان
+          // 2. المحتوى (الاسم والآية)
           const Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
