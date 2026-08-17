@@ -16,10 +16,11 @@ import java.util.*
 /**
  * PrayerFocusOverlay — شاشة التركيز للصلاة
  *
- * • خلفية شفافة + بطاقة مركزية فوق التطبيقات (FLAG_NOT_TOUCH_MODAL)
- * • زر "صليت والله" → يسأل: في وقتها أم متأخراً
- * • زر "ذكرني لاحقاً" → يُخفي الشاشة ويُعيدها بعد 5 دق بدون notification
- * • Streak لكل صلاة منفصل (5 سلاسل مستقلة)
+ * • Full-screen overlay مع خلفية شفافة تمرر اللمسات للتطبيق خلفها
+ * • الأزرار فقط هي التي تستقبل اللمسات
+ * • زر "صليت والله" → يُظهر شاشة إنجاز "الحمد لله!" مع الـ Streak
+ * • زر "ذكرني لاحقاً" → يُخفي الشاشة ويُعيدها بعد N دقائق
+ * • Streak يُعاد حسابه من السجل الفعلي (لا يزيد ببساطة ++)
  */
 object PrayerFocusOverlay {
 
@@ -37,13 +38,12 @@ object PrayerFocusOverlay {
             } catch (e: Exception) { e.printStackTrace() }
             overlayView = null
         }
-        // إلغاء أي snooze مجدول
         snoozeRunnable?.let { snoozeHandler?.removeCallbacks(it) }
         snoozeHandler = null
         snoozeRunnable = null
     }
 
-    // ـــ Pre-Adhan Reminder Overlay ــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ
+    // ─── Pre-Adhan Reminder Overlay ───────────────────────────────────────────
 
     fun showPreAdhan(context: Context, prayerName: String, alarmId: Int, minutesBefore: Int) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
@@ -52,20 +52,32 @@ object PrayerFocusOverlay {
             try {
                 dismiss(context)
                 val dm = context.resources.displayMetrics
+                val screenW = dm.widthPixels
+                val screenH = dm.heightPixels
                 val isDark = isDarkMode(context)
-                val cardBg   = if (isDark) 0xCC121212.toInt() else 0xF5FFFFFF.toInt()
-                val textColor  = if (isDark) 0xFFFFFFFF.toInt() else 0xFF1A1A1A.toInt()
-                val subColor   = if (isDark) 0xFFAAAAAA.toInt() else 0xFF666666.toInt()
                 val goldColor = 0xFFD0A871.toInt()
                 val goldDark  = 0xFF8B5E1A.toInt()
+                val subColor  = if (isDark) 0xFFAAAAAA.toInt() else 0xFF666666.toInt()
+                val cardBg    = if (isDark) 0xF2121212.toInt() else 0xF5FFFFFF.toInt()
 
+                // ── Full-screen container شفاف يمرر اللمسات ──────────────────
+                val root = android.widget.FrameLayout(context)
+
+                // ── البطاقة المركزية ──────────────────────────────────────────
                 val card = android.widget.LinearLayout(context).apply {
                     orientation = android.widget.LinearLayout.VERTICAL
                     gravity = Gravity.CENTER_HORIZONTAL
-                    setPadding(72, 56, 72, 48)
-                    background = buildCardBackground(cardBg, isDark)
+                    setPadding(dpToPx(dm, 32), dpToPx(dm, 48), dpToPx(dm, 32), dpToPx(dm, 40))
+                    background = buildCardBackground(cardBg)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) elevation = 24f
                 }
+
+                val cardW = if (screenW / dm.density >= 600)
+                    dpToPx(dm, 440) else (screenW * 0.9f).toInt()
+                val cardParams = android.widget.FrameLayout.LayoutParams(
+                    cardW, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER
+                )
+                root.addView(card, cardParams)
 
                 // أيقونة الصلاة
                 val imgName = when (prayerName) {
@@ -75,45 +87,53 @@ object PrayerFocusOverlay {
                     "العصر"   -> "ic_asr"
                     "المغرب" -> "ic_maghrib"
                     "العشاء" -> "ic_isha"
-                    else          -> "ic_fajr"
+                    else       -> "ic_fajr"
                 }
                 val iconView = android.widget.ImageView(context).apply {
                     try {
                         val id = context.resources.getIdentifier(imgName, "drawable", context.packageName)
                         if (id != 0) setImageResource(id)
                     } catch (_: Exception) {}
-                    val sz = (96 * dm.density).toInt()
-                    layoutParams = android.widget.LinearLayout.LayoutParams(sz, sz).apply { gravity = Gravity.CENTER }
+                    val sz = dpToPx(dm, 80)
+                    layoutParams = android.widget.LinearLayout.LayoutParams(sz, sz)
+                        .apply { gravity = Gravity.CENTER; bottomMargin = dpToPx(dm, 16) }
                 }
 
                 val timeView = android.widget.TextView(context).apply {
                     text = "باقي $minutesBefore دقيقة على أذان $prayerName"
-                    textSize = 15f; gravity = Gravity.CENTER
-                    setTextColor(subColor); setPadding(0, 20, 0, 40)
+                    textSize = 16f; gravity = Gravity.CENTER
+                    setTextColor(subColor)
+                    setPadding(0, 0, 0, dpToPx(dm, 32))
                 }
-                val dismissBtn = buildButton(context, "تم — جزاك الله خيراً",
-                    goldDark, 0xFFFFFFFF.toInt(), 15f, 0)
+
+                val dismissBtn = buildFullWidthButton(
+                    context, "تم — جزاك الله خيراً", goldDark, 0xFFFFFFFF.toInt(), 16f, 0
+                )
                 dismissBtn.setOnClickListener { dismiss(context) }
 
-                card.addView(iconView); card.addView(timeView); card.addView(dismissBtn)
+                card.addView(iconView)
+                card.addView(timeView)
+                card.addView(dismissBtn)
 
-                val dpW = dm.widthPixels / dm.density
-                val cardW = if (dpW >= 600) (480 * dm.density).toInt() else (dpW * 0.88f * dm.density).toInt()
-                val lType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
+                val lType = overlayLayerType()
+                // FLAG_NOT_TOUCH_MODAL: passes touches outside the card to underlying app
+                val flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                        WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
 
                 val params = WindowManager.LayoutParams(
-                    cardW, WindowManager.LayoutParams.WRAP_CONTENT, lType,
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
-                    PixelFormat.TRANSLUCENT
-                ).also { it.gravity = Gravity.CENTER }
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    lType, flags, PixelFormat.TRANSLUCENT
+                )
 
-                overlayView = card
-                (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).addView(card, params)
+                overlayView = root
+                (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).addView(root, params)
                 NativeLogger.log(context, "PreAdhan overlay shown for $prayerName (${minutesBefore}min before)")
-            } catch (e: Exception) { e.printStackTrace() }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                NativeLogger.log(context, "PreAdhan overlay ERROR: ${e.message}")
+            }
         }
     }
 
@@ -121,9 +141,7 @@ object PrayerFocusOverlay {
 
     fun show(context: Context, prayerName: String, alarmId: Int) {
         val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        val isEnabled = prefs.getBoolean("flutter.prayer_focus_enabled", false)
-        if (!isEnabled) return
-
+        if (!prefs.getBoolean("flutter.prayer_focus_enabled", false)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
             !android.provider.Settings.canDrawOverlays(context)) return
 
@@ -132,32 +150,22 @@ object PrayerFocusOverlay {
         Handler(Looper.getMainLooper()).post {
             try {
                 val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-                
-                val displayMetrics = context.resources.displayMetrics
-                val dpWidth = displayMetrics.widthPixels / displayMetrics.density
-                val targetWidthDp = if (dpWidth >= 600) 480 else (dpWidth * 0.95).toInt()
-                val cardWidth = (targetWidthDp * displayMetrics.density).toInt()
-
-                val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                else
-                    @Suppress("DEPRECATION")
-                    WindowManager.LayoutParams.TYPE_PHONE
-
-                val params = WindowManager.LayoutParams(
-                    cardWidth,
-                    WindowManager.LayoutParams.WRAP_CONTENT,
-                    layoutType,
-                    // FLAG_NOT_TOUCH_MODAL: passes touches outside the card to the underlying app
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
-                    PixelFormat.TRANSLUCENT
-                ).also { it.gravity = Gravity.CENTER }
-
                 val view = buildOverlayView(context, prayerName, alarmId) ?: return@post
                 overlayView = view
-                wm.addView(view, params)
 
+                val lType = overlayLayerType()
+                // FLAG_NOT_TOUCH_MODAL → touches outside the active views pass through to the app behind
+                val flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                        WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+
+                val params = WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    lType, flags, PixelFormat.TRANSLUCENT
+                )
+
+                wm.addView(view, params)
                 NativeLogger.log(context, "PrayerFocusOverlay shown for $prayerName (id: $alarmId)")
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -166,125 +174,111 @@ object PrayerFocusOverlay {
         }
     }
 
-    // ─── Build View ───────────────────────────────────────────────────────────
+    // ─── Build Main Overlay View ──────────────────────────────────────────────
 
     private fun buildOverlayView(context: Context, prayerName: String, alarmId: Int): View? {
         val isDark = isDarkMode(context)
-        val cardBg  = if (isDark) 0xCC000000.toInt() else 0xE8FFFFFF.toInt()
+        val dm = context.resources.displayMetrics
+        val screenW = dm.widthPixels
+
+        val cardBg     = if (isDark) 0xF0060606.toInt() else 0xF5FFFFFF.toInt()
         val textColor  = if (isDark) 0xFFFFFFFF.toInt() else 0xFF1A1A1A.toInt()
         val subColor   = if (isDark) 0xFFAAAAAA.toInt() else 0xFF666666.toInt()
         val goldColor  = 0xFFD0A871.toInt()
         val goldDark   = 0xFF8B5E1A.toInt()
 
-        // ── البطاقة المركزية (بدون خلفية تمنع اللمس) ─────────────────────
+        // ── Full-screen FrameLayout (شفاف — يمرر اللمسات خارج البطاقة) ──────
+        val root = android.widget.FrameLayout(context)
+
+        // ── البطاقة الرئيسية تملأ الشاشة عرضاً وتتمدد رأسياً بالمحتوى ──────
         val card = android.widget.LinearLayout(context).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setBackgroundColor(cardBg)
-            setPadding(72, 56, 72, 56)
-            background = buildCardBackground(cardBg, isDark)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                elevation = 24f
-            }
+            background = buildCardBackground(cardBg)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) elevation = 24f
+            setPadding(dpToPx(dm, 28), dpToPx(dm, 60), dpToPx(dm, 28), dpToPx(dm, 40))
         }
 
-        // البطاقة المركزية تأخذ أبعادها من WindowManager.LayoutParams مباشرة
-        val displayMetrics = context.resources.displayMetrics
+        // البطاقة تأخذ العرض الكامل (أو محدود على التابلت)
+        val cardW = if (screenW / dm.density >= 600)
+            dpToPx(dm, 480) else WindowManager.LayoutParams.MATCH_PARENT
+        val cardParams = android.widget.FrameLayout.LayoutParams(
+            cardW, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        )
+        root.addView(card, cardParams)
 
-        // ── محتوى البطاقة ─────────────────────────────────────────────────────
+        // ── أيقونة الصلاة ──────────────────────────────────────────────────
+        val imageName = when {
+            alarmId == 100 || alarmId == 110 || alarmId == 3000 || alarmId == 5000 -> "ic_fajr"
+            alarmId == 101 || alarmId == 3001 || alarmId == 5001 ->
+                if (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY) "ic_jumuah_prayer" else "ic_dhuhr"
+            alarmId == 102 || alarmId == 3002 || alarmId == 5002 -> "ic_asr"
+            alarmId == 103 || alarmId == 3003 || alarmId == 5003 -> "ic_maghrib"
+            alarmId == 104 || alarmId == 3004 || alarmId == 5004 -> "ic_isha"
+            else -> "logo"
+        }
 
-        // الأيقونة المخصصة لكل صلاة
         val iconView = android.widget.ImageView(context).apply {
-            val isFriday = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY
-            val imageName = when {
-                alarmId == 100 || alarmId == 110 || alarmId == 3000 || alarmId == 5000 -> "ic_fajr"
-                alarmId == 101 || alarmId == 3001 || alarmId == 5001 -> if (isFriday) "ic_jumuah_prayer" else "ic_dhuhr"
-                alarmId == 102 || alarmId == 3002 || alarmId == 5002 -> "ic_asr"
-                alarmId == 103 || alarmId == 3003 || alarmId == 5003 -> "ic_maghrib"
-                alarmId == 104 || alarmId == 3004 || alarmId == 5004 -> "ic_isha"
-                else -> "logo"
-            }
             try {
-                val resId = resources.getIdentifier(imageName, "drawable", context.packageName)
-                if (resId != 0) {
-                    setImageResource(resId)
-                }
-            } catch (e: Exception) {}
-            
-            // تحديد حجم الأيقونة
-            val size = (96 * displayMetrics.density).toInt()
+                val resId = context.resources.getIdentifier(imageName, "drawable", context.packageName)
+                if (resId != 0) setImageResource(resId)
+            } catch (_: Exception) {}
+            val size = dpToPx(dm, 110)
             layoutParams = android.widget.LinearLayout.LayoutParams(size, size).apply {
                 gravity = Gravity.CENTER
+                bottomMargin = dpToPx(dm, 8)
+                topMargin = dpToPx(dm, 8)
             }
         }
 
-        // "حان وقت الصلاة"
         val subtitleView = android.widget.TextView(context).apply {
             text = "حان وقت الصلاة"
-            textSize = 14f
-            gravity = Gravity.CENTER
+            textSize = 14f; gravity = Gravity.CENTER
             setTextColor(subColor)
-            setPadding(0, 16, 0, 4)
+            setPadding(0, dpToPx(dm, 8), 0, dpToPx(dm, 4))
         }
 
-        // اسم الصلاة
         val prayerNameView = android.widget.TextView(context).apply {
             text = "صلاة $prayerName"
-            textSize = 26f
-            gravity = Gravity.CENTER
+            textSize = 30f; gravity = Gravity.CENTER
             setTextColor(goldColor)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(0, 0, 0, 4)
+            setPadding(0, 0, 0, dpToPx(dm, 4))
         }
 
-        // Streak لهذه الصلاة تحديداً
-        val prayerStreak = getPrayerStreak(context, prayerName)
+        // Streak — يُحسب من السجل الفعلي
+        val prayerStreak = recalculateTrueStreak(context)
         val streakView = android.widget.TextView(context).apply {
             text = if (prayerStreak > 0) "🔥 $prayerStreak صلاة متتالية" else "ابدأ سلسلة الصلاة اليوم"
-            textSize = 15f
-            gravity = Gravity.CENTER
+            textSize = 16f; gravity = Gravity.CENTER
             setTextColor(if (prayerStreak > 0) 0xFFFF8C00.toInt() else subColor)
-            setPadding(0, 0, 0, 36)
+            setPadding(0, 0, 0, dpToPx(dm, 32))
         }
 
-        // ── زر "صليتُ والله" ──────────────────────────────────────────────────
-        val prayedButton = buildButton(
-            context,
-            text = "صليتُ والله ✓",
-            bgColor = goldDark,
-            textColor = 0xFFFFFFFF.toInt(),
-            textSizeSp = 17f,
-            marginBottom = 16
+        // ── زر "صليتُ والله" ─────────────────────────────────────────────────
+        val prayedButton = buildFullWidthButton(
+            context, "صليتُ والله ✓", goldDark, 0xFFFFFFFF.toInt(), 18f, dpToPx(dm, 14)
         )
         prayedButton.setOnClickListener {
             showConfirmationButtons(context, card, prayedButton, prayerName, alarmId,
                 goldColor, goldDark, subColor, textColor, isDark)
         }
 
-        // قراءة مدة التأجيل من إعدادات المستخدم
+        // ── زر "ذكرني لاحقاً" مع عداد تنازلي ───────────────────────────────
         val prefs2 = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val snoozeMins = try {
             val bits = prefs2.getLong("flutter.focus_snooze_duration", -1L)
             if (bits != -1L) bits.toInt().coerceIn(1, 60) else prefs2.getInt("flutter.focus_snooze_duration", 5).coerceIn(1, 60)
-        } catch (e: Exception) {
-            try {
-                prefs2.getInt("flutter.focus_snooze_duration", 5).coerceIn(1, 60)
-            } catch (e2: Exception) { 5 }
-        }
+        } catch (_: Exception) { 5 }
 
-        // زر "ذكرني لاحقاً" — يبدأ بعد استعداد 5 ثوان
-        val snoozeButton = buildButton(
-            context,
-            text = "ذكرني بعد $snoozeMins دقائق (5)",
-            bgColor = Color.TRANSPARENT,
-            textColor = goldColor,
-            textSizeSp = 14f,
-            marginBottom = 0
+        val snoozeButton = buildFullWidthButton(
+            context, "ذكرني بعد $snoozeMins دقائق (5)",
+            0x22D0A871.toInt(), goldColor, 15f, 0
         )
         snoozeButton.isEnabled = false
-        snoozeButton.alpha = 0.45f
-        
-        // عداد تنازلي 5→4→3→2→1→0 ثم تفعيل الزر
+        snoozeButton.alpha = 0.4f
+
         val countdownHandler = Handler(Looper.getMainLooper())
         var secondsLeft = 5
         val countdownRunnable = object : Runnable {
@@ -314,10 +308,10 @@ object PrayerFocusOverlay {
         card.addView(prayedButton)
         card.addView(snoozeButton)
 
-        return card
+        return root
     }
 
-    /** يُظهر زرّي التأكيد: "في وقتها" و"متأخراً" ─── يحل محل زر "صليتُ والله" */
+    /** يُظهر زرّي التأكيد: "في وقتها" و"متأخراً" */
     private fun showConfirmationButtons(
         context: Context,
         card: android.widget.LinearLayout,
@@ -326,42 +320,38 @@ object PrayerFocusOverlay {
         alarmId: Int,
         goldColor: Int, goldDark: Int, subColor: Int, textColor: Int, isDark: Boolean
     ) {
-        // إخفاء زر صليت
         prayedButton.visibility = View.GONE
+        val dm = context.resources.displayMetrics
 
-        // عنوان التأكيد
         val confirmLabel = android.widget.TextView(context).apply {
             text = "هل كانت في وقتها؟"
-            textSize = 14f
-            gravity = Gravity.CENTER
+            textSize = 15f; gravity = Gravity.CENTER
             setTextColor(subColor)
-            setPadding(0, 0, 0, 16)
+            setPadding(0, 0, 0, dpToPx(dm, 14))
         }
 
-        // صف الزرين
         val row = android.widget.LinearLayout(context).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
 
-        val onTimeBtn = buildButton(context, "في وقتها ✓", 0xFF2E7D32.toInt(), 0xFFFFFFFF.toInt(), 14f, 0)
-        val lateBtn   = buildButton(context, "متأخراً  ⏳", 0xFFE65100.toInt(), 0xFFFFFFFF.toInt(), 14f, 0)
+        val onTimeBtn = buildHalfButton(context, "في وقتها ✓", 0xFF2E7D32.toInt(), 0xFFFFFFFF.toInt(), 14f)
+        val lateBtn   = buildHalfButton(context, "متأخراً  ⏳", 0xFFE65100.toInt(), 0xFFFFFFFF.toInt(), 14f)
 
-        val halfParams = android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            .apply { setMargins(0, 0, 8, 0) }
-        val halfParams2 = android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            .apply { setMargins(8, 0, 0, 0) }
+        val halfP1 = android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            .apply { setMargins(0, 0, dpToPx(dm, 6), 0) }
+        val halfP2 = android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            .apply { setMargins(dpToPx(dm, 6), 0, 0, 0) }
 
-        onTimeBtn.layoutParams = halfParams
-        lateBtn.layoutParams   = halfParams2
+        onTimeBtn.layoutParams = halfP1
+        lateBtn.layoutParams   = halfP2
 
-        onTimeBtn.setOnClickListener { onPrayed(context, prayerName, alarmId, isOnTime = true) }
-        lateBtn.setOnClickListener   { onPrayed(context, prayerName, alarmId, isOnTime = false) }
+        onTimeBtn.setOnClickListener { onPrayed(context, card, prayerName, alarmId, isOnTime = true, goldColor = goldColor) }
+        lateBtn.setOnClickListener   { onPrayed(context, card, prayerName, alarmId, isOnTime = false, goldColor = goldColor) }
 
         row.addView(onTimeBtn)
         row.addView(lateBtn)
 
-        // إضافتهم بعد زر "صليت" مباشرة
         val prayedIndex = card.indexOfChild(prayedButton)
         card.addView(confirmLabel, prayedIndex + 1)
         card.addView(row, prayedIndex + 2)
@@ -369,15 +359,145 @@ object PrayerFocusOverlay {
 
     // ─── Actions ──────────────────────────────────────────────────────────────
 
-    private fun onPrayed(context: Context, prayerName: String, alarmId: Int, isOnTime: Boolean) {
+    private fun onPrayed(
+        context: Context,
+        card: android.widget.LinearLayout,
+        prayerName: String,
+        alarmId: Int,
+        isOnTime: Boolean,
+        goldColor: Int
+    ) {
         markPrayerInAccountability(context, prayerName)
-        updatePrayerStreak(context, prayerName)
         savePrayerLog(context, prayerName, if (isOnTime) "ontime" else "late")
-        dismiss(context)
-        
-        // Removed notification canceling to keep the notification in the status bar per user request.
+        val newStreak = recalculateTrueStreak(context)
+        NativeLogger.log(context, "PrayerFocus: $prayerName ✓ onTime=$isOnTime streak=$newStreak")
 
-        NativeLogger.log(context, "PrayerFocus: $prayerName ✓ onTime=$isOnTime")
+        // إظهار شاشة الإنجاز بدلاً من إغلاق مباشر
+        showAchievementScreen(context, card, prayerName, newStreak, goldColor)
+    }
+
+    /** يُظهر شاشة "الحمد لله!" مع Streak والشجرة بعد تسجيل الصلاة */
+    private fun showAchievementScreen(
+        context: Context,
+        card: android.widget.LinearLayout,
+        prayerName: String,
+        streak: Int,
+        goldColor: Int
+    ) {
+        val dm = context.resources.displayMetrics
+        val isDark = isDarkMode(context)
+        val subColor = if (isDark) 0xFFAAAAAA.toInt() else 0xFF666666.toInt()
+        val textColor = if (isDark) 0xFFFFFFFF.toInt() else 0xFF1A1A1A.toInt()
+
+        // امسح محتوى البطاقة
+        card.removeAllViews()
+
+        // ── الحمد لله! ────────────────────────────────────────────────────────
+        val titleView = android.widget.TextView(context).apply {
+            text = "الحمد لله!"
+            textSize = 28f; gravity = Gravity.CENTER or Gravity.END
+            setTextColor(textColor)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setPadding(0, dpToPx(dm, 8), 0, dpToPx(dm, 4))
+        }
+
+        // ── وصف ──────────────────────────────────────────────────────────────
+        val descView = android.widget.TextView(context).apply {
+            text = "أتممت صلاة $prayerName. الصلاة التالية تبدأ قريباً."
+            textSize = 13f; gravity = Gravity.CENTER or Gravity.END
+            setTextColor(subColor)
+            setPadding(0, 0, 0, dpToPx(dm, 20))
+        }
+
+        // ── صف: Streak + شجرة ────────────────────────────────────────────────
+        val contentRow = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dpToPx(dm, 24))
+        }
+
+        // معلومات الـ Streak (يمين)
+        val streakCol = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL or Gravity.END
+        }
+
+        val streakLabel = android.widget.TextView(context).apply {
+            text = "لم تفقد صلاتك"
+            textSize = 14f; gravity = Gravity.END
+            setTextColor(textColor)
+        }
+
+        val streakNum = android.widget.TextView(context).apply {
+            text = "$streak 🔥"
+            textSize = 36f; gravity = Gravity.END
+            setTextColor(0xFFFF8C00.toInt())
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+
+        val streakSub = android.widget.TextView(context).apply {
+            text = "!سلسلة"
+            textSize = 14f; gravity = Gravity.END
+            setTextColor(0xFF4CAF50.toInt())
+        }
+
+        streakCol.addView(streakLabel)
+        streakCol.addView(streakNum)
+        streakCol.addView(streakSub)
+
+        val streakColParams = android.widget.LinearLayout.LayoutParams(0,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        streakCol.layoutParams = streakColParams
+
+        // صورة الشجرة (يسار)
+        val treeView = android.widget.ImageView(context).apply {
+            try {
+                val id = context.resources.getIdentifier("ic_achievement_tree", "drawable", context.packageName)
+                if (id != 0) setImageResource(id)
+                else {
+                    // Fallback: emoji text instead of image
+                    // (سيتم تخطيه لو الصورة مش موجودة)
+                }
+            } catch (_: Exception) {}
+            val sz = dpToPx(dm, 120)
+            val p = android.widget.LinearLayout.LayoutParams(sz, sz).apply {
+                leftMargin = dpToPx(dm, 12)
+            }
+            layoutParams = p
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+        }
+
+        // لو مفيش صورة شجرة، نستخدم emoji text بدلها
+        val treeEmoji = android.widget.TextView(context).apply {
+            text = "🌳"
+            textSize = 72f; gravity = Gravity.CENTER
+            val p = android.widget.LinearLayout.LayoutParams(dpToPx(dm, 120), dpToPx(dm, 120)).apply {
+                leftMargin = dpToPx(dm, 12)
+            }
+            layoutParams = p
+        }
+
+        contentRow.addView(streakCol)
+        // نضيف الشجرة — لو drawable موجود نستخدم ImageView، لو لأ نستخدم الـ emoji
+        val treeResId = try {
+            context.resources.getIdentifier("ic_achievement_tree", "drawable", context.packageName)
+        } catch (_: Exception) { 0 }
+
+        if (treeResId != 0) contentRow.addView(treeView)
+        else contentRow.addView(treeEmoji)
+
+        // ── زر "متابعة" ───────────────────────────────────────────────────────
+        val continueBtn = buildFullWidthButton(
+            context, "متابعة", 0x00000000, goldColor, 16f, 0
+        )
+        continueBtn.setOnClickListener { dismiss(context) }
+
+        card.addView(titleView)
+        card.addView(descView)
+        card.addView(contentRow)
+        card.addView(continueBtn)
     }
 
     private fun onSnooze(context: Context, prayerName: String, alarmId: Int, snoozeMins: Int = 5) {
@@ -394,51 +514,37 @@ object PrayerFocusOverlay {
 
     private fun markPrayerInAccountability(context: Context, prayerName: String) {
         val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        // If the user prays after midnight but before Fajr, attribute it to the previous day
         val prayerDayStr = resolveIslamicDay(prefs)
 
-        // 1. Update temp_prayers (for Accountability Screen)
         val existingJson1 = prefs.getString("flutter.temp_prayers", null)
         val map1 = try {
             if (existingJson1 != null) JSONObject(existingJson1) else JSONObject()
-        } catch (e: Exception) { JSONObject() }
+        } catch (_: Exception) { JSONObject() }
         map1.put(prayerName, true)
         prefs.edit().putString("flutter.temp_prayers", map1.toString()).apply()
-        
-        // Prevent Flutter from wiping temp_prayers on cold boot by setting current_day_date
         prefs.edit().putString("flutter.current_day_date", prayerDayStr).apply()
 
-        // 2. Update temp_prayers_data (for Prayer Focus / Salaty Screen)
         val existingJson2 = prefs.getString("flutter.temp_prayers_data", null)
         val map2 = try {
             if (existingJson2 != null) JSONObject(existingJson2) else JSONObject()
-        } catch (e: Exception) { JSONObject() }
+        } catch (_: Exception) { JSONObject() }
         map2.put(prayerName, true)
         prefs.edit().putString("flutter.temp_prayers_data", map2.toString()).apply()
     }
 
-    /**
-     * Returns the Islamic-day date string (yyyy-MM-dd).
-     * Between midnight and Fajr the Islamic day is still the *previous* calendar date,
-     * so Isha prayed at e.g. 01:00 AM is logged under the correct day.
-     */
     private fun resolveIslamicDay(prefs: android.content.SharedPreferences): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val now = System.currentTimeMillis()
         val cal = java.util.Calendar.getInstance()
         val todayStr = sdf.format(Date(now))
 
-        // Try to read today's Fajr epoch from SharedPreferences (stored by Flutter as ms)
-        // Key pattern used by prayer_service.dart: flutter.fajr_epoch_today
         val fajrKey = "flutter.fajr_epoch_today"
         val fajrEpoch = try {
             val raw = prefs.all[fajrKey]
             (raw as? Number)?.toLong() ?: raw?.toString()?.toLongOrNull() ?: -1L
-        } catch (e: Exception) { -1L }
+        } catch (_: Exception) { -1L }
 
-        // If current time is after midnight (00:00) and before Fajr → previous calendar day
         if (fajrEpoch > 0 && now < fajrEpoch) {
-            // We are between midnight and Fajr — return yesterday's date string
             cal.timeInMillis = now
             cal.add(java.util.Calendar.DAY_OF_YEAR, -1)
             return sdf.format(cal.time)
@@ -446,16 +552,14 @@ object PrayerFocusOverlay {
         return todayStr
     }
 
-    /** حفظ سجل الصلاة مع الحالة: ontime / late / missed */
     private fun savePrayerLog(context: Context, prayerName: String, status: String) {
         val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        // Use the same Islamic-day resolution so the log entry lands on the correct date
         val dayStr = resolveIslamicDay(prefs)
         val key = "flutter.prayer_focus_log_${dayStr}"
         val existingJson = prefs.getString(key, null)
         val map = try {
             if (existingJson != null) JSONObject(existingJson) else JSONObject()
-        } catch (e: Exception) { JSONObject() }
+        } catch (_: Exception) { JSONObject() }
         val entry = JSONObject().apply {
             put("status", status)
             put("ts", System.currentTimeMillis())
@@ -464,38 +568,69 @@ object PrayerFocusOverlay {
         prefs.edit().putString(key, map.toString()).apply()
     }
 
-    // ─── Per-Prayer Streak ────────────────────────────────────────────────────
+    // ─── Streak Calculation (من السجل الفعلي) ────────────────────────────────
 
     fun getPrayerStreak(context: Context, prayerName: String): Int {
-        val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        val unifiedKey = "flutter.prayer_streak_unified"
-        var streak = 0
-        try {
-            val raw = prefs.all[unifiedKey]
-            streak = (raw as? Number)?.toInt() ?: raw?.toString()?.toIntOrNull() ?: 0
-        } catch (e: Exception) {}
-        return streak
+        return recalculateTrueStreak(context)
     }
 
-    private fun updatePrayerStreak(context: Context, prayerName: String) {
+    /**
+     * يحسب الـ streak من سجل الصلوات الفعلي:
+     * - يمشي للوراء يوماً بيوماً
+     * - لو يوم عنده 0 صلوات مسجلة (ومش اليوم الحالي) → يوقف العد
+     * - اليوم الحالي: لو لسه ماصلاش كلها عادي (ممكن الصلوات الجاية)
+     * - يحفظ النتيجة في shared preferences
+     */
+    private fun recalculateTrueStreak(context: Context): Int {
         val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        val unifiedKey = "flutter.prayer_streak_unified"
-        
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         var streak = 0
-        try {
-            val raw = prefs.all[unifiedKey]
-            streak = (raw as? Number)?.toInt() ?: raw?.toString()?.toIntOrNull() ?: 0
-        } catch (e: Exception) {}
 
-        streak++
-        
-        prefs.edit().putLong(unifiedKey, streak.toLong()).apply()
-        NativeLogger.log(context, "Unified Prayer Streak increased to $streak")
+        for (i in 0..61) {
+            val cal = java.util.Calendar.getInstance()
+            cal.add(java.util.Calendar.DAY_OF_YEAR, -i)
+            val key = "flutter.prayer_focus_log_${sdf.format(cal.time)}"
+            val raw = prefs.getString(key, null)
+
+            var loggedCount = 0
+            if (raw != null) {
+                try {
+                    val map = JSONObject(raw)
+                    for (k in listOf("الفجر", "الظهر", "العصر", "المغرب", "العشاء", "الجمعة")) {
+                        if (map.has(k)) {
+                            val entry = map.optJSONObject(k)
+                            if (entry != null && entry.optString("status").isNotEmpty()) {
+                                loggedCount++
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+
+            // اليوم الحالي: لو ما صلاش لسه، نكمل (مش بنكسر الـ streak)
+            if (loggedCount == 0 && i > 0) break
+            streak += loggedCount
+        }
+
+        prefs.edit().putLong("flutter.prayer_streak_unified", streak.toLong()).apply()
+        return streak
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    private fun buildButton(
+    private fun overlayLayerType(): Int {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        else
+            @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
+    }
+
+    private fun dpToPx(dm: android.util.DisplayMetrics, dp: Int): Int {
+        return (dp * dm.density).toInt()
+    }
+
+    /** زرار يأخذ العرض الكامل */
+    private fun buildFullWidthButton(
         context: Context,
         text: String,
         bgColor: Int,
@@ -505,13 +640,12 @@ object PrayerFocusOverlay {
         cornerRadiusDp: Float = 28f
     ): android.widget.Button {
         val dm = context.resources.displayMetrics
-        val cornerPx = cornerRadiusDp * dm.density
         val bg = android.graphics.drawable.GradientDrawable().apply {
             setColor(bgColor)
-            cornerRadius = cornerPx
+            cornerRadius = cornerRadiusDp * dm.density
         }
-        val paddingH = (20 * dm.density).toInt()
-        val paddingV = (14 * dm.density).toInt()
+        val paddingH = dpToPx(dm, 20)
+        val paddingV = dpToPx(dm, 16)
         val btn = android.widget.Button(context).apply {
             this.text = text
             this.textSize = textSizeSp
@@ -527,10 +661,35 @@ object PrayerFocusOverlay {
         return btn
     }
 
-    private fun buildCardBackground(bgColor: Int, isDark: Boolean): android.graphics.drawable.GradientDrawable {
+    /** زرار يأخذ نصف العرض (للـ row) */
+    private fun buildHalfButton(
+        context: Context,
+        text: String,
+        bgColor: Int,
+        textColor: Int,
+        textSizeSp: Float,
+        cornerRadiusDp: Float = 24f
+    ): android.widget.Button {
+        val dm = context.resources.displayMetrics
+        val bg = android.graphics.drawable.GradientDrawable().apply {
+            setColor(bgColor)
+            cornerRadius = cornerRadiusDp * dm.density
+        }
+        return android.widget.Button(context).apply {
+            this.text = text
+            this.textSize = textSizeSp
+            setTextColor(textColor)
+            background = bg
+            setPadding(dpToPx(dm, 12), dpToPx(dm, 14), dpToPx(dm, 12), dpToPx(dm, 14))
+            isAllCaps = false
+        }
+    }
+
+    private fun buildCardBackground(bgColor: Int): android.graphics.drawable.GradientDrawable {
         return android.graphics.drawable.GradientDrawable().apply {
             setColor(bgColor)
-            cornerRadius = 48f
+            // ركن علوي فقط مستدير (للـ bottom sheet effect)
+            cornerRadii = floatArrayOf(48f, 48f, 48f, 48f, 0f, 0f, 0f, 0f)
         }
     }
 
@@ -539,7 +698,6 @@ object PrayerFocusOverlay {
         val mode = prefs.getString("flutter.themeMode", null)
         if (mode == "darkTheme") return true
         if (mode == "lightTheme") return false
-
         val nightModeFlags = context.resources.configuration.uiMode and
                 android.content.res.Configuration.UI_MODE_NIGHT_MASK
         return nightModeFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES
