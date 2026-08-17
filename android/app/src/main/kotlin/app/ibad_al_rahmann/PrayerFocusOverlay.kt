@@ -563,10 +563,8 @@ object PrayerFocusOverlay {
 
     /**
      * يحسب الـ streak من سجل الصلوات الفعلي:
-     * - يمشي للوراء يوماً بيوماً
-     * - لو يوم عنده 0 صلوات مسجلة (ومش اليوم الحالي) → يوقف العد
-     * - اليوم الحالي: لو لسه ماصلاش كلها عادي (ممكن الصلوات الجاية)
-     * - يحفظ النتيجة في shared preferences
+     * - يمشي للوراء يوماً بيوماً للصلوات المتتالية فقط
+     */
     private fun recalculateTrueStreak(context: Context): Int {
         val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
