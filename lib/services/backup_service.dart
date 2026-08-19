@@ -599,17 +599,26 @@ class BackupService {
   }
 
   static Future<bool> isGoogleSignedIn() async {
-    await _ensureInitialized();
-    return (await GoogleSignIn.instance.attemptLightweightAuthentication()) != null;
+    final prefs = CacheHelper.prefs;
+    return prefs.getString('last_sync_email') != null;
   }
 
-  static Future<String?> getSignedInEmail() async {
+  static Future<String?> getSignedInEmail({bool forceCheck = false}) async {
+    final prefs = CacheHelper.prefs;
+    final cachedEmail = prefs.getString('last_sync_email');
+    
+    // تجنب محاولة تسجيل الدخول في كل مرة يتم فتح الإعدادات فيها
+    // إلا إذا طلبنا التحديث صراحة أو كان المستخدم قد سجل دخوله بالفعل ونريد التأكد
+    if (!forceCheck) {
+      return cachedEmail;
+    }
+
     try {
       await _ensureInitialized();
       GoogleSignInAccount? account;
       try {
         account = await (GoogleSignIn.instance
-            .attemptLightweightAuthentication() ?? Future.value(null))
+            .signInSilently() ?? Future.value(null))
             .timeout(const Duration(seconds: 8));
       } on TimeoutException {
         account = null;
@@ -617,15 +626,12 @@ class BackupService {
         account = null;
       }
       if (account?.email != null) {
-        final prefs = CacheHelper.prefs;
         await prefs.setString('last_sync_email', account!.email);
         return account.email;
       }
     } catch (_) {}
 
-    // Fallback to cached email if offline or silent sign-in delayed
-    final prefs = CacheHelper.prefs;
-    return prefs.getString('last_sync_email');
+    return cachedEmail;
   }
 
   static Future<String?> getLastSyncTime() async {

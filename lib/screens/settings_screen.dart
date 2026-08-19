@@ -732,7 +732,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 builder: (context) => Center(child: CircularProgressIndicator(color: const Color(0xFFD0A871), strokeWidth: 3.w)),
               );
               final success = await BackupService.syncToDrive();
-              final email = await BackupService.getSignedInEmail();
+              final email = await BackupService.getSignedInEmail(forceCheck: true);
               final syncTime = await BackupService.getLastSyncTime();
               if (mounted) {
                 // ignore: use_build_context_synchronously
@@ -801,7 +801,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 builder: (context) => Center(child: CircularProgressIndicator(color: const Color(0xFFD0A871), strokeWidth: 3.w)),
               );
               final success = await BackupService.syncFromDrive();
-              final email = await BackupService.getSignedInEmail();
+              final email = await BackupService.getSignedInEmail(forceCheck: true);
               final syncTime = await BackupService.getLastSyncTime();
               if (mounted) {
                 // ignore: use_build_context_synchronously
