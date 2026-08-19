@@ -412,6 +412,10 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
           child: OutlinedButton(
             onPressed: _snoozeCountdown == 0
                 ? () {
+                    // CRITICAL: Calculate target time STRICTLY at the exact moment of the tap
+                    final now = DateTime.now();
+                    final targetSnoozeTime = now.add(Duration(minutes: widget.snoozeMinutes));
+                    debugPrint('Snoozed at $now, next alert target: $targetSnoozeTime');
                     widget.onSnooze();
                   }
                 : null,
