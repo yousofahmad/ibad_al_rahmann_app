@@ -8,6 +8,7 @@ import '../services/prayer_service.dart';
 import 'package:adhan/adhan.dart';
 
 import 'package:intl/intl.dart';
+import 'widgets/prayer_alert_modal.dart';
 
 /// شاشة "صلاتي" — التركيز للصلاة
 /// • Streak مستقل لكل صلاة (5 سلاسل)
@@ -485,6 +486,44 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                   await prefs.setInt('focus_snooze_duration', v);
                   setState(() => _snoozeDuration = v);
                 },
+              ),
+            ),
+            // زر معاينة نافذة التنبيه الحديثة
+            InkWell(
+              onTap: () {
+                PrayerAlertModal.show(
+                  context,
+                  prayerName: 'الفجر',
+                  streak: _unifiedStreak,
+                  snoozeMinutes: _snoozeDuration,
+                  onPrayedOnTime: () => _savePrayerStatus('الفجر', 'ontime'),
+                  onPrayedLate: () => _savePrayerStatus('الفجر', 'late'),
+                  onSnooze: () {},
+                  onDismiss: () {},
+                );
+              },
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: gold.withValues(alpha: 0.12))),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.remove_red_eye_outlined, size: 16.sp, color: gold),
+                    SizedBox(width: 8.w),
+                    Text(
+                      'معاينة نافذة التنبيه',
+                      style: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontSize: 13.sp,
+                        color: gold,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(Icons.arrow_forward_ios_rounded, size: 12.sp, color: gold),
+                  ],
+                ),
               ),
             ),
           ],
