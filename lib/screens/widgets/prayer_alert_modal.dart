@@ -190,50 +190,39 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
     const goldDark = Color(0xFF8B5E1A);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Rule 1: Full-screen Scaffold with semi-transparent dark background + GestureDetector for tap-dismiss
-    return Scaffold(
-      backgroundColor: Colors.black.withValues(alpha: 0.7),
-      body: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          // Tapping anywhere on the dark background triggers Snooze/Dismiss
-          widget.onDismiss();
-        },
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h),
-            child: GestureDetector(
-              // Prevent taps inside the card from closing the dialog
-              onTap: () {},
-              child: Container(
-                width: double.infinity,
-                constraints: BoxConstraints(
-                  maxWidth: 420.w,
-                  minHeight: 460.h,
-                ),
-                padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1C1A) : const Color(0xFFFAF8F5),
-                  borderRadius: BorderRadius.circular(28.r),
-                  border: Border.all(
-                    color: goldColor.withValues(alpha: 0.25),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      blurRadius: 28,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: _isAchievementStep
-                    ? _buildAchievementStep(goldColor, goldDark, isDark)
-                    : (_isConfirmStep
-                        ? _buildConfirmStep(goldColor, goldDark, isDark)
-                        : _buildMainAlertContent(goldColor, goldDark, isDark)),
-              ),
+    // Root widget: Transparent Material with centered modal card (dimming handled by WindowManager / showDialog)
+    return Material(
+      color: Colors.transparent,
+      child: Center(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h),
+          child: Container(
+            width: double.infinity,
+            constraints: BoxConstraints(
+              maxWidth: 420.w,
+              minHeight: 460.h,
             ),
+            padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1C1A) : const Color(0xFFFAF8F5),
+              borderRadius: BorderRadius.circular(28.r),
+              border: Border.all(
+                color: goldColor.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  blurRadius: 28,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: _isAchievementStep
+                ? _buildAchievementStep(goldColor, goldDark, isDark)
+                : (_isConfirmStep
+                    ? _buildConfirmStep(goldColor, goldDark, isDark)
+                    : _buildMainAlertContent(goldColor, goldDark, isDark)),
           ),
         ),
       ),

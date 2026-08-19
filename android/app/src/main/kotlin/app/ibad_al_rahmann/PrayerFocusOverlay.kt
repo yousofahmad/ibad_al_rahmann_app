@@ -53,15 +53,10 @@ object PrayerFocusOverlay {
                 dismiss(context)
                 val dm = context.resources.displayMetrics
                 val screenW = dm.widthPixels
-                val screenH = dm.heightPixels
                 val isDark = isDarkMode(context)
-                val goldColor = 0xFFD0A871.toInt()
                 val goldDark  = 0xFF8B5E1A.toInt()
                 val subColor  = if (isDark) 0xFFAAAAAA.toInt() else 0xFF666666.toInt()
                 val cardBg    = if (isDark) 0xF2121212.toInt() else 0xF5FFFFFF.toInt()
-
-                // ── Full-screen container شفاف يمرر اللمسات ──────────────────
-                val root = android.widget.FrameLayout(context)
 
                 // ── البطاقة المركزية ──────────────────────────────────────────
                 val card = android.widget.LinearLayout(context).apply {
@@ -71,13 +66,6 @@ object PrayerFocusOverlay {
                     background = buildCardBackground(cardBg)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) elevation = 24f
                 }
-
-                val cardW = if (screenW / dm.density >= 600)
-                    dpToPx(dm, 440) else (screenW * 0.9f).toInt()
-                val cardParams = android.widget.FrameLayout.LayoutParams(
-                    cardW, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER
-                )
-                root.addView(card, cardParams)
 
                 // أيقونة الصلاة
                 val imgName = when (prayerName) {
@@ -107,7 +95,7 @@ object PrayerFocusOverlay {
                 }
 
                 val dismissBtn = buildFullWidthButton(
-                    context, "تم — جزاك الله خيراً", goldDark, 0xFFFFFFFF.toInt(), 16f, 0
+                    context, "تم — جزاك الله خيراً", goldDark, 0xFFFFFFFF.toInt(), 16f, 0, 20f
                 )
                 dismissBtn.setOnClickListener { dismiss(context) }
 
@@ -115,20 +103,26 @@ object PrayerFocusOverlay {
                 card.addView(timeView)
                 card.addView(dismissBtn)
 
+                val cardW = if (screenW / dm.density >= 600)
+                    dpToPx(dm, 440) else (screenW * 0.9f).toInt()
+
                 val lType = overlayLayerType()
-                // FLAG_NOT_TOUCH_MODAL: passes touches outside the card to underlying app
                 val flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                        WindowManager.LayoutParams.FLAG_DIM_BEHIND or
                         WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
 
                 val params = WindowManager.LayoutParams(
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.MATCH_PARENT,
+                    cardW,
+                    WindowManager.LayoutParams.WRAP_CONTENT,
                     lType, flags, PixelFormat.TRANSLUCENT
-                )
+                ).apply {
+                    gravity = Gravity.CENTER
+                    dimAmount = 0.7f
+                }
 
-                overlayView = root
-                (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).addView(root, params)
+                overlayView = card
+                (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).addView(card, params)
                 NativeLogger.log(context, "PreAdhan overlay shown for $prayerName (${minutesBefore}min before)")
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -153,18 +147,27 @@ object PrayerFocusOverlay {
                 val view = buildOverlayView(context, prayerName, alarmId) ?: return@post
                 overlayView = view
 
+                val dm = context.resources.displayMetrics
+                val screenW = dm.widthPixels
+                val cardW = if (screenW / dm.density >= 600)
+                    dpToPx(dm, 460) else (screenW * 0.92).toInt()
+
                 val lType = overlayLayerType()
-                // FLAG_NOT_TOUCH_MODAL + WRAP_CONTENT height with Gravity.BOTTOM ensures
-                // touches on the upper portion of the screen pass 100% directly to the underlying app
+                // FLAG_NOT_TOUCH_MODAL: allows touches outside the modal card to pass through to background apps
+                // FLAG_DIM_BEHIND: native OS dims entire screen behind the window
                 val flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                        WindowManager.LayoutParams.FLAG_DIM_BEHIND or
                         WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
 
                 val params = WindowManager.LayoutParams(
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.MATCH_PARENT,
+                    cardW,
+                    WindowManager.LayoutParams.WRAP_CONTENT,
                     lType, flags, PixelFormat.TRANSLUCENT
-                )
+                ).apply {
+                    gravity = Gravity.CENTER
+                    dimAmount = 0.7f
+                }
 
                 wm.addView(view, params)
                 NativeLogger.log(context, "PrayerFocusOverlay shown for $prayerName (id: $alarmId)")
@@ -180,7 +183,6 @@ object PrayerFocusOverlay {
     private fun buildOverlayView(context: Context, prayerName: String, alarmId: Int): View? {
         val isDark = isDarkMode(context)
         val dm = context.resources.displayMetrics
-        val screenW = dm.widthPixels
 
         // Semi-transparent frosted background matching app theme
         val cardBg     = if (isDark) 0xEE1E1C1A.toInt() else 0xEEFAF8F5.toInt()
@@ -191,34 +193,16 @@ object PrayerFocusOverlay {
         val snoozeBg   = if (isDark) 0x24D0A871.toInt() else 0x18000000.toInt()
         val snoozeText = if (isDark) 0xFFE0B880.toInt() else 0xFF8A5A1E.toInt()
 
-        // ── Rule 1: Full-screen FrameLayout with dark semi-transparent background (70% opacity) ──
-        val root = android.widget.FrameLayout(context).apply {
-            setBackgroundColor(0xB3000000.toInt())
-            // Tapping anywhere on the dark background triggers Snooze / Dismiss
-            setOnClickListener {
-                dismiss(context)
-            }
-        }
-
-        // ── Rule 2: Modernized, Larger Content Container ──────
+        // ── Modernized, Larger Content Container ──────
         val card = android.widget.LinearLayout(context).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             isClickable = true
             isFocusable = true
-            // Prevent taps on the card from bubbling up to the dismiss listener
-            setOnClickListener { }
             background = buildCardBackground(cardBg)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) elevation = 24f
             setPadding(dpToPx(dm, 24), dpToPx(dm, 28), dpToPx(dm, 24), dpToPx(dm, 28))
         }
-
-        val cardW = if (screenW / dm.density >= 600)
-            dpToPx(dm, 460) else (screenW * 0.92).toInt()
-        val cardParams = android.widget.FrameLayout.LayoutParams(
-            cardW, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER
-        )
-        root.addView(card, cardParams)
 
         // ── Rule 3: Retain circular prayer image prominently ────────────────
         val imageName = when {
@@ -376,8 +360,7 @@ object PrayerFocusOverlay {
         card.addView(timerContainer)
         card.addView(prayedButton)
         card.addView(snoozeButton)
-
-        return root
+        return card
     }
 
     /** يُظهر زرّي التأكيد: "في وقتها" و"متأخراً" ويخفي زر التذكير بناءً على رغبة المستخدم */
