@@ -370,7 +370,7 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
                   backgroundColor: isDark
                       ? Colors.white.withValues(alpha: 0.1)
                       : Colors.black.withValues(alpha: 0.08),
-                  valueColor: const AlwaysStoppedAnimation<Color>(goldColor),
+                  valueColor: AlwaysStoppedAnimation<Color>(goldColor),
                 ),
               ),
             ],
