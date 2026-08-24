@@ -436,21 +436,26 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: EdgeInsets.only(
+                          right: hizbText.isNotEmpty ? 0 : 4,
+                          left: hizbText.isNotEmpty ? 4 : 4,
+                        ),
                         child: Text(
                           'juz${juzNum.toString().padLeft(3, '0')}',
                           style: TextStyle(
                             fontFamily: AppConsts.quranCommon,
                             color: headerTextColor,
-                            fontSize: isTablet ? 34 : 24,
+                            fontSize: hizbText.isNotEmpty
+                                ? (isTablet ? 26 : 18)
+                                : (isTablet ? 34 : 24),
                             height: 1.0,
                           ),
                         ),
                       ),
                       if (hizbText.isNotEmpty) ...[
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 4),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: const Color(0xFFD0A871).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
@@ -461,7 +466,7 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                               fontWeight: FontWeight.bold,
                               fontFamily: AppConsts.cairo,
                               color: const Color(0xFFD0A871),
-                              fontSize: isTablet ? 13 : 10,
+                              fontSize: isTablet ? 12 : 9.5,
                             ),
                           ),
                         ),

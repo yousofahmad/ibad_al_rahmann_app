@@ -10,8 +10,22 @@
 ///   'نصف الحزب ١' …              → ½ of hizb
 ///   'ثلاثة أرباع الحزب ١' …       → ¾ of hizb
 abstract final class QuranHizbData {
-  /// Returns the header center label for [pageNumber], or '' if not a boundary.
-  static String labelForPage(int pageNumber) => _map[pageNumber] ?? '';
+  /// Returns the header label for [pageNumber] ONLY for the 3 requested boundaries:
+  /// 1. Start of Hizb: 'الحزب ١'
+  /// 2. Half of Hizb: 'نصف الحزب ١'
+  /// 3. 3/4 of Hizb: 'ثلاثة أرباع الحزب ١'
+  /// And '' for all other pages (including 1/4 quarter).
+  static String labelForPage(int pageNumber) {
+    final raw = _map[pageNumber];
+    if (raw == null) return '';
+    if (raw.startsWith('ربع الحزب')) {
+      return '';
+    }
+    if (raw.startsWith('حزب ')) {
+      return raw.replaceFirst('حزب ', 'الحزب ');
+    }
+    return raw;
+  }
 
   /// Returns the active Hizb / Quarter label for any given Quran page.
   static String activeLabelForPage(int pageNumber) {

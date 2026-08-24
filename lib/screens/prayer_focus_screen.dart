@@ -6,8 +6,8 @@ import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/prayer_service.dart';
 import 'package:adhan/adhan.dart';
-
-import 'package:intl/intl.dart';
+import 'package:hijri/hijri_calendar.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 
 /// شاشة "صلاتي" — التركيز للصلاة
 /// • Streak مستقل لكل صلاة (5 سلاسل)
@@ -58,6 +58,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
   
   // للتنقل بين الشهور في التقويم
   int _calendarMonthOffset = 0;
+  DateTime _selectedCalendarDate = DateTime.now();
   
   // إعدادات شاشة التركيز
   int _preAdhanMinutes = 0;   // 0 = معطّل
@@ -387,11 +388,23 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                 _buildTodayCard(isDark, cardBg, gold, textColor),
                 SizedBox(height: 16.h),
 
-                // ── 3. تقويم الشهر ────────────────────────────────────────
+                // ── 3. تقويم الشهر التفاعلي ─────────────────────────────────
                 _buildCalendarCard(isDark, cardBg, gold, textColor),
                 SizedBox(height: 16.h),
 
-                // ── 4. إحصائيات (on-time / late / missed) ────────────────
+                // ── 4. رسم بياني: إتمام الصلاة الأسبوعي ──────────────────
+                _buildWeeklyCompletionCard(isDark, cardBg, gold, textColor),
+                SizedBox(height: 16.h),
+
+                // ── 5. أعمدة الانتظام: ما مدى انتظامك؟ ───────────────────
+                _buildWeeklyConsistencyCard(isDark, cardBg, gold, textColor),
+                SizedBox(height: 16.h),
+
+                // ── 6. تحليل أسباب التأخير وتفاصيل الصلوات ──────────────
+                _buildDelayHabitsCard(isDark, cardBg, gold, textColor),
+                SizedBox(height: 16.h),
+
+                // ── 7. إحصائيات الشهر الإجمالية ───────────────────────────
                 _buildStatsCard(isDark, cardBg, gold, textColor),
                 SizedBox(height: 32.h),
               ]),
@@ -760,11 +773,28 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
     );
   }
 
+  // ─── Helpers for Hijri and Dates ──────────────────────────────────────────
+
+  String _getHijriDateString(DateTime date) {
+    try {
+      final h = HijriCalendar.fromDate(date);
+      return '${h.hDay} ${h.longMonthName} ${h.hYear} هـ';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  int _getDayDoneCount(DateTime date) {
+    final key = DateFormat('yyyy-MM-dd').format(date);
+    final log = _monthLog[key];
+    if (log == null) return 0;
+    return log.values.where((v) => v != null).length;
+  }
+
   // ─── Calendar Card ──────────────────────────────────────────────────────────
 
   Widget _buildCalendarCard(bool isDark, Color cardBg, Color gold, Color textColor) {
     final now = DateTime.now();
-    // حساب الشهر المعروض بناءً على الـ offset
     final displayMonth = DateTime(now.year, now.month + _calendarMonthOffset, 1);
     final daysInMonth = DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month);
     final firstWeekday = DateTime(displayMonth.year, displayMonth.month, 1).weekday;
@@ -775,6 +805,10 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
     ];
     final shortDays = ['إث', 'ثل', 'أر', 'خم', 'جم', 'سب', 'أح'];
 
+    final selectedDayStr = DateFormat('EEEE، d MMMM yyyy', 'ar').format(_selectedCalendarDate);
+    final selectedHijriStr = _getHijriDateString(_selectedCalendarDate);
+    final selectedDoneCount = _getDayDoneCount(_selectedCalendarDate);
+
     return Container(
       decoration: BoxDecoration(
         color: cardBg,
@@ -784,7 +818,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
       ),
       child: Column(
         children: [
-          // Header
+          // Header: Navigation
           Container(
             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
             decoration: BoxDecoration(
@@ -802,14 +836,12 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                         fontWeight: FontWeight.bold,
                         color: gold)),
                 const Spacer(),
-                // زر الشهر السابق
                 IconButton(
                   icon: Icon(Icons.chevron_right, color: gold, size: 22.sp),
                   onPressed: () => setState(() => _calendarMonthOffset--),
                   padding: EdgeInsets.zero,
                   constraints: BoxConstraints(minWidth: 32.w, minHeight: 32.w),
                 ),
-                // زر الشهر التالي (فقط لو مش الشهر الحالي)
                 IconButton(
                   icon: Icon(Icons.chevron_left,
                       color: _calendarMonthOffset < 0 ? gold : gold.withValues(alpha: 0.3),
@@ -819,6 +851,72 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                       : null,
                   padding: EdgeInsets.zero,
                   constraints: BoxConstraints(minWidth: 32.w, minHeight: 32.w),
+                ),
+              ],
+            ),
+          ),
+
+          // Selected Day Header Display (Matching Image 1)
+          Container(
+            width: double.infinity,
+            margin: EdgeInsets.fromLTRB(14.w, 14.h, 14.w, 8.h),
+            padding: EdgeInsets.all(12.w),
+            decoration: BoxDecoration(
+              color: gold.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(14.r),
+              border: Border.all(color: gold.withValues(alpha: 0.15)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        selectedDayStr,
+                        style: TextStyle(
+                          fontFamily: AppConsts.expoArabic,
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                      ),
+                      if (selectedHijriStr.isNotEmpty) ...[
+                        SizedBox(height: 2.h),
+                        Text(
+                          selectedHijriStr,
+                          style: TextStyle(
+                            fontFamily: AppConsts.cairo,
+                            fontSize: 11.5.sp,
+                            color: gold,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                  decoration: BoxDecoration(
+                    color: selectedDoneCount == 5
+                        ? const Color(0xFF2E7D32).withValues(alpha: 0.15)
+                        : (selectedDoneCount > 0
+                            ? gold.withValues(alpha: 0.15)
+                            : Colors.grey.withValues(alpha: 0.15)),
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Text(
+                    '$selectedDoneCount / 5 صلوات',
+                    style: TextStyle(
+                      fontFamily: AppConsts.expoArabic,
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.bold,
+                      color: selectedDoneCount == 5
+                          ? const Color(0xFF2E7D32)
+                          : (selectedDoneCount > 0 ? gold : textColor.withValues(alpha: 0.6)),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -859,6 +957,9 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                     final key = DateFormat('yyyy-MM-dd').format(dayDate);
                     final log = _monthLog[key];
                     final isToday = dayDate.year == now.year && dayDate.month == now.month && day == now.day;
+                    final isSelected = dayDate.year == _selectedCalendarDate.year &&
+                        dayDate.month == _selectedCalendarDate.month &&
+                        dayDate.day == _selectedCalendarDate.day;
                     final isFuture = dayDate.isAfter(now);
 
                     int ontime = 0, late = 0;
@@ -874,53 +975,60 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                     if (isFuture || total == 0) {
                       dotColor = Colors.transparent;
                     } else if (total == 5 && ontime == 5) {
-                      dotColor = const Color(0xFF2E7D32); // كل الصلوات في وقتها
+                      dotColor = const Color(0xFF2E7D32);
                     } else if (total == 5) {
-                      dotColor = gold; // كل الصلوات لكن بعضها متأخر
+                      dotColor = gold;
                     } else if (total > 0) {
-                      dotColor = const Color(0xFFE65100); // بعض الصلوات فقط
+                      dotColor = const Color(0xFFE65100);
                     } else {
                       dotColor = Colors.transparent;
                     }
 
                     return InkWell(
-                      onTap: () => _showDayDetails(context, dayDate, log, isDark, cardBg, gold, textColor),
+                      onTap: () {
+                        setState(() => _selectedCalendarDate = dayDate);
+                        _showDayDetails(context, dayDate, log, isDark, cardBg, gold, textColor);
+                      },
                       borderRadius: BorderRadius.circular(20.r),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Container(
-                          width: 30.w,
-                          height: 30.w,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isToday ? gold : Colors.transparent,
-                            border: isToday
-                                ? null
-                                : Border.all(color: Colors.transparent),
-                          ),
-                          child: Center(
-                            child: Text(
-                              '$day',
-                              style: TextStyle(
-                                fontFamily: AppConsts.expoArabic,
-                                fontSize: 11.sp,
-                                color: isToday ? Colors.white : textColor.withValues(alpha: 0.7),
-                                fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                            width: 30.w,
+                            height: 30.w,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isSelected
+                                  ? const Color(0xFF00897B)
+                                  : (isToday ? gold.withValues(alpha: 0.25) : Colors.transparent),
+                              border: isToday && !isSelected
+                                  ? Border.all(color: gold, width: 1.5)
+                                  : null,
+                            ),
+                            child: Center(
+                              child: Text(
+                                '$day',
+                                style: TextStyle(
+                                  fontFamily: AppConsts.expoArabic,
+                                  fontSize: 11.sp,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : (isToday ? gold : textColor.withValues(alpha: 0.7)),
+                                  fontWeight: (isToday || isSelected) ? FontWeight.bold : FontWeight.normal,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        SizedBox(height: 2.h),
-                        Container(
-                          width: 6.w,
-                          height: 6.w,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: dotColor,
+                          SizedBox(height: 2.h),
+                          Container(
+                            width: 6.w,
+                            height: 6.w,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: dotColor,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
                       ),
                     );
                   },
@@ -931,13 +1039,391 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _legendDot(const Color(0xFF2E7D32), 'كل الصلوات في وقتها'),
-                    SizedBox(width: 16.w),
-                    _legendDot(gold, 'بعضها متأخر'),
-                    SizedBox(width: 16.w),
-                    _legendDot(const Color(0xFFE65100), 'بعض الصلوات فقط'),
+                    _legendDot(const Color(0xFF2E7D32), 'في وقتها'),
+                    SizedBox(width: 14.w),
+                    _legendDot(gold, 'متأخر'),
+                    SizedBox(width: 14.w),
+                    _legendDot(const Color(0xFFE65100), 'فروض ناقصة'),
                   ],
                 ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Weekly Completion Curve Card (Matching Image 2) ────────────────────────
+
+  Widget _buildWeeklyCompletionCard(bool isDark, Color cardBg, Color gold, Color textColor) {
+    final now = DateTime.now();
+    final displayMonth = DateTime(now.year, now.month + _calendarMonthOffset, 1);
+    final daysInMonth = DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month);
+
+    final List<double> weeklyRates = [];
+
+    for (int w = 0; w < 5; w++) {
+      final startDay = w * 7 + 1;
+      final endDay = (w == 4) ? daysInMonth : (w + 1) * 7;
+      if (startDay > daysInMonth) {
+        weeklyRates.add(0.0);
+        continue;
+      }
+
+      int completed = 0;
+      int expected = 0;
+
+      for (int d = startDay; d <= endDay; d++) {
+        final date = DateTime(displayMonth.year, displayMonth.month, d);
+        if (date.isAfter(now)) continue;
+
+        expected += 5;
+        final key = DateFormat('yyyy-MM-dd').format(date);
+        final log = _monthLog[key];
+        if (log != null) {
+          completed += log.values.where((v) => v != null).length;
+        }
+      }
+
+      final rate = expected > 0 ? (completed / expected) * 100.0 : 0.0;
+      weeklyRates.add(rate);
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(color: gold.withValues(alpha: 0.2)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+            decoration: BoxDecoration(
+              color: gold.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.show_chart_rounded, color: gold, size: 22.sp),
+                SizedBox(width: 10.w),
+                Text(
+                  'إتمام الصلاة الأسبوعي',
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                    color: gold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 12.h),
+            child: SizedBox(
+              height: 180.h,
+              child: CustomPaint(
+                size: Size.infinite,
+                painter: WeeklyCompletionSplinePainter(
+                  weeklyRates: weeklyRates,
+                  isDark: isDark,
+                  primaryColor: const Color(0xFF00897B),
+                  textColor: textColor,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Weekly Consistency Bar Chart (Matching Image 2 & 3) ───────────────────
+
+  Widget _buildWeeklyConsistencyCard(bool isDark, Color cardBg, Color gold, Color textColor) {
+    final now = DateTime.now();
+    final displayMonth = DateTime(now.year, now.month + _calendarMonthOffset, 1);
+    final daysInMonth = DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month);
+
+    final List<int> onTimeList = [];
+    final List<int> lateList = [];
+    final List<int> missedList = [];
+
+    for (int w = 0; w < 5; w++) {
+      final startDay = w * 7 + 1;
+      final endDay = (w == 4) ? daysInMonth : (w + 1) * 7;
+      if (startDay > daysInMonth) {
+        onTimeList.add(0);
+        lateList.add(0);
+        missedList.add(0);
+        continue;
+      }
+
+      int ot = 0;
+      int lt = 0;
+      int expected = 0;
+
+      for (int d = startDay; d <= endDay; d++) {
+        final date = DateTime(displayMonth.year, displayMonth.month, d);
+        if (date.isAfter(now)) continue;
+
+        expected += 5;
+        final key = DateFormat('yyyy-MM-dd').format(date);
+        final log = _monthLog[key];
+        if (log != null) {
+          for (var v in log.values) {
+            if (v == 'ontime') ot++;
+            if (v == 'late') lt++;
+          }
+        }
+      }
+
+      final ms = (expected - (ot + lt)).clamp(0, expected);
+      onTimeList.add(ot);
+      lateList.add(lt);
+      missedList.add(ms);
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(color: gold.withValues(alpha: 0.2)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+            decoration: BoxDecoration(
+              color: gold.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.equalizer_rounded, color: gold, size: 22.sp),
+                SizedBox(width: 10.w),
+                Text(
+                  'ما مدى انتظامك؟',
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                    color: gold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
+            child: SizedBox(
+              height: 180.h,
+              child: CustomPaint(
+                size: Size.infinite,
+                painter: WeeklyConsistencyBarPainter(
+                  onTimeList: onTimeList,
+                  lateList: lateList,
+                  missedList: missedList,
+                  isDark: isDark,
+                  textColor: textColor,
+                  onTimeColor: const Color(0xFF00897B),
+                  lateColor: const Color(0xFFFBC02D),
+                  missedColor: const Color(0xFFE53935),
+                ),
+              ),
+            ),
+          ),
+          // Legend (Matching Image 3)
+          Padding(
+            padding: EdgeInsets.only(bottom: 14.h),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _barLegendItem(const Color(0xFFE53935), 'فاتتني (Missed)'),
+                SizedBox(width: 14.w),
+                _barLegendItem(const Color(0xFFFBC02D), 'متأخراً (Late)'),
+                SizedBox(width: 14.w),
+                _barLegendItem(const Color(0xFF00897B), 'في وقتها (On Time)'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _barLegendItem(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12.w,
+          height: 12.w,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3.r),
+          ),
+        ),
+        SizedBox(width: 5.w),
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: AppConsts.expoArabic,
+            fontSize: 10.sp,
+            color: const Color(0xFF888888),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Delay Habits Card (Matching Image 3) ───────────────────────────────────
+
+  Widget _buildDelayHabitsCard(bool isDark, Color cardBg, Color gold, Color textColor) {
+    final Map<String, int> prayerDelayCount = {};
+    final Map<String, int> prayerOnTimeCount = {};
+    for (var p in _prayers) {
+      prayerDelayCount[p] = 0;
+      prayerOnTimeCount[p] = 0;
+    }
+
+    for (var log in _monthLog.values) {
+      for (var p in _prayers) {
+        final status = log[p];
+        if (status == 'late' || status == null) {
+          prayerDelayCount[p] = (prayerDelayCount[p] ?? 0) + 1;
+        } else if (status == 'ontime') {
+          prayerOnTimeCount[p] = (prayerOnTimeCount[p] ?? 0) + 1;
+        }
+      }
+    }
+
+    String mostDelayedPrayer = 'الفجر';
+    int maxDelay = -1;
+    for (var entry in prayerDelayCount.entries) {
+      if (entry.value > maxDelay) {
+        maxDelay = entry.value;
+        mostDelayedPrayer = entry.key;
+      }
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(color: gold.withValues(alpha: 0.2)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+            decoration: BoxDecoration(
+              color: gold.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.psychology_alt_outlined, color: gold, size: 22.sp),
+                SizedBox(width: 10.w),
+                Text(
+                  'ما الذي يسبب تأخيرك؟',
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                    color: gold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(16.w),
+            child: Column(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE53935).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(color: const Color(0xFFE53935).withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.lightbulb_outline_rounded, color: const Color(0xFFE53935), size: 20.sp),
+                      SizedBox(width: 10.w),
+                      Expanded(
+                        child: Text(
+                          'أكثر صلاة بحاجة لمزيد من الحرص: $mostDelayedPrayer',
+                          style: TextStyle(
+                            fontFamily: AppConsts.expoArabic,
+                            fontSize: 12.5.sp,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFFE53935),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 14.h),
+                ..._prayers.map((p) {
+                  final ot = prayerOnTimeCount[p] ?? 0;
+                  final dl = prayerDelayCount[p] ?? 0;
+                  final total = ot + dl;
+                  final onTimePct = total > 0 ? (ot / total) : 0.0;
+
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: 10.h),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              p,
+                              style: TextStyle(
+                                fontFamily: AppConsts.expoArabic,
+                                fontSize: 12.sp,
+                                color: textColor,
+                              ),
+                            ),
+                            Text(
+                              '${(onTimePct * 100).round()}% في وقتها',
+                              style: TextStyle(
+                                fontFamily: AppConsts.cairo,
+                                fontSize: 11.sp,
+                                color: onTimePct >= 0.7 ? const Color(0xFF00897B) : const Color(0xFFE65100),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 4.h),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4.r),
+                          child: LinearProgressIndicator(
+                            value: onTimePct,
+                            minHeight: 6.h,
+                            backgroundColor: const Color(0xFFE53935).withValues(alpha: 0.2),
+                            valueColor: AlwaysStoppedAnimation(
+                              onTimePct >= 0.7 ? const Color(0xFF00897B) : const Color(0xFFFBC02D),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
               ],
             ),
           ),
@@ -1006,15 +1492,12 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
 
                     return InkWell(
                       onTap: () async {
-                        // لا تسمح بتسجيل صلوات المستقبل
                         if (date.isAfter(now)) return;
 
                         if (status != null) {
-                          // إلغاء التسجيل
                           await _savePrayerStatusForDate(p, null, dateKey);
                           setModalState(() {});
                         } else {
-                          // إظهار نافذة الاختيار
                           final result = await showDialog<String>(
                             context: context,
                             builder: (dialogCtx) => _buildConfirmDialog(p, dialogCtx),
@@ -1090,7 +1573,6 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
   // ─── Stats Card ─────────────────────────────────────────────────────────────
 
   Widget _buildStatsCard(bool isDark, Color cardBg, Color gold, Color textColor) {
-    // حساب الإحصائيات من آخر 30 يوم
     int totalOnTime = 0, totalLate = 0, totalMissed = 0;
     final now = DateTime.now();
     final displayMonth = DateTime(now.year, now.month + _calendarMonthOffset, 1);
@@ -1144,7 +1626,6 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
       ),
       child: Column(
         children: [
-          // Header
           Container(
             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
             decoration: BoxDecoration(
@@ -1161,7 +1642,6 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                         fontSize: 16.sp,
                         fontWeight: FontWeight.bold,
                         color: gold)),
-                
               ],
             ),
           ),
@@ -1170,7 +1650,6 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
             padding: EdgeInsets.all(16.w),
             child: Column(
               children: [
-                // شريط الملخص
                 Row(
                   children: [
                     _statBubble('في وقتها', totalOnTime, const Color(0xFF2E7D32), textColor),
@@ -1180,12 +1659,8 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                     _statBubble('فائتة', totalMissed, const Color(0xFFB0BEC5), textColor),
                   ],
                 ),
-
                 SizedBox(height: 20.h),
-
-                // أشرطة الصلوات الخمس
                 ..._prayers.map((prayer) {
-                  // حساب نسبة الصلاة هذه
                   int pOnTime = 0, pLate = 0;
                   for (final log in _monthLog.values) {
                     final s = log[prayer];
@@ -1337,4 +1812,299 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
     if (count == 5) return 'أتممتَ الصلوات الخمس! تقبّل الله طاعتك ✓';
     return 'باقي ${5 - count} صلاة';
   }
+}
+
+// ─── Custom Chart Painters ──────────────────────────────────────────────────
+
+class WeeklyCompletionSplinePainter extends CustomPainter {
+  final List<double> weeklyRates;
+  final bool isDark;
+  final Color primaryColor;
+  final Color textColor;
+
+  WeeklyCompletionSplinePainter({
+    required this.weeklyRates,
+    required this.isDark,
+    required this.primaryColor,
+    required this.textColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const double leftPadding = 16.0;
+    const double rightPadding = 48.0;
+    const double topPadding = 16.0;
+    const double bottomPadding = 36.0;
+
+    final double chartWidth = size.width - leftPadding - rightPadding;
+    final double chartHeight = size.height - topPadding - bottomPadding;
+
+    final gridPaint = Paint()
+      ..color = textColor.withValues(alpha: 0.12)
+      ..strokeWidth = 1.0;
+
+    final textPainter = TextPainter(
+      textDirection: TextDirection.rtl,
+    );
+
+    for (int i = 0; i <= 5; i++) {
+      final pct = (100 - i * 20);
+      final y = topPadding + (i / 5.0) * chartHeight;
+      canvas.drawLine(
+        Offset(leftPadding, y),
+        Offset(leftPadding + chartWidth, y),
+        gridPaint,
+      );
+
+      final textSpan = TextSpan(
+        text: '$pct\n%',
+        style: TextStyle(
+          fontFamily: AppConsts.cairo,
+          fontSize: 9.5.sp,
+          height: 1.0,
+          color: textColor.withValues(alpha: 0.5),
+        ),
+      );
+      textPainter.text = textSpan;
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(leftPadding + chartWidth + 6.0, y - (textPainter.height / 2)),
+      );
+    }
+
+    if (weeklyRates.isEmpty) return;
+
+    final points = <Offset>[];
+    for (int i = 0; i < 5; i++) {
+      final double x = leftPadding + (i / 4.0) * chartWidth;
+      final double rate = (i < weeklyRates.length ? weeklyRates[i] : 0.0).clamp(0.0, 100.0);
+      final double y = topPadding + (1.0 - (rate / 100.0)) * chartHeight;
+      points.add(Offset(x, y));
+    }
+
+    final path = Path();
+    path.moveTo(points.first.dx, points.first.dy);
+
+    for (int i = 0; i < points.length - 1; i++) {
+      final p0 = points[i];
+      final p1 = points[i + 1];
+      final midX = (p0.dx + p1.dx) / 2;
+      final cp1 = Offset((midX + p0.dx) / 2, p0.dy);
+      final cp2 = Offset((midX + p1.dx) / 2, p1.dy);
+      path.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, p1.dx, p1.dy);
+    }
+
+    final fillPath = Path.from(path)
+      ..lineTo(points.last.dx, topPadding + chartHeight)
+      ..lineTo(points.first.dx, topPadding + chartHeight)
+      ..close();
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          primaryColor.withValues(alpha: 0.35),
+          primaryColor.withValues(alpha: 0.0),
+        ],
+      ).createShader(Rect.fromLTWH(leftPadding, topPadding, chartWidth, chartHeight));
+
+    canvas.drawPath(fillPath, fillPaint);
+
+    final strokePaint = Paint()
+      ..color = primaryColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    canvas.drawPath(path, strokePaint);
+
+    final dotPaint = Paint()..color = primaryColor;
+    final dotBorderPaint = Paint()
+      ..color = isDark ? const Color(0xFF1E1E1E) : Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    for (int i = 0; i < points.length; i++) {
+      final pt = points[i];
+      canvas.drawCircle(pt, 5.0, dotPaint);
+      canvas.drawCircle(pt, 5.0, dotBorderPaint);
+
+      final textSpan = TextSpan(
+        text: '${i + 1}',
+        style: TextStyle(
+          fontFamily: AppConsts.expoArabic,
+          fontSize: 12.sp,
+          fontWeight: FontWeight.bold,
+          color: textColor.withValues(alpha: 0.75),
+        ),
+      );
+      textPainter.text = textSpan;
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(pt.dx - (textPainter.width / 2), topPadding + chartHeight + 6.0),
+      );
+    }
+
+    final weekLabelSpan = TextSpan(
+      text: 'أسبوع',
+      style: TextStyle(
+        fontFamily: AppConsts.expoArabic,
+        fontSize: 11.sp,
+        color: textColor.withValues(alpha: 0.5),
+      ),
+    );
+    textPainter.text = weekLabelSpan;
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset((leftPadding + (chartWidth / 2)) - (textPainter.width / 2), topPadding + chartHeight + 20.0),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant WeeklyCompletionSplinePainter oldDelegate) => true;
+}
+
+class WeeklyConsistencyBarPainter extends CustomPainter {
+  final List<int> onTimeList;
+  final List<int> lateList;
+  final List<int> missedList;
+  final bool isDark;
+  final Color textColor;
+  final Color onTimeColor;
+  final Color lateColor;
+  final Color missedColor;
+
+  WeeklyConsistencyBarPainter({
+    required this.onTimeList,
+    required this.lateList,
+    required this.missedList,
+    required this.isDark,
+    required this.textColor,
+    required this.onTimeColor,
+    required this.lateColor,
+    required this.missedColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const double leftPadding = 16.0;
+    const double rightPadding = 36.0;
+    const double topPadding = 16.0;
+    const double bottomPadding = 36.0;
+
+    final double chartWidth = size.width - leftPadding - rightPadding;
+    final double chartHeight = size.height - topPadding - bottomPadding;
+
+    final gridPaint = Paint()
+      ..color = textColor.withValues(alpha: 0.1)
+      ..strokeWidth = 1.0;
+
+    final textPainter = TextPainter(textDirection: TextDirection.rtl);
+
+    int maxVal = 10;
+    for (int i = 0; i < 5; i++) {
+      final ot = i < onTimeList.length ? onTimeList[i] : 0;
+      final lt = i < lateList.length ? lateList[i] : 0;
+      final ms = i < missedList.length ? missedList[i] : 0;
+      final m = [ot, lt, ms].reduce((a, b) => a > b ? a : b);
+      if (m > maxVal) maxVal = m;
+    }
+    maxVal = ((maxVal + 4) ~/ 5) * 5;
+    if (maxVal < 10) maxVal = 10;
+
+    final steps = [maxVal, (maxVal * 0.7).round(), (maxVal * 0.5).round(), (maxVal * 0.2).round(), 0];
+    for (int step in steps) {
+      final y = topPadding + (1.0 - (step / maxVal)) * chartHeight;
+      canvas.drawLine(
+        Offset(leftPadding, y),
+        Offset(leftPadding + chartWidth, y),
+        gridPaint,
+      );
+
+      final textSpan = TextSpan(
+        text: '$step',
+        style: TextStyle(
+          fontFamily: AppConsts.cairo,
+          fontSize: 9.5.sp,
+          color: textColor.withValues(alpha: 0.45),
+        ),
+      );
+      textPainter.text = textSpan;
+      textPainter.layout();
+      textPainter.paint(canvas, Offset(leftPadding + chartWidth + 6.0, y - (textPainter.height / 2)));
+    }
+
+    final barGroupWidth = chartWidth / 5.0;
+    final singleBarWidth = 6.5.w;
+
+    final onTimePaint = Paint()..color = onTimeColor;
+    final latePaint = Paint()..color = lateColor;
+    final missedPaint = Paint()..color = missedColor;
+
+    for (int i = 0; i < 5; i++) {
+      final centerX = leftPadding + (i * barGroupWidth) + (barGroupWidth / 2);
+      final ot = (i < onTimeList.length ? onTimeList[i] : 0).clamp(0, maxVal);
+      final lt = (i < lateList.length ? lateList[i] : 0).clamp(0, maxVal);
+      final ms = (i < missedList.length ? missedList[i] : 0).clamp(0, maxVal);
+
+      final baseY = topPadding + chartHeight;
+
+      if (ot > 0) {
+        final otHeight = (ot / maxVal) * chartHeight;
+        final otRect = Rect.fromLTWH(centerX - singleBarWidth * 1.5 - 2, baseY - otHeight, singleBarWidth, otHeight);
+        canvas.drawRRect(RRect.fromRectAndRadius(otRect, Radius.circular(3.r)), onTimePaint);
+      }
+
+      if (lt > 0) {
+        final ltHeight = (lt / maxVal) * chartHeight;
+        final ltRect = Rect.fromLTWH(centerX - singleBarWidth * 0.5, baseY - ltHeight, singleBarWidth, ltHeight);
+        canvas.drawRRect(RRect.fromRectAndRadius(ltRect, Radius.circular(3.r)), latePaint);
+      }
+
+      if (ms > 0) {
+        final msHeight = (ms / maxVal) * chartHeight;
+        final msRect = Rect.fromLTWH(centerX + singleBarWidth * 0.5 + 2, baseY - msHeight, singleBarWidth, msHeight);
+        canvas.drawRRect(RRect.fromRectAndRadius(msRect, Radius.circular(3.r)), missedPaint);
+      }
+
+      final textSpan = TextSpan(
+        text: '${i + 1}',
+        style: TextStyle(
+          fontFamily: AppConsts.expoArabic,
+          fontSize: 12.sp,
+          fontWeight: FontWeight.bold,
+          color: textColor.withValues(alpha: 0.75),
+        ),
+      );
+      textPainter.text = textSpan;
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(centerX - (textPainter.width / 2), baseY + 6.0),
+      );
+    }
+
+    final weekLabelSpan = TextSpan(
+      text: 'أسبوع',
+      style: TextStyle(
+        fontFamily: AppConsts.expoArabic,
+        fontSize: 11.sp,
+        color: textColor.withValues(alpha: 0.5),
+      ),
+    );
+    textPainter.text = weekLabelSpan;
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset((leftPadding + (chartWidth / 2)) - (textPainter.width / 2), topPadding + chartHeight + 20.0),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant WeeklyConsistencyBarPainter oldDelegate) => true;
 }

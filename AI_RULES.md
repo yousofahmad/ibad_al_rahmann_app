@@ -70,3 +70,19 @@
       3. Fallback: Algorithmic Umm al-Qura calculation.
       4. Emergency fail-safe: Standard astronomical conversion with sunset (Maghrib) day advancement.
     - PrayerFocusOverlay MUST check `prayer_focus_log_${dayStr}` before displaying and abort immediately if the prayer is already logged, ensuring the overlay never re-appears after the user taps "صليت".
+27. **True AMOLED Black & Pure White Theme Standard**:
+    - In Dark Mode, background colors MUST prioritize pure/true black (`#000000` / `#0A0A0A` / `#121212`) for maximum AMOLED screen energy efficiency and deep contrast.
+    - In Light Mode, backgrounds MUST be crisp clean white (`#FFFFFF`) with legible typography and golden Islamic accents (`#D0A871`).
+28. **Quran Header Hizb Boundaries (3 Boundaries Per Hizb) & Header Typography**:
+    - Hizb badges MUST appear strictly 3 times per Hizb (Start: `الحزب X`, Half: `نصف الحزب X`, Three-Quarters: `ثلاثة أرباع الحزب X`) on their exact boundary pages, and omitted on intermediate pages.
+    - On boundary pages, the Hizb badge is placed to the left of the Juz number (in RTL header row), and the Juz number font size is scaled down proportionally (`isTablet ? 26 : 18`) to ensure balanced spacing across regular Mushaf, Wird Mushaf, and Surah Al-Kahf.
+29. **Quran Double-Tap & Single-Tap Gesture Isolation (No-Hang Layout Switching)**:
+    - Full Quran view (`full_quran_mobile.dart`) MUST use `_TapListener` to cleanly distinguish single-tap (toggle action bar overlay) from double-tap (`QuranCubit.changeLayout()`).
+    - Double-tap MUST NEVER rapidly trigger and cancel the single-tap menu or freeze layout transitions.
+30. **Fail-Safe Emergency Audio Muting & Boot Resilience**:
+    - Muting audio via notification button ("إيقاف الصوت"), notification dismiss, or Flip-to-Mute MUST immediately stop and release all `MediaPlayer` instances, stop foreground audio services, restore saved system volume, and cancel notifications with 100% fail-safe reliability.
+    - `BOOT_COMPLETED` receiver MUST run all scheduling asynchronously without blocking system boot or causing device UI stutter.
+31. **Google Drive Clean Session Migration & Interactive Re-auth**:
+    - On app version updates (`AppMigrationHelper`), cached Google Sign-In email and session tokens MUST be cleaned and disconnected to prevent ghost sessions or repeated account selection dialog loops.
+    - Silent authentication timeout must be capped at 3 seconds, gracefully falling back to interactive authentication or notification prompting when backup/sync is requested.
+

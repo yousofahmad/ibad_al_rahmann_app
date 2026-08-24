@@ -248,9 +248,8 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
             right: true,
             child: Stack(
               children: [
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
+                _TapListener(
+                  onSingleTap: () {
                     if (state.isAutoScrolling) {
                       context.read<QuranCubit>().setAutoScrollPaused(true);
                       setState(() => _showAutoScrollMenu = true);
@@ -259,6 +258,9 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
                     } else {
                       _toggleOverlays();
                     }
+                  },
+                  onDoubleTap: () {
+                    context.read<QuranCubit>().changeLayout();
                   },
                   child: state.isAutoScrolling
                       ? ListView.builder(
@@ -346,6 +348,75 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
           ),
         );
       },
+    );
+  }
+}
+
+class _TapListener extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onSingleTap;
+  final VoidCallback? onDoubleTap;
+
+  const _TapListener({
+    required this.child,
+    this.onSingleTap,
+    this.onDoubleTap,
+  });
+
+  @override
+  State<_TapListener> createState() => _TapListenerState();
+}
+
+class _TapListenerState extends State<_TapListener> {
+  Offset? _downPosition;
+  DateTime? _lastTapTime;
+  Timer? _singleTapTimer;
+
+  static const double _maxMoveDelta = 10.0;
+  static const Duration _doubleTapWindow = Duration(milliseconds: 300);
+  static const Duration _singleTapDelay = Duration(milliseconds: 280);
+
+  @override
+  void dispose() {
+    _singleTapTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onPointerDown(PointerDownEvent e) {
+    _downPosition = e.localPosition;
+  }
+
+  void _onPointerUp(PointerUpEvent e) {
+    if (_downPosition == null) return;
+    final delta = (e.localPosition - _downPosition!).distance;
+    if (delta > _maxMoveDelta) {
+      _downPosition = null;
+      return;
+    }
+    _downPosition = null;
+
+    final now = DateTime.now();
+    if (_lastTapTime != null &&
+        now.difference(_lastTapTime!) < _doubleTapWindow) {
+      _singleTapTimer?.cancel();
+      _lastTapTime = null;
+      widget.onDoubleTap?.call();
+    } else {
+      _lastTapTime = now;
+      _singleTapTimer?.cancel();
+      _singleTapTimer = Timer(_singleTapDelay, () {
+        if (mounted) widget.onSingleTap?.call();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: _onPointerDown,
+      onPointerUp: _onPointerUp,
+      child: widget.child,
     );
   }
 }

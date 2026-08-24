@@ -567,6 +567,7 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
       child: Container(
         constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: EdgeInsets.symmetric(vertical: 16.h),
@@ -580,7 +581,7 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
                 ),
               ),
             ),
-            Expanded(
+            Flexible(
               child: SingleChildScrollView(
                 padding: EdgeInsets.all(20.w),
                 child: Column(
@@ -672,9 +673,11 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
-                            "تخصيص مستوى الصوت (تعلية مؤقتة)",
-                            style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 13, fontWeight: FontWeight.w600),
+                          Expanded(
+                            child: Text(
+                              "تخصيص مستوى الصوت (تعلية مؤقتة)",
+                              style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 13.sp, fontWeight: FontWeight.w600),
+                            ),
                           ),
                           Switch(
                             value: _useCustomVolume,

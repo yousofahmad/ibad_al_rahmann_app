@@ -1,7 +1,7 @@
 name: ibad_al_rahmann
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.1.5+9
+version: 1.1.5+10
 
 environment:
   sdk: ^3.10.0

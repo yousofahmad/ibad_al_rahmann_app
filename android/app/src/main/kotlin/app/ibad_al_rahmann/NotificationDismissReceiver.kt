@@ -19,8 +19,12 @@ class NotificationDismissReceiver : BroadcastReceiver() {
             try {
                 flipToMuteManager?.stopListening()
                 activeMediaPlayer?.let {
-                    if (it.isPlaying) it.stop()
-                    it.release()
+                    try {
+                        if (it.isPlaying) it.stop()
+                    } catch (_: Exception) {}
+                    try {
+                        it.release()
+                    } catch (_: Exception) {}
                 }
                 
                 // Restore volume if it was saved (either in static var or SharedPreferences backup)
@@ -32,7 +36,9 @@ class NotificationDismissReceiver : BroadcastReceiver() {
                     val stream = if (originalVolume != -1) originalStreamType else volPrefs.getInt("orig_stream", AudioManager.STREAM_MUSIC)
                     
                     if (vol != -1) {
-                        audioManager.setStreamVolume(stream, vol, 0)
+                        try {
+                            audioManager.setStreamVolume(stream, vol, 0)
+                        } catch (_: Exception) {}
                         // Clear backups
                         originalVolume = -1
                         volPrefs.edit().clear().apply()
@@ -55,12 +61,15 @@ class NotificationDismissReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
         val alarmId = intent.getIntExtra("alarm_id", -1)
-        if (action == "app.ibad_al_rahmann.ACTION_STOP_SOUND") {
-            NativeLogger.log(context, "NotificationDismissReceiver: Stopping sound manually. AlarmId: $alarmId")
-            stopSound(context)
-        } else {
-            NativeLogger.log(context, "NotificationDismissReceiver: User swiped/dismissed the notification. Action: $action. AlarmId: $alarmId")
-            stopSound(context)
+        NativeLogger.log(context, "NotificationDismissReceiver: Action: $action. AlarmId: $alarmId")
+        stopSound(context)
+        if (alarmId != -1) {
+            try {
+                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                nm.cancel(alarmId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 }

@@ -482,7 +482,7 @@ class BackupService {
       try {
         final authFuture = GoogleSignIn.instance.attemptLightweightAuthentication();
         if (authFuture != null) {
-          account = await authFuture.timeout(const Duration(seconds: 10));
+          account = await authFuture.timeout(const Duration(seconds: 3));
         }
         if (account != null) {
           AppLogger.log('GoogleDrive', 'silent auth OK: ${account.email}');
@@ -492,8 +492,8 @@ class BackupService {
           debugPrint('Google Sign-In: silent auth returned null (no cached session)');
         }
       } on TimeoutException {
-        AppLogger.log('GoogleDrive', 'silent auth timed-out (10s)');
-        debugPrint('Google Sign-In: silent auth timed-out after 10s');
+        AppLogger.log('GoogleDrive', 'silent auth timed-out (3s)');
+        debugPrint('Google Sign-In: silent auth timed-out after 3s');
         account = null;
       } catch (e) {
         AppLogger.log('GoogleDrive', 'silent auth error: $e');
