@@ -349,28 +349,29 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
     }
     final isPage1or2 = widget.pageNumber <= 2;
 
-    // Robustly detect the primary surah for this page by searching all lines.
-    int? detectedSurah;
+    // Robustly detect all distinct surahs for this page
+    final List<int> detectedSurahs = [];
     for (var line in _pageLines!) {
-      // 1. Try the surah_number column from map_db.pages
       if (line.surahNumber != null && line.surahNumber != 0) {
-        detectedSurah = line.surahNumber;
-        break;
+        if (!detectedSurahs.contains(line.surahNumber!)) {
+          detectedSurahs.add(line.surahNumber!);
+        }
       }
-      // 2. Try the first word's surah from the words table
       final words = _lineWordsMap[line.lineNumber];
       if (words != null && words.isNotEmpty) {
         for (var w in words) {
           if (w.suraNumber != null && w.suraNumber != 0) {
-            detectedSurah = w.suraNumber;
-            break;
+            if (!detectedSurahs.contains(w.suraNumber!)) {
+              detectedSurahs.add(w.suraNumber!);
+            }
           }
         }
-        if (detectedSurah != null) break;
       }
     }
 
-    int surahNum = detectedSurah ?? 1;
+    int surahNum = detectedSurahs.isNotEmpty ? detectedSurahs.first : 1;
+    final List<int> pageSurahs =
+        detectedSurahs.isNotEmpty ? detectedSurahs : [1];
     int verseNum = 1;
 
     // Determine verseNum for the first available ayah line to help with Juz calculation
@@ -423,53 +424,95 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
         ? Container(
             width: double.infinity,
             color: Colors.transparent,
-            padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
+            padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16, vertical: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // Right side in RTL: Juz & Hizb/Quarter
                 Flexible(
-                  child: Text(
-                    'surah${surahNum.toString().padLeft(3, '0')}',
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: 'SurahNames',
-                      color: headerTextColor,
-                      fontSize: isTablet ? 36 : 32,
-                      height: 0.7,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          'juz${juzNum.toString().padLeft(3, '0')}',
+                          style: TextStyle(
+                            fontFamily: AppConsts.quranCommon,
+                            color: headerTextColor,
+                            fontSize: isTablet ? 34 : 24,
+                            height: 1.0,
+                          ),
+                        ),
+                      ),
+                      if (hizbText.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD0A871).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            hizbText,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontFamily: AppConsts.cairo,
+                              color: const Color(0xFFD0A871),
+                              fontSize: isTablet ? 13 : 10,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Text(
-                    hizbText,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontFamily: AppConsts.cairo,
-                      color: headerTextColor.withAlpha(200),
-                      fontSize: isTablet ? 18 : 10,
-                    ),
-                  ),
-                ),
+                // Left side in RTL: Surah Name(s) with scaling
                 Flexible(
-                  child: Text(
-                    'juz${juzNum.toString().padLeft(3, '0')}',
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
-                    style: TextStyle(
-                      fontFamily: AppConsts.quranCommon,
-                      color: headerTextColor,
-                      fontSize: isTablet ? 36 : 26,
-                      height: 0.7,
-                    ),
-                  ),
+                  child: pageSurahs.length > 1
+                      ? FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: pageSurahs.map((sNum) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                ),
+                                child: Text(
+                                  'surah${sNum.toString().padLeft(3, '0')}',
+                                  style: TextStyle(
+                                    fontFamily: 'SurahNames',
+                                    color: headerTextColor,
+                                    fontSize: isTablet ? 30 : 22,
+                                    height: 1.0,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        )
+                      : Text(
+                          'surah${surahNum.toString().padLeft(3, '0')}',
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
+                          style: TextStyle(
+                            fontFamily: 'SurahNames',
+                            color: headerTextColor,
+                            fontSize: isTablet ? 36 : 30,
+                            height: 1.0,
+                          ),
+                        ),
                 ),
               ],
             ),
           )
         : const SizedBox.shrink();
 
-    final bool isExporting = context.select<QuranCubit, bool>((c) => c.state.isExporting);
     final bool isMinimized = !widget.showHeader && !isPage1or2;
 
     final versesColumn = LayoutBuilder(builder: (context, constraints) {
@@ -613,26 +656,8 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
               isPage1or2 || lineRule.isCentered || isLastLineOfSurah;
 
           final double canvasFontSize = isPage1or2
-              ? (context.isTablet ? 90.0 : (isExporting ? 48.0 : 42.0))
-              : (isExporting ? 110.0 : 125.0);
-
-          bool lineHasVisibleContent = true;
-          if (widget.startSuraNumber != null) {
-            if (lineRule.lineType == 'surah_name') {
-              final int s = lineRule.surahNumber ?? surahNum;
-              lineHasVisibleContent = s >= widget.startSuraNumber! && s <= (widget.endSuraNumber ?? s);
-            } else if (lineRule.lineType == 'basmallah') {
-              final int s = lineRule.surahNumber ?? surahNum;
-              lineHasVisibleContent = s >= widget.startSuraNumber! && s <= (widget.endSuraNumber ?? s);
-            } else {
-              final words = _lineWordsMap[lineNumber] ?? [];
-              lineHasVisibleContent = words.any((w) => isWordInRange(w.suraNumber ?? surahNum, w.ayahNumber ?? 0));
-            }
-          }
-
-          if (isExporting && !lineHasVisibleContent) {
-            return const SizedBox.shrink();
-          }
+              ? (context.isTablet ? 90.0 : 42.0)
+              : 125.0;
 
           Widget row = Directionality(
               textDirection: TextDirection.rtl,
@@ -847,17 +872,6 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                       : textColumnWithMargin,
                 ),
         );
-
-        if (isExporting) {
-          final bool hasRange = widget.startSuraNumber != null;
-          if (hasRange) return Center(child: innerContentWithoutMargin);
-          return Center(
-            child: AspectRatio(
-              aspectRatio: 1 / 1.72,
-              child: innerContentWithoutMargin,
-            ),
-          );
-        }
 
         return Padding(
           padding: EdgeInsets.symmetric(horizontal: sidePadding),

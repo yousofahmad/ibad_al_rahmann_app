@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:adhan/adhan.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
 
@@ -29,7 +30,7 @@ class PrayerAlertModal extends StatefulWidget {
     super.key,
     required this.prayerName,
     required this.streak,
-    this.snoozeMinutes = 5,
+    this.snoozeMinutes = 10,
     this.nextPrayerName,
     this.nextPrayerTime,
     this.currentPrayerTime,
@@ -91,7 +92,6 @@ class PrayerAlertModal extends StatefulWidget {
 class _PrayerAlertModalState extends State<PrayerAlertModal> {
   bool _isConfirmStep = false;
   bool _isAchievementStep = false;
-  bool _lastPrayedOnTime = true;
   int _snoozeCountdown = 5;
   Timer? _snoozeCountdownTimer;
   Timer? _refreshTimer;
@@ -146,11 +146,11 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
       final times = pService.getPrayerTimes();
       if (times != null) {
         final nextP = times.nextPrayer();
-        if (nextP != null) {
+        if (nextP != Prayer.none) {
           nextTime = times.timeForPrayer(nextP);
         }
         final currentP = times.currentPrayer();
-        if (currentP != null) {
+        if (currentP != Prayer.none) {
           currTime = times.timeForPrayer(currentP);
         }
       }
@@ -192,31 +192,21 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
 
     // Root widget: Transparent Material with centered modal card (dimming handled by WindowManager / showDialog)
     return Material(
-      color: Colors.transparent,
-      child: Center(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h),
-          child: Container(
-            width: double.infinity,
+      type: MaterialType.transparency,
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h),
+            child: Container(
+              width: double.infinity,
             constraints: BoxConstraints(
               maxWidth: 420.w,
               minHeight: 460.h,
             ),
             padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1C1A) : const Color(0xFFFAF8F5),
-              borderRadius: BorderRadius.circular(28.r),
-              border: Border.all(
-                color: goldColor.withValues(alpha: 0.25),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  blurRadius: 28,
-                  offset: const Offset(0, 10),
-                ),
-              ],
+            decoration: const BoxDecoration(
+              color: Colors.transparent,
             ),
             child: _isAchievementStep
                 ? _buildAchievementStep(goldColor, goldDark, isDark)
@@ -226,11 +216,11 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
           ),
         ),
       ),
+      ),
     );
   }
 
   Widget _buildMainAlertContent(Color goldColor, Color goldDark, bool isDark) {
-    final textColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
     final subColor = isDark ? Colors.white70 : const Color(0xFF6E655C);
     final (remainingTimeText, progressValue) = _calculateRemainingTimeAndProgress();
 
@@ -315,15 +305,13 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
         SizedBox(height: 18.h),
 
         // Rule 4: Timer & Progress Bar Section
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-          decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.04)
-                : Colors.black.withValues(alpha: 0.03),
-            borderRadius: BorderRadius.circular(16.r),
-          ),
+        IgnorePointer(
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+            decoration: const BoxDecoration(
+              color: Colors.transparent,
+            ),
           child: Column(
             children: [
               Row(
@@ -364,6 +352,7 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
               ),
             ],
           ),
+        ),
         ),
         SizedBox(height: 24.h),
 
@@ -486,7 +475,6 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
               ),
             ),
             onPressed: () {
-              _lastPrayedOnTime = true;
               widget.onPrayedOnTime();
               setState(() => _isAchievementStep = true);
             },
@@ -515,7 +503,6 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
               ),
             ),
             onPressed: () {
-              _lastPrayedOnTime = false;
               widget.onPrayedLate();
               setState(() => _isAchievementStep = true);
             },

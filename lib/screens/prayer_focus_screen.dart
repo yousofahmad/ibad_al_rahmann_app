@@ -8,7 +8,6 @@ import '../services/prayer_service.dart';
 import 'package:adhan/adhan.dart';
 
 import 'package:intl/intl.dart';
-import 'widgets/prayer_alert_modal.dart';
 
 /// شاشة "صلاتي" — التركيز للصلاة
 /// • Streak مستقل لكل صلاة (5 سلاسل)
@@ -146,9 +145,6 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
   }
 
   Map<String, String?> _parseLog(SharedPreferences prefs, String date) {
-    // النظام يحفظ البيانات بالـ prefix 'flutter.' عبر SharedPreferences
-    // لكن Kotlin يكتب مباشرة بـ 'flutter.' prefix
-    // نجرب كلا المفتاحين للتوافق
     final raw = prefs.getString('prayer_focus_log_$date')
         ?? prefs.getString('flutter.prayer_focus_log_$date');
     if (raw == null) return {for (var p in _prayers) p: null};
@@ -157,12 +153,18 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
       return {
         for (var p in _prayers)
           p: () {
-            if (p == 'الظهر' && decoded.containsKey('الجمعة') && decoded['الجمعة'] is Map) {
-              return (decoded['الجمعة'] as Map)['status'] as String?;
+            dynamic val = decoded[p];
+            if (p == 'الظهر' && (val == null || val == false)) {
+              if (decoded.containsKey('الجمعة')) val = decoded['الجمعة'];
             }
-            return (decoded[p] is Map)
-                ? (decoded[p] as Map)['status'] as String?
-                : null;
+            if (p == 'الجمعة' && (val == null || val == false)) {
+              if (decoded.containsKey('الظهر')) val = decoded['الظهر'];
+            }
+            if (val == null) return null;
+            if (val is Map) return (val['status'] as String?) ?? 'on_time';
+            if (val is bool) return val ? 'on_time' : null;
+            if (val is String) return val.isNotEmpty ? val : null;
+            return 'on_time';
           }(),
       };
     } catch (_) {
@@ -172,16 +174,53 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
 
   Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
     int streak = 0;
-    // يحسب إجمالي الصلوات المسجلة في الأيام المتتالية (يتوقف عند أول يوم بدون أي صلاة)
-    for (int i = 0; i < 62; i++) {
-      final d = DateTime.now().subtract(Duration(days: i));
-      final key = DateFormat('yyyy-MM-dd').format(d);
-      final log = _parseLog(prefs, key);
-      final loggedCount = log.values.where((s) => s != null).length;
-      // اليوم الحالي: إذا لم يصل بعد، لا نكسر الاستريك
-      if (loggedCount == 0 && i > 0) break;
-      streak += loggedCount;
+    bool shouldContinue = true;
+    final now = DateTime.now();
+
+    // فحص التاريخ بالكامل دون التقيد بشهر واحد (حتى سنتين رجوعاً للخلف)
+    for (int dayOffset = 0; dayOffset < 730; dayOffset++) {
+      if (!shouldContinue) break;
+      final d = now.subtract(Duration(days: dayOffset));
+      final dateStr = DateFormat('yyyy-MM-dd').format(d);
+      final log = _parseLog(prefs, dateStr);
+
+      final isFriday = d.weekday == DateTime.friday;
+      final prayersInReverse = [
+        'العشاء',
+        'المغرب',
+        'العصر',
+        if (isFriday) 'الجمعة' else 'الظهر',
+        'الفجر',
+      ];
+
+      if (dayOffset == 0) {
+        // اليوم الحالي: نبدأ من أحدث صلاة مسجلة
+        bool foundLatest = false;
+        for (final p in prayersInReverse) {
+          final isLogged = log[p] != null;
+          if (isLogged) {
+            foundLatest = true;
+            streak++;
+          } else if (foundLatest) {
+            // هناك صلاة غير مسجلة سابقة لأحدث صلاة اليوم
+            shouldContinue = false;
+            break;
+          }
+        }
+      } else {
+        // الأيام السابقة: كل صلاة غير مسجلة تكسر الاستريك
+        for (final p in prayersInReverse) {
+          final isLogged = log[p] != null;
+          if (isLogged) {
+            streak++;
+          } else {
+            shouldContinue = false;
+            break;
+          }
+        }
+      }
     }
+
     await prefs.setInt('prayer_streak_unified', streak);
     return streak;
   }
@@ -490,17 +529,16 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
             ),
             // زر معاينة نافذة التنبيه الحديثة
             InkWell(
-              onTap: () {
-                PrayerAlertModal.show(
-                  context,
-                  prayerName: 'الفجر',
-                  streak: _unifiedStreak,
-                  snoozeMinutes: _snoozeDuration,
-                  onPrayedOnTime: () => _savePrayerStatus('الفجر', 'ontime'),
-                  onPrayedLate: () => _savePrayerStatus('الفجر', 'late'),
-                  onSnooze: () {},
-                  onDismiss: () {},
-                );
+              onTap: () async {
+                try {
+                  await _channel.invokeMethod('showFocusOverlayPreview', {
+                    'prayerName': 'العصر',
+                    'alarmId': 102,
+                    'streak': _unifiedStreak,
+                  });
+                } catch (e) {
+                  debugPrint('Failed to show overlay preview: $e');
+                }
               },
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
@@ -1064,10 +1102,15 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
       final cp = PrayerService().getPrayerTimes()?.currentPrayer() ?? Prayer.none;
       if (cp == Prayer.fajr) {
         expectedPrayers += 1;
-      } else if (cp == Prayer.dhuhr) expectedPrayers += 2;
-      else if (cp == Prayer.asr) expectedPrayers += 3;
-      else if (cp == Prayer.maghrib) expectedPrayers += 4;
-      else if (cp == Prayer.isha) expectedPrayers += 5;
+      } else if (cp == Prayer.dhuhr) {
+        expectedPrayers += 2;
+      } else if (cp == Prayer.asr) {
+        expectedPrayers += 3;
+      } else if (cp == Prayer.maghrib) {
+        expectedPrayers += 4;
+      } else if (cp == Prayer.isha) {
+        expectedPrayers += 5;
+      }
     } else if (displayMonth.isBefore(now)) {
       int daysInMonth = DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month);
       expectedPrayers += daysInMonth * 5;
@@ -1084,7 +1127,9 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
       for (final status in entry.value.values) {
         if (status == 'ontime') {
           totalOnTime++;
-        } else if (status == 'late') totalLate++;
+        } else if (status == 'late') {
+          totalLate++;
+        }
       }
     }
     totalMissed = expectedPrayers - (totalOnTime + totalLate);

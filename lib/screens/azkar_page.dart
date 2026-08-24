@@ -631,6 +631,37 @@ class _AzkarPageState extends State<AzkarPage> {
                                   _azkarList[_currentIndex].count) {
                                 _currentCount++;
                                 _currentCounts[_currentIndex] = _currentCount;
+                                // تحديث إجمالي تكرار هذا الذكر عبر التاريخ
+                                final itemTotalKey =
+                                    'azkar_item_total_${widget.jsonFile}_$_currentIndex';
+                                final currentItemTotal =
+                                    CacheHelper.prefs.getInt(itemTotalKey) ?? 0;
+                                CacheHelper.prefs.setInt(
+                                  itemTotalKey,
+                                  currentItemTotal + 1,
+                                );
+
+                                // فحص شرط الـ 50% للستريك
+                                final key = _getCategoryKey();
+                                if (key.isNotEmpty) {
+                                  final sumCurrent = _currentCounts.fold(
+                                    0,
+                                    (a, b) => a + b,
+                                  );
+                                  final sumRequired = _azkarList.fold(
+                                    0,
+                                    (a, b) => a + b.count,
+                                  );
+                                  DailyTrackerService.checkAndRecordAzkarStreak(
+                                    key,
+                                    sumCurrent,
+                                    sumRequired,
+                                  ).then((newStreak) {
+                                    if (mounted) {
+                                      setState(() => _streakCount = newStreak);
+                                    }
+                                  });
+                                }
                               }
 
                               _saveProgress(_currentIndex);
@@ -1023,6 +1054,10 @@ class _AzkarPageState extends State<AzkarPage> {
 
     if (key.isNotEmpty) {
       await DailyTrackerService.markAsDone(key);
+      final countKey = 'count_${widget.jsonFile.replaceAll('.json', '')}';
+      final currentDoneCount = CacheHelper.prefs.getInt(countKey) ?? 0;
+      await CacheHelper.prefs.setInt(countKey, currentDoneCount + 1);
+
       final newStreak = await DailyTrackerService.getStreak(key);
       if (mounted) {
         setState(() => _streakCount = newStreak);

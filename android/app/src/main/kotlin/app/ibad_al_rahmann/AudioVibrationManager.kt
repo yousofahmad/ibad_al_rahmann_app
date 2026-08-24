@@ -9,42 +9,38 @@ import android.os.Vibrator
 object AudioVibrationManager {
     
     /**
-     * يقيم حالة الصوت والاهتزاز بدقة بناءً على القواعد المطلوبة:
-     * 1. RINGER_MODE_SILENT -> لا صوت ولا اهتزاز.
-     * 2. RINGER_MODE_VIBRATE -> اهتزاز فقط (برمجياً).
-     * 3. إشعار صامت من التطبيق -> اهتزاز فقط (برمجياً).
-     * 4. بخلاف ذلك -> السماح بتشغيل الصوت.
-     * 
-     * يُرجع [true] إذا كان يجب تشغيل الصوت، و [false] إذا كان الإشعار يجب أن يكون صامتاً.
+     * يقيم حالة الصوت والاهتزاز بدقة بناءً على القواعد الصارمة:
+     * 1. صوت التطبيق صامت ("none", "silent_notif", "silent", "ruqyah") -> لا صوت إطلاقاً (false).
+     * 2. الموبايل في وضع صامت (RINGER_MODE_SILENT) -> لا صوت إطلاقاً (false).
+     * 3. الموبايل في وضع اهتزاز (RINGER_MODE_VIBRATE) -> لا صوت إطلاقاً (false).
+     * 4. بخلاف ذلك (وضع رنين عادي + صوت غير صامت) -> السماح بتشغيل الصوت (true).
      */
-    fun evaluateAudioVibrationState(context: Context, soundName: String, overrideSilent: Boolean): Boolean {
+    fun evaluateAudioVibrationState(context: Context, soundName: String, overrideSilent: Boolean = false): Boolean {
         val cleanSoundName = soundName.replace(".mp3", "").lowercase().trim()
-        if (cleanSoundName == "none" || cleanSoundName == "null") return false
+        if (cleanSoundName == "none" || cleanSoundName == "null" || cleanSoundName.isEmpty()) return false
 
         val isAppSilent = cleanSoundName == "silent_notif" || cleanSoundName == "ruqyah" || cleanSoundName == "silent"
-        if (overrideSilent && !isAppSilent) return true
+        if (isAppSilent) {
+            if (cleanSoundName != "ruqyah") {
+                triggerVibration(context)
+            }
+            return false
+        }
 
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        return when (audioManager.ringerMode) {
-            AudioManager.RINGER_MODE_SILENT -> false
-            AudioManager.RINGER_MODE_VIBRATE -> {
-                // Vibration is handled by the notification channel (prayer_vibrate_channel_v2).
-                // No manual triggerVibration needed — the channel's pattern fires on notify().
-                false
-            }
-            else -> {
-                if (isAppSilent) {
-                    triggerVibration(context)
-                    false
-                } else true
-            }
+        val ringerMode = audioManager.ringerMode
+        
+        // إذا كان الموبايل في وضع صامت أو اهتزاز -> منع الصوت منعاً باتاً
+        if (ringerMode == AudioManager.RINGER_MODE_SILENT || ringerMode == AudioManager.RINGER_MODE_VIBRATE) {
+            return false
         }
+
+        return true
     }
 
     private fun triggerVibration(context: Context) {
         try {
             val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-            // نمط اهتزاز مخصص للإشعارات
             val pattern = longArrayOf(0, 500, 300, 500)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))

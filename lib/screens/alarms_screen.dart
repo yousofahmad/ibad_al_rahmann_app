@@ -185,8 +185,9 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
     _prefs = CacheHelper.prefs;
     setState(() {
       _qiyamMode =
+          _prefs.getString('adhan_mode_Last_third') ??
           _prefs.getString('qiyam_mode_notif') ??
-          ((_prefs.getBool('notif_qiyam') ?? true) ? 'sound' : 'none');
+          ((_prefs.getBool('notif_qiyam') ?? false) ? 'sound' : 'none');
       _sunriseMode =
           _prefs.getString('sunrise_mode') ??
           ((_prefs.getBool('notif_sunrise') ?? true) ? 'sound' : 'none');
@@ -484,10 +485,11 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
             title: 'القيام',
             subtitle: 'الثلث الأخير من الليل',
             value: _qiyamMode != 'none',
-            onToggle: (v) {
+            onToggle: (v) async {
               final newMode = v ? 'sound' : 'none';
               setState(() => _qiyamMode = newMode);
-              _saveMode('qiyam_mode_notif', 'notif_qiyam', newMode);
+              await _saveMode('qiyam_mode_notif', 'notif_qiyam', newMode);
+              await _prefs.setString('adhan_mode_Last_third', newMode);
             },
             expanded: _qiyamMode != 'none',
             child: Row(
@@ -501,9 +503,10 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
                   ),
                 ),
                 const Spacer(),
-                _modeToggle(_qiyamMode, (v) {
+                _modeToggle(_qiyamMode, (v) async {
                   setState(() => _qiyamMode = v);
-                  _saveMode('qiyam_mode_notif', 'notif_qiyam', v);
+                  await _saveMode('qiyam_mode_notif', 'notif_qiyam', v);
+                  await _prefs.setString('adhan_mode_Last_third', v);
                 }),
               ],
             ),

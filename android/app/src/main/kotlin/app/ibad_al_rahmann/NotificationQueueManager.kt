@@ -102,10 +102,11 @@ object NotificationQueueManager {
         val serviceIntent = Intent(context, PrayerNotificationService::class.java).apply {
             action = "PLAY_SOUND"
             putExtras(request.intent)
+            putExtra("is_queued", true)
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try { context.startForegroundService(serviceIntent) } catch (e: Exception) { e.printStackTrace() }
+            try { androidx.core.content.ContextCompat.startForegroundService(context, serviceIntent) } catch (e: Exception) { e.printStackTrace() }
         } else {
             context.startService(serviceIntent)
         }

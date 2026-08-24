@@ -140,7 +140,8 @@ object NativeAzkarScheduler {
                 val notifType  = json.optString("notificationType", "daily")
                 val offsetMins = json.optInt("notificationOffsetMinutes", 30)
                 val khatmaId   = json.optString("id", khatmaKey)
-                val idBase     = 100000 + (khatmaId.hashCode().let { if (it < 0) -it else it } % 40000) * 10
+                val cleanId    = if (khatmaId.startsWith("khatma_")) khatmaId.removePrefix("khatma_") else khatmaId
+                val idBase     = 100000 + (cleanId.hashCode().let { if (it < 0) -it else it } % 40000) * 10
 
                 // Build a full deep-link payload that includes the current wird index + page range
                 // so handleGlobalNavigation() opens IsolatedWirdScreen directly on the right pages
@@ -150,9 +151,15 @@ object NativeAzkarScheduler {
                 val currentWird  = wirdsArray?.optJSONObject(clampedIdx)
                 val startPage    = currentWird?.optInt("startPage", 1) ?: 1
                 val endPage      = currentWird?.optInt("endPage", 604) ?: 604
-                val payload      = "khatma_${khatmaId}_${clampedIdx}_${startPage}_${endPage}"
+                val payload      = "khatma_${cleanId}_${clampedIdx}_${startPage}_${endPage}"
+                val pageInfo     = if (currentWird != null) " (ص$startPage–$endPage)" else ""
 
-                NativeLogger.log(context, "scheduleWird: processing '$khatmaName' (type=$notifType, id=$khatmaId, idBase=$idBase, payload=$payload)")
+                NativeLogger.log(context, "scheduleWird: processing '$khatmaName' (type=$notifType, id=$cleanId, idBase=$idBase, payload=$payload)")
+
+                val startDateStr = json.optString("startDate", "")
+                val daysSinceStart = getDaysSinceStart(startDateStr)
+                val currentWirdIndex = json.optInt("currentWirdIndex", 0)
+                val startPrayerOffset = json.optInt("startPrayerOffset", 0)
 
                 if (notifType == "daily") {
                     val timeStr = json.optString("dailyTime", "22:00")
@@ -165,6 +172,16 @@ object NativeAzkarScheduler {
                         cal.set(java.util.Calendar.MILLISECOND, 0)
                         cal.add(java.util.Calendar.DAY_OF_YEAR, i)
                         if (cal.timeInMillis <= now) continue
+
+                        val targetDaysSinceStart = daysSinceStart + i
+                        var passedPeriods = targetDaysSinceStart
+                        if (passedPeriods < 0) passedPeriods = 0
+                        val delayedWirds = passedPeriods - currentWirdIndex
+                        val bodyPrefix = if (delayedWirds > 0) "⚠️ أنت متأخر بمقدار $delayedWirds ورد .. "
+                                         else if (delayedWirds < 0) "🌟 أنت متقدم بمقدار ${-delayedWirds} ورد .. "
+                                         else ""
+                        val finalBody = bodyPrefix + "حان وقت وردك اليومي$pageInfo"
+
                         val scheduledId = idBase + cal.get(java.util.Calendar.DAY_OF_WEEK)
                         MainActivity.scheduleAlarmInternal(
                             context, editor, scheduledId,
@@ -174,7 +191,7 @@ object NativeAzkarScheduler {
                             hour = h, minute = m,
                             soundName = "ibad_al_rahmann_tone",
                             title = "ورد $khatmaName",
-                            body = "حان وقت وردك اليومي",
+                            body = finalBody,
                             payload = payload,
                             isRepeating = false,
                             audioPath = null,
@@ -202,6 +219,16 @@ object NativeAzkarScheduler {
                         for (pIdx in 0..4) {
                             val pEpoch = prayerTimes[pIdx] + offsetMins * 60_000L
                             if (pEpoch <= now) continue
+
+                            val targetDaysSinceStart = daysSinceStart + i
+                            var passedPeriods = (targetDaysSinceStart * 5 + pIdx - startPrayerOffset)
+                            if (passedPeriods < 0) passedPeriods = 0
+                            val delayedWirds = passedPeriods - currentWirdIndex
+                            val bodyPrefix = if (delayedWirds > 0) "⚠️ أنت متأخر بمقدار $delayedWirds ورد .. "
+                                             else if (delayedWirds < 0) "🌟 أنت متقدم بمقدار ${-delayedWirds} ورد .. "
+                                             else ""
+                            val finalBody = bodyPrefix + "حان وقت وردك بعد صلاة ${prayerNames[pIdx]}"
+
                             val pCal = java.util.Calendar.getInstance()
                             pCal.timeInMillis = pEpoch
                             val scheduledId = idBase + (dayCal.get(java.util.Calendar.DAY_OF_WEEK) * 10) + pIdx
@@ -214,7 +241,7 @@ object NativeAzkarScheduler {
                                 minute = pCal.get(java.util.Calendar.MINUTE),
                                 soundName = "ibad_al_rahmann_tone",
                                 title = "ورد $khatmaName",
-                                body = "حان وقت وردك بعد صلاة ${prayerNames[pIdx]}",
+                                body = finalBody,
                                 payload = payload,
                                 isRepeating = false,
                                 audioPath = null,
@@ -284,6 +311,30 @@ object NativeAzkarScheduler {
         } catch (e: Exception) {
             Pair(6, 0)
         }
+    }
+
+    private fun getDaysSinceStart(startDateStr: String): Int {
+        if (startDateStr.isEmpty()) return 0
+        try {
+            val parts = startDateStr.split("T")
+            val dParts = parts[0].split("-")
+            if (dParts.size >= 3) {
+                val startCal = java.util.Calendar.getInstance()
+                startCal.set(dParts[0].toInt(), dParts[1].toInt()-1, dParts[2].toInt(), 0,0,0)
+                startCal.set(java.util.Calendar.MILLISECOND, 0)
+                
+                val todayCal = java.util.Calendar.getInstance()
+                todayCal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                todayCal.set(java.util.Calendar.MINUTE, 0)
+                todayCal.set(java.util.Calendar.SECOND, 0)
+                todayCal.set(java.util.Calendar.MILLISECOND, 0)
+                
+                val diff = todayCal.timeInMillis - startCal.timeInMillis
+                val days = (diff / (1000 * 60 * 60 * 24)).toInt()
+                return if (days < 0) 0 else days
+            }
+        } catch (_: Exception) {}
+        return 0
     }
 
     /** 

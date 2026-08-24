@@ -9,11 +9,9 @@ import 'occasions_screen.dart';
 import 'fasting_days_screen.dart';
 import 'package:ibad_al_rahmann/features/share_cards/ui/share_cards_screen.dart';
 import 'time_for_allah_screen.dart';
-
 import 'package:ibad_al_rahmann/services/notification_service.dart';
-
 import 'package:flutter/services.dart';
-
+import 'package:file_picker/file_picker.dart';
 import 'package:ibad_al_rahmann/main.dart'; // To access scaffoldMessengerKey
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
@@ -242,7 +240,10 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
   bool _isEnabled = false;
   String _unlockMode = 'none';
   bool _unlockEnabled = false; // explicit toggle for the unlock sound feature
+  bool _useCustomVolume = false;
   double _unlockVolume = 1.0;
+  String? _customSoundPath;
+  String? _customSoundName;
   String _periodicSound = 'saly_3ala_mo7amad';
   
   final AudioPlayer _audioPlayer = AudioPlayer();
@@ -283,7 +284,10 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
     final prefs = CacheHelper.prefs;
     final enabled = prefs.getBool('salawat_reminder_enabled') ?? false;
     final unlockMode = prefs.getString('salah_unlock_mode') ?? 'none';
+    final useCustomVolume = prefs.getBool('salah_unlock_use_custom_volume') ?? false;
     final unlockVolume = prefs.getDouble('salah_unlock_volume') ?? 1.0;
+    final customPath = prefs.getString('salah_unlock_custom_path');
+    final customName = prefs.getString('salah_unlock_custom_name');
     final periodicSound = prefs.getString('salawat_periodic_sound') ?? 'saly_3ala_mo7amad';
     final minutes = prefs.getInt('salawat_reminder_minutes') ?? 60;
     final daysList = prefs.getStringList('salawat_reminder_days') ?? [DateTime.friday.toString()];
@@ -298,7 +302,10 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
         _isEnabled = enabled;
         _unlockMode = unlockMode;
         _unlockEnabled = unlockMode != 'none';
+        _useCustomVolume = useCustomVolume;
         _unlockVolume = unlockVolume;
+        _customSoundPath = customPath;
+        _customSoundName = customName;
         _periodicSound = periodicSound;
         _controller.text = minutes.toString();
         _selectedDays = daysList.map((e) => int.parse(e)).toList();
@@ -315,7 +322,14 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
     await prefs.setBool('salawat_reminder_enabled', _isEnabled);
     await prefs.setInt('salawat_reminder_minutes', minutes);
     await prefs.setString('salah_unlock_mode', _unlockEnabled ? _unlockMode : 'none');
+    await prefs.setBool('salah_unlock_use_custom_volume', _useCustomVolume);
     await prefs.setDouble('salah_unlock_volume', _unlockVolume);
+    if (_customSoundPath != null) {
+      await prefs.setString('salah_unlock_custom_path', _customSoundPath!);
+    }
+    if (_customSoundName != null) {
+      await prefs.setString('salah_unlock_custom_name', _customSoundName!);
+    }
     await prefs.setString('salawat_periodic_sound', _periodicSound);
     await prefs.setStringList('salawat_reminder_days', _selectedDays.map((e) => e.toString()).toList());
     await prefs.setInt('quiet_hours_start_hour', _quietHoursStart.hour);
@@ -356,6 +370,26 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
     }
   }
 
+  Future<void> _pickCustomAudio() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.audio,
+        allowMultiple: false,
+      );
+      if (result != null && result.files.single.path != null) {
+        final path = result.files.single.path!;
+        final name = result.files.single.name;
+        setState(() {
+          _customSoundPath = path;
+          _customSoundName = name;
+          _unlockMode = 'custom';
+        });
+      }
+    } catch (e) {
+      debugPrint("Error picking audio: $e");
+    }
+  }
+
   Future<void> _playSound(String soundName, {double volume = 1.0}) async {
     if (_playingSound == soundName) {
       await _audioPlayer.stop();
@@ -365,7 +399,11 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
       setState(() => _playingSound = soundName);
       try {
         await _audioPlayer.setVolume(volume);
-        await _audioPlayer.play(AssetSource('audio/$soundName.mp3'));
+        if (soundName == 'custom' && _customSoundPath != null) {
+          await _audioPlayer.play(DeviceFileSource(_customSoundPath!));
+        } else {
+          await _audioPlayer.play(AssetSource('audio/$soundName.mp3'));
+        }
       } catch (e) {
         debugPrint('_playSound error: $e');
         setState(() => _playingSound = null);
@@ -379,6 +417,7 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
     required ValueChanged<String?> onChanged,
     bool showNone = false,
     bool showBoth = false,
+    bool showCustom = false,
     double previewVolume = 1.0,
   }) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
@@ -386,9 +425,9 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
       'saly_3ala_mo7amad': 'صلي على محمد',
       'salah_2': 'اللهم صلي وسلم على نبينا محمد',
       'both': 'كلاهما (عشوائي)',
+      'custom': _customSoundName != null ? 'صوت مخصص: $_customSoundName' : 'صوت مخصص من الهاتف',
       'none': 'إيقاف',
     };
-    // For 'both' preview we play the first sound
     final previewKey = value == 'both' ? 'saly_3ala_mo7amad' : value;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -404,7 +443,7 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
-              value: value,
+              value: (showCustom && value == 'custom') || soundLabel.containsKey(value) ? value : 'saly_3ala_mo7amad',
               isExpanded: true,
               icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFFD0A871)),
               dropdownColor: isDark ? Colors.grey[900] : Colors.white,
@@ -415,11 +454,33 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
                 DropdownMenuItem(value: 'salah_2', child: Text(soundLabel['salah_2']!, style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 13.sp))),
                 if (showBoth)
                   DropdownMenuItem(value: 'both', child: Text(soundLabel['both']!, style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 13.sp))),
+                if (showCustom)
+                  DropdownMenuItem(value: 'custom', child: Text(soundLabel['custom']!, style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 13.sp, overflow: TextOverflow.ellipsis))),
               ],
               onChanged: onChanged,
             ),
           ),
         ),
+        if (showCustom && value == 'custom') ...[
+          SizedBox(height: 8.h),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFD0A871)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                padding: EdgeInsets.symmetric(vertical: 8.h),
+              ),
+              icon: const Icon(Icons.file_upload_outlined, color: Color(0xFFD0A871), size: 18),
+              label: Text(
+                _customSoundName != null ? 'تغيير الملف: $_customSoundName' : 'اختيار ملف صوتي من الجهاز',
+                style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 12.sp, color: const Color(0xFFD0A871)),
+                overflow: TextOverflow.ellipsis,
+              ),
+              onPressed: _pickCustomAudio,
+            ),
+          ),
+        ],
         if (value != 'none') ...[
           SizedBox(height: 8.h),
           Row(
@@ -603,40 +664,59 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
                         value: _unlockMode == 'none' ? 'saly_3ala_mo7amad' : _unlockMode,
                         showNone: false,
                         showBoth: true,
+                        showCustom: true,
                         previewVolume: _unlockVolume,
                         onChanged: (val) { if (val != null) setState(() => _unlockMode = val); },
                       ),
-                      SizedBox(height: 16.h),
-                      // Volume slider with live percentage label
+                      SizedBox(height: 14.h),
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Icon(Icons.volume_mute, color: Colors.grey, size: 20),
-                          Expanded(
-                            child: Slider(
-                              value: _unlockVolume,
-                              min: 0.1,
-                              max: 1.0,
-                              divisions: 9,
-                              activeColor: const Color(0xFFD0A871),
-                              inactiveColor: const Color(0xFFD0A871).withValues(alpha: 0.2),
-                              onChanged: (val) => setState(() => _unlockVolume = val),
-                            ),
+                          const Text(
+                            "تخصيص مستوى الصوت (تعلية مؤقتة)",
+                            style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 13, fontWeight: FontWeight.w600),
                           ),
-                          const Icon(Icons.volume_up, color: Color(0xFFD0A871), size: 20),
-                          SizedBox(width: 6.w),
-                          SizedBox(
-                            width: 36.w,
-                            child: Text(
-                              '${(_unlockVolume * 100).round()}%',
-                              style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 12.sp,
-                                color: const Color(0xFFD0A871), fontWeight: FontWeight.bold),
-                              textAlign: TextAlign.right,
-                            ),
+                          Switch(
+                            value: _useCustomVolume,
+                            activeThumbColor: const Color(0xFFD0A871),
+                            onChanged: (val) => setState(() => _useCustomVolume = val),
                           ),
                         ],
                       ),
-                      Text("مستوى صوت مستقل عن إعدادات الأذان",
-                        style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 11.sp, color: Colors.grey)),
+                      if (_useCustomVolume) ...[
+                        SizedBox(height: 8.h),
+                        Row(
+                          children: [
+                            const Icon(Icons.volume_mute, color: Colors.grey, size: 20),
+                            Expanded(
+                              child: Slider(
+                                value: _unlockVolume,
+                                min: 0.1,
+                                max: 1.0,
+                                divisions: 9,
+                                activeColor: const Color(0xFFD0A871),
+                                inactiveColor: const Color(0xFFD0A871).withValues(alpha: 0.2),
+                                onChanged: (val) => setState(() => _unlockVolume = val),
+                              ),
+                            ),
+                            const Icon(Icons.volume_up, color: Color(0xFFD0A871), size: 20),
+                            SizedBox(width: 6.w),
+                            SizedBox(
+                              width: 36.w,
+                              child: Text(
+                                '${(_unlockVolume * 100).round()}%',
+                                style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 12.sp,
+                                  color: const Color(0xFFD0A871), fontWeight: FontWeight.bold),
+                                textAlign: TextAlign.right,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          "يتم تعلية الصوت مؤقتاً أثناء التنبيه ثم استعادة مستوى صوت النظام تلقائياً",
+                          style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 11.sp, color: Colors.grey),
+                        ),
+                      ],
                     ],
                   ],
                 ),

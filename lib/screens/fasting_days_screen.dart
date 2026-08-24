@@ -202,7 +202,7 @@ class _FastingDaysScreenState extends State<FastingDaysScreen> {
         await ImageGenerationService.saveToGallery(bytes);
 
         if (mounted) {
-          ShareHelper.showTopNotification(context, 'تم حفظ الصورة في المعرض بنجاح ✨');
+          ShareHelper.showTopNotification(context, 'تم حفظ الصورة في المعرض بنجاح ');
         }
       } catch (e) {
         if (mounted) {

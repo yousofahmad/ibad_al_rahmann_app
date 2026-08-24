@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
-import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
 
 import '../../../../../core/theme/app_images.dart';
 
@@ -20,15 +18,12 @@ class FullHeaderWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isExporting = context.select<QuranCubit, bool>((c) => c.state.isExporting);
-
-    // Original large width for normal Mushaf, smaller for export images
-    final double mobileWidth = isExporting ? 320 : 500;
+    const double mobileWidth = 500;
     final double targetWidth = width ?? (context.isTablet ? 750 : mobileWidth);
 
     return Container(
       width: targetWidth,
-      padding: EdgeInsets.symmetric(vertical: isExporting ? 0.0 : 2.0),
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -41,7 +36,7 @@ class FullHeaderWidget extends StatelessWidget {
                 'surah${surahNumber.toString().padLeft(3, '0')}',
                 textAlign: TextAlign.center,
                 style: context.headlineMedium.copyWith(
-                  fontSize: context.isTablet ? 54 : (isExporting ? 30 : 48),
+                  fontSize: context.isTablet ? 54 : 48,
                   color: color,
                   fontFamily: 'SurahNames',
                   fontWeight: FontWeight.normal,

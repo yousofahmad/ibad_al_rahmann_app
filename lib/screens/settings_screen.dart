@@ -18,6 +18,7 @@ import 'package:ibad_al_rahmann/main.dart'; // To access scaffoldMessengerKey
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:ibad_al_rahmann/services/background_service.dart';
+import 'package:ibad_al_rahmann/widgets/app_loading_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -95,7 +96,6 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
   bool _useCustomVolume = false;
   int _customVolume = 100;
   String _audioStream = 'alarm';
-  bool _forceSpeaker = false;
   bool _enableNativeLogging = true;
   String? _googleEmail;
   String? _lastSyncTime;
@@ -124,7 +124,6 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
         _useCustomVolume = prefs.getBool('use_custom_notif_volume') ?? false;
         _customVolume = prefs.getInt('custom_notif_volume_level') ?? 100;
         _audioStream = prefs.getString('audio_stream_channel') ?? 'alarm';
-        _forceSpeaker = prefs.getBool('force_speaker') ?? false;
         _enableNativeLogging = prefs.getBool('enable_native_logging') ?? true;
         _googleEmail = email;
         _lastSyncTime = syncTime;
@@ -626,45 +625,6 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             ),
 
           // 5. Backup & Data
-          
-            
-            _buildListTile(
-              "تفعيل سجل الإشعارات",
-              "تسجيل الإشعارات للمساعدة في حل المشاكل (يُنصح بتفعيله)",
-              Icons.receipt_long_rounded,
-              trailing: Switch(
-                value: _enableNativeLogging,
-                activeThumbColor: const Color(0xFFD0A871),
-                onChanged: (val) async {
-                  final prefs = CacheHelper.prefs;
-                  await prefs.setBool('enable_native_logging', val);
-                  if (val) {
-                    try {
-                      final dir = await getApplicationSupportDirectory();
-                      final file = File('${dir.path}/native_prayer_log.txt');
-                      if (await file.exists()) {
-                        await file.delete();
-                      }
-                    } catch (_) {}
-                  }
-                  setState(() => _enableNativeLogging = val);
-                },
-              ),
-            ),
-            if (_enableNativeLogging)
-              _buildListTile(
-                "عرض سجل الإشعارات",
-                "قراءة السجل الخاص بالإشعارات وتصديره",
-                Icons.bug_report_outlined,
-                onTap: () => _showNativeLog(context),
-              ),
-            _buildListTile(
-              "تشخيص دقة أوقات الصلاة",
-              "عرض الإحداثيات وطريقة الحساب للمقارنة مع التطبيقات الأخرى",
-              Icons.my_location_outlined,
-              onTap: () => _showAccuracyDialog(context),
-            ),
-          // 5. Backup & Data
           _buildSectionHeader("النسخ الاحتياطي والبيانات"),
           _buildListTile(
             "تصدير البيانات",
@@ -689,17 +649,12 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             "استعادة الإعدادات من ملف نسخة احتياطية",
             Icons.file_download_rounded,
             onTap: () async {
-              // Show loading
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => Center(child: CircularProgressIndicator(color: const Color(0xFFD0A871), strokeWidth: 3.w)),
-              );
+              AppLoadingDialog.show(context, message: 'جاري استعادة النسخة الاحتياطية...');
 
               final success = await BackupService.importBackup();
 
               // ignore: use_build_context_synchronously
-              if (mounted) Navigator.pop(context); // Close loading
+              if (mounted) AppLoadingDialog.hide(context); // Close loading
 
               if (success) {
                 scaffoldMessengerKey.currentState?.showSnackBar(
@@ -726,17 +681,13 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 : "حفظ واستعادة الإعدادات تلقائياً من سحابة جوجل",
             FontAwesomeIcons.googleDrive,
             onTap: () async {
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => Center(child: CircularProgressIndicator(color: const Color(0xFFD0A871), strokeWidth: 3.w)),
-              );
+              AppLoadingDialog.show(context, message: 'جاري حفظ النسخة الاحتياطية على السحاب...');
               final success = await BackupService.syncToDrive();
               final email = await BackupService.getSignedInEmail(forceCheck: true);
               final syncTime = await BackupService.getLastSyncTime();
               if (mounted) {
                 // ignore: use_build_context_synchronously
-                if (mounted) Navigator.pop(context);
+                AppLoadingDialog.hide(context);
 
                 setState(() {
                   _googleEmail = email;
@@ -795,17 +746,13 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             "تحميل آخر نسخة محفوظة من السحابة",
             Icons.cloud_download_rounded,
             onTap: () async {
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => Center(child: CircularProgressIndicator(color: const Color(0xFFD0A871), strokeWidth: 3.w)),
-              );
+              AppLoadingDialog.show(context, message: 'جاري استعادة النسخة الاحتياطية من السحاب...');
               final success = await BackupService.syncFromDrive();
               final email = await BackupService.getSignedInEmail(forceCheck: true);
               final syncTime = await BackupService.getLastSyncTime();
               if (mounted) {
                 // ignore: use_build_context_synchronously
-                if (mounted) Navigator.pop(context);
+                AppLoadingDialog.hide(context);
 
                 setState(() {
                   _googleEmail = email;
@@ -858,20 +805,77 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
 
           // 6. Support
           _buildSectionHeader("الدعم"),
+          _buildListTile(
+            "تشخيص دقة أوقات الصلاة",
+            "عرض الإحداثيات وطريقة الحساب ووقت آخر تحديث للمقارنة مع التطبيقات الأخرى",
+            Icons.my_location_outlined,
+            onTap: () => _showAccuracyDialog(context),
+          ),
+          _buildListTile(
+            "تفعيل سجل الإشعارات",
+            "تسجيل الإشعارات للمساعدة في حل المشاكل (يُنصح بتفعيله)",
+            Icons.receipt_long_rounded,
+            trailing: Switch(
+              value: _enableNativeLogging,
+              activeThumbColor: const Color(0xFFD0A871),
+              onChanged: (val) async {
+                final prefs = CacheHelper.prefs;
+                await prefs.setBool('enable_native_logging', val);
+                if (val) {
+                  try {
+                    final dir = await getApplicationSupportDirectory();
+                    final file = File('${dir.path}/native_prayer_log.txt');
+                    if (await file.exists()) {
+                      await file.delete();
+                    }
+                  } catch (_) {}
+                }
+                setState(() => _enableNativeLogging = val);
+              },
+            ),
+          ),
+          if (_enableNativeLogging)
+            _buildListTile(
+              "عرض سجل الإشعارات",
+              "قراءة السجل الخاص بالإشعارات وتصديره",
+              Icons.receipt_rounded,
+              onTap: () => _showNativeLog(context),
+            ),
+          _buildListTile(
+            "الإبلاغ عن مشكلة وإرسال السجل",
+            "إرسال تقرير مفصل مع ملف السجل للتشخيص والمساعدة عبر الواتساب أو البريد",
+            Icons.support_agent_rounded,
+            onTap: () async {
+              AppLoadingDialog.show(context, message: 'جاري تجهيز تقرير السجل...');
+              try {
+                final nativeLog = await BackgroundService.getNativeLog(lines: 500);
+                if (context.mounted) AppLoadingDialog.hide(context);
+                if (context.mounted) {
+                  await AppLogger.reportIssue(context, nativeLogContent: nativeLog);
+                }
+              } catch (e) {
+                if (context.mounted) AppLoadingDialog.hide(context);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('خطأ: $e')),
+                  );
+                }
+              }
+            },
+          ),
           // ─ مشاركة اللوغ — يعمل بدون USB ────────────────────
           _buildListTile(
             "مشاركة سجل التطبيق",
             "إرسال ملف اللوج لتشخيص مشاكل التهنيج — يعمل بدون اتصال بالكمبيوتر",
             Icons.bug_report_outlined,
             onTap: () async {
-              final snack = ScaffoldMessenger.of(context);
-              snack.showSnackBar(
-                const SnackBar(content: Text('جاري تجميع اللوج...')),
-              );
+              AppLoadingDialog.show(context, message: 'جاري تجميع اللوج...');
               try {
                 final nativeLog = await BackgroundService.getNativeLog(lines: 500);
+                if (context.mounted) AppLoadingDialog.hide(context);
                 await AppLogger.shareLog(nativeLogContent: nativeLog);
               } catch (e) {
+                if (context.mounted) AppLoadingDialog.hide(context);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('خطأ: $e')),
@@ -890,8 +894,6 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 const SnackBar(content: Text('جاري تحليل السجل...')),
               );
               final result = await AppLogger.smartClean();
-              final nativeLog = await BackgroundService.getNativeLog(lines: 500);
-              // تنظيف Native log: احتفظ فقط بالسطور التي تحتوي على أخطاء أو syncFromSharedPrefs
               if (context.mounted) {
                 final kept = result['kept'] ?? 0;
                 final removed = result['removed'] ?? 0;
@@ -1249,9 +1251,15 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     final lastGpsMs = prefs.getInt('last_gps_update_ms') ?? 0;
     final lastGpsDate = lastGpsMs == 0
         ? 'لم يتم بعد'
-        : '${DateTime.fromMillisecondsSinceEpoch(lastGpsMs).day}/'  
-          '${DateTime.fromMillisecondsSinceEpoch(lastGpsMs).month}/'  
-          '${DateTime.fromMillisecondsSinceEpoch(lastGpsMs).year}';
+        : () {
+            final dt = DateTime.fromMillisecondsSinceEpoch(lastGpsMs);
+            final d = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+            final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+            final m = dt.minute.toString().padLeft(2, '0');
+            final s = dt.second.toString().padLeft(2, '0');
+            final ampm = dt.hour >= 12 ? 'م' : 'ص';
+            return '$d  الساعة  $h:$m:$s $ampm';
+          }();
 
     final offsets = ps.adjustments;
     final times = ps.getPrayerTimes();

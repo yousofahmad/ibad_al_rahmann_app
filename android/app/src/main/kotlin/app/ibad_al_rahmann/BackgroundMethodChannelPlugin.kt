@@ -343,6 +343,12 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
                         .edit().putBoolean("flutter.prayer_focus_enabled", enabled).apply()
                     result.success(null)
                 }
+                "showFocusOverlayPreview" -> {
+                    val prayerName = call.argument<String>("prayerName") ?: "العصر"
+                    val alarmId = call.argument<Int>("alarmId") ?: 102
+                    PrayerFocusOverlay.show(context, prayerName, alarmId, isPreview = true)
+                    result.success(true)
+                }
                 "startScreenUnlockService" -> {
                     // Save salawat unlock settings to FlutterSharedPreferences so
                     // ScreenUnlockService can read them without a running Flutter engine.

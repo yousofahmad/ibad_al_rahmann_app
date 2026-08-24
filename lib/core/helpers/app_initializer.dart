@@ -47,7 +47,10 @@ class AppInitializer {
   }
 
   static Future<void> _handleFullScreen() async {
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values,
+    );
 
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(

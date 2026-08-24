@@ -76,6 +76,19 @@ class AlarmReceiver : BroadcastReceiver() {
             return
         }
         
+        // ── Prayer Focus Snooze Overlay (Doze-proof wakeup) ──
+        if (intent.getBooleanExtra("is_snooze_overlay", false) || payload == "snooze_focus_overlay") {
+            val prayerName = intent.getStringExtra("snooze_prayer_name") ?: "الصلاة"
+            val snoozeAlarmId = intent.getIntExtra("snooze_alarm_id", 100)
+            NativeLogger.log(context, "AlarmReceiver: Snooze fired for $prayerName (alarmId: $snoozeAlarmId)")
+            try {
+                PrayerFocusOverlay.show(context, prayerName, snoozeAlarmId)
+            } catch (e: Exception) {
+                NativeLogger.log(context, "PrayerFocusOverlay Snooze ERROR: $e")
+            }
+            return
+        }
+
         // Ignore rogue broadcasts with no valid alarm_id.
         // This solves the bug where a rogue "تنبيه / حان الوقت" notification
         // appears alongside normal alarms (like Adhan).
@@ -212,16 +225,27 @@ class AlarmReceiver : BroadcastReceiver() {
             else -> ""
         }
 
-        var title = (intent.getStringExtra("title") ?: fallbackTitle).trim()
-        var body = (intent.getStringExtra("body") ?: fallbackBody).trim()
+        var title = (intent.getStringExtra("title") ?: fallbackTitle).trim().take(250)
+        var body = (intent.getStringExtra("body") ?: fallbackBody).trim().take(500)
         // payload variable already extracted above
-        val audioPath = intent.getStringExtra("audio_path")
-        val customSoundName = intent.getStringExtra("custom_sound_name")
+        val rawAudioPath = intent.getStringExtra("audio_path")
+        val audioPath = if (rawAudioPath != null && (rawAudioPath.contains("..") || rawAudioPath.contains("\u0000"))) {
+            null
+        } else {
+            rawAudioPath
+        }
+        val customSoundName = intent.getStringExtra("custom_sound_name")?.replace("..", "")?.take(100)
         
         if (payload.startsWith("khatma_")) {
             val parts = payload.split("_")
             if (parts.size >= 2) {
                 val khatmaId = parts[1]
+                if (!KhatmaHelper.isKhatmaValid(context, khatmaId)) {
+                    NativeLogger.log(context, "AlarmReceiver: Dropping khatma notification since khatma_khatmaId was deleted.")
+                    // Make sure we still chain if this was a repeating alarm, but for khatmas we usually don't chain here.
+                    // Actually, if it's deleted, we don't want to chain. We want to kill the sequence!
+                    return
+                }
                 val delayText = KhatmaHelper.getDelayText(context, khatmaId)
                 body = delayText + body
             }
@@ -259,18 +283,21 @@ class AlarmReceiver : BroadcastReceiver() {
             }
 
             // ── Quiet Hours Gate for Salawat and Takbeerat ──
-            var skipNotif = false
-            if (alarmId in 8000..8999) {
-                // Salawat range (8000+) uses general quiet_hours
-                if (isInQuietHours(context, "quiet_hours")) {
-                    skipNotif = true
-                }
-            } else if (alarmId in 9000..9199) {
-                // Takbeerat range uses takbeerat_quiet_hours
-                if (isInQuietHours(context, "takbeerat_quiet_hours")) {
-                    skipNotif = true
+            var skipNotif = isNotificationExplicitlyDisabled(context, alarmId, soundName)
+            if (!skipNotif) {
+                if (alarmId in 8000..8999) {
+                    // Salawat range (8000+) uses general quiet_hours
+                    if (isInQuietHours(context, "quiet_hours")) {
+                        skipNotif = true
+                    }
+                } else if (alarmId in 9000..9199) {
+                    // Takbeerat range uses takbeerat_quiet_hours
+                    if (isInQuietHours(context, "takbeerat_quiet_hours")) {
+                        skipNotif = true
+                    }
                 }
             }
+
             // --- Backward Compatibility for Ghost Salawat Alarms ---
             var finalSoundName = soundName
             var finalPayload = payload
@@ -284,6 +311,8 @@ class AlarmReceiver : BroadcastReceiver() {
             if (!skipNotif) {
                 NativeLogger.log(context, "Notification Fired! Title: $title | Body: $body | AlarmId: $alarmId | Payload: $finalPayload")
                 showNotification(context, alarmId, title, body, finalSoundName, finalPayload, audioPath, finalCustomSoundName)
+            } else {
+                NativeLogger.log(context, "Notification Skipped (disabled or in quiet hours). AlarmId: $alarmId")
             }
         }
 
@@ -298,6 +327,42 @@ class AlarmReceiver : BroadcastReceiver() {
         }
 
         handleAlarmChaining(context, intent, alarmId, chainSoundName, title, body, chainPayload, audioPath)
+    }
+
+    private fun isNotificationExplicitlyDisabled(context: Context, alarmId: Int, soundName: String): Boolean {
+        val cleanSoundName = soundName.replace(".mp3", "").lowercase().trim()
+        if (cleanSoundName == "none" || cleanSoundName == "null" || cleanSoundName.isEmpty()) return true
+
+        val fp = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+
+        when (alarmId) {
+            100, 110 -> if (fp.contains("flutter.notif_prayer_fajr") && !fp.getBoolean("flutter.notif_prayer_fajr", true)) return true
+            101, 111 -> {
+                val isFriday = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY
+                if (isFriday) {
+                    if (fp.contains("flutter.notif_jumua") && !fp.getBoolean("flutter.notif_jumua", true)) return true
+                } else {
+                    if (fp.contains("flutter.notif_prayer_dhuhr") && !fp.getBoolean("flutter.notif_prayer_dhuhr", true)) return true
+                }
+            }
+            102, 112 -> if (fp.contains("flutter.notif_prayer_asr") && !fp.getBoolean("flutter.notif_prayer_asr", true)) return true
+            103, 113 -> if (fp.contains("flutter.notif_prayer_maghrib") && !fp.getBoolean("flutter.notif_prayer_maghrib", true)) return true
+            104, 114 -> if (fp.contains("flutter.notif_prayer_isha") && !fp.getBoolean("flutter.notif_prayer_isha", true)) return true
+
+            1 -> if (fp.contains("flutter.notif_azkar_morning") && !fp.getBoolean("flutter.notif_azkar_morning", true)) return true
+            3 -> if (fp.contains("flutter.notif_azkar_evening") && !fp.getBoolean("flutter.notif_azkar_evening", true)) return true
+
+            2000, 2001, 2002 -> if (fp.contains("flutter.notif_qiyam") && !fp.getBoolean("flutter.notif_qiyam", false)) return true
+            732 -> if (fp.contains("flutter.notif_duha") && !fp.getBoolean("flutter.notif_duha", false)) return true
+            736 -> if (fp.contains("flutter.notif_sunrise") && !fp.getBoolean("flutter.notif_sunrise", true)) return true
+
+            3000 -> if (fp.contains("flutter.notif_pre_Fajr") && !fp.getBoolean("flutter.notif_pre_Fajr", false)) return true
+            3001 -> if (fp.contains("flutter.notif_pre_Dhuhr") && !fp.getBoolean("flutter.notif_pre_Dhuhr", false)) return true
+            3002 -> if (fp.contains("flutter.notif_pre_Asr") && !fp.getBoolean("flutter.notif_pre_Asr", false)) return true
+            3003 -> if (fp.contains("flutter.notif_pre_Maghrib") && !fp.getBoolean("flutter.notif_pre_Maghrib", false)) return true
+            3004 -> if (fp.contains("flutter.notif_pre_Isha") && !fp.getBoolean("flutter.notif_pre_Isha", false)) return true
+        }
+        return false
     }
 
     private fun isInQuietHours(context: Context, prefix: String): Boolean {

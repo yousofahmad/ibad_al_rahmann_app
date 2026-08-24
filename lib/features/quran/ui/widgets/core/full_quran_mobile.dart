@@ -31,8 +31,6 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
   Timer? _hideMenuTimer;
   double _cachedPageHeight = 0.0;
   double _lastWidth = 0.0;
-  Offset? _tapDownPosition;
-  static const double _maxTapDelta = 30.0;
   bool _wasAutoScrolling = false;
 
   double _getPageHeight(BuildContext context) {
@@ -262,55 +260,54 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
                       _toggleOverlays();
                     }
                   },
-                  onDoubleTap: () =>
-                      context.read<QuranCubit>().changeLayout(),
                   child: state.isAutoScrolling
-                        ? ListView.builder(
-                            controller: _autoScrollController,
-                            scrollDirection: Axis.vertical,
-                            cacheExtent:
-                                MediaQuery.of(context).size.height * 3.0,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: 604,
-                            itemBuilder: (context, index) {
-                              return SizedBox(
-                                height: _cachedPageHeight,
-                                child: WbwPageWidget(
-                                  pageNumber: index + 1,
-                                  isZoomEnabled: false,
-                                  textColorOverride: textColor,
-                                  paperColorOverride: state.quranPaperColor,
-                                  isSeamlessScroll: true,
-                                  isLandscape: isLandscape,
-                                ),
-                              );
-                            },
-                          )
-                        : PageView.builder(
-      allowImplicitScrolling: true,
-                            controller: _pageController,
-                            physics: const BouncingScrollPhysics(
-                              parent: PageScrollPhysics(),
-                            ),
-                            itemCount: 604,
-                            onPageChanged: (value) {
-                              if (value != _currentIndex) {
-                                _currentIndex = value;
-                                context.read<QuranCubit>().onQuranPageChanged(
-                                  value,
-                                );
-                              }
-                            },
-                            itemBuilder: (context, index) {
-                              return WbwPageWidget(
+                      ? ListView.builder(
+                          controller: _autoScrollController,
+                          scrollDirection: Axis.vertical,
+                          cacheExtent:
+                              MediaQuery.of(context).size.height * 3.0,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: 604,
+                          itemBuilder: (context, index) {
+                            return SizedBox(
+                              height: _cachedPageHeight,
+                              child: WbwPageWidget(
                                 pageNumber: index + 1,
-                                isZoomEnabled: true,
+                                isZoomEnabled: false,
                                 textColorOverride: textColor,
                                 paperColorOverride: state.quranPaperColor,
+                                isSeamlessScroll: true,
                                 isLandscape: isLandscape,
-                              );
-                            },
+                              ),
+                            );
+                          },
+                        )
+                      : PageView.builder(
+                          allowImplicitScrolling: true,
+                          controller: _pageController,
+                          physics: const ClampingScrollPhysics(
+                            parent: PageScrollPhysics(),
                           ),
+                          pageSnapping: true,
+                          itemCount: 604,
+                          onPageChanged: (value) {
+                            if (value != _currentIndex) {
+                              _currentIndex = value;
+                              context.read<QuranCubit>().onQuranPageChanged(
+                                    value,
+                                  );
+                            }
+                          },
+                          itemBuilder: (context, index) {
+                            return WbwPageWidget(
+                              pageNumber: index + 1,
+                              isZoomEnabled: true,
+                              textColorOverride: textColor,
+                              paperColorOverride: state.quranPaperColor,
+                              isLandscape: isLandscape,
+                            );
+                          },
+                        ),
                 ),
                 if (_showOverlays && !state.isAutoScrolling)
                   Positioned(

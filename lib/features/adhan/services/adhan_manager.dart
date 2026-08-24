@@ -10,7 +10,12 @@ class AdhanManager {
   factory AdhanManager() => _instance;
   AdhanManager._internal();
 
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 15),
+    ),
+  );
   final AudioPlayer _player = AudioPlayer();
 
   // --- 1. The Massive Library ---

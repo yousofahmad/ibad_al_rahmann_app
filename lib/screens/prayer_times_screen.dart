@@ -12,9 +12,8 @@ import 'widgets/prayer_ring_widget.dart';
 import 'prayer_taqwim_screen.dart';
 
 import '../widgets/app_skeleton.dart';
-
-import 'package:ibad_al_rahmann/main.dart'; // To access scaffoldMessengerKey
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import 'package:ibad_al_rahmann/widgets/app_loading_dialog.dart';
 
 class PrayerTimesScreen extends StatefulWidget {
   const PrayerTimesScreen({super.key});
@@ -86,10 +85,15 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
       final id = p.id.toLowerCase();
 
       bool def = (p.prayer != null || id == 'sunrise');
-      final notifKey = p.prayer != null ? 'notif_prayer_$id' : 'notif_$id';
+      final notifKey = p.prayer != null
+          ? 'notif_prayer_$id'
+          : (id == 'last_third' || id == 'qiyam'
+              ? 'notif_qiyam'
+              : 'notif_$id');
       final legacyBool = prefs.getBool(notifKey) ?? def;
       final mode =
           prefs.getString('adhan_mode_$capKey') ??
+          (id == 'last_third' ? prefs.getString('qiyam_mode_notif') : null) ??
           (legacyBool ? 'sound' : 'none');
       modes[p.id] = mode;
 
@@ -286,28 +290,17 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   }
 
   Future<void> _forceRefreshLocation() async {
-    scaffoldMessengerKey.currentState?.showSnackBar(
-      SnackBar(
-        content: const Text(
-          'جاري تحديث الموقع...',
-          style: TextStyle(
-            fontFamily: AppConsts.cairo,
-            color: Colors.blueAccent,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 1),
-      ),
-    );
+    AppLoadingDialog.show(context, message: 'يرجى الانتظار لحين تحديث الموقع وجدولة جميع الإشعارات...');
 
-    await PrayerService().updateLocation();
-    await _loadData();
-    final times = PrayerService().getPrayerTimes();
-    if (times != null) {
-      await NotificationService.scheduleAll(times, isUserAction: true);
+    try {
+      await PrayerService().updateLocation();
+      await _loadData();
+      final times = PrayerService().getPrayerTimes();
+      if (times != null) {
+        await NotificationService.scheduleAll(times, isUserAction: true);
+      }
+    } finally {
+      if (mounted) AppLoadingDialog.hide(context);
     }
   }
 

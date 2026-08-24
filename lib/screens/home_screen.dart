@@ -12,6 +12,7 @@ import 'package:hijri/hijri_calendar.dart';
 import 'package:intl/intl.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import '../services/prayer_service.dart';
+import 'package:ibad_al_rahmann/core/helpers/app_formatters.dart';
 import '../services/notification_service.dart';
 import 'prayer_times_screen.dart';
 import 'muslim_azkar_screen.dart';
@@ -27,6 +28,7 @@ import 'accountability_screen.dart';
 import '../features/qadaa/ui/qadaa_screen.dart';
 import 'prayer_focus_screen.dart';
 import '../features/quran/ui/quran_screen.dart';
+import 'package:ibad_al_rahmann/widgets/whats_new_dialog.dart';
 import '../features/wird/ui/wird_dashboard_screen.dart';
 import '../features/wird/ui/isolated_wird_screen.dart';
 import '../features/wird/bloc/khatma_cubit.dart';
@@ -72,7 +74,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values,
+    );
     
     // Add listener to prayer service to handle cases where it initializes late
     _prayerService.addListener(_loadPrayerTimes);
@@ -91,10 +96,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             await Permission.scheduleExactAlarm.request();
           }
         } catch (e) {
-          debugPrint("Failed to request permissions: ");
+          debugPrint("Failed to request permissions: $e");
         }
         if (mounted) {
           NotificationService.checkAndRequestBatteryPermission(context);
+          WhatsNewDialog.checkAndShow(context);
         }
       }
     });
@@ -267,8 +273,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             alignment: Alignment.center,
             children: [
               Container(
-                width: 240.w,
-                height: 240.w,
+                width: 250.w,
+                height: 250.w,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   boxShadow: [
@@ -281,53 +287,61 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               ),
               SizedBox(
-                width: 205.w,
-                height: 205.w,
+                width: 230.w,
+                height: 230.w,
                 child: PrayerRingWidget(
                   percent: _progressValue,
                   color: const Color(0xFFD0A871),
                 ),
               ),
-
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _isCountUp ? "مضى على" : "الصلاة القادمة",
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 14.sp,
-                      fontFamily: AppConsts.expoArabic,
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 28.w),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _isCountUp ? "مضى على" : "الصلاة القادمة",
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 13.sp,
+                        fontFamily: AppConsts.expoArabic,
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 8.h),
-                  Text(
-                    _isCountUp
-                        ? _getPrayerName(
-                            _currentPrayer == Prayer.none ||
-                                    _currentPrayer == null
-                                ? Prayer.isha
-                                : _currentPrayer!,
-                          )
-                        : nextPrayerName,
-                    style: TextStyle(
-                      color: Theme.of(context).textTheme.bodyLarge?.color,
-                      fontSize: 28.sp,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: AppConsts.expoArabic,
+                    SizedBox(height: 6.h),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        _isCountUp
+                            ? _getPrayerName(
+                                _currentPrayer == Prayer.none ||
+                                        _currentPrayer == null
+                                    ? Prayer.isha
+                                    : _currentPrayer!,
+                              )
+                            : nextPrayerName,
+                        style: TextStyle(
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                          fontSize: 26.sp,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: AppConsts.expoArabic,
+                        ),
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 8.h),
-                  Text(
-                    countdownStr,
-                    style: TextStyle(
-                      color: const Color(0xFFD0A871),
-                      fontSize: 30.sp,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Courier',
+                    SizedBox(height: 6.h),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        countdownStr,
+                        style: TextStyle(
+                          color: const Color(0xFFD0A871),
+                          fontSize: 28.sp,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Courier',
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -336,24 +350,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  String _getPrayerName(Prayer p) {
-    switch (p) {
-      case Prayer.fajr:
-        return "الفجر";
-      case Prayer.sunrise:
-        return "الشروق";
-      case Prayer.dhuhr:
-        return "الظهر";
-      case Prayer.asr:
-        return "العصر";
-      case Prayer.maghrib:
-        return "المغرب";
-      case Prayer.isha:
-        return "العشاء";
-      case Prayer.none:
-        return "الفجر";
-    }
-  }
+  String _getPrayerName(Prayer p) => p.arabicName;
 
   Widget _buildGridItem(
     String title,

@@ -92,13 +92,13 @@ object NativeEventScheduler {
             }
             // Last Third (Qiyam)
             val qiyamMode = prefs.getString("flutter.adhan_mode_Last_third", null)
-                ?: if (prefs.getBoolean("flutter.notif_qiyam", true)) "sound" else "none"
+                ?: if (prefs.getBoolean("flutter.notif_qiyam", false)) "sound" else "none"
             if (qiyamMode != "none" && lastThird > now) {
                 NativePrayerScheduler.scheduleSingleAlarm(
                     context, alarmManager, ID_LAST_THIRD, lastThird,
                     "الثلث الأخير من الليل", "هل من داع فأستجيب له",
-                    if (qiyamMode == "silent_notif") "silent_notif" else "time_qiyam",
-                    "time_qiyam", "home"
+                    if (qiyamMode == "silent_notif") "silent_notif" else "night_last",
+                    "night_last", "home"
                 )
             }
         }
@@ -124,7 +124,7 @@ object NativeEventScheduler {
         tomorrowCal.timeInMillis = now + 86_400_000L // Roughly tomorrow
         val tomorrowDate = tomorrowCal.time
 
-        val (hDay, hMonth, _) = HijriCalendarHelper.getHijriDateComponents(tomorrowDate)
+        val (hDay, hMonth, _) = HijriCalendarHelper.getHijriDateComponents(context, tomorrowDate)
         val dayOfWeek = tomorrowCal.get(Calendar.DAY_OF_WEEK)
 
         val isRamadan = hMonth == 9

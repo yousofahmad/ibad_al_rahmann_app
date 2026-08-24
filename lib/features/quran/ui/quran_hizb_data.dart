@@ -13,6 +13,19 @@ abstract final class QuranHizbData {
   /// Returns the header center label for [pageNumber], or '' if not a boundary.
   static String labelForPage(int pageNumber) => _map[pageNumber] ?? '';
 
+  /// Returns the active Hizb / Quarter label for any given Quran page.
+  static String activeLabelForPage(int pageNumber) {
+    if (_map.containsKey(pageNumber)) {
+      return _map[pageNumber]!;
+    }
+    for (int p = pageNumber; p >= 1; p--) {
+      if (_map.containsKey(p)) {
+        return _map[p]!;
+      }
+    }
+    return 'حزب ١';
+  }
+
   // ---------------------------------------------------------------------------
   // Hardcoded map — built offline from quran-metadata-rub.json + quran package.
   // Rub' n → page = getPageNumber(surah, verse) for first_verse_key.

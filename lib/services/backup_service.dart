@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
@@ -158,7 +160,7 @@ class BackupService {
       if (isBlacklisted) continue;
 
       bool isPrayerKey = key.startsWith('adhan_') || key.startsWith('iqama_') || key.startsWith('notif_prayer_') || key.startsWith('adjust_') || key.startsWith('sound_') || key.startsWith('calc_method') || key.startsWith('asr_calc') || key.startsWith('city_') || key.startsWith('lat') || key.startsWith('long');
-      bool isTrackerKey = key.startsWith('temp_') || key.startsWith('prayer_focus_log_') || key.startsWith('accountability_') || key.startsWith('fasting_') || key.startsWith('sabah_') || key.startsWith('masaa_') || key.startsWith('daily_tracker_') || key.startsWith('prayer_streak_');
+      bool isTrackerKey = key.startsWith('temp_') || key.startsWith('prayer_focus_log_') || key.startsWith('accountability_') || key.startsWith('fasting_') || key.startsWith('sabah_') || key.startsWith('masaa_') || key.startsWith('daily_tracker_') || key.startsWith('prayer_streak_') || key.startsWith('azkar_') || key.startsWith('count_') || key.startsWith('streak_');
       bool isSettingsKey = !isPrayerKey && !isTrackerKey;
 
       if ((isPrayerKey && includePrayers) ||
@@ -210,12 +212,19 @@ class BackupService {
     return backupData;
   }
 
+  static String getGeneratedBackupFileName() {
+    final now = DateTime.now();
+    final timestamp = DateFormat('yyyy_MM_dd_HHmmss').format(now);
+    return 'ibad_al_rahmann_backup_$timestamp.json';
+  }
+
   /// Export settings and bookmarks to a JSON file and share it (supports selective backup).
   static Future<bool> exportBackup({Set<BackupCategory>? categories}) async {
     try {
       final backupData = await _generateBackupData(categories: categories);
       final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/$_backupFileName');
+      final fileName = getGeneratedBackupFileName();
+      final file = File('${tempDir.path}/$fileName');
       await file.writeAsString(jsonEncode(backupData));
       // ignore: deprecated_member_use
       await Share.shareXFiles([XFile(file.path)], text: 'نسخة احتياطية لإعدادات تطبيق عباد الرحمن');
@@ -227,19 +236,29 @@ class BackupService {
   }
 
   /// Save backup to device manually using file picker (supports selective backup).
-  static Future<bool> saveBackupToDevice({Set<BackupCategory>? categories}) async {
+  static Future<bool> saveBackupToDevice({Set<BackupCategory>? categories, void Function(double)? onProgress}) async {
     try {
       final backupData = await _generateBackupData(categories: categories);
       final content = jsonEncode(backupData);
+      onProgress?.call(0.5);
       final bytes = utf8.encode(content);
+      onProgress?.call(0.7);
       
+      final dynamicFileName = getGeneratedBackupFileName();
       String? outputPath = await FilePicker.platform.saveFile(
         dialogTitle: 'اختر مكان حفظ النسخة الاحتياطية',
-        fileName: _backupFileName,
+        fileName: dynamicFileName,
         type: FileType.custom,
         allowedExtensions: ['json'],
         bytes: bytes,
       );
+
+      if (outputPath != null) {
+        final file = File(outputPath);
+        if (!await file.exists() || (await file.length()) == 0) {
+          await file.writeAsBytes(bytes);
+        }
+      }
 
       return outputPath != null;
     } catch (e) {
@@ -249,23 +268,40 @@ class BackupService {
   }
 
   /// Import settings and bookmarks from a JSON file.
-  static Future<bool> importBackup() async {
+  static Future<bool> importBackup({void Function(double)? onProgress}) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-      );
+      FilePickerResult? result;
+      try {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['json'],
+        );
+      } catch (_) {
+        result = null;
+      }
+
+      if (result == null || result.files.single.path == null) {
+        // Fallback for files where Android appended numbering or altered extension
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.any,
+        );
+      }
+
       if (result == null || result.files.single.path == null) return false;
       final file = File(result.files.single.path!);
+      onProgress?.call(0.2);
       final content = await file.readAsString();
-      return await _applyBackupData(jsonDecode(content));
+      final decoded = await compute(jsonDecode, content) as Map<String, dynamic>;
+      onProgress?.call(0.4);
+      onProgress?.call(0.5);
+      return await _applyBackupData(decoded, onProgress: onProgress, startProgress: 0.4);
     } catch (e) {
       debugPrint('Import error: $e');
       return false;
     }
   }
 
-  static Future<bool> _applyBackupData(Map<String, dynamic> backupData) async {
+  static Future<bool> _applyBackupData(Map<String, dynamic> backupData, {void Function(double)? onProgress, double startProgress = 0.5}) async {
     try {
       if (backupData['version'] == null) {
         debugPrint('Restore: ❌ invalid backup — missing version');
@@ -273,7 +309,14 @@ class BackupService {
       }
       debugPrint('Restore: starting from backup version ${backupData['version']}');
 
-      // 1. Restore SharedPreferences ────────────────────────────────────────
+      
+        final Map<String, dynamic> prefsMap = (backupData['preferences'] as Map<String, dynamic>?) ?? {};
+        final List<dynamic> bMap = (backupData['bookmarks'] as List<dynamic>?) ?? [];
+        final Map<String, dynamic> kMap = backupData['khatmas'] != null ? Map<String, dynamic>.from(backupData['khatmas'] as Map) : {};
+        int totalItems = prefsMap.length + bMap.length + kMap.length;
+        if (totalItems == 0) totalItems = 1;
+        int currentItem = 0;
+// 1. Restore SharedPreferences ────────────────────────────────────────
       final prefs = CacheHelper.prefs;
       final Map<String, dynamic> preferences =
           (backupData['preferences'] as Map<String, dynamic>?) ?? {};
@@ -287,14 +330,44 @@ class BackupService {
         try {
           if (value == null) {
             await prefs.remove(key);
+            currentItem++;
+            if (currentItem % 10 == 0 || currentItem == totalItems) {
+                final fraction = currentItem / totalItems;
+                final mapped = startProgress + fraction * (1.0 - startProgress);
+                onProgress?.call(mapped);
+            }
           } else if (value is bool) {
             await prefs.setBool(key, value);
+            currentItem++;
+            if (currentItem % 10 == 0 || currentItem == totalItems) {
+                final fraction = currentItem / totalItems;
+                final mapped = startProgress + fraction * (1.0 - startProgress);
+                onProgress?.call(mapped);
+            }
           } else if (value is String) {
             await prefs.setString(key, value);
+            currentItem++;
+            if (currentItem % 10 == 0 || currentItem == totalItems) {
+                final fraction = currentItem / totalItems;
+                final mapped = startProgress + fraction * (1.0 - startProgress);
+                onProgress?.call(mapped);
+            }
           } else if (value is int) {
             await prefs.setInt(key, value);
+            currentItem++;
+            if (currentItem % 10 == 0 || currentItem == totalItems) {
+                final fraction = currentItem / totalItems;
+                final mapped = startProgress + fraction * (1.0 - startProgress);
+                onProgress?.call(mapped);
+            }
           } else if (value is double) {
             await prefs.setDouble(key, value);
+            currentItem++;
+            if (currentItem % 10 == 0 || currentItem == totalItems) {
+                final fraction = currentItem / totalItems;
+                final mapped = startProgress + fraction * (1.0 - startProgress);
+                onProgress?.call(mapped);
+            }
           } else if (value is num) {
             // JSON decode يرجع num — نقرر int أو double بناءً على القيمة
             if (value == value.toInt()) {
@@ -336,6 +409,12 @@ class BackupService {
                 label: bData['label']?.toString(),
               );
               await BookmarkService.addBookmark(verse);
+              currentItem++;
+            if (currentItem % 10 == 0 || currentItem == totalItems) {
+                final fraction = currentItem / totalItems;
+                final mapped = startProgress + fraction * (1.0 - startProgress);
+                onProgress?.call(mapped);
+            }
             } catch (e) {
               debugPrint('Restore: ❌ bookmark error: $e');
             }
@@ -357,6 +436,12 @@ class BackupService {
             if (entry.key.startsWith('khatma_')) {
               await appBox.put(entry.key, entry.value);
               kCount++;
+            }
+            currentItem++;
+            if (currentItem % 10 == 0 || currentItem == totalItems) {
+                final fraction = currentItem / totalItems;
+                final mapped = startProgress + fraction * (1.0 - startProgress);
+                onProgress?.call(mapped);
             }
           }
           debugPrint('Restore: ✅ khatmas — $kCount restored to appDataBox');
@@ -395,9 +480,10 @@ class BackupService {
       // 1. Try silent/lightweight authentication first
       GoogleSignInAccount? account;
       try {
-        account = await (GoogleSignIn.instance
-            .attemptLightweightAuthentication() ?? Future.value(null))
-            .timeout(const Duration(seconds: 10));
+        final authFuture = GoogleSignIn.instance.attemptLightweightAuthentication();
+        if (authFuture != null) {
+          account = await authFuture.timeout(const Duration(seconds: 10));
+        }
         if (account != null) {
           AppLogger.log('GoogleDrive', 'silent auth OK: ${account.email}');
           debugPrint('Google Sign-In: silent auth OK — ${account.email}');
@@ -419,15 +505,15 @@ class BackupService {
       if (account == null && allowUI) {
         AppLogger.log('GoogleDrive', 'triggering interactive authenticate()');
         debugPrint('Google Sign-In: triggering interactive authenticate()');
-        account = await GoogleSignIn.instance.authenticate(
-          scopeHint: [drive.DriveApi.driveAppdataScope],
-        );
-        if (account != null) {
+        try {
+          account = await GoogleSignIn.instance.authenticate(
+            scopeHint: [drive.DriveApi.driveAppdataScope],
+          );
           AppLogger.log('GoogleDrive', 'interactive auth OK: ${account.email}');
           debugPrint('Google Sign-In: interactive auth OK — ${account.email}');
-        } else {
-          AppLogger.log('GoogleDrive', 'interactive auth returned null');
-          debugPrint('Google Sign-In: interactive auth returned null');
+        } catch (e) {
+          AppLogger.log('GoogleDrive', 'interactive auth error: $e');
+          debugPrint('Google Sign-In: interactive auth error: $e');
         }
       }
       return account;
@@ -511,7 +597,7 @@ class BackupService {
     await prefs.remove('last_sync_time');
   }
 
-  static Future<bool> syncToDrive({bool allowUI = true}) async {
+  static Future<bool> syncToDrive({bool allowUI = true, void Function(double)? onProgress}) async {
     try {
       debugPrint('Google Drive: Starting Sync to Drive...');
       final driveApi = await _getDriveApi(allowUI: allowUI);
@@ -520,15 +606,20 @@ class BackupService {
         return false;
       }
 
+      onProgress?.call(0.1);
       final backupData = await _generateBackupData();
+      onProgress?.call(0.3);
       final content = jsonEncode(backupData);
+      onProgress?.call(0.5);
       final bytes = utf8.encode(content);
+      onProgress?.call(0.7);
 
       final fileList = await driveApi.files.list(
         q: "name = '$_backupFileName' and 'appDataFolder' in parents",
         spaces: 'appDataFolder',
         $fields: 'files(id)',
       ).timeout(const Duration(minutes: 2));
+        onProgress?.call(1.0);
 
       final media = drive.Media(Stream.value(bytes), bytes.length);
 
@@ -537,12 +628,14 @@ class BackupService {
         final driveFile = drive.File()..name = _backupFileName;
         await driveApi.files.update(driveFile, fileId, uploadMedia: media)
             .timeout(const Duration(minutes: 2));
+        onProgress?.call(1.0);
       } else {
         final driveFile = drive.File()
           ..name = _backupFileName
           ..parents = ['appDataFolder'];
         await driveApi.files.create(driveFile, uploadMedia: media)
             .timeout(const Duration(minutes: 2));
+        onProgress?.call(1.0);
       }
 
       final prefs = CacheHelper.prefs;
@@ -555,7 +648,7 @@ class BackupService {
     }
   }
 
-  static Future<bool> syncFromDrive({bool allowUI = true}) async {
+  static Future<bool> syncFromDrive({bool allowUI = true, void Function(double)? onProgress}) async {
     try {
       debugPrint('Google Drive: Starting Sync from Drive...');
       final driveApi = await _getDriveApi(allowUI: allowUI);
@@ -566,6 +659,7 @@ class BackupService {
         spaces: 'appDataFolder',
         $fields: 'files(id)',
       ).timeout(const Duration(minutes: 2));
+        onProgress?.call(1.0);
 
       if (fileList.files == null || fileList.files!.isEmpty) {
         debugPrint('Google Drive: No backup found.');
@@ -583,8 +677,12 @@ class BackupService {
         dataBytes.addAll(chunk);
       }
 
+      onProgress?.call(0.3);
       final content = utf8.decode(dataBytes);
-      final result = await _applyBackupData(jsonDecode(content));
+      final decoded = await compute(jsonDecode, content) as Map<String, dynamic>;
+      onProgress?.call(0.4);
+      onProgress?.call(0.5);
+      final result = await _applyBackupData(decoded, onProgress: onProgress);
 
       if (result) {
         final prefs = CacheHelper.prefs;
@@ -618,7 +716,7 @@ class BackupService {
       GoogleSignInAccount? account;
       try {
         account = await (GoogleSignIn.instance
-            .signInSilently() ?? Future.value(null))
+            .attemptLightweightAuthentication() ?? Future.value(null))
             .timeout(const Duration(seconds: 8));
       } on TimeoutException {
         account = null;

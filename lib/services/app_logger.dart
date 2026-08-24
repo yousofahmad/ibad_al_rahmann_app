@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:intl/intl.dart';
 
 /// AppLogger — سجل شامل للتطبيق يعمل بدون اتصال بالكمبيوتر
 ///
@@ -41,7 +42,7 @@ class AppLogger {
   /// يكتب رسالة في الملف
   static void log(String tag, String message) {
     final now = DateTime.now();
-    final ts = '${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
+    final ts = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:'
         '${now.second.toString().padLeft(2, '0')}.${now.millisecond.toString().padLeft(3, '0')}';
     final line = '[$ts] [$tag] $message\n';
@@ -170,7 +171,7 @@ class AppLogger {
       // 2. هل هناك تأخير كبير منذ السطر السابق؟ (> 2 ثانية = تهنيج محتمل)
       bool isSlowStep = false;
       if (lineTime != null && prevTime != null) {
-        final gapMs = lineTime.difference(prevTime!).inMilliseconds;
+        final gapMs = lineTime.difference(prevTime).inMilliseconds;
         if (gapMs > 2000) {
           isSlowStep = true;
           kept.add('⚠️  [SLOW ${gapMs}ms gap before this line]');
@@ -241,18 +242,67 @@ class AppLogger {
         combined += nativeLogContent;
       }
 
-      // كتابة الملف المدمج في temp
+      final timeStr = DateFormat('yyyy_MM_dd_HHmmss').format(DateTime.now());
       final dir = await getTemporaryDirectory();
-      final tempFile = File('${dir.path}/ibad_full_log.txt');
+      final tempFile = File('${dir.path}/ibad_app_log_$timeStr.txt');
       await tempFile.writeAsString(combined);
 
       await Share.shareXFiles(
         [XFile(tempFile.path)],
-        subject: 'سجل عباد الرحمن — ${DateTime.now().toString().substring(0, 16)}',
-        text: 'سجل التطبيق لتشخيص المشاكل',
+        subject: 'سجل عباد الرحمن — ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}',
+        text: 'سجل التطبيق لتشخيص المشاكل (الإصدار 1.1.5)',
       );
     } catch (e) {
       debugPrint('AppLogger.shareLog error: $e');
+    }
+  }
+
+  /// الإبلاغ عن مشكلة وتجهيز ملف السجل وإرساله
+  static Future<void> reportIssue(BuildContext context, {String? nativeLogContent}) async {
+    try {
+      final timeStr = DateFormat('yyyy_MM_dd_HHmmss').format(DateTime.now());
+      final path = await getLogPath();
+      final flutterFile = path != null ? File(path) : null;
+      
+      String combined = '';
+      combined += '═══════════ تقرير تشخيص مشكلة — عباد الرحمن ═══════════\n';
+      combined += 'تاريخ التقرير: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())}\n';
+      combined += 'إصدار التطبيق: 1.1.5\n';
+      combined += 'نظام التشغيل: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}\n\n';
+
+      combined += '────── Flutter/Dart Logs ──────\n';
+      if (flutterFile != null && await flutterFile.exists()) {
+        combined += await flutterFile.readAsString();
+      } else {
+        combined += '(لا يوجد سجل Flutter)\n';
+      }
+
+      if (nativeLogContent != null && nativeLogContent.isNotEmpty) {
+        combined += '\n────── Native/Kotlin Logs ──────\n';
+        combined += nativeLogContent;
+      }
+
+      final dir = await getTemporaryDirectory();
+      final tempFile = File('${dir.path}/ibad_issue_report_$timeStr.txt');
+      await tempFile.writeAsString(combined);
+
+      const messageText = 'السلام عليكم ورحمة الله وبركاته،\n'
+          'أود الإبلاغ عن مشكلة في تطبيق عباد الرحمن (الإصدار 1.1.5):\n\n'
+          '[يرجى كتابة تفاصيل المشكلة هنا]\n\n'
+          '(مرفق ملف سجل التطبيق للتشخيص)';
+
+      await Share.shareXFiles(
+        [XFile(tempFile.path)],
+        subject: 'تقرير مشكلة — تطبيق عباد الرحمن',
+        text: messageText,
+      );
+    } catch (e) {
+      debugPrint('AppLogger.reportIssue error: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('حدث خطأ أثناء تجهيز التقرير: $e')),
+        );
+      }
     }
   }
 }

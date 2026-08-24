@@ -30,6 +30,8 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
   final Map<String, String> _iqamaMode = {};
   final Map<String, int> _adjustments = {};
 
+  bool _hasChanges = false;
+
   @override
   void initState() {
     super.initState();
@@ -38,7 +40,9 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
 
   @override
   void dispose() {
-    PrayerService().scheduleNotifications(isUserAction: true);
+    if (_hasChanges) {
+      PrayerService().scheduleNotifications(isUserAction: true);
+    }
     super.dispose();
   }
 
@@ -88,6 +92,7 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
   }
 
   Future<void> _savePrayerMode(String modeKey, String legacyBoolKey, String value) async {
+    _hasChanges = true;
     await _prefs.setString(modeKey, value);
     await _prefs.setBool(legacyBoolKey, value != 'none');
     if (value != 'none') await _checkNotificationPermission();
@@ -95,6 +100,7 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
   }
 
   Future<void> _openSoundPicker(String prefsKey, String title) async {
+    _hasChanges = true;
     await Navigator.push(
       context,
       MaterialPageRoute(

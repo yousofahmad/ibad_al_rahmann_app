@@ -52,6 +52,7 @@ class QuranWbwDbHelper {
   /// Single-pass caching of all verses in the Quran to memory.
   /// This makes the share list and previews instant.
   /// Optimized to prevent CursorWindow overflow by processing surahs one by one.
+  /// TODO(H2): Monitor memory consumption of _verseGlyphsCache on low-RAM (<=1GB) devices; consider offloading to background isolate or LRU cache if RAM pressure occurs.
   Future<void> cacheAllVersesGlyphs() async {
     try {
       final db = await instance.database;

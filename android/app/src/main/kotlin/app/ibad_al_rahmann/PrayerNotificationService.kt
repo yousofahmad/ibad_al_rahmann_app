@@ -56,11 +56,19 @@ class PrayerNotificationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action ?: "SYNC"
 
-        if (action == "SYNC" && !isPersistentNotificationEnabled()) {
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                stopForeground(true)
-                stopSelf(startId)
-            }, 1500)
+        if (action == "STOP_PRAYER_NOTIFICATION" || (action == "SYNC" && !isPersistentNotificationEnabled())) {
+            refreshHandler.removeCallbacks(refreshRunnable)
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(777)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+            } catch (e: Exception) {}
+            stopSelf(startId)
             return START_NOT_STICKY
         }
 
@@ -70,12 +78,6 @@ class PrayerNotificationService : Service() {
                 stopAudio()
             }
             "UPDATE_PRAYER_NOTIFICATION" -> handleUpdateIntent(intent!!)
-            "STOP_PRAYER_NOTIFICATION" -> {
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    stopForeground(true)
-                    stopSelf(startId)
-                }, 1500)
-            }
             else -> syncFromSharedPrefs(startId)
         }
 
@@ -87,25 +89,37 @@ class PrayerNotificationService : Service() {
 
     private fun handlePlaySound(intent: Intent?) {
         if (intent == null) return
-        stopAudio() 
-
-        val soundName = intent.getStringExtra("sound_name") ?: "default"
-        val audioPath = intent.getStringExtra("audio_path")
-        val customSoundName = intent.getStringExtra("custom_sound_name")
         val alarmId = intent.getIntExtra("notification_id", -1)
+        playSoundAndNotify(intent, alarmId)
+    }
+
+    private fun playSoundAndNotify(intent: Intent, alarmId: Int) {
+        val soundName = intent.getStringExtra("sound_name") ?: "default"
+        val cleanSoundName = soundName.replace(".mp3", "").lowercase().trim()
+        if (cleanSoundName == "none" || cleanSoundName == "null" || cleanSoundName.isEmpty()) {
+            if (intent.getBooleanExtra("is_queued", false)) {
+                NotificationQueueManager.onAudioFinished(this)
+            }
+            return
+        }
 
         val flutterPrefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        val overrideSilent = flutterPrefs.getBoolean("flutter.override_silent_mode", false)
-        val useCustomVolume = flutterPrefs.getBoolean("flutter.use_custom_notif_volume", false)
+        val customSoundName = intent.getStringExtra("custom_sound_name")
+        val audioPath = intent.getStringExtra("audio_path")
+        val overrideSilent = flutterPrefs.getBoolean("flutter.override_silent_mode", true)
+        val useCustomVolume = flutterPrefs.getBoolean("flutter.custom_notif_volume", false)
         val volumePercent = (flutterPrefs.all["flutter.custom_notif_volume_level"] as? Number)?.toInt() ?: 100
 
         // 1. Evaluate State FIRST before initializing MediaPlayer
         if (!AudioVibrationManager.evaluateAudioVibrationState(this, soundName, overrideSilent)) {
             showSoundNotification(intent, alarmId, isSilent = true) // Visual only
-            NotificationQueueManager.onAudioFinished(this)
+            if (intent.getBooleanExtra("is_queued", false)) {
+                NotificationQueueManager.onAudioFinished(this)
+            }
             return
         }
 
+        stopAudio()
         audioVolumeManager.captureState()
         val forceSpeaker = flutterPrefs.getBoolean("flutter.force_speaker", false)
         if (useCustomVolume || overrideSilent || forceSpeaker) {
@@ -231,20 +245,35 @@ class PrayerNotificationService : Service() {
         val fullPendingIntent = PendingIntent.getActivity(this, alarmId, fullIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channelId = "prayer_sound_channel_v12"
+        val isSilentNotif = isSilent || soundName == "silent_notif" || soundName == "none"
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             // Create Groups
             notificationManager.createNotificationChannelGroup(android.app.NotificationChannelGroup("prayer_group", "إشعارات الصلاة"))
             notificationManager.createNotificationChannelGroup(android.app.NotificationChannelGroup("general_group", "إشعارات عامة"))
 
-            // Create Channel and assign to Prayer Group — IMPORTANCE_MAX for heads-up display
-            val channel = NotificationChannel(channelId, "صوت الأذان والتنبيهات", NotificationManager.IMPORTANCE_MAX).apply {
+            try {
+                notificationManager.deleteNotificationChannel("prayer_sound_channel_v12")
+            } catch (_: Exception) {}
+
+            // Create Sound Channel (IMPORTANCE_HIGH so persistent notification with IMPORTANCE_MAX stays on TOP)
+            val soundChannel = NotificationChannel("prayer_sound_channel_v13", "صوت الأذان والتنبيهات", NotificationManager.IMPORTANCE_HIGH).apply {
                 setSound(null, null)
                 enableVibration(true)
                 group = "prayer_group"
             }
-            notificationManager.createNotificationChannel(channel)
+            notificationManager.createNotificationChannel(soundChannel)
+            
+            // Create Silent Channel
+            val silentChannel = NotificationChannel("prayer_silent_channel_v1", "إشعارات صامتة", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                setSound(null, null)
+                enableVibration(false)
+                group = "general_group"
+            }
+            notificationManager.createNotificationChannel(silentChannel)
         }
+
+        val channelId = if (isSilentNotif) "prayer_silent_channel_v1" else "prayer_sound_channel_v13"
 
         val isPrayerGroup = alarmId in 100..139 || alarmId in 3000..3099 || alarmId in 5000..5099 || alarmId == 110 || alarmId in 730..739
         val notifGroup    = if (isPrayerGroup) "PRAYER_GROUP" else "GENERAL_GROUP"
@@ -254,7 +283,7 @@ class PrayerNotificationService : Service() {
             .setSmallIcon(R.mipmap.launcher_icon)
             .setContentTitle(title)
             .setContentText(body)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setOngoing(false)
             .setAutoCancel(true)
@@ -286,6 +315,7 @@ class PrayerNotificationService : Service() {
         val bitmap = getLargeIconForPayload(payload, alarmId)
         if (bitmap != null) builder.setLargeIcon(bitmap)
 
+        notificationManager.cancel(alarmId)
         notificationManager.notify(alarmId, builder.build())
 
         // Group summary — setOngoing(true) prevents swiping it (which would dismiss ALL notifications)
@@ -531,15 +561,20 @@ class PrayerNotificationService : Service() {
     }
 
     private fun buildPersistentNotification(fajr: String, dhuhr: String, asr: String, maghrib: String, isha: String, nextName: String, countdown: String, hijri: String, activeIndex: Int, nextPrayerEpoch: Long, isCountUp: Boolean): Notification {
-        val channelId = "persistent_prayer_v18"
+        val channelId = "persistent_prayer_v23"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             try {
-                nm.deleteNotificationChannel("persistent_prayer_v14")
-                nm.deleteNotificationChannel("persistent_prayer_v12")
+                nm.deleteNotificationChannel("persistent_prayer_v20")
+                nm.deleteNotificationChannel("persistent_prayer_v21")
+                nm.deleteNotificationChannel("persistent_prayer_v22")
+                nm.deleteNotificationChannel("persistent_prayer_v19")
+                nm.deleteNotificationChannel("persistent_prayer_v18")
             } catch (_: Exception) {}
             val channel = NotificationChannel(channelId, "شريط وقت الصلاة", NotificationManager.IMPORTANCE_MAX)
-            channel.setShowBadge(false); channel.setSound(null, null); channel.enableVibration(false)
+            channel.setShowBadge(false)
+            channel.setSound(null, null)
+            channel.enableVibration(false)
             nm.createNotificationChannel(channel)
         }
         val collapsedView = RemoteViews(packageName, R.layout.notification_collapsed)
@@ -591,10 +626,13 @@ class PrayerNotificationService : Service() {
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setSound(null)
+            .setVibrate(null)
+            .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setWhen(System.currentTimeMillis())
+            .setSortKey("0000_top")
+            .setWhen(0)
             .setShowWhen(false)
-            .setSortKey("!0_prayer_bar")  // '!0' sorts before letters and other notifications → always top
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setContentIntent(pi)
             .build()

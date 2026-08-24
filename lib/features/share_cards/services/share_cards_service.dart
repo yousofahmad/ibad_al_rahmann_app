@@ -8,7 +8,12 @@ class ShareCardsService {
       "https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-features/main/";
   static const String _configPath = "app_config.json";
 
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 15),
+    ),
+  );
 
   Future<List<ShareCardCategory>> fetchShareCards() async {
     try {

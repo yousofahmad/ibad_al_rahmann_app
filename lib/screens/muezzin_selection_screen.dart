@@ -21,7 +21,12 @@ class MuezzinSelectionScreen extends StatefulWidget {
 
 class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 15),
+    ),
+  );
 
   String? _selectedMuezzinId;
   String? _playingMuezzinId;

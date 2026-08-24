@@ -4,7 +4,12 @@ import 'package:path_provider/path_provider.dart';
 import '../models/muezzin_model.dart';
 
 class MuezzinRepository {
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 15),
+    ),
+  );
 
   final List<Muezzin> _muezzins = [
     Muezzin(

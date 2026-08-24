@@ -55,3 +55,6 @@ build/
 lib/firebase_options.dart
 **/google-services.json
 
+# Scratch & temporary scripts
+scratch/
+

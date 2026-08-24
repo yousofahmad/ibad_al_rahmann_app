@@ -80,17 +80,7 @@ object NativePrayerManager {
     }
 
     fun getHijriDate(context: Context, date: Date = Date()): String {
-        val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        
-        // Pull the total offset calculated and saved by Flutter
-        // (Flutter's 'hijri_offset' already contains firebaseOffset + manualOffset)
-        val totalOffset = prefs.all["flutter.hijri_offset"] as? Long ?: 0L
-        
-        val calendar = Calendar.getInstance()
-        calendar.time = date
-        calendar.add(Calendar.DAY_OF_YEAR, totalOffset.toInt())
-        
-        return HijriCalendarHelper.getArabicDate(calendar.time)
+        return HijriCalendarHelper.getArabicDate(context, date)
     }
 
     fun generateThirtyDayCache(context: Context) {
@@ -141,19 +131,74 @@ object NativePrayerManager {
 }
 
 object HijriCalendarHelper {
-    fun getHijriDateComponents(date: Date): Triple<Int, Int, Int> {
+    fun getHijriDateComponents(context: Context, date: Date): Triple<Int, Int, Int> {
+        val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        
+        fun parseOffset(key: String): Int {
+            val raw = prefs.all[key]
+            return when (raw) {
+                is Long -> raw.toInt()
+                is Int -> raw
+                is Double -> raw.toInt()
+                is String -> raw.toIntOrNull() ?: 0
+                else -> 0
+            }
+        }
+
+        var manualOffset = parseOffset("flutter.hijri_offset_manual")
+        val storedMonth = parseOffset("flutter.hijri_offset_month")
+        val localDelta = parseOffset("flutter.hijri_local_delta")
+        val generalOffset = parseOffset("flutter.hijri_offset")
+        
+        // Auto-reset manual offset if the month has rolled over
+        if (storedMonth > 0 && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            try {
+                val tempIcu = android.icu.util.IslamicCalendar()
+                tempIcu.calculationType = android.icu.util.IslamicCalendar.CalculationType.ISLAMIC_UMALQURA
+                tempIcu.time = date
+                val curHMonth = tempIcu.get(android.icu.util.IslamicCalendar.MONTH) + 1
+                if (curHMonth != storedMonth) {
+                    manualOffset = 0
+                }
+            } catch (_: Exception) {}
+        }
+
+        val totalOffset = if (prefs.contains("flutter.hijri_offset_manual") || prefs.contains("flutter.hijri_local_delta")) {
+            manualOffset + localDelta + parseOffset("flutter.global_hijri_offset")
+        } else {
+            generalOffset
+        }
+        
+        val adjustedCal = Calendar.getInstance()
+        adjustedCal.time = date
+        adjustedCal.add(Calendar.DAY_OF_YEAR, totalOffset)
+
+        // في الشريعة الإسلامية يبدأ اليوم الجديد مع أذان المغرب (الغروب)
+        try {
+            val prayerTimes = NativePrayerManager.calculatePrayerTimes(context, date)
+            if (prayerTimes != null && date.after(prayerTimes.maghrib)) {
+                adjustedCal.add(Calendar.DAY_OF_YEAR, 1)
+            }
+        } catch (_: Exception) {}
+
+        val adjustedDate = adjustedCal.time
+
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-            val icuCal = android.icu.util.IslamicCalendar()
-            icuCal.calculationType = android.icu.util.IslamicCalendar.CalculationType.ISLAMIC_CIVIL
-            icuCal.time = date
-            val hDay = icuCal.get(android.icu.util.IslamicCalendar.DAY_OF_MONTH)
-            val hMonth = icuCal.get(android.icu.util.IslamicCalendar.MONTH) + 1
-            val hYear = icuCal.get(android.icu.util.IslamicCalendar.YEAR)
-            return Triple(hDay, hMonth, hYear)
+            try {
+                val icuCal = android.icu.util.IslamicCalendar()
+                icuCal.calculationType = android.icu.util.IslamicCalendar.CalculationType.ISLAMIC_UMALQURA
+                icuCal.time = adjustedDate
+                val hDay = icuCal.get(android.icu.util.IslamicCalendar.DAY_OF_MONTH)
+                val hMonth = icuCal.get(android.icu.util.IslamicCalendar.MONTH) + 1
+                val hYear = icuCal.get(android.icu.util.IslamicCalendar.YEAR)
+                if (hDay in 1..30 && hMonth in 1..12 && hYear > 1400) {
+                    return Triple(hDay, hMonth, hYear)
+                }
+            } catch (_: Exception) {}
         }
 
         val cal = Calendar.getInstance()
-        cal.time = date
+        cal.time = adjustedDate
         
         val day = cal.get(Calendar.DAY_OF_MONTH)
         var month = cal.get(Calendar.MONTH) + 1
@@ -183,9 +228,10 @@ object HijriCalendarHelper {
         if (hMonth == 13) hMonth = 12
         
         var hDay = (res - Math.floor(hMonth * 29.5 - 28.999)).toInt()
-        if (hDay == 0) hDay = 1
+        if (hDay <= 0) hDay = 1
+        if (hDay > 30) hDay = 30
 
-        if (hMonth == 0) {
+        if (hMonth <= 0) {
             hMonth = 12
             hYear -= 1
             hDay = 30
@@ -194,16 +240,20 @@ object HijriCalendarHelper {
         return Triple(hDay, hMonth, hYear)
     }
 
-    fun getArabicDate(date: Date): String {
-        val (hDay, hMonth, hYear) = getHijriDateComponents(date)
-        val monthsAr = arrayOf(
-            "محرم", "صفر", "ربيع الأول", "ربيع الثاني", "جمادى الأولى", "جمادى الآخرة",
-            "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
-        )
-        
-        val monthName = if (hMonth in 1..12) monthsAr[hMonth - 1] else ""
-        
-        return toArabicDigits("$hDay $monthName $hYear هـ")
+    fun getArabicDate(context: Context, date: Date): String {
+        try {
+            val (hDay, hMonth, hYear) = getHijriDateComponents(context, date)
+            val monthsAr = arrayOf(
+                "محرم", "صفر", "ربيع الأول", "ربيع الثاني", "جمادى الأولى", "جمادى الآخرة",
+                "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
+            )
+            
+            val monthName = if (hMonth in 1..12) monthsAr[hMonth - 1] else "شهر"
+            
+            return toArabicDigits("$hDay $monthName $hYear هـ")
+        } catch (e: Exception) {
+            return "التاريخ الهجري"
+        }
     }
 
     private fun toArabicDigits(input: String): String {

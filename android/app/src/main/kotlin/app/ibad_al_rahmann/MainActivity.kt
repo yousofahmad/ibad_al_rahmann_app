@@ -225,8 +225,9 @@ class MainActivity: AudioServiceFragmentActivity() {
     }
 
     private fun handleMigrationCleanup() {
+        AppMigrationManager.checkAndPerformMigration(this)
         val prefs = getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE)
-        val currentMigrationVersion = 11 // Bump to cancel old fasting alarm ID 2003
+        val currentMigrationVersion = 12 // Bump for fresh clean slate in v1.1.5
         val lastMigrationVersion = prefs.getInt("migration_version", 0)
 
         if (lastMigrationVersion < currentMigrationVersion) {

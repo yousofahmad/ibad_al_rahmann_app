@@ -29,6 +29,7 @@ import 'services/app_logger.dart';
 
 import 'core/di/di.dart';
 import 'core/helpers/tafsir_helper.dart';
+import 'core/helpers/app_migration_helper.dart';
 import 'core/theme/theme_manager/theme_cubit.dart';
 
 import 'package:flutter_native_splash/flutter_native_splash.dart';
@@ -174,11 +175,19 @@ Future<void> _runBackgroundInits() async {
     NotificationService.onNotificationTap.value = null;
   }
 
+  AppLogger.log('BgInit', 'AppMigrationHelper check start');
+  await AppMigrationHelper.checkAndPerformMigration();
+  AppLogger.log('BgInit', 'AppMigrationHelper check done');
+
+  AppLogger.log('BgInit', 'PrayerService.init start');
+  PrayerService().init();
+  AppLogger.log('BgInit', 'PrayerService.init triggered');
+
   AppLogger.log('BgInit', 'BookmarkService.init start');
   await BookmarkService.init();
   AppLogger.log('BgInit', 'BookmarkService.init done');
 
-  await Future.delayed(const Duration(seconds: 1));
+  await Future.delayed(const Duration(milliseconds: 500));
   AppLogger.log('BgInit', 'AlarmManager.initialize start');
   AndroidAlarmManager.initialize().catchError((e) {
     AppLogger.log('BgInit', 'AlarmManager error: $e');
@@ -187,7 +196,7 @@ Future<void> _runBackgroundInits() async {
   });
   AppLogger.log('BgInit', 'AlarmManager.initialize triggered');
 
-  await Future.delayed(const Duration(seconds: 1));
+  await Future.delayed(const Duration(milliseconds: 500));
   AppLogger.log('BgInit', 'DailyTrackerService.initStatsForToday start');
   await DailyTrackerService.initStatsForToday();
   AppLogger.log('BgInit', 'DailyTrackerService.initStatsForToday done');
@@ -197,15 +206,10 @@ Future<void> _runBackgroundInits() async {
     BackupService.scheduleNextAutoSync();
   }
 
-  await Future.delayed(const Duration(seconds: 1));
+  await Future.delayed(const Duration(milliseconds: 500));
   AppLogger.log('BgInit', 'NotificationService.init start');
   await NotificationService.init();
   AppLogger.log('BgInit', 'NotificationService.init done');
-
-  await Future.delayed(const Duration(seconds: 5));
-  AppLogger.log('BgInit', 'PrayerService.init start');
-  PrayerService().init();
-  AppLogger.log('BgInit', 'PrayerService.init triggered');
 
   await Future.delayed(const Duration(seconds: 2));
   AppLogger.log('BgInit', 'RemoteConfigService.init start');

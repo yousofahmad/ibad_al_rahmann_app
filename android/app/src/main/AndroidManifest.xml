@@ -30,7 +30,6 @@
         android:label="عِبَادُ الرَّحْمَٰن"
         android:name=".MainApplication"
         android:icon="@mipmap/launcher_icon"
-        android:requestLegacyExternalStorage="true"
         android:allowBackup="false"
         android:fullBackupContent="false"
         tools:replace="android:label,android:allowBackup">

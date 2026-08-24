@@ -71,6 +71,25 @@ class DailyTrackerService {
     return prefs.getBool('$_dailyPrefix${dateStr}_$category') ?? false;
   }
 
+  /// Checks if at least 50% of the session counters are completed, qualifying for streak.
+  static Future<int> checkAndRecordAzkarStreak(
+    String category,
+    int currentTotalCount,
+    int requiredTotalCount,
+  ) async {
+    if (requiredTotalCount <= 0) return await getStreak(category);
+    if (currentTotalCount >= (requiredTotalCount * 0.5)) {
+      final prefs = CacheHelper.prefs;
+      final String dateStr = await _getCycleDate(category);
+      final String streakRecordedKey = '$_dailyPrefix${dateStr}_${category}_streak_recorded';
+      if (!prefs.containsKey(streakRecordedKey)) {
+        await prefs.setBool(streakRecordedKey, true);
+        await _updateStreak(prefs, dateStr, category);
+      }
+    }
+    return await getStreak(category);
+  }
+
   /// Updates the streak counter.
   static Future<void> _updateStreak(
     SharedPreferences prefs,
@@ -193,8 +212,6 @@ class DailyTrackerService {
   /// Friday that concludes the period (Thu Maghrib → Fri Maghrib).
   static String getKahfWeekId() {
     final now = DateTime.now();
-    // Friday is 5. If today is Sat(6), Sun(7), Mon(1)... it belongs to next Fri.
-    // However, our UI only shows this during the Thu-Fri window.
     int daysUntilFriday = (DateTime.friday - now.weekday);
     if (daysUntilFriday < 0) daysUntilFriday += 7;
     final fridayDate = now.add(Duration(days: daysUntilFriday));
@@ -241,17 +258,12 @@ class DailyTrackerService {
     // 1. Handle Reset of Temporary Keys
     final String? lastResetDate = prefs.getString('current_day_date');
     if (lastResetDate != today) {
-      // Save current day date first to prevent multiple resets
       await prefs.setString('current_day_date', today);
-
-      // Clear temporary keys used by AccountabilityScreen
       await prefs.remove('temp_prayers');
       await prefs.remove('temp_quran');
       await prefs.remove('temp_azkar');
       await prefs.remove('temp_deeds');
-
-      // Clear any other daily transient progress if needed
-      await clearProgress('active_wird_page'); // Example
+      await clearProgress('active_wird_page');
 
       debugPrint(
         'DailyTrackerService: New day detected ($today). Temporary data reset.',

@@ -97,7 +97,8 @@ class _RamadanScreenState extends State<RamadanScreen> {
     int missed = 0;
     final hijriOffset = PrayerService().hijriOffset;
     final adjustedDate = DateTime.now().add(Duration(days: hijriOffset));
-    int year = HijriCalendar.fromDate(adjustedDate).hYear;
+    final hijri = HijriCalendar.fromDate(adjustedDate);
+    final int year = hijri.hMonth >= 9 ? hijri.hYear : hijri.hYear - 1;
     for (int i = 1; i <= 30; i++) {
       if (prefs.getBool('qada_${year}_$i') ?? false) missed++;
     }

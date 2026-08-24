@@ -589,14 +589,30 @@ class NotificationService {
         await _scheduleKhatmaNotifications(khatma, prefs);
       }
     }
+
+    try {
+      await _platform.invokeMethod('rescheduleToday');
+    } catch (_) {}
+  }
+
+  static int _javaStringHashCode(String s) {
+    int h = 0;
+    for (int i = 0; i < s.length; i++) {
+      h = (31 * h + s.codeUnitAt(i)) & 0xFFFFFFFF;
+      if (h > 0x7FFFFFFF) h -= 0x100000000;
+    }
+    return h.abs();
   }
 
   static Future<void> _scheduleKhatmaNotifications(KhatmaModel khatma, SharedPreferences prefs) async {
-    int idBase = 100000 + (khatma.id.hashCode.abs() % 40000) * 10;
+    final cleanId = khatma.id.startsWith('khatma_') ? khatma.id.replaceFirst('khatma_', '') : khatma.id;
+    int idBase = 100000 + (_javaStringHashCode(cleanId) % 40000) * 10;
     final now = DateTime.now();
 
     // Cancel existing khatma alarms first to avoid duplicates when rescheduleWird is called multiple times
-    final cancelIds = List.generate(80, (i) => idBase + i);
+    final cancelIds = <int>[];
+    cancelIds.addAll(List.generate(80, (i) => idBase + i));
+    cancelIds.addAll(List.generate(80, (i) => (100000 + (khatma.id.hashCode.abs() % 40000) * 10) + i));
     try { await _platform.invokeMethod('cancelAlarms', {'ids': cancelIds}); } catch (_) {}
 
     // حساب ما إذا كان المستخدم متأخراً عن الورد
@@ -647,7 +663,7 @@ class NotificationService {
          final t = DateTime(now.year, now.month, now.day, hour, minute).add(Duration(days: i));
           if (t.isAfter(now)) {
            final scheduledId = idBase + t.weekday;
-           // await _scheduleNative(scheduledId, "ورد ${khatma.name}", "$bodyPrefixحان وقت وردك اليومي$pageInfo", t.hour, t.minute, "ibad_al_rahmann_tone", year: t.year, month: t.month, day: t.day, payload: payload, customSoundName: "ibad_al_rahmann_tone");
+           await _scheduleNative(scheduledId, "ورد ${khatma.name}", "$bodyPrefixحان وقت وردك اليومي$pageInfo", t.hour, t.minute, "ibad_al_rahmann_tone", year: t.year, month: t.month, day: t.day, payload: payload, customSoundName: "ibad_al_rahmann_tone");
           }
       }
     } else if (khatma.notificationType == 'prayer') {
@@ -671,7 +687,7 @@ class NotificationService {
           final t = time.add(Duration(minutes: khatma.notificationOffsetMinutes));
           if (t.isAfter(now)) {
             final scheduledId = idBase + (targetDate.weekday * 10) + prayerIdx;
-            // await _scheduleNative(scheduledId, "ورد ${khatma.name}", "$bodyPrefixحان وقت وردك بعد صلاة $name$pageInfo", t.hour, t.minute, "ibad_al_rahmann_tone", year: t.year, month: t.month, day: t.day, payload: payload, customSoundName: "ibad_al_rahmann_tone");
+            await _scheduleNative(scheduledId, "ورد ${khatma.name}", "$bodyPrefixحان وقت وردك بعد صلاة $name$pageInfo", t.hour, t.minute, "ibad_al_rahmann_tone", year: t.year, month: t.month, day: t.day, payload: payload, customSoundName: "ibad_al_rahmann_tone");
           }
           prayerIdx++;
         }

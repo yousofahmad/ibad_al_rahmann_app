@@ -35,7 +35,8 @@ class _QadaaScreenState extends State<QadaaScreen> {
     super.initState();
     final hijriOffset = PrayerService().hijriOffset;
     final adjustedDate = DateTime.now().add(Duration(days: hijriOffset));
-    _currentRamadanYear = HijriCalendar.fromDate(adjustedDate).hYear;
+    final hijri = HijriCalendar.fromDate(adjustedDate);
+    _currentRamadanYear = hijri.hMonth >= 9 ? hijri.hYear : hijri.hYear - 1;
     _loadData();
   }
 

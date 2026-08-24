@@ -316,6 +316,10 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
                             widget.prayer.id.substring(1);
                         await prefs.setString('adhan_mode_$capKey', v);
                         await prefs.setBool(_getNotifKey(), v != 'none');
+                        if (widget.prayer.id == 'last_third' || widget.prayer.id == 'qiyam') {
+                          await prefs.setString('qiyam_mode_notif', v);
+                          await prefs.setBool('notif_qiyam', v != 'none');
+                        }
                         PrayerService().scheduleNotificationsDebounced();
                       }),
                     ),

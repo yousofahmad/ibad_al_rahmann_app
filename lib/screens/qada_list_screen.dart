@@ -21,7 +21,9 @@ class _QadaListScreenState extends State<QadaListScreen> {
     super.initState();
     final hijriOffset = PrayerService().hijriOffset;
     final adjustedDate = DateTime.now().add(Duration(days: hijriOffset));
-    _currentRamadanYear = HijriCalendar.fromDate(adjustedDate).hYear;
+    final hijri = HijriCalendar.fromDate(adjustedDate);
+    // Until the 1st of the next Ramadan (Month 9) arrives, we track the preceding Ramadan
+    _currentRamadanYear = hijri.hMonth >= 9 ? hijri.hYear : hijri.hYear - 1;
     _loadData();
   }
 
@@ -111,20 +113,15 @@ class _QadaListScreenState extends State<QadaListScreen> {
               itemBuilder: (context, index) {
                 int day = index + 1;
 
-                // Future Lock Logic
+                // Future Lock Logic:
+                // Only lock days ahead of today IF we are currently in Ramadan.
+                // Otherwise (months 10-12 and months 1-8 of the new year), all 30 days are past and active for Qadaa.
                 bool isFuture = false;
                 if (isRamadan) {
                   if (day > now.hDay) {
                     isFuture = true;
                   }
-                } else if (now.hMonth < 9) {
-                  // Before Ramadan (Months 1-8 are NEXT year's Ramadan?)
-                  // Usually tracking is for CURRENT year.
-                  // If we are in Safar (2), next Ramadan is in 7 months.
-                  // So ALL days are future.
-                  isFuture = true;
                 }
-                // If Month > 9 (Shawwal etc), all days are past -> Enabled.
 
                 return Container(
                   margin: EdgeInsets.only(bottom: 10.h),
@@ -145,8 +142,7 @@ class _QadaListScreenState extends State<QadaListScreen> {
                     ],
                   ),
                   child: ListTile(
-                    enabled:
-                        !isFuture, // Greys out content automatically usually
+                    enabled: !isFuture,
                     title: Text(
                       "رمضان $day",
                       style: TextStyle(
@@ -172,13 +168,10 @@ class _QadaListScreenState extends State<QadaListScreen> {
                       scale: 1.2,
                       child: Checkbox(
                         value: _missedDays[day] ?? false,
-                        activeColor:
-                            Colors.red, // Red for "Missed" / Danger? Or Gold?
-                        // User asked for "Qada Tracker" being Red. Maybe checkbox Red too?
-                        // Or default Gold. Let's use Red for "Missed".
+                        activeColor: const Color(0xFFD0A871),
                         fillColor: WidgetStateProperty.resolveWith((states) {
                           if (states.contains(WidgetState.selected)) {
-                            return const Color(0xFFD0A871); // Gold check
+                            return const Color(0xFFD0A871);
                           }
                           return Colors.white24;
                         }),

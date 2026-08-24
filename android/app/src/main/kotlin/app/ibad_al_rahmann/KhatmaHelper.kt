@@ -5,6 +5,29 @@ import org.json.JSONObject
 
 object KhatmaHelper {
 
+    fun isKhatmaValid(context: Context, khatmaId: String): Boolean {
+        try {
+            val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            val legacyKey = "flutter.khatma_" + khatmaId
+            if (flutterPrefs.contains(legacyKey)) return true
+            
+            val modelKey = "flutter.khatma_" + khatmaId + "_model"
+            if (flutterPrefs.contains(modelKey)) return true
+            
+            // Also check all keys just in case
+            for (key in flutterPrefs.all.keys) {
+                if (key.startsWith("flutter.khatma_")) {
+                    val jsonStr = flutterPrefs.getString(key, null) ?: continue
+                    try {
+                        val json = JSONObject(jsonStr)
+                        if (json.optString("id") == khatmaId) return true
+                    } catch (e: Exception) { }
+                }
+            }
+        } catch (e: Exception) {}
+        return false
+    }
+
     fun getDelayText(context: Context, khatmaId: String): String {
         try {
             val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)

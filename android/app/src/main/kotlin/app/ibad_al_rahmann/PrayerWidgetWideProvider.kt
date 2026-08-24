@@ -61,21 +61,10 @@ class PrayerWidgetWideProvider : AppWidgetProvider() {
         val activeHighlightIndex = if (isCountUp) currentIndex else nextIndex
 
         // ─── Native Hijri Calculation ───
-        val hijriOffset = activeWidgetData.getInt("widget_hijri_offset", 0)
-        val calendar = Calendar.getInstance()
-        calendar.add(Calendar.DAY_OF_YEAR, hijriOffset)
-        
-        var hijriString = ""
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val islamicCalendar = android.icu.util.IslamicCalendar()
-            islamicCalendar.time = calendar.time
-            val hDay = islamicCalendar.get(android.icu.util.IslamicCalendar.DAY_OF_MONTH)
-            val hMonth = islamicCalendar.get(android.icu.util.IslamicCalendar.MONTH)
-            val hYear = islamicCalendar.get(android.icu.util.IslamicCalendar.YEAR)
-            val monthNames = arrayOf("محرم", "صفر", "ربيع الأول", "ربيع الثاني", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة")
-            hijriString = "$hDay ${monthNames[hMonth]} $hYear هـ"
-        } else {
-            hijriString = activeWidgetData.getString("hijri", "").orEmpty()
+        val hijriString = try {
+            NativePrayerManager.getHijriDate(context)
+        } catch (_: Exception) {
+            activeWidgetData.getString("hijri", "").orEmpty()
         }
 
         // ─── Schedule refresh when count-up window expires ───

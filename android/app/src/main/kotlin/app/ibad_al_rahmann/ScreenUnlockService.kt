@@ -96,43 +96,78 @@ class ScreenUnlockService : Service() {
     // Audio Playback
     // ──────────────────────────────────────────────────────────────────────────
 
+    private var originalVolume: Int? = null
+    private var targetStream: Int = AudioManager.STREAM_MUSIC
+
     private fun playSalawat() {
         releasePlayer() // أوقف أي صوت سابق فوراً
 
-        val prefs     = applicationContext.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        val mode      = prefs.getString("flutter.salah_unlock_mode", "saly_3ala_mo7amad") ?: "saly_3ala_mo7amad"
-        val volume    = prefs.getFloat("flutter.salah_unlock_volume", 1.0f)
-            .coerceIn(0.0f, 1.0f)
+        val prefs = applicationContext.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        val mode = prefs.getString("flutter.salah_unlock_mode", "saly_3ala_mo7amad") ?: "saly_3ala_mo7amad"
+        if (mode == "none") return
 
-        // اختر الصوت
-        val soundName = when (mode) {
-            "both"   -> if (Math.random() < 0.5) "saly_3ala_mo7amad" else "salah_2"
-            "none"   -> return  // مُعطَّل
-            else     -> mode    // "saly_3ala_mo7amad" أو "salah_2" مباشرةً
+        // Check if custom volume override is enabled
+        val useCustomVolume = prefs.getBoolean("flutter.salah_unlock_use_custom_volume", false)
+
+        // Read volume ratio (0.0 .. 1.0)
+        val volumeRatio = try {
+            val v = prefs.getFloat("flutter.salah_unlock_volume", 1.0f)
+            if (v > 0) v else 1.0f
+        } catch (_: Exception) {
+            1.0f
+        }.coerceIn(0.1f, 1.0f)
+
+        // Adjust system volume temporarily only if user enabled custom volume
+        if (useCustomVolume) {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            if (audioManager != null) {
+                try {
+                    targetStream = AudioManager.STREAM_MUSIC
+                    val maxVol = audioManager.getStreamMaxVolume(targetStream)
+                    originalVolume = audioManager.getStreamVolume(targetStream)
+                    val targetVol = (maxVol * volumeRatio).toInt().coerceIn(1, maxVol)
+                    audioManager.setStreamVolume(targetStream, targetVol, 0)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not adjust system volume: ${e.message}")
+                }
+            }
+        } else {
+            originalVolume = null
         }
 
-        val assetPath = "assets/audio/$soundName.mp3"
+        val customPath = prefs.getString("flutter.salah_unlock_custom_path", null)
 
         try {
-            val afd = applicationContext.assets.openFd(assetPath)
             mediaPlayer = MediaPlayer().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .setLegacyStreamType(AudioManager.STREAM_MUSIC)
+                        .setLegacyStreamType(targetStream)
                         .build()
                 )
-                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                afd.close()
-                setVolume(volume, volume)
+
+                if (mode == "custom" && !customPath.isNullOrEmpty() && java.io.File(customPath).exists()) {
+                    setDataSource(customPath)
+                } else {
+                    val soundName = when (mode) {
+                        "both" -> if (Math.random() < 0.5) "saly_3ala_mo7amad" else "salah_2"
+                        "custom" -> "saly_3ala_mo7amad" // Fallback if custom file not found
+                        else -> mode
+                    }
+                    val assetPath = "assets/audio/$soundName.mp3"
+                    val afd = applicationContext.assets.openFd(assetPath)
+                    setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                    afd.close()
+                }
+
                 isLooping = false
                 setOnCompletionListener { releasePlayer() }
                 setOnErrorListener { _, _, _ -> releasePlayer(); true }
                 prepare()
                 start()
             }
-            Log.d(TAG, "Playing: $soundName at volume $volume")
+            Log.d(TAG, "Playing salawat mode=$mode at volume ratio $volumeRatio")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to play salawat: ${e.message}")
             releasePlayer()
@@ -140,6 +175,17 @@ class ScreenUnlockService : Service() {
     }
 
     private fun releasePlayer() {
+        // Restore system volume if it was elevated
+        if (originalVolume != null) {
+            try {
+                val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                audioManager?.setStreamVolume(targetStream, originalVolume!!, 0)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to restore original volume: ${e.message}")
+            }
+            originalVolume = null
+        }
+
         mediaPlayer?.let {
             try {
                 if (it.isPlaying) it.stop()
