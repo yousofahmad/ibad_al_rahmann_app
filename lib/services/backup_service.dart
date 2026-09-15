@@ -109,6 +109,8 @@ class BackupService {
 
   static const String _serverClientId = '1029405862241-u0m400hgjnmjsb60g6e4qcop3gd41fbp.apps.googleusercontent.com';
   static bool _isGoogleSignInInitialized = false;
+  static GoogleSignInAccount? _cachedAccount;
+  static Map<String, String>? _cachedAuthHeaders;
 
   static Future<void> _ensureInitialized() async {
     if (!_isGoogleSignInInitialized) {
@@ -471,113 +473,59 @@ class BackupService {
     }
   }
 
-  // ── Google Drive Sync Methods ──────────────────────────────────────────
+  static bool _isSyncing = false;
 
-  static Future<GoogleSignInAccount?> _getSignedInAccount({bool allowUI = true}) async {
+  /// Gets authenticated Drive API client with a single prompt.
+  static Future<drive.DriveApi?> _getDriveApi({bool allowUI = true}) async {
     try {
       await _ensureInitialized();
 
-      // 1. Try silent/lightweight authentication first
-      GoogleSignInAccount? account;
+      // 1. If we already have valid auth headers in memory, return client immediately
+      if (_cachedAuthHeaders != null) {
+        return drive.DriveApi(GoogleAuthClient(_cachedAuthHeaders!));
+      }
+
+      // 2. Try silent headers retrieval first without prompt
       try {
-        final authFuture = GoogleSignIn.instance.attemptLightweightAuthentication();
-        if (authFuture != null) {
-          account = await authFuture.timeout(const Duration(seconds: 3));
-        }
-        if (account != null) {
-          AppLogger.log('GoogleDrive', 'silent auth OK: ${account.email}');
-          debugPrint('Google Sign-In: silent auth OK — ${account.email}');
-        } else {
-          AppLogger.log('GoogleDrive', 'silent auth: no cached session');
-          debugPrint('Google Sign-In: silent auth returned null (no cached session)');
-        }
-      } on TimeoutException {
-        AppLogger.log('GoogleDrive', 'silent auth timed-out (3s)');
-        debugPrint('Google Sign-In: silent auth timed-out after 3s');
-        account = null;
-      } catch (e) {
-        AppLogger.log('GoogleDrive', 'silent auth error: $e');
-        debugPrint('Google Sign-In: silent auth error — $e');
-        account = null;
-      }
-
-      // 2. If silent failed and UI is allowed, trigger interactive sign-in
-      if (account == null && allowUI) {
-        AppLogger.log('GoogleDrive', 'triggering interactive authenticate()');
-        debugPrint('Google Sign-In: triggering interactive authenticate()');
-        try {
-          account = await GoogleSignIn.instance.authenticate(
-            scopeHint: [drive.DriveApi.driveAppdataScope],
-          );
-          AppLogger.log('GoogleDrive', 'interactive auth OK: ${account.email}');
-          debugPrint('Google Sign-In: interactive auth OK — ${account.email}');
-        } catch (e) {
-          AppLogger.log('GoogleDrive', 'interactive auth error: $e');
-          debugPrint('Google Sign-In: interactive auth error: $e');
-        }
-      }
-      return account;
-    } catch (e, st) {
-      AppLogger.log('GoogleDrive', 'Google Sign-In Error: $e');
-      debugPrint('Google Sign-In Error: $e\n$st');
-      return null;
-    }
-  }
-
-  /// Gets authenticated Drive API client. Returns null if auth fails.
-  static Future<drive.DriveApi?> _getDriveApi({bool allowUI = true}) async {
-    try {
-      final account = await _getSignedInAccount(allowUI: allowUI);
-      if (account == null) {
-        AppLogger.log('GoogleDrive', 'No signed-in account — cannot get DriveApi');
-        debugPrint('Google Drive: No signed-in account — cannot get DriveApi');
-        return null;
-      }
-
-      final duration = allowUI ? const Duration(seconds: 30) : const Duration(seconds: 15);
-
-      Map<String, String>? authHeaders;
-      try {
-        authHeaders = await GoogleSignIn.instance.authorizationClient
+        final silentHeaders = await GoogleSignIn.instance.authorizationClient
             .authorizationHeaders(
               [drive.DriveApi.driveAppdataScope],
-              promptIfNecessary: allowUI,
-            )
-            .timeout(duration);
-      } on TimeoutException {
-        AppLogger.log('GoogleDrive', 'authorizationHeaders timed-out (${duration.inSeconds}s)');
-        debugPrint('Google Drive: authorizationHeaders timed-out (${duration.inSeconds}s)');
-        authHeaders = null;
+              promptIfNecessary: false,
+            );
+        if (silentHeaders != null && silentHeaders.isNotEmpty) {
+          _cachedAuthHeaders = silentHeaders;
+          AppLogger.log('GoogleDrive', 'Silent headers OK');
+          return drive.DriveApi(GoogleAuthClient(silentHeaders));
+        }
       } catch (e) {
-        AppLogger.log('GoogleDrive', 'authorizationHeaders error: $e');
-        debugPrint('Google Drive: authorizationHeaders error — $e');
-        authHeaders = null;
+        AppLogger.log('GoogleDrive', 'Silent authorizationHeaders: $e');
       }
 
-      if (authHeaders == null) {
-        AppLogger.log('GoogleDrive', 'authorizationHeaders null — trying forced re-authorize');
-        debugPrint('Google Drive: authorizationHeaders null — trying forced re-authorize');
-        if (allowUI) {
-          try {
-            await GoogleSignIn.instance.authorizationClient
-                .authorizeScopes([drive.DriveApi.driveAppdataScope]);
-            authHeaders = await GoogleSignIn.instance.authorizationClient
-                .authorizationHeaders([drive.DriveApi.driveAppdataScope]);
-          } catch (e) {
-            AppLogger.log('GoogleDrive', 'forced re-authorize failed: $e');
-            debugPrint('Google Drive: forced re-authorize failed — $e');
-          }
-        }
-        if (authHeaders == null) {
-          AppLogger.log('GoogleDrive', 'giving up — no valid auth headers');
-          debugPrint('Google Drive: giving up — no valid auth headers');
-          return null;
+      // 3. If silent failed and UI is allowed, authenticate with driveAppdataScope in ONE dialog
+      if (allowUI) {
+        AppLogger.log('GoogleDrive', 'Triggering single interactive authenticate()');
+        final account = await GoogleSignIn.instance.authenticate(
+          scopeHint: [drive.DriveApi.driveAppdataScope],
+        );
+        _cachedAccount = account;
+        final prefs = CacheHelper.prefs;
+        await prefs.setString('last_sync_email', account.email);
+        AppLogger.log('GoogleDrive', 'Interactive auth OK: ${account.email}');
+
+        // Retrieve the authorized headers immediately
+        final authHeaders = await GoogleSignIn.instance.authorizationClient
+            .authorizationHeaders(
+              [drive.DriveApi.driveAppdataScope],
+              promptIfNecessary: false,
+            );
+
+        if (authHeaders != null) {
+          _cachedAuthHeaders = authHeaders;
+          AppLogger.log('GoogleDrive', 'DriveApi client ready for ${account.email}');
+          return drive.DriveApi(GoogleAuthClient(authHeaders));
         }
       }
-
-      AppLogger.log('GoogleDrive', 'DriveApi client ready for ${account.email}');
-      debugPrint('Google Drive: DriveApi client ready');
-      return drive.DriveApi(GoogleAuthClient(authHeaders));
+      return null;
     } catch (e) {
       AppLogger.log('GoogleDrive', '_getDriveApi error: $e');
       debugPrint('Google Drive: _getDriveApi error: $e');
@@ -586,18 +534,33 @@ class BackupService {
   }
 
   static Future<GoogleSignInAccount?> signIn() async {
-    return await _getSignedInAccount(allowUI: true);
+    try {
+      final api = await _getDriveApi(allowUI: true);
+      if (api != null) {
+        return _cachedAccount;
+      }
+    } catch (_) {}
+    return null;
   }
 
   static Future<void> signOut() async {
     await _ensureInitialized();
-    await GoogleSignIn.instance.signOut();
+    try {
+      await GoogleSignIn.instance.signOut();
+    } catch (_) {}
+    _cachedAccount = null;
+    _cachedAuthHeaders = null;
     final prefs = CacheHelper.prefs;
     await prefs.remove('last_sync_email');
     await prefs.remove('last_sync_time');
   }
 
   static Future<bool> syncToDrive({bool allowUI = true, void Function(double)? onProgress}) async {
+    if (_isSyncing) {
+      debugPrint('Google Drive: Sync already in progress, ignoring duplicate call.');
+      return false;
+    }
+    _isSyncing = true;
     try {
       debugPrint('Google Drive: Starting Sync to Drive...');
       final driveApi = await _getDriveApi(allowUI: allowUI);
@@ -645,10 +608,17 @@ class BackupService {
     } catch (e) {
       debugPrint('Google Drive Sync Up Error: $e');
       return false;
+    } finally {
+      _isSyncing = false;
     }
   }
 
   static Future<bool> syncFromDrive({bool allowUI = true, void Function(double)? onProgress}) async {
+    if (_isSyncing) {
+      debugPrint('Google Drive: Sync already in progress, ignoring duplicate call.');
+      return false;
+    }
+    _isSyncing = true;
     try {
       debugPrint('Google Drive: Starting Sync from Drive...');
       final driveApi = await _getDriveApi(allowUI: allowUI);
@@ -693,6 +663,8 @@ class BackupService {
     } catch (e) {
       debugPrint('Google Drive Sync Down Error: $e');
       return false;
+    } finally {
+      _isSyncing = false;
     }
   }
 
@@ -702,34 +674,11 @@ class BackupService {
   }
 
   static Future<String?> getSignedInEmail({bool forceCheck = false}) async {
-    final prefs = CacheHelper.prefs;
-    final cachedEmail = prefs.getString('last_sync_email');
-    
-    // تجنب محاولة تسجيل الدخول في كل مرة يتم فتح الإعدادات فيها
-    // إلا إذا طلبنا التحديث صراحة أو كان المستخدم قد سجل دخوله بالفعل ونريد التأكد
-    if (!forceCheck) {
-      return cachedEmail;
+    if (_cachedAccount?.email != null) {
+      return _cachedAccount!.email;
     }
-
-    try {
-      await _ensureInitialized();
-      GoogleSignInAccount? account;
-      try {
-        account = await (GoogleSignIn.instance
-            .attemptLightweightAuthentication() ?? Future.value(null))
-            .timeout(const Duration(seconds: 8));
-      } on TimeoutException {
-        account = null;
-      } catch (_) {
-        account = null;
-      }
-      if (account?.email != null) {
-        await prefs.setString('last_sync_email', account!.email);
-        return account.email;
-      }
-    } catch (_) {}
-
-    return cachedEmail;
+    final prefs = CacheHelper.prefs;
+    return prefs.getString('last_sync_email');
   }
 
   static Future<String?> getLastSyncTime() async {

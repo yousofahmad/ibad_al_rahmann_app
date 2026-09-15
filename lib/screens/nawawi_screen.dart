@@ -18,6 +18,7 @@ class _NawawiScreenState extends State<NawawiScreen> {
   bool _showFavoritesOnly = false;
   List<Map<String, dynamic>> _allHadiths = [];
   bool _isLoading = true;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -70,17 +71,79 @@ class _NawawiScreenState extends State<NawawiScreen> {
     await prefs.setStringList('nawawi_favorites', _favoriteHadiths);
   }
 
+  /// Builds a RichText where every occurrence of [query] in [text] is
+  /// highlighted with a gold background — identical to WhatsApp search style.
+  Widget _buildHighlightedText(
+    String text,
+    String query, {
+    TextStyle? baseStyle,
+  }) {
+    if (query.isEmpty) return Text(text, style: baseStyle);
+    final lower = text.toLowerCase();
+    final lowerQ = query.toLowerCase();
+    final spans = <TextSpan>[];
+    int start = 0;
+    int idx = lower.indexOf(lowerQ);
+    while (idx != -1) {
+      if (idx > start) {
+        spans.add(TextSpan(text: text.substring(start, idx), style: baseStyle));
+      }
+      spans.add(TextSpan(
+        text: text.substring(idx, idx + query.length),
+        style: (baseStyle ?? const TextStyle()).copyWith(
+          backgroundColor: const Color(0xFFFFE082),
+          color: Colors.black,
+          fontWeight: FontWeight.bold,
+        ),
+      ));
+      start = idx + query.length;
+      idx = lower.indexOf(lowerQ, start);
+    }
+    if (start < text.length) {
+      spans.add(TextSpan(text: text.substring(start), style: baseStyle));
+    }
+    return RichText(
+      textDirection: TextDirection.rtl,
+      text: TextSpan(children: spans),
+    );
+  }
+
+  /// Returns a ~120-char snippet of [hadith] centred around the first match
+  /// of [query], with "..." on either side when truncated.
+  String _hadithSnippet(String hadith, String query) {
+    final lower = hadith.toLowerCase();
+    final idx = lower.indexOf(query.toLowerCase());
+    if (idx == -1) return hadith.length > 120 ? '${hadith.substring(0, 120)}...' : hadith;
+    const half = 60;
+    final from = (idx - half).clamp(0, hadith.length);
+    final to = (idx + query.length + half).clamp(0, hadith.length);
+    final prefix = from > 0 ? '...' : '';
+    final suffix = to < hadith.length ? '...' : '';
+    return '$prefix${hadith.substring(from, to)}$suffix';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark ? const Color(0xFF000000) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
+    final snippetColor = isDark ? Colors.grey.shade400 : Colors.grey.shade700;
 
-    final displayedHadiths = _showFavoritesOnly
+    final baseHadiths = _showFavoritesOnly
         ? _allHadiths
               .where((h) => _favoriteHadiths.contains(h['title']))
               .toList()
-        : _allHadiths;
+        : List<Map<String, dynamic>>.from(_allHadiths);
+
+    final displayedHadiths = _searchQuery.isEmpty
+        ? baseHadiths
+        : baseHadiths
+              .where(
+                (h) =>
+                    (h['title'] as String? ?? '').contains(_searchQuery) ||
+                    (h['hadith'] as String? ?? '').contains(_searchQuery),
+              )
+              .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -128,7 +191,43 @@ class _NawawiScreenState extends State<NawawiScreen> {
               itemCount: 8,
               itemBuilder: (_, __) => AppSkeleton.indexItem(),
             )
-          : displayedHadiths.isEmpty
+          : Column(
+              children: [
+                // Search Bar
+                Padding(
+                  padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 4.h),
+                  child: TextField(
+                    textDirection: TextDirection.rtl,
+                    onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                    decoration: InputDecoration(
+                      hintText: 'ابحث في الأحاديث...',
+                      hintStyle: TextStyle(fontFamily: AppConsts.expoArabic, fontSize: 13.sp),
+                      hintTextDirection: TextDirection.rtl,
+                      prefixIcon: const Icon(Icons.search, color: Color(0xFFD0A871)),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.close, size: 18),
+                              onPressed: () => setState(() => _searchQuery = ''),
+                            )
+                          : null,
+                      contentPadding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 16.w),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25.r),
+                        borderSide: const BorderSide(color: Color(0xFFD0A871)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25.r),
+                        borderSide: const BorderSide(color: Color(0xFFD0A871), width: 1.5),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25.r),
+                        borderSide: BorderSide(color: const Color(0xFFD0A871).withValues(alpha: 0.4)),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: displayedHadiths.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -218,6 +317,9 @@ class _NawawiScreenState extends State<NawawiScreen> {
                 );
               },
             ),
+                ), // Expanded
+              ],
+            ), // Column
     );
   }
 }

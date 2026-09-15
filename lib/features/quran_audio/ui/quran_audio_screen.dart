@@ -7,7 +7,7 @@ import 'widgets/quran_audio_screen_body.dart';
 
 class QuranAudioScreen extends StatelessWidget {
   const QuranAudioScreen({super.key, required this.reciter});
-  final ReciterModel reciter;
+  final ReciterAudioModel reciter;
 
   @override
   Widget build(BuildContext context) {

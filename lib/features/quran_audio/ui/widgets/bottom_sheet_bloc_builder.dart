@@ -8,7 +8,7 @@ import 'quran_screen_bottom_sheet.dart';
 class SurahOverlayPlayerBuilder extends StatelessWidget {
   const SurahOverlayPlayerBuilder({super.key, required this.qaree});
 
-  final ReciterModel qaree;
+  final ReciterAudioModel qaree;
 
   @override
   Widget build(BuildContext context) {

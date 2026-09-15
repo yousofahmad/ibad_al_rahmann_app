@@ -250,7 +250,7 @@ class AppLogger {
       await Share.shareXFiles(
         [XFile(tempFile.path)],
         subject: 'سجل عباد الرحمن — ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}',
-        text: 'سجل التطبيق لتشخيص المشاكل (الإصدار 1.1.5)',
+        text: 'سجل التطبيق لتشخيص المشاكل (الإصدار 1.2.0)',
       );
     } catch (e) {
       debugPrint('AppLogger.shareLog error: $e');
@@ -267,7 +267,7 @@ class AppLogger {
       String combined = '';
       combined += '═══════════ تقرير تشخيص مشكلة — عباد الرحمن ═══════════\n';
       combined += 'تاريخ التقرير: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())}\n';
-      combined += 'إصدار التطبيق: 1.1.5\n';
+      combined += 'إصدار التطبيق: 1.2.0\n';
       combined += 'نظام التشغيل: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}\n\n';
 
       combined += '────── Flutter/Dart Logs ──────\n';
@@ -287,7 +287,7 @@ class AppLogger {
       await tempFile.writeAsString(combined);
 
       const messageText = 'السلام عليكم ورحمة الله وبركاته،\n'
-          'أود الإبلاغ عن مشكلة في تطبيق عباد الرحمن (الإصدار 1.1.5):\n\n'
+          'أود الإبلاغ عن مشكلة في تطبيق عباد الرحمن (الإصدار 1.2.0):\n\n'
           '[يرجى كتابة تفاصيل المشكلة هنا]\n\n'
           '(مرفق ملف سجل التطبيق للتشخيص)';
 

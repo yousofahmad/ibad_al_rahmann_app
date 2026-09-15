@@ -10,6 +10,7 @@ import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cu
 import 'package:ibad_al_rahmann/features/quran/bloc/search/search_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/data/repo/quran_repo.dart';
 import 'package:ibad_al_rahmann/services/daily_tracker_service.dart';
+import 'package:quran/quran.dart' as quran;
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'widgets/core/quran_screen_body.dart';
@@ -139,7 +140,21 @@ class _QuranScreenState extends State<QuranScreen> {
         BlocProvider<QuranThemeCubit>.value(value: _quranThemeCubit),
         BlocProvider<ThemeCubit>.value(value: _quranThemeCubit),
       ],
-      child: BlocBuilder<ThemeCubit, ThemeState>(
+      child: BlocListener<VersePlayerCubit, VersePlayerState>(
+        listenWhen: (prev, curr) =>
+            prev.currentVerse?.surahNumber != curr.currentVerse?.surahNumber ||
+            prev.currentVerse?.verseNumber != curr.currentVerse?.verseNumber,
+        listener: (context, playerState) {
+          final verse = playerState.currentVerse;
+          if (verse != null) {
+            final pageIndex = quran.getPageNumber(verse.surahNumber, verse.verseNumber) - 1;
+            final quranCubit = context.read<QuranCubit>();
+            if (quranCubit.state.currentPage != pageIndex) {
+              quranCubit.jumpToPage(pageIndex);
+            }
+          }
+        },
+        child: BlocBuilder<ThemeCubit, ThemeState>(
         builder: (context, themeState) {
           return BlocBuilder<QuranCubit, QuranState>(
             builder: (context, quranState) {
@@ -202,6 +217,7 @@ class _QuranScreenState extends State<QuranScreen> {
             },
           );
         },
+      ),
       ),
     );
   }

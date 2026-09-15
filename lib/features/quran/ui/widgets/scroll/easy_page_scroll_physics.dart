@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 /// Custom page scroll physics that requires less swipe distance to turn pages.
-/// The default PageScrollPhysics requires ~50% swipe. This one triggers at ~30%.
-class EasyPageScrollPhysics extends ScrollPhysics {
+/// The default PageScrollPhysics requires ~50% swipe. This one triggers at ~25%.
+class EasyPageScrollPhysics extends PageScrollPhysics {
   const EasyPageScrollPhysics({super.parent});
 
   @override
@@ -10,14 +10,12 @@ class EasyPageScrollPhysics extends ScrollPhysics {
     return EasyPageScrollPhysics(parent: buildParent(ancestor));
   }
 
-  /// Lower velocity threshold = easier to fling to next page
+  /// Lower velocity threshold = easier to fling to next page.
+  /// Default PageScrollPhysics is ~365. We use 80 for comfortable swipe.
   @override
-  double get minFlingVelocity => 50.0; // default is ~365
+  double get minFlingVelocity => 80.0;
 
-  /// The page snaps based on PageScrollPhysics default behavior,
-  /// but the lower minFlingVelocity means a gentle swipe triggers a page turn.
-
-  @override
-  SpringDescription get spring =>
-      const SpringDescription(mass: 80, stiffness: 100, damping: 1.2);
+  /// Use PageScrollPhysics default spring (critically damped, no oscillation).
+  /// Do NOT override spring here — overriding with custom values caused
+  /// underdamped oscillation (pendulum bounce effect).
 }

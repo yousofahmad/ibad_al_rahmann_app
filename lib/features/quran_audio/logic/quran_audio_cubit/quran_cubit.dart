@@ -1,45 +1,54 @@
-import 'dart:developer';
-
-import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:ibad_al_rahmann/core/di/di.dart';
-import 'package:ibad_al_rahmann/core/networking/dio_consumer.dart';
 import 'package:ibad_al_rahmann/features/quran_reciters/data/models/reciter_model.dart';
-
-import '../../../../core/networking/api_keys.dart';
 import '../../data/models/surah_audio_model.dart';
+import '../../data/surah_list.dart';
 
 part 'quran_state.dart';
 
 class QuranAudioCubit extends Cubit<QuranState> {
   QuranAudioCubit(this.reciter) : super(QuranInitial());
-  final ReciterModel reciter;
+  final ReciterAudioModel reciter;
 
   List<SurahAudioModel> quran = [];
 
-  Future<List<SurahAudioModel>> getQuran(int qareeId) async {
+  Future<List<SurahAudioModel>> getQuran([int? _]) async {
     emit(QuranLoading());
     try {
-      int moshafIndex = 0;
-      String url = '${reciter.moshafList[moshafIndex].server}/$qareeId';
+      final surahsMap = await ReciterAudioHelper.getSurahs(reciter);
+      if (surahsMap.isNotEmpty) {
+        quran = surahsMap.values.map((item) {
+          final sName = (item.surahNumber >= 1 && item.surahNumber <= quranSurahs.length)
+              ? quranSurahs[item.surahNumber - 1]
+              : 'سورة ${item.surahNumber}';
+          return SurahAudioModel(
+            url: item.audioUrl,
+            name: sName,
+            surahNumber: item.surahNumber,
+            durationSec: item.durationSec,
+          );
+        }).toList();
 
-      var response = await getIt<DioConsumer>().get(
-        url,
-        headers: {'content-type': 'application/json'},
-      );
-
-      log(response.toString());
-
-      List quranAsMaps = response.data['data'][ApiKeys.audioFiles];
-
-      quran = quranAsMaps.map((e) => SurahAudioModel.fromJson(e)).toList();
-
-      emit(QuranSuccess());
-
-      return quran;
-    } on DioException catch (e) {
-      emit(QuranFailure(errMessage: e.message ?? 'هناك خطأ'));
+        quran.sort((a, b) => a.surahNumber.compareTo(b.surahNumber));
+        emit(QuranSuccess());
+        return quran;
+      } else {
+        // Fallback: generate default 114 surahs for reciter if config is still loading
+        quran = List.generate(114, (index) {
+          final sNum = index + 1;
+          final sName = quranSurahs[index];
+          return SurahAudioModel(
+            url: 'https://audio-cdn.tarteel.ai/quran/surah/${reciter.folderName}/murattal/mp3/${sNum.toString().padLeft(3, '0')}.mp3',
+            name: sName,
+            surahNumber: sNum,
+          );
+        });
+        emit(QuranSuccess());
+        return quran;
+      }
+    } catch (e) {
+      emit(QuranFailure(errMessage: 'تعذر جلب قائمة السور'));
       return [];
     }
   }
 }
+

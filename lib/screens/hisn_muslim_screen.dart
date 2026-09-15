@@ -18,6 +18,7 @@ class _HisnMuslimScreenState extends State<HisnMuslimScreen> {
   List<String> _favoriteChapters = []; // List of titles
   bool _showFavoritesOnly = false;
   bool _isLoading = true;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -75,12 +76,20 @@ class _HisnMuslimScreenState extends State<HisnMuslimScreen> {
     final cardColor = isDark ? const Color(0xFF000000) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
 
-    // Filter list based on selection
-    final displayedChapters = _showFavoritesOnly
+    // Filter list based on selection and search
+    final baseChapters = _showFavoritesOnly
         ? _allChapters
               .where((c) => _favoriteChapters.contains(c['title']))
               .toList()
-        : _allChapters;
+        : List<Map<String, dynamic>>.from(_allChapters);
+
+    final displayedChapters = _searchQuery.isEmpty
+        ? baseChapters
+        : baseChapters
+              .where(
+                (c) => (c['title'] as String? ?? '').contains(_searchQuery),
+              )
+              .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -135,7 +144,43 @@ class _HisnMuslimScreenState extends State<HisnMuslimScreen> {
               itemCount: 8,
               itemBuilder: (_, __) => AppSkeleton.gridItem(),
             )
-          : displayedChapters.isEmpty
+          : Column(
+              children: [
+                // Search Bar
+                Padding(
+                  padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 4.h),
+                  child: TextField(
+                    textDirection: TextDirection.rtl,
+                    onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                    decoration: InputDecoration(
+                      hintText: 'ابحث في الأدعية...',
+                      hintStyle: TextStyle(fontFamily: AppConsts.expoArabic, fontSize: 13.sp),
+                      hintTextDirection: TextDirection.rtl,
+                      prefixIcon: const Icon(Icons.search, color: Color(0xFFD0A871)),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.close, size: 18),
+                              onPressed: () => setState(() => _searchQuery = ''),
+                            )
+                          : null,
+                      contentPadding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 16.w),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25.r),
+                        borderSide: const BorderSide(color: Color(0xFFD0A871)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25.r),
+                        borderSide: const BorderSide(color: Color(0xFFD0A871), width: 1.5),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25.r),
+                        borderSide: BorderSide(color: const Color(0xFFD0A871).withValues(alpha: 0.4)),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: displayedChapters.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -228,6 +273,9 @@ class _HisnMuslimScreenState extends State<HisnMuslimScreen> {
                 );
               },
             ),
+                ), // Expanded
+              ],
+            ), // Column
     );
   }
 }

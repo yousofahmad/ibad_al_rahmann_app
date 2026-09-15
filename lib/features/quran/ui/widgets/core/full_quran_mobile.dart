@@ -8,8 +8,10 @@ import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../menus/single_tap_menu.dart';
 import '../scroll/auto_scroll_control_overlay.dart';
+import '../scroll/easy_page_scroll_physics.dart';
 
 import './wbw_page_widget.dart';
+
 
 class FullQuranWidget extends StatefulWidget {
   const FullQuranWidget({super.key, this.currentPage});
@@ -287,9 +289,7 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
                       : PageView.builder(
                           allowImplicitScrolling: true,
                           controller: _pageController,
-                          physics: const ClampingScrollPhysics(
-                            parent: PageScrollPhysics(),
-                          ),
+                          physics: const EasyPageScrollPhysics(),
                           pageSnapping: true,
                           itemCount: 604,
                           onPageChanged: (value) {

@@ -8,6 +8,7 @@ import '../services/prayer_service.dart';
 import 'package:adhan/adhan.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import '../core/helpers/islamic_day.dart';
 
 /// شاشة "صلاتي" — التركيز للصلاة
 /// • Streak مستقل لكل صلاة (5 سلاسل)
@@ -21,13 +22,7 @@ class PrayerFocusScreen extends StatefulWidget {
 }
 
 class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindingObserver {
-  String _getLogicalDate() {
-    final now = DateTime.now();
-    if (now.hour < 4) {
-      return DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 1)));
-    }
-    return DateFormat('yyyy-MM-dd').format(now);
-  }
+
   static const _channel = MethodChannel('app.ibad_al_rahmann/native_notifications');
 
   // أسماء الصلوات
@@ -50,6 +45,8 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
 
   // Streak موحد لجميع الصلوات
   int _unifiedStreak = 0;
+  // تاريخ بدء التتبع الفعلي (لا نحسب الأيام قبله كفائتة أو متأخرة)
+  DateTime _trackingStartDate = DateTime.now();
   // حالة صلوات اليوم: قيم ممكنة: null (لم يُصلَّ) / 'ontime' / 'late'
   final Map<String, String?> _todayStatus = {};
 
@@ -107,7 +104,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
     final enabled = prefs.getBool('prayer_focus_enabled') ?? false;
 
     // صلوات اليوم
-    final today = _getLogicalDate();
+    final today = await IslamicDay.todayKey();
     final todayStatus = <String, String?>{};
     final todayLog = _parseLog(prefs, today);
     for (final p in _prayers) {
@@ -130,6 +127,44 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
 
     final realStreak = await _recalculateTrueStreak(prefs);
 
+    // تحديد تاريخ بدء التتبع الفعلي
+    DateTime trackingStart = DateTime.now();
+    final nowD = DateTime.now();
+    final todayNorm = DateTime(nowD.year, nowD.month, nowD.day);
+    DateTime? earliestDate;
+
+    for (final k in prefs.getKeys()) {
+      if (k.startsWith('prayer_focus_log_') || k.startsWith('flutter.prayer_focus_log_')) {
+        final dStr = k.replaceFirst('flutter.prayer_focus_log_', '').replaceFirst('prayer_focus_log_', '');
+        try {
+          final d = DateTime.parse(dStr);
+          final val = prefs.getString(k);
+          if (val != null && val.isNotEmpty && val != '{}') {
+            final parsed = json.decode(val);
+            if (parsed is Map && parsed.values.any((v) => v != null && v != false)) {
+              if (earliestDate == null || d.isBefore(earliestDate)) {
+                earliestDate = DateTime(d.year, d.month, d.day);
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    final savedStartDateStr = prefs.getString('prayer_focus_start_date');
+    if (savedStartDateStr != null) {
+      try {
+        final sd = DateTime.parse(savedStartDateStr);
+        final sdNorm = DateTime(sd.year, sd.month, sd.day);
+        trackingStart = (earliestDate != null && earliestDate.isBefore(sdNorm)) ? earliestDate : sdNorm;
+      } catch (_) {
+        trackingStart = earliestDate ?? todayNorm;
+      }
+    } else {
+      trackingStart = earliestDate ?? todayNorm;
+      await prefs.setString('prayer_focus_start_date', DateFormat('yyyy-MM-dd').format(trackingStart));
+    }
+
     if (mounted) {
       setState(() {
         _isEnabled = enabled;
@@ -139,6 +174,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
           ..clear()
           ..addAll(monthLog);
         _unifiedStreak = realStreak;
+        _trackingStartDate = trackingStart;
         _preAdhanMinutes = preAdhanMinutes;
         _snoozeDuration  = snoozeDuration;
       });
@@ -195,17 +231,46 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
       ];
 
       if (dayOffset == 0) {
-        // اليوم الحالي: نبدأ من أحدث صلاة مسجلة
-        bool foundLatest = false;
-        for (final p in prayersInReverse) {
-          final isLogged = log[p] != null;
-          if (isLogged) {
-            foundLatest = true;
-            streak++;
-          } else if (foundLatest) {
-            // هناك صلاة غير مسجلة سابقة لأحدث صلاة اليوم
-            shouldContinue = false;
-            break;
+        // اليوم الحالي: فحص الصلوات التي انقضى وقتها (Rule 21)
+        try {
+          final prayersToday = await PrayerService().getExtendedPrayers(date: now);
+          final prayerMap = {
+            'الفجر': prayersToday.firstWhere((p) => p.id == 'fajr').time,
+            if (isFriday)
+              'الجمعة': prayersToday.firstWhere((p) => p.id == 'dhuhr').time
+            else
+              'الظهر': prayersToday.firstWhere((p) => p.id == 'dhuhr').time,
+            'العصر': prayersToday.firstWhere((p) => p.id == 'asr').time,
+            'المغرب': prayersToday.firstWhere((p) => p.id == 'maghrib').time,
+            'العشاء': prayersToday.firstWhere((p) => p.id == 'isha').time,
+          };
+
+          for (final p in prayersInReverse) {
+            final pTime = prayerMap[p];
+            final isPassed = pTime != null && now.isAfter(pTime);
+            final isLogged = log[p] != null;
+
+            if (isLogged) {
+              streak++;
+            } else if (isPassed) {
+              // انقضى وقت الصلاة ولم تُسجل -> كسر الاستريك فوراً
+              shouldContinue = false;
+              streak = 0;
+              break;
+            }
+          }
+        } catch (_) {
+          // Fallback
+          bool foundLatest = false;
+          for (final p in prayersInReverse) {
+            final isLogged = log[p] != null;
+            if (isLogged) {
+              foundLatest = true;
+              streak++;
+            } else if (foundLatest) {
+              shouldContinue = false;
+              break;
+            }
           }
         }
       } else {
@@ -284,7 +349,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
     }
     await prefs.setString(logKey, json.encode(logMap));
 
-    final todayKey = _getLogicalDate();
+    final todayKey = await IslamicDay.todayKey();
     if (dateKey == todayKey) {
       final tempRaw = prefs.getString('temp_prayers');
       final tempMap = <String, dynamic>{};
@@ -316,7 +381,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
   }
 
   Future<void> _savePrayerStatus(String prayer, String? status) async {
-    final today = _getLogicalDate();
+    final today = await IslamicDay.todayKey();
     await _savePrayerStatusForDate(prayer, status, today);
   }
 
@@ -665,11 +730,11 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                 final isOnTime = status == 'ontime';
                 final circleColor = isDone
                     ? (isOnTime
-                        ? const Color(0xFF2E7D32)
+                        ? gold
                         : const Color(0xFFE65100))
                     : gold.withValues(alpha: 0.12);
                 final borderColor = isDone
-                    ? (isOnTime ? const Color(0xFF2E7D32) : const Color(0xFFE65100))
+                    ? (isOnTime ? gold : const Color(0xFFE65100))
                     : gold.withValues(alpha: 0.4);
 
                 return Column(
@@ -710,7 +775,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                                   child: Container(
                                     padding: EdgeInsets.all(2.w),
                                     decoration: BoxDecoration(
-                                      color: isOnTime ? const Color(0xFF2E7D32) : const Color(0xFFE65100),
+                                      color: isOnTime ? gold : const Color(0xFFE65100),
                                       shape: BoxShape.circle,
                                       border: Border.all(color: circleColor, width: 1.5),
                                     ),
@@ -900,7 +965,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                   padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
                   decoration: BoxDecoration(
                     color: selectedDoneCount == 5
-                        ? const Color(0xFF2E7D32).withValues(alpha: 0.15)
+                        ? gold.withValues(alpha: 0.2)
                         : (selectedDoneCount > 0
                             ? gold.withValues(alpha: 0.15)
                             : Colors.grey.withValues(alpha: 0.15)),
@@ -913,7 +978,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                       fontSize: 11.sp,
                       fontWeight: FontWeight.bold,
                       color: selectedDoneCount == 5
-                          ? const Color(0xFF2E7D32)
+                          ? gold
                           : (selectedDoneCount > 0 ? gold : textColor.withValues(alpha: 0.6)),
                     ),
                   ),
@@ -975,9 +1040,9 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                     if (isFuture || total == 0) {
                       dotColor = Colors.transparent;
                     } else if (total == 5 && ontime == 5) {
-                      dotColor = const Color(0xFF2E7D32);
-                    } else if (total == 5) {
                       dotColor = gold;
+                    } else if (total == 5) {
+                      dotColor = const Color(0xFFFBC02D);
                     } else if (total > 0) {
                       dotColor = const Color(0xFFE65100);
                     } else {
@@ -999,7 +1064,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: isSelected
-                                  ? const Color(0xFF00897B)
+                                  ? gold
                                   : (isToday ? gold.withValues(alpha: 0.25) : Colors.transparent),
                               border: isToday && !isSelected
                                   ? Border.all(color: gold, width: 1.5)
@@ -1039,9 +1104,9 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _legendDot(const Color(0xFF2E7D32), 'في وقتها'),
+                    _legendDot(gold, 'في وقتها'),
                     SizedBox(width: 14.w),
-                    _legendDot(gold, 'متأخر'),
+                    _legendDot(const Color(0xFFFBC02D), 'متأخر'),
                     SizedBox(width: 14.w),
                     _legendDot(const Color(0xFFE65100), 'فروض ناقصة'),
                   ],
@@ -1058,8 +1123,19 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
 
   Widget _buildWeeklyCompletionCard(bool isDark, Color cardBg, Color gold, Color textColor) {
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     final displayMonth = DateTime(now.year, now.month + _calendarMonthOffset, 1);
     final daysInMonth = DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month);
+
+    final todayTimes = PrayerService().getPrayerTimes();
+    int passedToday = 0;
+    if (todayTimes != null) {
+      if (now.isAfter(todayTimes.fajr)) passedToday++;
+      if (now.isAfter(todayTimes.dhuhr)) passedToday++;
+      if (now.isAfter(todayTimes.asr)) passedToday++;
+      if (now.isAfter(todayTimes.maghrib)) passedToday++;
+      if (now.isAfter(todayTimes.isha)) passedToday++;
+    }
 
     final List<double> weeklyRates = [];
 
@@ -1076,9 +1152,13 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
 
       for (int d = startDay; d <= endDay; d++) {
         final date = DateTime(displayMonth.year, displayMonth.month, d);
-        if (date.isAfter(now)) continue;
+        if (date.isAfter(today) || date.isBefore(_trackingStartDate)) continue;
 
-        expected += 5;
+        final bool isToday = date.year == today.year && date.month == today.month && date.day == today.day;
+        final int dayExpected = isToday ? passedToday : 5;
+        if (dayExpected <= 0) continue;
+
+        expected += dayExpected;
         final key = DateFormat('yyyy-MM-dd').format(date);
         final log = _monthLog[key];
         if (log != null) {
@@ -1131,7 +1211,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                 painter: WeeklyCompletionSplinePainter(
                   weeklyRates: weeklyRates,
                   isDark: isDark,
-                  primaryColor: const Color(0xFF00897B),
+                  primaryColor: gold,
                   textColor: textColor,
                 ),
               ),
@@ -1146,8 +1226,19 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
 
   Widget _buildWeeklyConsistencyCard(bool isDark, Color cardBg, Color gold, Color textColor) {
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     final displayMonth = DateTime(now.year, now.month + _calendarMonthOffset, 1);
     final daysInMonth = DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month);
+
+    final todayTimes = PrayerService().getPrayerTimes();
+    int passedToday = 0;
+    if (todayTimes != null) {
+      if (now.isAfter(todayTimes.fajr)) passedToday++;
+      if (now.isAfter(todayTimes.dhuhr)) passedToday++;
+      if (now.isAfter(todayTimes.asr)) passedToday++;
+      if (now.isAfter(todayTimes.maghrib)) passedToday++;
+      if (now.isAfter(todayTimes.isha)) passedToday++;
+    }
 
     final List<int> onTimeList = [];
     final List<int> lateList = [];
@@ -1169,9 +1260,13 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
 
       for (int d = startDay; d <= endDay; d++) {
         final date = DateTime(displayMonth.year, displayMonth.month, d);
-        if (date.isAfter(now)) continue;
+        if (date.isAfter(today) || date.isBefore(_trackingStartDate)) continue;
 
-        expected += 5;
+        final bool isToday = date.year == today.year && date.month == today.month && date.day == today.day;
+        final int dayExpected = isToday ? passedToday : 5;
+        if (dayExpected <= 0) continue;
+
+        expected += dayExpected;
         final key = DateFormat('yyyy-MM-dd').format(date);
         final log = _monthLog[key];
         if (log != null) {
@@ -1232,7 +1327,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                   missedList: missedList,
                   isDark: isDark,
                   textColor: textColor,
-                  onTimeColor: const Color(0xFF00897B),
+                  onTimeColor: gold,
                   lateColor: const Color(0xFFFBC02D),
                   missedColor: const Color(0xFFE53935),
                 ),
@@ -1249,7 +1344,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                 SizedBox(width: 14.w),
                 _barLegendItem(const Color(0xFFFBC02D), 'متأخراً (Late)'),
                 SizedBox(width: 14.w),
-                _barLegendItem(const Color(0xFF00897B), 'في وقتها (On Time)'),
+                _barLegendItem(gold, 'في وقتها (On Time)'),
               ],
             ),
           ),
@@ -1296,7 +1391,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
     for (var log in _monthLog.values) {
       for (var p in _prayers) {
         final status = log[p];
-        if (status == 'late' || status == null) {
+        if (status == 'late') {
           prayerDelayCount[p] = (prayerDelayCount[p] ?? 0) + 1;
         } else if (status == 'ontime') {
           prayerOnTimeCount[p] = (prayerOnTimeCount[p] ?? 0) + 1;
@@ -1304,14 +1399,16 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
       }
     }
 
-    String mostDelayedPrayer = 'الفجر';
-    int maxDelay = -1;
+    String? mostDelayedPrayer;
+    int maxDelay = 0;
     for (var entry in prayerDelayCount.entries) {
       if (entry.value > maxDelay) {
         maxDelay = entry.value;
         mostDelayedPrayer = entry.key;
       }
     }
+
+    final bool hasDelays = maxDelay > 0 && mostDelayedPrayer != null;
 
     return Container(
       decoration: BoxDecoration(
@@ -1334,7 +1431,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                 Icon(Icons.psychology_alt_outlined, color: gold, size: 22.sp),
                 SizedBox(width: 10.w),
                 Text(
-                  'ما الذي يسبب تأخيرك؟',
+                  'تحليل وتوقيت الصلوات',
                   style: TextStyle(
                     fontFamily: AppConsts.expoArabic,
                     fontSize: 16.sp,
@@ -1352,22 +1449,34 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                 Container(
                   padding: EdgeInsets.all(12.w),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE53935).withValues(alpha: 0.08),
+                    color: hasDelays
+                        ? const Color(0xFFE53935).withValues(alpha: 0.08)
+                        : gold.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(color: const Color(0xFFE53935).withValues(alpha: 0.2)),
+                    border: Border.all(
+                      color: hasDelays
+                          ? const Color(0xFFE53935).withValues(alpha: 0.2)
+                          : gold.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.lightbulb_outline_rounded, color: const Color(0xFFE53935), size: 20.sp),
+                      Icon(
+                        hasDelays ? Icons.lightbulb_outline_rounded : Icons.check_circle_outline_rounded,
+                        color: hasDelays ? const Color(0xFFE53935) : gold,
+                        size: 20.sp,
+                      ),
                       SizedBox(width: 10.w),
                       Expanded(
                         child: Text(
-                          'أكثر صلاة بحاجة لمزيد من الحرص: $mostDelayedPrayer',
+                          hasDelays
+                              ? 'أكثر صلاة بحاجة لمزيد من الحرص: $mostDelayedPrayer'
+                              : 'أحسنت! لا يوجد تأخير مسجل في صلواتك',
                           style: TextStyle(
                             fontFamily: AppConsts.expoArabic,
                             fontSize: 12.5.sp,
                             fontWeight: FontWeight.bold,
-                            color: const Color(0xFFE53935),
+                            color: hasDelays ? const Color(0xFFE53935) : gold,
                           ),
                         ),
                       ),
@@ -1379,7 +1488,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                   final ot = prayerOnTimeCount[p] ?? 0;
                   final dl = prayerDelayCount[p] ?? 0;
                   final total = ot + dl;
-                  final onTimePct = total > 0 ? (ot / total) : 0.0;
+                  final onTimePct = total > 0 ? (ot / total) : 1.0;
 
                   return Padding(
                     padding: EdgeInsets.only(bottom: 10.h),
@@ -1398,11 +1507,13 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                               ),
                             ),
                             Text(
-                              '${(onTimePct * 100).round()}% في وقتها',
+                              total > 0 ? '${(onTimePct * 100).round()}% في وقتها' : 'لم تُسجل بعد',
                               style: TextStyle(
                                 fontFamily: AppConsts.cairo,
                                 fontSize: 11.sp,
-                                color: onTimePct >= 0.7 ? const Color(0xFF00897B) : const Color(0xFFE65100),
+                                color: total == 0
+                                    ? textColor.withValues(alpha: 0.4)
+                                    : (onTimePct >= 0.7 ? gold : const Color(0xFFE65100)),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -1412,11 +1523,11 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                         ClipRRect(
                           borderRadius: BorderRadius.circular(4.r),
                           child: LinearProgressIndicator(
-                            value: onTimePct,
+                            value: total > 0 ? onTimePct : 0.0,
                             minHeight: 6.h,
-                            backgroundColor: const Color(0xFFE53935).withValues(alpha: 0.2),
+                            backgroundColor: (total > 0 ? const Color(0xFFE53935) : textColor).withValues(alpha: 0.15),
                             valueColor: AlwaysStoppedAnimation(
-                              onTimePct >= 0.7 ? const Color(0xFF00897B) : const Color(0xFFFBC02D),
+                              onTimePct >= 0.7 ? gold : const Color(0xFFFBC02D),
                             ),
                           ),
                         ),
@@ -1482,7 +1593,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
 
                     if (status == 'ontime') {
                       statusText = "في وقتها";
-                      statusColor = const Color(0xFF2E7D32);
+                      statusColor = gold;
                       iconData = Icons.check_circle;
                     } else if (status == 'late') {
                       statusText = "متأخراً";
@@ -1578,24 +1689,35 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
     final displayMonth = DateTime(now.year, now.month + _calendarMonthOffset, 1);
     
     int expectedPrayers = 0;
-    if (displayMonth.year == now.year && displayMonth.month == now.month) {
-      int daysPassed = now.day - 1;
-      expectedPrayers += daysPassed * 5;
-      final cp = PrayerService().getPrayerTimes()?.currentPrayer() ?? Prayer.none;
-      if (cp == Prayer.fajr) {
-        expectedPrayers += 1;
-      } else if (cp == Prayer.dhuhr) {
-        expectedPrayers += 2;
-      } else if (cp == Prayer.asr) {
-        expectedPrayers += 3;
-      } else if (cp == Prayer.maghrib) {
-        expectedPrayers += 4;
-      } else if (cp == Prayer.isha) {
-        expectedPrayers += 5;
+    final monthStart = DateTime(displayMonth.year, displayMonth.month, 1);
+    final monthEnd = DateTime(displayMonth.year, displayMonth.month, DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month));
+
+    if (!monthEnd.isBefore(_trackingStartDate)) {
+      final effectiveStart = _trackingStartDate.isAfter(monthStart) ? _trackingStartDate : monthStart;
+      final effectiveEnd = now.isBefore(monthEnd) ? DateTime(now.year, now.month, now.day) : monthEnd;
+
+      if (!effectiveStart.isAfter(effectiveEnd)) {
+        if (displayMonth.year == now.year && displayMonth.month == now.month) {
+          final daysBeforeToday = (DateTime(now.year, now.month, now.day).difference(effectiveStart).inDays).clamp(0, 31);
+          expectedPrayers += daysBeforeToday * 5;
+
+          final cp = PrayerService().getPrayerTimes()?.currentPrayer() ?? Prayer.none;
+          if (cp == Prayer.fajr) {
+            expectedPrayers += 1;
+          } else if (cp == Prayer.dhuhr) {
+            expectedPrayers += 2;
+          } else if (cp == Prayer.asr) {
+            expectedPrayers += 3;
+          } else if (cp == Prayer.maghrib) {
+            expectedPrayers += 4;
+          } else if (cp == Prayer.isha) {
+            expectedPrayers += 5;
+          }
+        } else {
+          final totalDays = (effectiveEnd.difference(effectiveStart).inDays + 1).clamp(0, 31);
+          expectedPrayers += totalDays * 5;
+        }
       }
-    } else if (displayMonth.isBefore(now)) {
-      int daysInMonth = DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month);
-      expectedPrayers += daysInMonth * 5;
     }
 
     final monthEntries = _monthLog.entries.where((e) {
@@ -1603,7 +1725,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
         final d = DateTime.parse(e.key);
         return d.year == displayMonth.year && d.month == displayMonth.month;
       } catch (_) { return false; }
-    });
+    }).toList();
 
     for (final entry in monthEntries) {
       for (final status in entry.value.values) {
@@ -1614,8 +1736,16 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
         }
       }
     }
-    totalMissed = expectedPrayers - (totalOnTime + totalLate);
-    if (totalMissed < 0) totalMissed = 0;
+    totalMissed = (expectedPrayers - (totalOnTime + totalLate)).clamp(0, expectedPrayers);
+
+    // Number of active tracking days in the current display month
+    int trackedDaysInMonth = 0;
+    for (int d = 1; d <= DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month); d++) {
+      final date = DateTime(displayMonth.year, displayMonth.month, d);
+      if (!date.isAfter(now) && !date.isBefore(_trackingStartDate)) {
+        trackedDaysInMonth++;
+      }
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -1652,27 +1782,26 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
               children: [
                 Row(
                   children: [
-                    _statBubble('في وقتها', totalOnTime, const Color(0xFF2E7D32), textColor),
+                    _statBubble('في وقتها', totalOnTime, gold, textColor),
                     SizedBox(width: 8.w),
                     _statBubble('متأخراً', totalLate, const Color(0xFFE65100), textColor),
                     SizedBox(width: 8.w),
-                    _statBubble('فائتة', totalMissed, const Color(0xFFB0BEC5), textColor),
+                    _statBubble('فائتة', totalMissed, const Color(0xFFE53935), textColor),
                   ],
                 ),
                 SizedBox(height: 20.h),
                 ..._prayers.map((prayer) {
                   int pOnTime = 0, pLate = 0;
-                  for (final log in _monthLog.values) {
-                    final s = log[prayer];
+                  for (final entry in monthEntries) {
+                    final s = entry.value[prayer];
                     if (s == 'ontime') {
                       pOnTime++;
                     } else if (s == 'late') {
                       pLate++;
                     }
                   }
-                  final pTotal = _monthLog.length;
                   final pDone = pOnTime + pLate;
-                  final pct = pTotal > 0 ? pDone / pTotal : 0.0;
+                  final pct = trackedDaysInMonth > 0 ? (pDone / trackedDaysInMonth) : (pDone > 0 ? 1.0 : 0.0);
 
                   return Padding(
                     padding: EdgeInsets.only(bottom: 12.h),
@@ -1701,9 +1830,9 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
                                   height: 10.h,
                                   decoration: BoxDecoration(
                                     color: pct > 0.8
-                                        ? const Color(0xFF2E7D32)
+                                        ? gold
                                         : pct > 0.4
-                                            ? gold
+                                            ? const Color(0xFFFBC02D)
                                             : const Color(0xFFE65100),
                                     borderRadius: BorderRadius.circular(6.r),
                                   ),
@@ -1776,15 +1905,15 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
         TextButton(
           onPressed: () => Navigator.pop(ctx, 'ontime'),
           style: TextButton.styleFrom(
-            backgroundColor: const Color(0xFF2E7D32).withValues(alpha: 0.1),
+            backgroundColor: const Color(0xFFD0A871).withValues(alpha: 0.15),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
             padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
           ),
-          child: Text('في وقتها ✓',
+          child: const Text('في وقتها ✓',
               style: TextStyle(
                   fontFamily: AppConsts.expoArabic,
-                  fontSize: 14.sp,
-                  color: const Color(0xFF2E7D32),
+                  fontSize: 14,
+                  color: Color(0xFFD0A871),
                   fontWeight: FontWeight.bold)),
         ),
         TextButton(

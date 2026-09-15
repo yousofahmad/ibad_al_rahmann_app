@@ -70,7 +70,11 @@ class _MobileMinPageRichTextState extends State<MobileMinPageRichText> {
                     : (widget.pageNumber.isEven ? 20.w : 5.w),
               ),
               width: double.infinity, // increase width constraints
-              child: WbwPageWidget(pageNumber: widget.pageNumber),
+              child: WbwPageWidget(
+                pageNumber: widget.pageNumber,
+                showHeader: false,
+                showPageNumber: false,
+              ),
             ),
           ),
         ],

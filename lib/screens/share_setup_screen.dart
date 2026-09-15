@@ -823,9 +823,17 @@ class _VersesSection extends StatelessWidget {
 
     if (provider.isMushafFormat && provider.mushafLines != null) {
       const double baseFontSize = 75.0; // Optimized for 980px width
+      final visibleLines = provider.mushafLines!.where((line) {
+        return line.any((w) =>
+            w.lineType == 'surah_name' ||
+            w.lineType == 'basmallah' ||
+            (w.suraNumber == provider.surahNumber &&
+                provider.isInRange(w.ayahNumber ?? 0)));
+      }).toList();
+
       return Column(
         mainAxisSize: MainAxisSize.min,
-        children: provider.mushafLines!.map((line) {
+        children: visibleLines.map((line) {
           final firstWord = line.first;
           final pageNum = firstWord.pageNumber ?? 1;
           final fontFamily = FontsHelper.getFontFamily(pageNum);
@@ -885,6 +893,9 @@ class _VersesSection extends StatelessWidget {
     final List<InlineSpan> spans = [];
     final allWords = provider.allWords!;
     const double normalFontSize = 65.0; 
+    final firstFontFamily = allWords.isNotEmpty
+        ? FontsHelper.getFontFamily(allWords.first.pageNumber ?? 1)
+        : 'uthmanic';
 
     for (int i = 0; i < allWords.length; i++) {
       final word = allWords[i];
@@ -907,7 +918,18 @@ class _VersesSection extends StatelessWidget {
       if (isMarker) {
         spans.add(WidgetSpan(
           alignment: PlaceholderAlignment.middle,
-          child: _buildWordWidget(word, true, normalFontSize, fontFamily),
+          baseline: TextBaseline.alphabetic,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: AyahMarkerWidget(
+              ayahNumber: word.ayahNumber ?? 0,
+              size: normalFontSize * 1.05,
+              fontSize: normalFontSize * 0.36,
+              numberColor: textColor.computeLuminance() > 0.5
+                  ? const Color(0xFFFFF8E1)
+                  : const Color(0xFF3E2723),
+            ),
+          ),
         ));
         spans.add(const TextSpan(text: ' '));
       } else {
@@ -917,10 +939,10 @@ class _VersesSection extends StatelessWidget {
             fontFamily: fontFamily,
             fontSize: normalFontSize,
             color: textColor,
-            height: 1.3, 
+            height: 1.6, 
           ),
         ));
-        if (i < allWords.length - 1 && allWords[i+1].lineType != 'surah_name') {
+        if (i < allWords.length - 1 && allWords[i+1].lineType != 'surah_name' && !_isMarker(allWords[i+1])) {
           spans.add(const TextSpan(text: ' '));
         }
       }
@@ -930,11 +952,18 @@ class _VersesSection extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Container(
         width: contentWidth,
-        padding: EdgeInsets.zero,
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        alignment: Alignment.center,
         child: Text.rich(
           TextSpan(children: spans),
-          textAlign: TextAlign.justify,
+          textAlign: TextAlign.center,
           textDirection: TextDirection.rtl,
+          strutStyle: StrutStyle(
+            fontFamily: firstFontFamily,
+            fontSize: normalFontSize,
+            height: 1.6,
+            forceStrutHeight: true,
+          ),
         ),
       ),
     );

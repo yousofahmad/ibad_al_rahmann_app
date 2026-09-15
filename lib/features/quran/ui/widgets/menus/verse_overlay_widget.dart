@@ -175,7 +175,7 @@ class _VerseBottomSheetState extends State<VerseBottomSheet> {
                 : () {
                     context.pop();
                     cubit.show();
-                    cubit.initVerse();
+                    cubit.initVerse(autoPlay: true);
                   },
             icon: const Icon(
               Icons.play_circle_filled_rounded,

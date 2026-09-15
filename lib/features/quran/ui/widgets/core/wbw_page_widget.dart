@@ -18,8 +18,6 @@ import '../components/basmallah.dart';
 import '../../../../../core/helpers/extensions/screen_details.dart';
 import '../../../../../core/theme/quran_theme_extension.dart';
 import '../../../../../core/helpers/fonts_helper.dart';
-import '../../../data/models/selected_verse_model.dart';
-import '../../../../../core/theme/app_colors.dart';
 import '../components/ayah_marker_widget.dart';
 
 import 'package:ibad_al_rahmann/widgets/app_skeleton.dart';
@@ -211,27 +209,7 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
     }
   }
 
-  void _scheduleHighlightClear() {
-    _bookmarkHighlightTimer?.cancel();
-    _bookmarkHighlightTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        try {
-          final playerCubit = context.read<VersePlayerCubit>();
-          // Only clear the highlight if the audio player is not explicitly shown
-          if (!playerCubit.state.showed) {
-            playerCubit.hide();
-          }
-        } catch (e) {
-          debugPrint('Error hiding player cubit on timer: $e');
-        }
-        if (mounted) {
-          setState(() {
-            _selectedWord = null;
-          });
-        }
-      }
-    });
-  }
+
 
   Future<void> _onWordLongPressed(
     BuildContext context,
@@ -320,9 +298,11 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
       );
     }
 
-    final playingVerse = context.select<VersePlayerCubit, VerseModel?>(
-      (cubit) => cubit.state.currentVerse,
+    final playerState = context.select<VersePlayerCubit, VersePlayerState>(
+      (cubit) => cubit.state,
     );
+    final playingVerse = playerState.currentVerse;
+    final activeWordIndex = playerState.activeWordIndex;
     // Read the navigation-highlight coordinates set by Fehres / bookmarks.
     final navHighlightSurah = context.select<QuranCubit, int?>(
       (cubit) => cubit.state.highlightedSurah,
@@ -331,13 +311,6 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
       (cubit) => cubit.state.highlightedAyah,
     );
 
-    // Only trigger the auto-clear timer when the audio player UI is visible.
-    final playerShowed = context.select<VersePlayerCubit, bool>(
-      (cubit) => cubit.state.showed,
-    );
-    if (playingVerse != null && _selectedWord == null && playerShowed) {
-      _scheduleHighlightClear();
-    }
     // Schedule a clear for the nav highlight after 8 s so it doesn't stick.
     if (navHighlightSurah != null) {
       _bookmarkHighlightTimer?.cancel();
@@ -424,94 +397,109 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
         ? Container(
             width: double.infinity,
             color: Colors.transparent,
-            padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16, vertical: 4),
+            padding: EdgeInsets.only(
+              right: isTablet ? 36 : 28,
+              left: isTablet ? 24 : 16,
+              top: 4,
+              bottom: 4,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Right side in RTL: Juz & Hizb/Quarter
+                // Right side in RTL: Juz Number + Hizb badge
                 Flexible(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.only(
-                          right: hizbText.isNotEmpty ? 0 : 4,
-                          left: hizbText.isNotEmpty ? 4 : 4,
-                        ),
-                        child: Text(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
                           'juz${juzNum.toString().padLeft(3, '0')}',
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
                           style: TextStyle(
                             fontFamily: AppConsts.quranCommon,
                             color: headerTextColor,
                             fontSize: hizbText.isNotEmpty
-                                ? (isTablet ? 26 : 18)
-                                : (isTablet ? 34 : 24),
+                                ? (isTablet ? 24 : 18)
+                                : (isTablet ? 28 : 20),
                             height: 1.0,
                           ),
                         ),
-                      ),
-                      if (hizbText.isNotEmpty) ...[
-                        const SizedBox(width: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFD0A871).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            hizbText,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontFamily: AppConsts.cairo,
-                              color: const Color(0xFFD0A871),
-                              fontSize: isTablet ? 12 : 9.5,
+                        if (hizbText.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFD0A871).withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                hizbText,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: AppConsts.cairo,
+                                  color: const Color(0xFFD0A871),
+                                  fontSize: isTablet ? 12 : 9.5,
+                                  height: 1.1,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
                       ],
-                    ],
+                    ),
                   ),
                 ),
-                // Left side in RTL: Surah Name(s) with scaling
+
+                // Left side in RTL: Surah Name(s)
                 Flexible(
-                  child: pageSurahs.length > 1
-                      ? FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: pageSurahs.map((sNum) {
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 2,
-                                ),
-                                child: Text(
-                                  'surah${sNum.toString().padLeft(3, '0')}',
-                                  style: TextStyle(
-                                    fontFamily: 'SurahNames',
-                                    color: headerTextColor,
-                                    fontSize: isTablet ? 30 : 22,
-                                    height: 1.0,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: pageSurahs.length > 1
+                        ? FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: pageSurahs.map((sNum) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                                  child: Text(
+                                    'surah${sNum.toString().padLeft(3, '0')}',
+                                    style: TextStyle(
+                                      fontFamily: 'SurahNames',
+                                      color: headerTextColor,
+                                      fontSize: isTablet ? 26 : 20,
+                                      height: 1.0,
+                                    ),
                                   ),
-                                ),
-                              );
-                            }).toList(),
+                                );
+                              }).toList(),
+                            ),
+                          )
+                        : FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'surah${surahNum.toString().padLeft(3, '0')}',
+                              style: TextStyle(
+                                fontFamily: 'SurahNames',
+                                color: headerTextColor,
+                                fontSize: isTablet ? 28 : 22,
+                                height: 1.0,
+                              ),
+                            ),
                           ),
-                        )
-                      : Text(
-                          'surah${surahNum.toString().padLeft(3, '0')}',
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.end,
-                          style: TextStyle(
-                            fontFamily: 'SurahNames',
-                            color: headerTextColor,
-                            fontSize: isTablet ? 36 : 30,
-                            height: 1.0,
-                          ),
-                        ),
+                  ),
                 ),
               ],
             ),
@@ -681,21 +669,21 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                     for (int wIdx = 0; wIdx < lineWords.length; wIdx++) {
                       final word = lineWords[wIdx];
 
+                      final int currentWSura = word.suraNumber ?? surahNum;
+                      final int currentWAyah = word.ayahNumber ?? 0;
+                      final bool isVisible = isWordInRange(currentWSura, currentWAyah);
+
                       final bool isHighlighted =
                           (playingVerse != null &&
-                              playingVerse.surahNumber == word.suraNumber &&
-                              playingVerse.verseNumber == word.ayahNumber) ||
+                              playingVerse.surahNumber == currentWSura &&
+                              playingVerse.verseNumber == currentWAyah) ||
                           (_selectedWord != null &&
-                              _selectedWord!.suraNumber == word.suraNumber &&
-                              _selectedWord!.ayahNumber == word.ayahNumber) ||
+                              (_selectedWord!.suraNumber ?? surahNum) == currentWSura &&
+                              (_selectedWord!.ayahNumber ?? 0) == currentWAyah) ||
                           (navHighlightSurah != null &&
                               navHighlightAyah != null &&
-                              word.suraNumber == navHighlightSurah &&
-                              word.ayahNumber == navHighlightAyah);
-
-                      int currentWSura = word.suraNumber ?? surahNum;
-                      int currentWAyah = word.ayahNumber ?? 0;
-                      bool isVisible = isWordInRange(currentWSura, currentWAyah);
+                              currentWSura == navHighlightSurah &&
+                              currentWAyah == navHighlightAyah);
 
                       Color textColor =
                           widget.textColorOverride ??
@@ -731,13 +719,23 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
 
                         Widget marker = Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                          child: AyahMarkerWidget(
-                            ayahNumber: currentWAyah,
-                            size: markerSize,
-                            fontSize: markerFontSize,
-                            numberColor: isDarkPaper
-                                ? const Color(0xFFFFF8E1)
-                                : const Color(0xFF3E2723),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: isHighlighted && isVisible
+                                  ? const Color(0xFFE5A93C).withValues(
+                                      alpha: isDarkPaper ? 0.55 : 0.45,
+                                    )
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(markerSize),
+                            ),
+                            child: AyahMarkerWidget(
+                              ayahNumber: currentWAyah,
+                              size: markerSize,
+                              fontSize: markerFontSize,
+                              numberColor: isDarkPaper
+                                  ? const Color(0xFFFFF8E1)
+                                  : const Color(0xFF3E2723),
+                            ),
                           ),
                         );
                         if (!isVisible) {
@@ -758,20 +756,38 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                                   );
                                 }
                               },
-                              child: Container(
-                                color: isHighlighted && isVisible
-                                    ? AppColors.lime.withAlpha(128)
-                                    : Colors.transparent,
-                                child: Text(
-                                  word.text,
-                                  style: const TextStyle(height: 1.0).copyWith(
-                                    fontFamily: _fontFamily,
-                                    fontSize: canvasFontSize,
-                                    color: textColor,
-                                    fontWeight: FontWeight.normal,
+                              child: () {
+                                final bool isWordActive = (playingVerse != null &&
+                                    playingVerse.surahNumber == currentWSura &&
+                                    playingVerse.verseNumber == currentWAyah &&
+                                    activeWordIndex != null &&
+                                    word.position == activeWordIndex);
+
+                                final bool showHighlight = (isHighlighted || isWordActive) && isVisible;
+                                final Color highlightColor = isWordActive
+                                    ? const Color(0xFFE5A93C).withValues(
+                                        alpha: isDarkPaper ? 0.85 : 0.70,
+                                      )
+                                    : const Color(0xFFE5A93C).withValues(
+                                        alpha: isDarkPaper ? 0.55 : 0.45,
+                                      );
+
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    color: showHighlight ? highlightColor : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(4),
                                   ),
-                                ),
-                              ),
+                                  child: Text(
+                                    word.text,
+                                    style: const TextStyle(height: 1.0).copyWith(
+                                      fontFamily: _fontFamily,
+                                      fontSize: canvasFontSize,
+                                      color: textColor,
+                                      fontWeight: isWordActive ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                );
+                              }(),
                             ),
                           );
                         }

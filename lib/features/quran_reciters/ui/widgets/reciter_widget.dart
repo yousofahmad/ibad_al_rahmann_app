@@ -13,7 +13,7 @@ import '../../data/models/reciter_model.dart';
 
 class ReciterWidget extends StatelessWidget {
   const ReciterWidget({super.key, required this.reciter});
-  final ReciterModel reciter;
+  final ReciterAudioModel reciter;
 
   @override
   Widget build(BuildContext context) {
@@ -29,30 +29,89 @@ class ReciterWidget extends StatelessWidget {
         },
         child: Container(
           width: 340.w,
-          padding: EdgeInsets.symmetric(vertical: 20.h, horizontal: 20.w),
+          padding: EdgeInsets.symmetric(vertical: 16.h, horizontal: 20.w),
           decoration: BoxDecoration(
             image: const DecorationImage(
               image: AssetImage(AppAssets.imagesGreenColor),
               fit: BoxFit.cover,
             ),
-            borderRadius: BorderRadius.circular(100),
+            borderRadius: BorderRadius.circular(24.r),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: Text(
-                  reciter.name,
-                  style: AppStyles.style22expo.copyWith(
-                    fontSize: (context.isTablet || context.isLandscape)
-                        ? 18.sp
-                        : null,
-                  ),
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      reciter.name,
+                      style: AppStyles.style22expo.copyWith(
+                        fontSize: (context.isTablet || context.isLandscape)
+                            ? 18.sp
+                            : 16.5.sp,
+                        color: Colors.white,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 4.h),
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                          child: Text(
+                            reciter.style,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11.sp,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 6.w),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                          decoration: BoxDecoration(
+                            color: reciter.hasSegments
+                                ? const Color(0xFFD0A871).withValues(alpha: 0.35)
+                                : Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                reciter.hasSegments
+                                    ? Icons.auto_stories_rounded
+                                    : Icons.library_music_rounded,
+                                size: 12.sp,
+                                color: Colors.white,
+                              ),
+                              SizedBox(width: 4.w),
+                              Text(
+                                reciter.hasSegments
+                                    ? 'أصوات متقسمة آيات'
+                                    : 'سورة كاملة فقط',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10.sp,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios_rounded, size: 24),
+              const Icon(Icons.arrow_forward_ios_rounded, size: 20, color: Colors.white),
             ],
           ),
         ),

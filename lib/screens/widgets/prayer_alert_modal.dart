@@ -92,14 +92,15 @@ class PrayerAlertModal extends StatefulWidget {
 class _PrayerAlertModalState extends State<PrayerAlertModal> {
   bool _isConfirmStep = false;
   bool _isAchievementStep = false;
+  int _prayedCountdown = 10;
   int _snoozeCountdown = 5;
-  Timer? _snoozeCountdownTimer;
+  Timer? _countdownTimer;
   Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
-    _startSnoozeCountdown();
+    _startCountdowns();
     _refreshTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -107,19 +108,26 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
 
   @override
   void dispose() {
-    _snoozeCountdownTimer?.cancel();
+    _countdownTimer?.cancel();
     _refreshTimer?.cancel();
     super.dispose();
   }
 
-  void _startSnoozeCountdown() {
+  void _startCountdowns() {
+    _prayedCountdown = 10;
     _snoozeCountdown = 5;
-    _snoozeCountdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (_snoozeCountdown > 0) {
-        if (mounted) setState(() => _snoozeCountdown--);
-      } else {
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
         t.cancel();
+        return;
       }
+      setState(() {
+        if (_prayedCountdown > 0) _prayedCountdown--;
+        if (_snoozeCountdown > 0) _snoozeCountdown--;
+        if (_prayedCountdown <= 0 && _snoozeCountdown <= 0) {
+          t.cancel();
+        }
+      });
     });
   }
 
@@ -361,19 +369,25 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
           width: double.infinity,
           height: 48.h,
           child: ElevatedButton(
-            onPressed: () {
-              setState(() => _isConfirmStep = true);
-            },
+            onPressed: _prayedCountdown == 0
+                ? () {
+                    setState(() => _isConfirmStep = true);
+                  }
+                : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: goldDark,
+              disabledBackgroundColor: goldDark.withValues(alpha: 0.4),
               foregroundColor: Colors.white,
+              disabledForegroundColor: Colors.white70,
               elevation: 4,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20.r),
               ),
             ),
             child: Text(
-              'صليتُ والله ✓',
+              _prayedCountdown > 0
+                  ? 'صليتُ والله ✓ ($_prayedCountdown)'
+                  : 'صليتُ والله ✓',
               style: TextStyle(
                 fontFamily: AppConsts.expoArabic,
                 fontSize: 15.sp,

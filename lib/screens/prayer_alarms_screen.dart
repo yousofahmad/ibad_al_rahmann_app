@@ -41,7 +41,7 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
   @override
   void dispose() {
     if (_hasChanges) {
-      PrayerService().scheduleNotifications(isUserAction: true);
+      PrayerService().scheduleNotificationsDebounced(isUserAction: true);
     }
     super.dispose();
   }
@@ -236,6 +236,37 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
         elevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: _gold),
+        actions: [
+          if (_hasChanges)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12.w),
+              child: Center(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: _gold.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle_outline, color: _gold, size: 14.sp),
+                      SizedBox(width: 4.w),
+                      Text(
+                        'محفوظ',
+                        style: TextStyle(
+                          fontFamily: AppConsts.cairo,
+                          fontSize: 11.sp,
+                          color: _gold,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       body: ListView(
         padding: EdgeInsets.all(16.w),

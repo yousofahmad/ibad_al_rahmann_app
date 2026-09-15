@@ -154,6 +154,8 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen> with TickerProv
       await DailyTrackerService.markKahfDone();
     } else if (widget.isWirdMode && widget.khatmaId != null && widget.wirdIndex != null) {
       context.read<KhatmaCubit>().markWirdAsCompleted(widget.khatmaId!, widget.wirdIndex!);
+      // Auto-save wird completion to daily tracker (Rule 22)
+      await DailyTrackerService.markWirdDone('ورد التلاوة');
     }
 
     if (!mounted) return;
@@ -168,14 +170,36 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen> with TickerProv
         behavior: SnackBarBehavior.fixed,
       ),
     );
-    Navigator.of(context).pop();
+
+    if (!mounted) return;
+    // Restore UI before navigating to avoid black screen
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+    // If launched from a notification the stack may only have this screen.
+    // popUntil(isFirst) goes to home safely; if there are multiple routes, pop() works normally.
+    final nav = Navigator.of(context);
+    if (nav.canPop()) {
+      nav.pop();
+    } else {
+      // Stack is empty (opened directly from notification) — go to first route
+      nav.popUntil((route) => route.isFirst);
+    }
+  }
+
+  void _toggleOverlays() {
+    setState(() {
+      _showOverlays = !_showOverlays;
+      if (_showOverlays) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      }
+    });
   }
 
   void _toggleMenu() {
     setState(() {
       _showMenu = !_showMenu;
-      // We no longer toggle _showOverlays here based on user request.
-      // Single tap only opens/closes the menu.
     });
   }
 
@@ -197,6 +221,11 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen> with TickerProv
             if (_pageController.hasClients) {
               _pageController.jumpToPage(relative);
             }
+          }
+          if (state.layout == QuranLayout.full && _showOverlays) {
+            _toggleOverlays();
+          } else if (state.layout == QuranLayout.min && !_showOverlays) {
+            _toggleOverlays();
           }
         },
         child: Builder(
@@ -347,9 +376,10 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen> with TickerProv
                                 // ── Main Content ──
                                 Expanded(
                                   child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
                                     onTap: _toggleMenu,
                                     onDoubleTap: () {
-                                      setState(() => _showOverlays = !_showOverlays);
+                                      _localQuranCubit.changeLayout();
                                     },
                                     child: PageView.builder(
       allowImplicitScrolling: true,

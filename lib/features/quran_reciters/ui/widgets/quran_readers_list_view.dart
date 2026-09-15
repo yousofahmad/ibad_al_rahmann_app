@@ -10,7 +10,7 @@ import 'reciters_search_bar.dart';
 
 class ReadersBody extends StatelessWidget {
   const ReadersBody({super.key, required this.reciters});
-  final List<ReciterModel> reciters;
+  final List<ReciterAudioModel> reciters;
 
   @override
   Widget build(BuildContext context) {
@@ -42,83 +42,87 @@ class ReadersBody extends StatelessWidget {
         ),
       ],
     );
-    // return Container(
-    //   decoration: const BoxDecoration(
-    //     image: DecorationImage(
-    //       fit: BoxFit.cover,
-    //       image: AssetImage(AppAssets.imagesWhiteBackground),
-    //     ),
-    //   ),
-    //   child: CustomScrollView(
-    //     cacheExtent: 600,
-    //     physics: const ClampingScrollPhysics(),
-    //     slivers: [
-    //       SliverToBoxAdapter(
-    //         child: SizedBox(
-    //           height: 280.h,
-    //           child: Stack(
-    //             children: [
-    //               TopBar(
-    //                 height: 242.h + context.topPadding,
-    //                 label: 'القـــراء',
-    //               ),
-    //               Positioned.fill(
-    //                 top:
-    //                     (context.isTablet ? 180.h : 180.h) + context.topPadding,
-    //                 child: const Align(
-    //                   alignment: Alignment.topCenter,
-    //                   child: RecitersSearchBar(),
-    //                 ),
-    //               ),
-    //             ],
-    //           ),
-    //         ),
-    //       ),
-    //       const SliverToBoxAdapter(child: SizedBox(height: 20)),
-    //       SliverPrototypeExtentList(
-    //         prototypeItem: Padding(
-    //           padding: const EdgeInsets.all(8.0),
-    //           child: ReciterWidget(reciter: reciters[0]),
-    //         ),
-    //         delegate: SliverChildBuilderDelegate(
-    //           childCount: reciters.length,
-    //           (context, index) => Padding(
-    //             padding: const EdgeInsets.only(bottom: 20),
-    //             child: ReciterWidget(reciter: reciters[index]),
-    //           ),
-    //         ),
-    //       ),
-    //     ],
-    //   ),
-    // );
   }
 }
 
 class ReadersListView extends StatelessWidget {
   const ReadersListView({super.key, required this.reciters});
 
-  final List<ReciterModel> reciters;
+  final List<ReciterAudioModel> reciters;
+
+  /// Build a flat list of mixed items: category headers + reciters.
+  /// Each entry is either a String (header) or a ReciterAudioModel.
+  List<Object> _buildFlatList() {
+    // Preserve insertion order of categories as they appear in the list.
+    final List<Object> items = [];
+    String? currentCategory;
+    for (final reciter in reciters) {
+      if (reciter.category != currentCategory) {
+        currentCategory = reciter.category;
+        items.add(currentCategory);
+      }
+      items.add(reciter);
+    }
+    return items;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final items = _buildFlatList();
     return CustomScrollView(
       cacheExtent: 600,
       physics: const ClampingScrollPhysics(),
       slivers: [
-        SliverPrototypeExtentList(
-          prototypeItem: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ReciterWidget(reciter: reciters[0]),
-          ),
+        SliverList(
           delegate: SliverChildBuilderDelegate(
-            childCount: reciters.length,
-            (context, index) => Padding(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: ReciterWidget(reciter: reciters[index]),
-            ),
+            childCount: items.length,
+            (context, index) {
+              final item = items[index];
+              if (item is String) {
+                return _CategoryHeader(label: item);
+              }
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: ReciterWidget(reciter: item as ReciterAudioModel),
+              );
+            },
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CategoryHeader extends StatelessWidget {
+  const _CategoryHeader({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(28.w, 16.h, 28.w, 6.h),
+      child: Row(
+        children: [
+          Container(
+            width: 4.w,
+            height: 18.h,
+            decoration: BoxDecoration(
+              color: const Color(0xFFD0A871),
+              borderRadius: BorderRadius.circular(2.r),
+            ),
+          ),
+          SizedBox(width: 8.w),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF5A3E1B),
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

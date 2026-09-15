@@ -12,7 +12,7 @@ import 'surah_player_controllers.dart';
 
 class SurahOverlayPlayer extends StatelessWidget {
   const SurahOverlayPlayer({super.key, required this.reciter});
-  final ReciterModel reciter;
+  final ReciterAudioModel reciter;
 
   @override
   Widget build(BuildContext context) {
@@ -37,9 +37,12 @@ class SurahOverlayPlayer extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             Text(
-              cubit.currentReciterName!,
+              reciter.hasSegments
+                  ? '${cubit.currentReciterName!} • أصوات متقسمة آيات'
+                  : '${cubit.currentReciterName!} • سورة كاملة فقط (تظليل الآيات: لا يوجد)',
               style: AppStyles.style20harmattan.copyWith(
                 color: Colors.grey.shade200,
+                fontSize: 14,
               ),
               overflow: TextOverflow.ellipsis,
             ),

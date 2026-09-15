@@ -399,29 +399,32 @@ class PrayerService extends ChangeNotifier {
 
     final times = getPrayerTimes();
     if (times != null) {
-      await NotificationService.schedulePrayerNotifications(times, isUserAction: isUserAction);
-      await updatePersistentElements();
-      
-      try {
-        final now = DateTime.now();
-        // Schedule refresh 1 hour after Isha
-        DateTime scheduleTime = times.isha.add(const Duration(hours: 1));
-        if (scheduleTime.isBefore(now)) {
-          scheduleTime = scheduleTime.add(const Duration(days: 1));
+      // Offload heavy notification scheduling & updates to background so caller/UI doesn't freeze
+      unawaited(() async {
+        try {
+          await NotificationService.schedulePrayerNotifications(times, isUserAction: isUserAction);
+          await updatePersistentElements();
+          
+          final now = DateTime.now();
+          // Schedule refresh 1 hour after Isha
+          DateTime scheduleTime = times.isha.add(const Duration(hours: 1));
+          if (scheduleTime.isBefore(now)) {
+            scheduleTime = scheduleTime.add(const Duration(days: 1));
+          }
+          
+          AndroidAlarmManager.periodic(
+            const Duration(hours: 24),
+            0,
+            backgroundWidgetUpdateCallback,
+            startAt: scheduleTime,
+            exact: true,
+            wakeup: true,
+            rescheduleOnReboot: true,
+          );
+        } catch (e) {
+          debugPrint("Error in async notification scheduling: $e");
         }
-        
-        AndroidAlarmManager.periodic(
-          const Duration(hours: 24),
-          0,
-          backgroundWidgetUpdateCallback,
-          startAt: scheduleTime,
-          exact: true,
-          wakeup: true,
-          rescheduleOnReboot: true,
-        );
-      } catch (e) {
-        debugPrint("Error scheduling periodic background refresh: $e");
-      }
+      }());
     }
   }
 
@@ -864,7 +867,7 @@ class PrayerService extends ChangeNotifier {
 
   Future<void> scheduleNotificationsDebounced({bool isUserAction = true}) async {
     if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 2500), () {
+    _debounceTimer = Timer(const Duration(milliseconds: 800), () {
       scheduleNotifications(isUserAction: isUserAction);
     });
   }
@@ -993,27 +996,6 @@ class PrayerService extends ChangeNotifier {
     }
 
     final h = HijriCalendar.fromDate(effectiveDate);
-    // ── تصحيح يوم 29 → 30 ──────────────────────────────────────────────
-    // بعض الأشهر الهجرية 29 يوماً لكن المكتبة تُرجع 29 حتى لو اليوم هو 30
-    // نتحقق: لو اليوم 29 وبكرا هيكون أول الشهر الجاي → نعرض 30
-    if (h.hDay == 29) {
-      final tomorrow = effectiveDate.add(const Duration(days: 1));
-      final tomorrowH = HijriCalendar.fromDate(tomorrow);
-      if (tomorrowH.hMonth != h.hMonth || tomorrowH.hYear != h.hYear) {
-        // اليوم آخر الشهر — تحقق هل الشهر 29 فعلاً أم المكتبة قصّرته
-        // نُرجع نفس الكائن مع تعديل hDay لـ 30 إذا كان الشهر الجاي بدأ مبكراً
-        final lastDayCheck = effectiveDate.add(const Duration(days: 1));
-        final nextH = HijriCalendar.fromDate(lastDayCheck);
-        if (nextH.hDay == 1) {
-          // المكتبة انتقلت للشهر الجديد بعد 29 — نعرض 30 للمستخدم
-          final corrected = HijriCalendar();
-          corrected.hYear = h.hYear;
-          corrected.hMonth = h.hMonth;
-          corrected.hDay = 30;
-          return corrected;
-        }
-      }
-    }
     return h;
   }
 

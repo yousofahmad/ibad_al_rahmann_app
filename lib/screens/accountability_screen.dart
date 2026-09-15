@@ -10,6 +10,7 @@ import '../services/daily_tracker_service.dart';
 
 import 'package:ibad_al_rahmann/main.dart'; // To access scaffoldMessengerKey
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 
 class AccountabilityScreen extends StatefulWidget {
   const AccountabilityScreen({super.key});
@@ -59,6 +60,10 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
   final Map<String, bool> _goodDeeds = {};
 
   bool _isLoading = true;
+  bool _isKahfDone = false;
+  bool _isFriday = false;
+  List<String> _wirdsDoneToday = [];
+  int _salawatCount = 0;
 
   @override
   void initState() {
@@ -114,6 +119,28 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
     _loadMapFromPrefs(prefs, 'temp_azkar', _azkar);
     _loadMapFromPrefs(prefs, 'temp_deeds', _goodDeeds);
 
+    // ✅ دمج الصلوات المسجلة في صلاتي (Prayer Focus) لليوم الحالي
+    final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final focusLogRaw = prefs.getString('prayer_focus_log_$todayKey');
+    if (focusLogRaw != null) {
+      try {
+        final Map<String, dynamic> focusMap = json.decode(focusLogRaw);
+        focusMap.forEach((k, v) {
+          String actualKey = k;
+          if (k == 'الجمعة' && _prayers.containsKey('الظهر')) {
+            actualKey = 'الظهر';
+          }
+          if (_prayers.containsKey(actualKey)) {
+            if (v is Map && v['status'] != null) {
+              _prayers[actualKey] = true;
+            } else if (v == true) {
+              _prayers[actualKey] = true;
+            }
+          }
+        });
+      } catch (_) {}
+    }
+
     // Load Azkar from Service + Prefs
     if (_azkar.containsKey('أذكار الصباح')) {
       _azkar['أذكار الصباح'] = await DailyTrackerService.isDone('morning_azkar');
@@ -137,10 +164,28 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
     }
 
     if (mounted) {
+      // Load Kahf (Friday only) and Wird tracking
+      _isFriday = DateTime.now().weekday == DateTime.friday;
+      if (_isFriday) {
+        _isKahfDone = await DailyTrackerService.isKahfDone();
+      }
+      _wirdsDoneToday = await DailyTrackerService.getWirdsDoneToday();
+      _salawatCount = prefs.getInt('salawat_count_$todayKey') ?? 0;
+
       setState(() {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _updateSalawatCount(int newCount) async {
+    if (newCount < 0) newCount = 0;
+    setState(() {
+      _salawatCount = newCount;
+    });
+    final prefs = CacheHelper.prefs;
+    final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    await prefs.setInt('salawat_count_$todayKey', newCount);
   }
 
   // دالة مساعدة لفك تشفير الماب المحفوظة
@@ -177,6 +222,22 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
 
     final prefs = CacheHelper.prefs;
     await prefs.setString(key, json.encode(map));
+
+    if (key == 'temp_prayers') {
+      final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final logKey = 'prayer_focus_log_$todayKey';
+      final focusLogRaw = prefs.getString(logKey);
+      final focusMap = <String, dynamic>{};
+      if (focusLogRaw != null) {
+        try { focusMap.addAll(json.decode(focusLogRaw)); } catch (_) {}
+      }
+      if (value) {
+        focusMap[itemKey] = {'status': 'present', 'ts': DateTime.now().millisecondsSinceEpoch};
+      } else {
+        focusMap.remove(itemKey);
+      }
+      await prefs.setString(logKey, json.encode(focusMap));
+    }
 
     // ✅ حفظ فوري للإحصائيات (Auto-Save)
     await _saveStatsSilent();
@@ -231,30 +292,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
     }
   }
 
-  // دالة حفظ السجل التاريخي (الإحصائيات النهائية)
-  Future<void> _saveProgressToHistory() async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final snackBg = isDark ? const Color(0xFF000000) : const Color(0xFFD0A871);
-    const snackText = Colors.white;
 
-    await _saveStatsSilent();
-
-    if (!mounted) return;
-    scaffoldMessengerKey.currentState?.showSnackBar(
-      SnackBar(
-        content: const Text(
-          "تم حفظ إنجاز اليوم في السجل! تقبل الله",
-          style: TextStyle(
-            fontFamily: AppConsts.expoArabic,
-            color: snackText,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: snackBg,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-      ),
-    );
-  }
 
   Future<void> _reviewOldEntry() async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -587,6 +625,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final textColor = isDark ? Colors.white : Colors.black87;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -717,6 +756,69 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                             "temp_quran",
                             _defaultQuran,
                           ),
+
+                          // ✅ سورة الكهف (يوم الجمعة فقط)
+                          if (_isFriday)
+                            Container(
+                              margin: EdgeInsets.only(bottom: 12.h),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF000000) : Colors.white,
+                                borderRadius: BorderRadius.circular(16.r),
+                                border: Border.all(color: const Color(0xFFD0A871).withValues(alpha: 0.5)),
+                              ),
+                              child: CheckboxListTile(
+                                activeColor: const Color(0xFFD0A871),
+                                checkColor: Colors.white,
+                                value: _isKahfDone,
+                                onChanged: (val) async {
+                                  if (val == true) {
+                                    await DailyTrackerService.markKahfDone();
+                                    setState(() => _isKahfDone = true);
+                                  }
+                                },
+                                title: Text(
+                                  'قراءة سورة الكهف 📖',
+                                  style: TextStyle(
+                                    fontFamily: AppConsts.expoArabic,
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? Colors.white : Colors.black87,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  'من قرأ سورة الكهف في يوم الجمعة أضاء له النور',
+                                  style: TextStyle(fontFamily: AppConsts.expoArabic, fontSize: 11.sp, color: const Color(0xFFD0A871)),
+                                ),
+                              ),
+                            ),
+
+                          // ✅ الورد المنجز اليوم (يتحدد تلقائياً)
+                          if (_wirdsDoneToday.isNotEmpty)
+                            Container(
+                              margin: EdgeInsets.only(bottom: 12.h),
+                              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(16.r),
+                                border: Border.all(color: Colors.green.withValues(alpha: 0.35)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.check_circle, color: Colors.green, size: 22),
+                                  SizedBox(width: 10.w),
+                                  Expanded(
+                                    child: Text(
+                                      'أتممت الورد اليوم: ${_wirdsDoneToday.join('، ')} ✅',
+                                      style: TextStyle(fontFamily: AppConsts.expoArabic, fontSize: 13.sp, color: Colors.green),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                          // ✅ عداد الصلاة على النبي ﷺ
+                          _buildSalawatCounterCard(isDark, textColor),
+
                           _buildSection(
                             "الأذكار",
                             "ألا بذكر الله تطمئن القلوب",
@@ -734,28 +836,39 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
 
                           SizedBox(height: 20.h),
 
-                          // زر الحفظ النهائي
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFD0A871),
-                              minimumSize: Size(double.infinity, 55.h),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15.r),
-                              ),
-                              elevation: 5,
-                              shadowColor: const Color(
-                                0xFFD0A871,
-                              ).withValues(alpha: 0.5),
+                          // مؤشر الحفظ التلقائي
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.symmetric(
+                              vertical: 14.h,
+                              horizontal: 16.w,
                             ),
-                            onPressed: _saveProgressToHistory,
-                            child: Text(
-                              "تسجيل اليوم في السجل",
-                              style: TextStyle(
-                                fontFamily: AppConsts.expoArabic,
-                                fontSize: 18.sp,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD0A871).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(15.r),
+                              border: Border.all(
+                                color: const Color(0xFFD0A871).withValues(alpha: 0.35),
                               ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.check_circle_outline_rounded,
+                                  color: Color(0xFFD0A871),
+                                  size: 22,
+                                ),
+                                SizedBox(width: 8.w),
+                                Text(
+                                  "يتم حفظ إنجازك وسجل اليوم تلقائياً",
+                                  style: TextStyle(
+                                    fontFamily: AppConsts.expoArabic,
+                                    fontSize: 14.sp,
+                                    color: const Color(0xFFD0A871),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           SizedBox(height: 20.h),
@@ -765,6 +878,120 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                   ],
                 ),
               ),
+      ),
+    );
+  }
+
+  Widget _buildSalawatCounterCard(bool isDark, Color textColor) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 20.h),
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF000000) : Colors.white,
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(
+          color: const Color(0xFFD0A871).withValues(alpha: 0.5),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10.r,
+            offset: Offset(0, 5.h),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "الصلاة على النبي ﷺ",
+                style: TextStyle(
+                  fontFamily: AppConsts.expoArabic,
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFFD0A871),
+                ),
+              ),
+              if (_salawatCount > 0)
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 20, color: Colors.grey),
+                  tooltip: "إعادة ضبط العداد",
+                  onPressed: () => _updateSalawatCount(0),
+                ),
+            ],
+          ),
+          SizedBox(height: 8.h),
+          InkWell(
+            onTap: () => _updateSalawatCount(_salawatCount + 1),
+            borderRadius: BorderRadius.circular(16.r),
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(vertical: 18.h),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD0A871).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(16.r),
+                border: Border.all(color: const Color(0xFFD0A871).withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    _salawatCount.toArabicNums,
+                    style: TextStyle(
+                      fontFamily: AppConsts.expoArabic,
+                      fontSize: 34.sp,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFFD0A871),
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    "اضغط هنا لزيادة العداد +1",
+                    style: TextStyle(
+                      fontFamily: AppConsts.expoArabic,
+                      fontSize: 11.5.sp,
+                      color: isDark ? Colors.white60 : Colors.black54,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: 12.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildQuickSalawatBtn("+10", 10),
+              _buildQuickSalawatBtn("+33", 33),
+              _buildQuickSalawatBtn("+100", 100),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickSalawatBtn(String label, int add) {
+    return InkWell(
+      onTap: () => _updateSalawatCount(_salawatCount + add),
+      borderRadius: BorderRadius.circular(12.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: const Color(0xFFD0A871).withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: const Color(0xFFD0A871).withValues(alpha: 0.4)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: AppConsts.expoArabic,
+            fontSize: 13.sp,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFFD0A871),
+          ),
+        ),
       ),
     );
   }
@@ -821,12 +1048,13 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                       Text(
                         title,
                         style: TextStyle(
-                          fontFamily: AppConsts.motoNastaliq,
-                          fontSize: 22.sp,
+                          fontFamily: AppConsts.expoArabic,
+                          fontSize: 16.5.sp,
                           fontWeight: FontWeight.bold,
                           color: const Color(0xFFD0A871),
                         ),
                       ),
+                      SizedBox(height: 3.h),
                       Text(
                         subtitle,
                         style: TextStyle(

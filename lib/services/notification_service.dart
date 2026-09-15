@@ -358,11 +358,19 @@ class NotificationService {
           }
         }
 
-        // Kahf & Friday Night Salawat (Merged)
+        // Kahf & Friday Night Salawat (Thursday Night)
         if (targetDate.weekday == DateTime.thursday && (prefs.getBool('notif_kahf_salawat') ?? true)) {
           final kahfTime = dayTimes.isha.add(const Duration(minutes: 60)); 
           if (kahfTime.isAfter(now)) {
             await _scheduleNative(2350 + i, 'ليلة الجمعة', 'لا تنس قراءة سورة الكهف والإكثار من الصلاة على النبي ﷺ', kahfTime.hour, kahfTime.minute, 'saly_3ala_mo7amad', payload: 'kahf', year: kahfTime.year, month: kahfTime.month, day: kahfTime.day, customSoundName: 'saly_3ala_mo7amad');
+          }
+        }
+
+        // Kahf & Friday Salawat (Friday Morning 09:00 AM)
+        if (targetDate.weekday == DateTime.friday && (prefs.getBool('notif_kahf_salawat') ?? true)) {
+          final fridayMorningTime = DateTime(targetDate.year, targetDate.month, targetDate.day, 9, 0);
+          if (fridayMorningTime.isAfter(now)) {
+            await _scheduleNative(2360 + i, 'يوم الجمعة', 'لا تنس قراءة سورة الكهف والإكثار من الصلاة على النبي ﷺ', 9, 0, 'saly_3ala_mo7amad', payload: 'kahf', year: fridayMorningTime.year, month: fridayMorningTime.month, day: fridayMorningTime.day, customSoundName: 'saly_3ala_mo7amad');
           }
         }
 

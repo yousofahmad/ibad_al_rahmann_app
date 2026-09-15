@@ -4,34 +4,14 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'prayer_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import '../core/helpers/islamic_day.dart';
 
 class DailyTrackerService {
   static const String _lastStreakDateKey = 'last_streak_date';
   static const String _dailyPrefix = 'daily_';
 
-  /// Internal helper to get the logical "Cycle Date" for Azkar.
-  /// Morning Azkar cycle resets at Maghrib. Evening Azkar cycle resets at Fajr.
   static Future<String> _getCycleDate(String category) async {
-    final now = DateTime.now();
-    DateTime cycleDate = DateTime(now.year, now.month, now.day);
-
-    if (category == 'morning_azkar' || category == 'evening_azkar') {
-      try {
-        final prayers = await PrayerService().getExtendedPrayers(date: now);
-        if (category == 'morning_azkar') {
-          final maghrib = prayers.firstWhere((p) => p.id == 'maghrib').time;
-          if (now.isAfter(maghrib)) {
-            cycleDate = now.add(const Duration(days: 1));
-          }
-        } else {
-          final fajr = prayers.firstWhere((p) => p.id == 'fajr').time;
-          if (now.isBefore(fajr)) {
-            cycleDate = now.subtract(const Duration(days: 1));
-          }
-        }
-      } catch (_) {}
-    }
-    return DateFormat('yyyy-MM-dd').format(cycleDate);
+    return await IslamicDay.todayKey();
   }
 
   /// Marks a specific category as started for today.
@@ -253,7 +233,7 @@ class DailyTrackerService {
   /// Also handles resetting temporary progress keys for the new day.
   static Future<void> initStatsForToday() async {
     final prefs = CacheHelper.prefs;
-    final String today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final String today = await IslamicDay.todayKey();
 
     // 1. Handle Reset of Temporary Keys
     final String? lastResetDate = prefs.getString('current_day_date');
@@ -283,5 +263,26 @@ class DailyTrackerService {
       };
       await prefs.setString(key, json.encode(initialData));
     }
+  }
+
+  // ─── Wird Completion Helpers ──────────────────────────────────────────────
+
+  /// Marks a Wird as completed for today. Called automatically from isolated_wird_screen.
+  static Future<void> markWirdDone(String wirdTitle) async {
+    final prefs = CacheHelper.prefs;
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final key = 'wird_done_$today';
+    final existing = prefs.getStringList(key) ?? [];
+    if (!existing.contains(wirdTitle)) {
+      existing.add(wirdTitle);
+      await prefs.setStringList(key, existing);
+    }
+  }
+
+  /// Returns list of wirds completed today.
+  static Future<List<String>> getWirdsDoneToday() async {
+    final prefs = CacheHelper.prefs;
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    return prefs.getStringList('wird_done_$today') ?? [];
   }
 }

@@ -7,7 +7,7 @@ final class QuranReadersInitial extends QuranReadersState {}
 final class QuranReadersLoading extends QuranReadersState {}
 
 final class QuranReadersSuccess extends QuranReadersState {
-  final List<ReciterModel> reciters;
+  final List<ReciterAudioModel> reciters;
 
   QuranReadersSuccess({required this.reciters});
 }

@@ -1358,7 +1358,7 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
 
     cubit.toggleExporting(false);
 
-    if (mounted) {
+    if (mounted && Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     }
     widget.onComplete(capturedPaths);

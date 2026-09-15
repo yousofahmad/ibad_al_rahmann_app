@@ -10,7 +10,7 @@ import 'reciters_search_bar.dart';
 
 class LandscapeReadersBody extends StatelessWidget {
   const LandscapeReadersBody({super.key, required this.reciters});
-  final List<ReciterModel> reciters;
+  final List<ReciterAudioModel> reciters;
 
   @override
   Widget build(BuildContext context) {

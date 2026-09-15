@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:ibad_al_rahmann/core/di/di.dart';
 import 'package:ibad_al_rahmann/core/theme/app_assets.dart';
 import 'package:ibad_al_rahmann/features/quran_reciters/data/models/reciter_model.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:lottie/lottie.dart';
 
 import '../../../../core/theme/app_styles.dart';
@@ -13,13 +11,13 @@ import 'surah_widget.dart';
 
 class QuranListView extends StatelessWidget {
   const QuranListView({super.key, required this.qaree});
-  final ReciterModel qaree;
+  final ReciterAudioModel qaree;
 
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<QuranAudioCubit>();
     return FutureBuilder(
-      future: cubit.getQuran(qaree.id),
+      future: cubit.getQuran(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(
@@ -32,16 +30,17 @@ class QuranListView extends StatelessWidget {
         } else if (snapshot.hasData) {
           return ListView.separated(
             padding: const EdgeInsets.symmetric(vertical: 100),
-            itemCount: cubit.reciter.moshafList[0].surahTotal,
+            itemCount: cubit.quran.length,
             itemBuilder: (context, index) {
+              final surahItem = cubit.quran[index];
               return BlocBuilder<QuranPlayerCubit, QuranPlayerState>(
                 buildWhen: (previous, current) {
                   return current is! SliderValueChanged;
                 },
                 builder: (context, state) {
                   return SurahWidget(
-                    index: cubit.reciter.moshafList[0].surahList[index],
-                    selected: isSelected(context, index),
+                    index: surahItem.surahNumber,
+                    selected: isSelected(context, surahItem.surahNumber),
                   );
                 },
               );
@@ -57,8 +56,9 @@ class QuranListView extends StatelessWidget {
     );
   }
 
-  bool isSelected(BuildContext context, int index) {
-    return context.read<QuranPlayerCubit>().selectedSurah == index + 1 &&
-        getIt<AudioPlayer>().playing;
+  bool isSelected(BuildContext context, int surahNumber) {
+    final cubit = context.read<QuranPlayerCubit>();
+    return cubit.selectedSurah == surahNumber && cubit.player.playing;
   }
 }
+

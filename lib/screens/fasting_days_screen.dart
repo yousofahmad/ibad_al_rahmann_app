@@ -11,6 +11,38 @@ import 'package:share_plus/share_plus.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../core/helpers/share_helper.dart';
 
+const List<String> fastingIntentions = [
+  'الدخول من باب الريان',
+  'الإخلاص وعمل السر',
+  'الثبات على طاعة قدر المستطاع',
+  'تحصيل التقوى',
+  'البعد عن النار',
+  'صيام الإثنين والخميس سنة عن رسول الله ﷺ وتعرض فيها الأعمال',
+  'صيام الأيام البيض سنة عن رسول الله ﷺ ويعدل صيام الدهر',
+  'الصوم يشفع للعبد',
+  'طلب العفة ووقاية من الشهوة',
+  'التقرب إلى منزلة حب الله',
+  'اتباع سنة النبي ﷺ للنجاة من فتن الدنيا',
+  'حسن الخاتمة ودخول الجنة',
+  'الفرح عند لقاء الله',
+  'الصيام ستر من النار',
+  'رضا الله عز وجل لخلوف فم الصائم',
+  'التقرب بأفضل الأعمال إلى الله',
+  'تكفير الذنوب',
+  'مجاهدة النفس لنيل الهداية',
+  'إدراك بركة السحور',
+  'إدراك الخيرية في تعجيل الفطر',
+  'تزكية النفس وترويضها على الصبر',
+  'شكر نعمة الصحة بالجوارح',
+  'أن نكون من السبعة الذين يظلهم الله يوم القيامة',
+  'اغتنام العمر ووقت الشباب في عبادة الله',
+  'نيل المغفرة والأجر العظيم',
+  'الصائم يبيع نفسه لله مقابل الجنة',
+  'الفوز بدعوة مستجابة',
+  'اتباع سنة النبي ﷺ في مخالفة الهوى والعادة',
+  'الصوم مدرسة تربوية تربط بين حسن الخلق والتقوى وضبط النفس',
+];
+
 class FastingDaysScreen extends StatefulWidget {
   const FastingDaysScreen({super.key});
 
@@ -26,6 +58,7 @@ class _FastingDaysScreenState extends State<FastingDaysScreen> {
   bool _isCapturing = false;
   Color _shareBgColor = const Color(0xFFFCF9F2);
   bool _isVerticalShareLayout = false;
+  bool _includeIntentions = false;
 
   final List<Color> _bgColors = [
     const Color(0xFFFCF9F2), // Warm Paper
@@ -214,6 +247,121 @@ class _FastingDaysScreenState extends State<FastingDaysScreen> {
     });
   }
 
+  void _showIntentionsDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const gold = Color(0xFFD0A871);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.r)),
+        child: Container(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8.w),
+                    decoration: BoxDecoration(
+                      color: gold.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.favorite_rounded, color: gold, size: 24.sp),
+                  ),
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    child: Text(
+                      'نوايا صيام التطوع (29 نية)',
+                      style: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.bold,
+                        color: gold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              Expanded(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: fastingIntentions.length,
+                  separatorBuilder: (_, __) => SizedBox(height: 10.h),
+                  itemBuilder: (context, index) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 28.w,
+                          height: 28.w,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: gold.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                          child: Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.bold,
+                              color: gold,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 10.w),
+                        Expanded(
+                          child: Text(
+                            fastingIntentions[index],
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w600,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              SizedBox(height: 16.h),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: gold,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
+                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(
+                    'إغلاق',
+                    style: TextStyle(
+                      fontFamily: AppConsts.expoArabic,
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -239,6 +387,22 @@ class _FastingDaysScreenState extends State<FastingDaysScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              _includeIntentions ? Icons.fact_check : Icons.fact_check_outlined,
+              color: _includeIntentions ? const Color(0xFFD0A871) : null,
+            ),
+            onPressed: () {
+              setState(() => _includeIntentions = !_includeIntentions);
+              ShareHelper.showTopNotification(
+                context,
+                _includeIntentions
+                    ? 'تم تفعيل إرفاق نوايا صيام التطوع في الصورة'
+                    : 'تم إلغاء إرفاق نوايا الصيام',
+              );
+            },
+            tooltip: 'إرفاق نوايا صيام التطوع في الصورة',
+          ),
           IconButton(
             icon: Icon(_isVerticalShareLayout ? Icons.grid_view : Icons.view_day),
             onPressed: () {
@@ -274,6 +438,7 @@ class _FastingDaysScreenState extends State<FastingDaysScreen> {
           Column(
             children: [
               _buildMonthSelector(primary),
+              _buildIntentionsToggleCard(isDark),
               Expanded(
                 child: _fastingDays.isEmpty
                     ? const Center(
@@ -303,6 +468,7 @@ class _FastingDaysScreenState extends State<FastingDaysScreen> {
                 primaryColor: primary,
                 backgroundColor: _shareBgColor,
                 isVerticalLayout: _isVerticalShareLayout,
+                includeIntentions: _includeIntentions,
               ),
             ),
           ),
@@ -314,6 +480,90 @@ class _FastingDaysScreenState extends State<FastingDaysScreen> {
                 child: CircularProgressIndicator(color: Color(0xFFD0A871)),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIntentionsToggleCard(bool isDark) {
+    const gold = Color(0xFFD0A871);
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+      decoration: BoxDecoration(
+        color: _includeIntentions
+            ? gold.withValues(alpha: 0.12)
+            : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(
+          color: _includeIntentions
+              ? gold
+              : (isDark ? Colors.white12 : Colors.black12),
+          width: _includeIntentions ? 1.5 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(8.w),
+            decoration: BoxDecoration(
+              color: gold.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.favorite_rounded,
+              color: gold,
+              size: 20.sp,
+            ),
+          ),
+          SizedBox(width: 10.w),
+          Expanded(
+            child: InkWell(
+              onTap: _showIntentionsDialog,
+              borderRadius: BorderRadius.circular(8.r),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'نوايا صيام التطوع',
+                        style: TextStyle(
+                          fontFamily: AppConsts.expoArabic,
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(width: 6.w),
+                      Icon(Icons.info_outline_rounded, size: 14.sp, color: gold),
+                    ],
+                  ),
+                  Text(
+                    'إرفاق 29 نية مباركة في صورة المشاركة',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 11.sp,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Switch(
+            value: _includeIntentions,
+            activeThumbColor: gold,
+            activeTrackColor: gold.withValues(alpha: 0.5),
+            onChanged: (val) {
+              setState(() => _includeIntentions = val);
+              ShareHelper.showTopNotification(
+                context,
+                val
+                    ? 'تم تفعيل إرفاق نوايا صيام التطوع في الصورة'
+                    : 'تم إلغاء إرفاق نوايا الصيام',
+              );
+            },
+          ),
         ],
       ),
     );
@@ -565,6 +815,7 @@ class _FastingShareDesign extends StatelessWidget {
   final Color primaryColor;
   final Color backgroundColor;
   final bool isVerticalLayout;
+  final bool includeIntentions;
 
   const _FastingShareDesign({
     required this.selectedDays,
@@ -572,6 +823,7 @@ class _FastingShareDesign extends StatelessWidget {
     required this.primaryColor,
     required this.backgroundColor,
     this.isVerticalLayout = false,
+    this.includeIntentions = false,
   });
 
   @override
@@ -684,6 +936,141 @@ class _FastingShareDesign extends StatelessWidget {
                               .toList(),
                         ),
                 ),
+
+                if (includeIntentions) ...[
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 40),
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 35),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(25),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFD0A871).withValues(alpha: 0.15),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: const Color(0xFFD0A871).withValues(alpha: 0.3),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              height: 2,
+                              width: 60,
+                              color: const Color(0xFFD0A871),
+                            ),
+                            const SizedBox(width: 20),
+                            const Text(
+                              "نوايا صيام التطوع",
+                              style: TextStyle(
+                                fontFamily: AppConsts.expoArabic,
+                                fontSize: 36,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF5D4037),
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            Container(
+                              height: 2,
+                              width: 60,
+                              color: const Color(0xFFD0A871),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 30),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Right column (items 1 to 15)
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: List.generate(15, (index) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 14),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${index + 1}. ',
+                                          style: const TextStyle(
+                                            fontFamily: 'Cairo',
+                                            fontSize: 21,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFFD0A871),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: Text(
+                                            fastingIntentions[index],
+                                            style: const TextStyle(
+                                              fontFamily: 'Cairo',
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF3E2723),
+                                              height: 1.3,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ),
+                            ),
+                            const SizedBox(width: 30),
+                            // Left column (items 16 to 29)
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: List.generate(14, (i) {
+                                  final index = i + 15;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 14),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${index + 1}. ',
+                                          style: const TextStyle(
+                                            fontFamily: 'Cairo',
+                                            fontSize: 21,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFFD0A871),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: Text(
+                                            fastingIntentions[index],
+                                            style: const TextStyle(
+                                              fontFamily: 'Cairo',
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF3E2723),
+                                              height: 1.3,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 Container(
                   padding: const EdgeInsets.all(40),

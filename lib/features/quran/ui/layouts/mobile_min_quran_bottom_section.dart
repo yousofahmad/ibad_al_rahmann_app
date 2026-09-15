@@ -6,6 +6,8 @@ import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/data/services/bookmark_service.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/widgets/bookmark_widget/bookmarks_dialog.dart';
+import 'package:ibad_al_rahmann/core/app_constants.dart';
+import 'package:ibad_al_rahmann/features/quran/ui/quran_hizb_data.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/widgets/menus/single_tap_menu.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -85,15 +87,40 @@ class MobileMinQuranBottomSection extends StatelessWidget {
           ),
           BlocBuilder<QuranCubit, QuranState>(
             buildWhen: (previous, current) {
-              return previous.juzNumber != current.juzNumber;
+              return previous.juzNumber != current.juzNumber || previous.currentPage != current.currentPage;
             },
             builder: (context, state) {
-              return Text(
-                state.juzNumber.toJuzName,
-                style: context.headlineLarge.copyWith(
-                  fontSize: 24.sp,
-                  color: contentColor,
-                ),
+              final pageNum = state.currentPage ?? 1;
+              final hizbLabel = QuranHizbData.activeLabelForPage(pageNum);
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    state.juzNumber.toJuzName,
+                    style: context.headlineLarge.copyWith(
+                      fontSize: 19.sp,
+                      color: contentColor,
+                    ),
+                  ),
+                  SizedBox(height: 2.h),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 2.h),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD0A871).withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(8.r),
+                      border: Border.all(color: const Color(0xFFD0A871).withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      hizbLabel,
+                      style: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFFD0A871),
+                      ),
+                    ),
+                  ),
+                ],
               );
             },
           ),

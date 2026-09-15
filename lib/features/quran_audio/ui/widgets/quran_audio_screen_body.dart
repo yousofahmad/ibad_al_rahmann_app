@@ -16,7 +16,7 @@ import 'quran_list_view.dart';
 class QuranAudioScreenBody extends StatelessWidget {
   const QuranAudioScreenBody({super.key, required this.reciter});
 
-  final ReciterModel reciter;
+  final ReciterAudioModel reciter;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +40,7 @@ class QuranAudioScreenBody extends StatelessWidget {
 class TabletQuranAudioLayout extends StatelessWidget {
   const TabletQuranAudioLayout({super.key, required this.reciter});
 
-  final ReciterModel reciter;
+  final ReciterAudioModel reciter;
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +112,7 @@ class TabletQuranAudioLayout extends StatelessWidget {
 class MobileQuranAudioLayout extends StatelessWidget {
   const MobileQuranAudioLayout({super.key, required this.reciter});
 
-  final ReciterModel reciter;
+  final ReciterAudioModel reciter;
   @override
   Widget build(BuildContext context) {
     return Container(

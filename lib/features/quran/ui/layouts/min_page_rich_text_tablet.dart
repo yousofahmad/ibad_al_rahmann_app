@@ -39,7 +39,11 @@ class _TabletMinPageRichTextState extends State<TabletMinPageRichText> {
                     MediaQuery.sizeOf(context).width *
                     (widget.pageNumber == 1 ? 0.08 : 0.04),
               ),
-              child: WbwPageWidget(pageNumber: widget.pageNumber),
+              child: WbwPageWidget(
+                pageNumber: widget.pageNumber,
+                showHeader: false,
+                showPageNumber: false,
+              ),
             ),
           ),
           if (widget.pageNumber <= 2)

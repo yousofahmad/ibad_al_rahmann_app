@@ -1,10 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:zoom_tap_animation/zoom_tap_animation.dart';
 
-import '../../../../core/di/di.dart';
 import '../../logic/quran_player/quran_player_cubit.dart';
 
 class SurahPlayerControllers extends StatelessWidget {
@@ -32,8 +30,9 @@ class SurahPlayerControllers extends StatelessWidget {
               return current is! SliderValueChanged;
             },
             builder: (context, state) {
+              final isPlaying = context.read<QuranPlayerCubit>().player.playing;
               return Icon(
-                !getIt<AudioPlayer>().playing
+                !isPlaying
                     ? CupertinoIcons.play_circle_fill
                     : CupertinoIcons.pause_circle_fill,
                 size: 50,

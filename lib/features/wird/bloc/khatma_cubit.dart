@@ -9,6 +9,7 @@ import '../data/wird_model.dart';
 import '../utils/wird_calculator.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import 'package:ibad_al_rahmann/core/helpers/islamic_day.dart';
 
 part 'khatma_state.dart';
 
@@ -257,7 +258,7 @@ class KhatmaCubit extends Cubit<KhatmaState> {
     if (k == null) return 0;
 
     final khatma = k;
-    final now = DateTime.now();
+    final now = DateTime.parse(IslamicDay.todayKeySync());
     // Use true calendar day difference to avoid 24h shifting issues.
     final startDay = DateTime(
       khatma.startDate.year,
@@ -347,6 +348,24 @@ class KhatmaCubit extends Cubit<KhatmaState> {
       }
     }
     return null;
+  }
+
+  Future<void> updateDailyTime(String khatmaId, String newTime) async {
+    if (state is! KhatmaLoaded) return;
+    final khatmas = List<KhatmaModel>.from((state as KhatmaLoaded).khatmas);
+    final kIndex = khatmas.indexWhere((k) => k.id == khatmaId);
+    if (kIndex == -1) return;
+
+    final updatedKhatma = khatmas[kIndex].copyWith(dailyTime: newTime);
+    khatmas[kIndex] = updatedKhatma;
+
+    final box = Hive.box('appDataBox');
+    await box.put('khatma_$khatmaId', jsonEncode(updatedKhatma.toJson()));
+
+    await NotificationService.cancelKhatmaNotifications(khatmaId);
+    await NotificationService.rescheduleAllKhatmaNotifications();
+
+    emit(KhatmaLoaded(khatmas));
   }
 
   Future<void> deleteKhatma(String id) async {

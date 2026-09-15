@@ -1,10 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
-import 'package:ibad_al_rahmann/core/di/di.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:just_audio/just_audio.dart';
+import '../../logic/quran_player/quran_player_cubit.dart';
 
 class CustomAudioSlider extends StatefulWidget {
   const CustomAudioSlider({super.key});
@@ -16,35 +17,38 @@ class CustomAudioSlider extends StatefulWidget {
 class _CustomAudioSliderState extends State<CustomAudioSlider> {
   StreamSubscription? _posStream;
   StreamSubscription? _durStream;
-  late double max;
+  AudioPlayer? _player;
+  late double max = 1;
   Duration currentPosition = Duration.zero;
   bool _isDragging = false;
   double _dragValue = 0;
 
-  void init() {
-    max = getIt<AudioPlayer>().duration?.inSeconds.toDouble() ?? 1;
-
-    _posStream = getIt<AudioPlayer>().positionStream.listen((val) {
-      if (!_isDragging) {
-        setState(() {
-          currentPosition = val;
-        });
-      }
-    });
-
-    _durStream = getIt<AudioPlayer>().durationStream.listen((val) {
-      if (val != null) {
-        setState(() {
-          max = val.inSeconds.toDouble() > 0 ? val.inSeconds.toDouble() : 1;
-        });
-      }
-    });
-  }
-
   @override
-  void initState() {
-    init();
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final p = context.read<QuranPlayerCubit>().player;
+    if (_player != p) {
+      _posStream?.cancel();
+      _durStream?.cancel();
+      _player = p;
+      max = _player?.duration?.inSeconds.toDouble() ?? 1;
+
+      _posStream = _player?.positionStream.listen((val) {
+        if (!_isDragging && mounted) {
+          setState(() {
+            currentPosition = val;
+          });
+        }
+      });
+
+      _durStream = _player?.durationStream.listen((val) {
+        if (val != null && mounted) {
+          setState(() {
+            max = val.inSeconds.toDouble() > 0 ? val.inSeconds.toDouble() : 1;
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -76,7 +80,7 @@ class _CustomAudioSliderState extends State<CustomAudioSlider> {
             });
           },
           onChangeEnd: (val) {
-            getIt<AudioPlayer>().seek(Duration(seconds: val.toInt()));
+            _player?.seek(Duration(seconds: val.toInt()));
             setState(() {
               _isDragging = false;
             });
@@ -95,7 +99,7 @@ class _CustomAudioSliderState extends State<CustomAudioSlider> {
                 ),
               ),
               Text(
-                handlePosition(getIt<AudioPlayer>().duration),
+                handlePosition(_player?.duration),
                 style: const TextStyle(
                   fontFamily: AppConsts.uthmanic,
                   fontWeight: FontWeight.bold,

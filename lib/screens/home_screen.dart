@@ -406,16 +406,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               Transform.translate(
                 offset: Offset(0, textOffset.h),
                 child: ShaderMask(
+                  blendMode: BlendMode.srcIn,
                   shaderCallback: (bounds) => const LinearGradient(
                     colors: [Color(0xFFF2D69D), Color(0xFFD0A871), Color(0xFFB88A4A)],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                  ).createShader(bounds),
+                  ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height + 10.h)),
                   child: Text(
                     title,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: Colors.white,
+                      color: const Color(0xFFD0A871),
                       fontWeight: FontWeight.bold,
                       fontSize: 16.sp,
                       fontFamily: 'Cairo',

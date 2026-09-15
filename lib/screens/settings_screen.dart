@@ -97,6 +97,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
   int _customVolume = 100;
   String _audioStream = 'alarm';
   bool _enableNativeLogging = true;
+  bool _isSyncingToDrive = false;
   String? _googleEmail;
   String? _lastSyncTime;
 
@@ -676,35 +677,42 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
           ),
           _buildListTile(
             "مزامنة جوجل درايف",
-            _googleEmail != null 
-                ? "مرتبط بـ: $_googleEmail\nآخر مزامنة: ${_formatSyncTime(_lastSyncTime)}" 
-                : "حفظ واستعادة الإعدادات تلقائياً من سحابة جوجل",
+            _isSyncingToDrive
+                ? "جاري المزامنة مع سحابة جوجل..."
+                : _googleEmail != null 
+                    ? "مرتبط بـ: $_googleEmail\nآخر مزامنة: ${_formatSyncTime(_lastSyncTime)}" 
+                    : "حفظ واستعادة الإعدادات تلقائياً من سحابة جوجل",
             FontAwesomeIcons.googleDrive,
-            onTap: () async {
-              AppLoadingDialog.show(context, message: 'جاري حفظ النسخة الاحتياطية على السحاب...');
-              final success = await BackupService.syncToDrive();
-              final email = await BackupService.getSignedInEmail(forceCheck: true);
-              final syncTime = await BackupService.getLastSyncTime();
-              if (mounted) {
-                // ignore: use_build_context_synchronously
-                AppLoadingDialog.hide(context);
+            onTap: _isSyncingToDrive
+                ? null
+                : () async {
+                    setState(() => _isSyncingToDrive = true);
+                    try {
+                      final success = await BackupService.syncToDrive();
+                      final email = await BackupService.getSignedInEmail();
+                      final syncTime = await BackupService.getLastSyncTime();
+                      if (mounted) {
+                        setState(() {
+                          _googleEmail = email;
+                          _lastSyncTime = syncTime;
+                        });
+                      }
 
-                setState(() {
-                  _googleEmail = email;
-                  _lastSyncTime = syncTime;
-                });
-              }
-              
-              if (success) {
-                scaffoldMessengerKey.currentState?.showSnackBar(
-                  const SnackBar(content: Text('تمت المزامنة مع جوجل درايف بنجاح')),
-                );
-              } else {
-                scaffoldMessengerKey.currentState?.showSnackBar(
-                  const SnackBar(content: Text('فشلت المزامنة. تأكد من تفعيل خدمة Google Drive ومنح الصلاحيات المطلوبة.')),
-                );
-              }
-            },
+                      if (success) {
+                        scaffoldMessengerKey.currentState?.showSnackBar(
+                          const SnackBar(content: Text('تمت المزامنة مع جوجل درايف بنجاح')),
+                        );
+                      } else {
+                        scaffoldMessengerKey.currentState?.showSnackBar(
+                          const SnackBar(content: Text('فشلت المزامنة أو تم إلغاء العملية')),
+                        );
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() => _isSyncingToDrive = false);
+                      }
+                    }
+                  },
           ),
           if (_googleEmail != null)
             _buildListTile(
@@ -790,12 +798,12 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 await prefs.setBool('auto_sync_drive', val);
                 await BackupService.toggleAutoSync(val);
                 setState(() => _autoSyncDrive = val);
-                if (val && context.mounted) {
+                if (val && mounted) {
                   final times = await PrayerService.getPrayerTimesForDateStatic(DateTime.now());
                   DateTime sTime = times != null ? times.isha.add(const Duration(hours: 1)) : DateTime.now().add(const Duration(hours: 1));
                   if (sTime.isBefore(DateTime.now())) sTime = sTime.add(const Duration(days: 1));
                   final timeStr = "${sTime.hour > 12 ? sTime.hour - 12 : sTime.hour}:${sTime.minute.toString().padLeft(2, '0')} ${sTime.hour >= 12 ? 'م' : 'ص'}";
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  scaffoldMessengerKey.currentState?.showSnackBar(
                     SnackBar(content: Text('تم تفعيل المزامنة التلقائية. ستعمل القادمة يوم ${sTime.day}/${sTime.month} الساعة $timeStr')),
                   );
                 }
@@ -914,13 +922,13 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
           ),
           _buildListTile(
             "عن التطبيق",
-            "الإصدار 1.1.4",
+            "الإصدار 1.2.0",
             Icons.info_outline,
             onTap: () {
               showAboutDialog(
                 context: context,
                 applicationName: "عباد الرحمن",
-                applicationVersion: "1.1.3",
+                applicationVersion: "1.2.0",
                 applicationIcon: Image.asset(
                   "assets/images/logo.png",
                   width: 50.w,

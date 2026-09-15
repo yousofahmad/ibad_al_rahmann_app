@@ -1,11 +1,12 @@
 import 'dart:async';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/di/di.dart';
 import 'package:ibad_al_rahmann/core/services/cache_service.dart';
 import 'package:ibad_al_rahmann/features/quran/data/models/selected_verse_model.dart';
 import 'package:ibad_al_rahmann/features/quran/data/services/bookmark_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
+import 'package:ibad_al_rahmann/features/quran_reciters/data/models/reciter_model.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:quran/quran.dart';
@@ -17,27 +18,149 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   VersePlayerCubit() : super(VersePlayerInitial(showed: false)) {
     init();
   }
-  final player = getIt<AudioPlayer>();
+  final player = AudioPlayer();
 
   VerseModel? currnetVerse;
 
   StreamSubscription<PlayerState>? playerStateSubscription;
+  StreamSubscription<Duration>? positionSubscription;
 
   String? reciter;
+  double playbackSpeed = 1.0;
+  bool isLooping = false;
+  bool autoPlayNext = false;
 
-  void init() async {
-    reciter = await getIt<CacheService>().getString('reciter');
-  }
-
-  Map<String, String> reciters = {
-    'ar.minshawi': 'محمد صديق المنشاوي',
+  static const Map<String, String> defaultReciters = {
+    'ar.alafasy': 'مشاري راشد العفاسي',
+    'ar.minshawi': 'محمد صديق المنشاوي (مرتل)',
+    'ar.minshawimujawwad': 'محمد صديق المنشاوي (مجود)',
+    'ar.abdulbasitmurattal': 'عبد الباسط عبد الصمد (مرتل)',
+    'ar.abdulbasitmujawwad': 'عبد الباسط عبد الصمد (مجود)',
+    'ar.husary': 'محمود خليل الحصري (مرتل)',
+    'ar.husarymuallim': 'محمود خليل الحصري (معلم)',
+    'ar.saoodshuraym': 'سعود الشريم',
+    'ar.abdurrahmaansudais': 'عبد الرحمن السديس',
+    'ar.mahermuaiqly': 'ماهر المعيقلي',
+    'ar.yasseraddossari': 'ياسر الدوسري',
+    'ar.saadalghamdi': 'سعد الغامدي',
+    'ar.ahmedajamy': 'أحمد بن علي العجمي',
     'ar.muhammadjibreel': 'محمد جبريل',
     'ar.muhammadayyoub': 'محمد أيوب',
+    'ar.hudhaify': 'علي بن عبد الرحمن الحذيفي',
+    'ar.abdullahbasfar': 'عبد الله بصفر',
+    'ar.faresabbad': 'فارس عباد',
+    'ar.shaatree': 'أبو بكر الشاطري',
+    'ar.banna': 'محمود علي البنا',
+    'ar.tablawi': 'محمد محمود الطبلاوي',
+    'ar.hazzaalbalushi': 'هزاع البلوشي',
+    'ar.nasserqatami': 'ناصر القطامي',
+    'ar.khaledalqahtani': 'خالد القحطاني',
+    'ar.ali_jaber': 'عبد الله علي جابر',
+    'ar.aljuhany': 'عبد الله عواد الجهني',
+    'ar.aymanswoid': 'أيمن سويد',
+    'ar.mustafaismail': 'مصطفى إسماعيل',
+    'ar.muhsin_al_qasim': 'محسن القاسم',
+    'ar.salahbudair': 'صلاح بدير',
+    'ar.salahbukhatir': 'صلاح بو خاطر',
+    'ar.abdullahmatroud': 'عبد الله المطرود',
   };
+
+  static const Map<String, String> reciterFolders = {
+    'ar.alafasy': 'Alafasy_128kbps',
+    'ar.minshawi': 'Minshawy_Murattal_128kbps',
+    'ar.minshawimujawwad': 'Minshawy_Mujawwad_192kbps',
+    'ar.abdulbasitmurattal': 'Abdul_Basit_Murattal_192kbps',
+    'ar.abdulbasitmujawwad': 'Abdul_Basit_Mujawwad_128kbps',
+    'ar.husary': 'Husary_128kbps',
+    'ar.husarymuallim': 'Husary_Muallim_128kbps',
+    'ar.saoodshuraym': 'Saood_ash-Shuraym_128kbps',
+    'ar.abdurrahmaansudais': 'Abdurrahmaan_As-Sudais_192kbps',
+    'ar.mahermuaiqly': 'Maher_AlMuaiqly_64kbps',
+    'ar.yasseraddossari': 'Yasser_Ad-Dussary_128kbps',
+    'ar.saadalghamdi': 'Ghamadi_40kbps',
+    'ar.ahmedajamy': 'Ahmed_ibn_Ali_al-Ajamy_128kbps_kotSimple',
+    'ar.muhammadjibreel': 'Muhammad_Jibreel_128kbps',
+    'ar.muhammadayyoub': 'Muhammad_Ayyoub_128kbps',
+    'ar.hudhaify': 'Hudhaify_128kbps',
+    'ar.abdullahbasfar': 'Abdullah_Basfar_192kbps',
+    'ar.faresabbad': 'Fares_Abbad_64kbps',
+    'ar.shaatree': 'Abu_Bakr_Ash-Shaatree_128kbps',
+    'ar.banna': 'Mahmoud_Ali_Al_Banna_32kbps',
+    'ar.tablawi': 'Mohammad_al_Tablaway_128kbps',
+    'ar.hazzaalbalushi': 'Haza_Al_Balushi_128kbps',
+    'ar.nasserqatami': 'Nasser_Alqatami_128kbps',
+    'ar.khaledalqahtani': 'Khaalid_Al-Qahtaanee_192kbps',
+    'ar.ali_jaber': 'Ali_Jaber_64kbps',
+    'ar.aljuhany': 'Abdullaah_3li_Jabbir_32kbps',
+    'ar.aymanswoid': 'Ayman_Sowaid_64kbps',
+    'ar.mustafaismail': 'Mustafa_Ismail_48kbps',
+    'ar.muhsin_al_qasim': 'Muhsin_Al_Qasim_192kbps',
+    'ar.salahbudair': 'Salah_Al_Budair_128kbps',
+    'ar.salahbukhatir': 'Salah_Bukhatir_128kbps',
+    'ar.abdullahmatroud': 'Abdullah_Matroud_128kbps',
+  };
+
+  static String getAyahAudioUrl(int surahNumber, int verseNumber, String reciterId) {
+    final folder = reciterFolders[reciterId] ?? 'Alafasy_128kbps';
+    final s = surahNumber.toString().padLeft(3, '0');
+    final v = verseNumber.toString().padLeft(3, '0');
+    return 'https://everyayah.com/data/$folder/$s$v.mp3';
+  }
+
+  Map<String, String> get reciters => defaultReciters;
+
+  void init() async {
+    reciter = await getIt<CacheService>().getString('reciter') ?? defaultReciters.keys.first;
+    autoPlayNext = getIt<CacheService>().getBool('verse_player_auto_play') ?? false;
+  }
 
   void changeReciter(String value) {
     reciter = value;
-    initVerse();
+    getIt<CacheService>().setString('reciter', value);
+    emit(
+      VersePlayerInitial(
+        showed: state.showed,
+        loading: state.loading,
+        currentVerse: currnetVerse,
+      ),
+    );
+    initVerse(autoPlay: player.playing);
+  }
+
+  void changePlaybackSpeed(double speed) {
+    playbackSpeed = speed;
+    player.setSpeed(speed);
+    emit(
+      VersePlayerInitial(
+        showed: state.showed,
+        loading: state.loading,
+        currentVerse: currnetVerse,
+      ),
+    );
+  }
+
+  void toggleLoop() {
+    isLooping = !isLooping;
+    player.setLoopMode(isLooping ? LoopMode.one : LoopMode.off);
+    emit(
+      VersePlayerInitial(
+        showed: state.showed,
+        loading: state.loading,
+        currentVerse: currnetVerse,
+      ),
+    );
+  }
+
+  void toggleAutoPlayNext() {
+    autoPlayNext = !autoPlayNext;
+    getIt<CacheService>().setBool('verse_player_auto_play', autoPlayNext);
+    emit(
+      VersePlayerInitial(
+        showed: state.showed,
+        loading: state.loading,
+        currentVerse: currnetVerse,
+      ),
+    );
   }
 
   void setVerse({
@@ -64,16 +187,19 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
     );
   }
 
-  Future<void> initVerse() async {
+  Future<void> initVerse({bool autoPlay = false}) async {
     if (currnetVerse != null) {
       if (player.playing) {
         await player.stop();
       }
 
-      String ayahUrl = getAudioURLByVerse(
+      final activeReciter = reciter ?? defaultReciters.keys.first;
+
+      // Compute direct EveryAyah CDN audio URL immediately (0ms delay)
+      final ayahUrl = getAyahAudioUrl(
         currnetVerse!.surahNumber,
         currnetVerse!.verseNumber,
-        reciter ?? reciters.keys.first,
+        activeReciter,
       );
 
       emit(
@@ -84,37 +210,28 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
         ),
       );
 
-      await player.setAudioSource(
-        AudioSource.uri(
-          Uri.parse(ayahUrl),
-          tag: MediaItem(
-            id: ayahUrl,
-            title: 'سورة ${surahArabicTashkel[currnetVerse!.surahNumber - 1]}',
-            artist: 'الآية ${currnetVerse!.verseNumber.toArabicNums}',
-            album: reciter != null && reciters.containsKey(reciter)
-                ? reciters[reciter]
-                : 'القارئ',
+      try {
+        await player.setAudioSource(
+          AudioSource.uri(
+            Uri.parse(ayahUrl),
+            tag: MediaItem(
+              id: ayahUrl,
+              title: 'سورة ${surahArabicTashkel[currnetVerse!.surahNumber - 1]}',
+              artist: 'الآية ${currnetVerse!.verseNumber.toArabicNums}',
+              album: defaultReciters[activeReciter] ?? 'القارئ',
+            ),
           ),
-        ),
-        preload: false,
-      );
+          preload: true,
+        );
 
-      verseListener();
-      // Removed player.play() to prevent autoplay
-      emit(
-        VersePlayerInitial(
-          showed: true,
-          loading: false,
-          currentVerse: currnetVerse,
-        ),
-      );
-    }
-  }
+        await player.setSpeed(playbackSpeed);
+        await player.setLoopMode(isLooping ? LoopMode.one : LoopMode.off);
+        verseListener();
 
-  void verseListener() {
-    playerStateSubscription?.cancel();
-    playerStateSubscription = player.playerStateStream.listen((playerState) {
-      if (playerState.processingState == ProcessingState.completed) {
+        if (autoPlay) {
+          player.play();
+        }
+
         emit(
           VersePlayerInitial(
             showed: true,
@@ -122,6 +239,87 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
             currentVerse: currnetVerse,
           ),
         );
+
+        // Fetch segments asynchronously in background for word-by-word highlight without delaying audio
+        _loadSegmentsAsync(activeReciter, currnetVerse!.surahNumber, currnetVerse!.verseNumber);
+      } catch (e) {
+        debugPrint('Error setting verse audio source: $e');
+        emit(
+          VersePlayerInitial(
+            showed: true,
+            loading: false,
+            currentVerse: currnetVerse,
+          ),
+        );
+      }
+    }
+  }
+
+  void _loadSegmentsAsync(String activeReciter, int surahNum, int verseNum) async {
+    try {
+      final recitersList = await ReciterAudioHelper.getReciters();
+      final reciterModel = recitersList.firstWhere(
+        (r) =>
+            r.id == activeReciter ||
+            r.folderName.contains(activeReciter.replaceFirst('ar.', '')),
+        orElse: () => ReciterAudioModel(id: '', name: '', style: '', folderName: ''),
+      );
+
+      if (reciterModel.id.isNotEmpty || reciterModel.folderName.isNotEmpty) {
+        final segmentsMap = await ReciterAudioHelper.getSegments(reciterModel);
+        final key = '$surahNum:$verseNum';
+        if (segmentsMap.containsKey(key)) {
+          final timing = segmentsMap[key]!;
+          final wordSegments = timing.segments;
+
+          if (wordSegments.isNotEmpty &&
+              currnetVerse?.surahNumber == surahNum &&
+              currnetVerse?.verseNumber == verseNum) {
+            positionSubscription?.cancel();
+            positionSubscription = player.positionStream.listen((pos) {
+              if (currnetVerse == null) return;
+              final ms = pos.inMilliseconds;
+              int? currentWord;
+              for (final seg in wordSegments) {
+                if (ms >= seg.startMs && ms <= seg.endMs) {
+                  currentWord = seg.wordIndex;
+                  break;
+                }
+              }
+              if (currentWord != state.activeWordIndex) {
+                emit(
+                  VersePlayerInitial(
+                    showed: true,
+                    loading: state.loading,
+                    currentVerse: currnetVerse,
+                    activeWordIndex: currentWord,
+                  ),
+                );
+              }
+            });
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  void verseListener() {
+    playerStateSubscription?.cancel();
+    playerStateSubscription = player.playerStateStream.listen((playerState) {
+      if (playerState.processingState == ProcessingState.completed) {
+        if (autoPlayNext && !isLooping) {
+          playNextVerse();
+        } else {
+          player.seek(Duration.zero);
+          player.pause();
+          emit(
+            VersePlayerInitial(
+              showed: true,
+              loading: false,
+              currentVerse: currnetVerse,
+            ),
+          );
+        }
       } else if (playerState.processingState == ProcessingState.buffering ||
           playerState.processingState == ProcessingState.loading) {
         emit(
@@ -141,6 +339,57 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
         );
       }
     });
+  }
+
+  Future<void> playNextVerse() async {
+    if (currnetVerse == null) return;
+    final totalVersesInSurah = getVerseCount(currnetVerse!.surahNumber);
+    int nextSNum = currnetVerse!.surahNumber;
+    int nextVNum = currnetVerse!.verseNumber + 1;
+    if (nextVNum > totalVersesInSurah) {
+      if (nextSNum < 114) {
+        nextSNum += 1;
+        nextVNum = 1;
+      } else {
+        return;
+      }
+    }
+    final nextText = getVerse(nextSNum, nextVNum);
+    final nextPg = getPageNumber(nextSNum, nextVNum);
+    final nextFont = 'page$nextPg';
+
+    setVerse(
+      surahNumber: nextSNum,
+      verseNumber: nextVNum,
+      fontFamily: nextFont,
+      verse: nextText,
+    );
+    await initVerse(autoPlay: true);
+  }
+
+  Future<void> playPreviousVerse() async {
+    if (currnetVerse == null) return;
+    int prevSNum = currnetVerse!.surahNumber;
+    int prevVNum = currnetVerse!.verseNumber - 1;
+    if (prevVNum < 1) {
+      if (prevSNum > 1) {
+        prevSNum -= 1;
+        prevVNum = getVerseCount(prevSNum);
+      } else {
+        return;
+      }
+    }
+    final prevText = getVerse(prevSNum, prevVNum);
+    final prevPg = getPageNumber(prevSNum, prevVNum);
+    final prevFont = 'page$prevPg';
+
+    setVerse(
+      surahNumber: prevSNum,
+      verseNumber: prevVNum,
+      fontFamily: prevFont,
+      verse: prevText,
+    );
+    await initVerse(autoPlay: true);
   }
 
   void handlePlayPause() {
@@ -220,5 +469,15 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   /// Get bookmarked verses sorted by date
   List<VerseModel> getBookmarksSortedByDate() {
     return BookmarkService.getBookmarksSortedByDate();
+  }
+
+  @override
+  Future<void> close() {
+    playerStateSubscription?.cancel();
+    positionSubscription?.cancel();
+    if (player.playing) {
+      player.stop();
+    }
+    return super.close();
   }
 }

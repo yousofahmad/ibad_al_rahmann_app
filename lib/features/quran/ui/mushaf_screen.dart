@@ -1,5 +1,5 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -10,6 +10,8 @@ import 'widgets/menus/single_tap_menu.dart';
 import '../bloc/quran/quran_cubit.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import '../../../widgets/app_skeleton.dart';
+import 'widgets/scroll/easy_page_scroll_physics.dart';
+
 
 class MushafScreen extends StatefulWidget {
   const MushafScreen({super.key});
@@ -18,58 +20,86 @@ class MushafScreen extends StatefulWidget {
   State<MushafScreen> createState() => _MushafScreenState();
 }
 
-class _MushafScreenState extends State<MushafScreen> {
-  late PageController _pageController;
+class _MushafScreenState extends State<MushafScreen>
+    with SingleTickerProviderStateMixin {
+  PageController _pageController = PageController();
   ScrollController _autoScrollController = ScrollController();
+  late final Ticker _scrollTicker;
+  Duration _lastElapsed = Duration.zero;
+  int _currentIndex = 1;
+  double _scrollSpeed = 0.5;
   bool _isPaused = false;
-  double _scrollSpeed = 1.5;
-  Timer? _autoScrollTimer;
-  int _currentIndex = 0;
   bool _showMenu = false;
+  double _cachedScreenHeight = 0; // cached to avoid MediaQuery every frame
 
   @override
   void initState() {
     super.initState();
+    _scrollTicker = createTicker(_onTick);
     WakelockPlus.enable();
     _currentIndex = context.read<QuranCubit>().state.currentPage ?? 1;
     _pageController = PageController(initialPage: _currentIndex - 1);
+    // Cache screen height once — safe to do in initState via WidgetsBinding
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _cachedScreenHeight = MediaQuery.of(context).size.height;
+      }
+    });
+  }
+
+  void _onTick(Duration elapsed) {
+    if (_isPaused || !_autoScrollController.hasClients) {
+      _lastElapsed = elapsed;
+      return;
+    }
+    final delta = (elapsed - _lastElapsed).inMicroseconds / 1000000.0;
+    _lastElapsed = elapsed;
+    // Clamp delta: skip frames > 100ms (e.g. after resume), use 16ms if 0
+    if (delta <= 0) return;
+    final clampedDelta = delta > 0.1 ? 0.016 : delta;
+
+    final pixelsPerSec = _scrollSpeed * 33.3;
+    final newOffset = _autoScrollController.offset + (pixelsPerSec * clampedDelta);
+    if (newOffset <= _autoScrollController.position.maxScrollExtent) {
+      _autoScrollController.jumpTo(newOffset);
+      final pageHeight = _cachedScreenHeight > 0 ? _cachedScreenHeight : MediaQuery.of(context).size.height;
+      if (pageHeight > 0) {
+        final newIndex = (newOffset / pageHeight).round() + 1;
+        if (newIndex != _currentIndex && newIndex > 0 && newIndex <= 604) {
+          _currentIndex = newIndex;
+          context.read<QuranCubit>().onQuranPageChanged(_currentIndex);
+        }
+      }
+    }
   }
 
   @override
   void dispose() {
     WakelockPlus.disable();
-    _autoScrollTimer?.cancel();
+    _scrollTicker.dispose();
     _pageController.dispose();
     _autoScrollController.dispose();
     super.dispose();
   }
 
-  void _startTimer() {
-    _autoScrollTimer?.cancel();
-    _autoScrollTimer = Timer.periodic(const Duration(milliseconds: 30), (
-      timer,
-    ) {
-      if (!_isPaused && _autoScrollController.hasClients) {
-        _autoScrollController.jumpTo(
-          _autoScrollController.offset + _scrollSpeed,
-        );
-        int newIndex =
-            (_autoScrollController.offset / MediaQuery.of(context).size.height)
-                .round() +
-            1;
-        if (newIndex != _currentIndex && newIndex > 0 && newIndex <= 604) {
-          setState(() {
-            _currentIndex = newIndex;
-          });
-          context.read<QuranCubit>().onQuranPageChanged(_currentIndex);
-        }
-      }
-    });
+  void _startAutoScroll() {
+    _lastElapsed = Duration.zero;
+    if (!_scrollTicker.isActive) {
+      _scrollTicker.start();
+    }
+  }
+
+  void _stopAutoScroll() {
+    if (_scrollTicker.isActive) {
+      _scrollTicker.stop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isAutoScrolling = context.watch<QuranCubit>().state.isAutoScrolling;
+    final screenHeight = MediaQuery.of(context).size.height;
+    _cachedScreenHeight = screenHeight;
 
     return BlocListener<QuranCubit, QuranState>(
       listenWhen: (p, c) => p.isAutoScrolling != c.isAutoScrolling,
@@ -78,14 +108,13 @@ class _MushafScreenState extends State<MushafScreen> {
           _isPaused = false;
           _showMenu = false;
           _autoScrollController = ScrollController(
-            initialScrollOffset:
-                (_currentIndex - 1) * MediaQuery.of(context).size.height,
+            initialScrollOffset: (_currentIndex - 1) * screenHeight,
           );
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            _startTimer();
+            _startAutoScroll();
           });
         } else {
-          _autoScrollTimer?.cancel();
+          _stopAutoScroll();
           _pageController = PageController(initialPage: _currentIndex - 1);
         }
       },
@@ -124,21 +153,18 @@ class _MushafScreenState extends State<MushafScreen> {
                               scrollDirection: Axis.vertical,
                               physics: const ClampingScrollPhysics(),
                               itemCount: 604,
+                              itemExtent: screenHeight,
+                              cacheExtent: screenHeight * 2.0,
                               itemBuilder: (context, index) {
-                                return SizedBox(
-                                  height: MediaQuery.of(context).size.height,
-                                  child: _buildPageContent(index + 1),
-                                );
+                                return _buildPageContent(index + 1);
                               },
                             )
                           : PageView.builder(
-      allowImplicitScrolling: true,
+                              allowImplicitScrolling: true,
                               controller: _pageController,
                               itemCount: 604,
                               reverse: true,
-                              physics: const ClampingScrollPhysics(
-                                parent: PageScrollPhysics(),
-                              ),
+                              physics: const EasyPageScrollPhysics(),
                               onPageChanged: (idx) {
                                 _currentIndex = idx + 1;
                                 context.read<QuranCubit>().onQuranPageChanged(
