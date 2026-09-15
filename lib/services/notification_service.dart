@@ -28,6 +28,26 @@ class NotificationContentService {
 
 class NotificationService {
   static const _platform = MethodChannel('app.ibad_al_rahmann/native_notifications');
+  static const _activeAlarmsKey = 'active_alarm_ids';
+
+  static Future<void> _addActiveAlarmId(int id) async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList(_activeAlarmsKey) ?? [];
+    if (!ids.contains(id.toString())) {
+      ids.add(id.toString());
+      await prefs.setStringList(_activeAlarmsKey, ids);
+    }
+  }
+
+  static Future<void> _removeActiveAlarmIds(List<int> idsToRemove) async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList(_activeAlarmsKey) ?? [];
+    final originalLength = ids.length;
+    ids.removeWhere((id) => idsToRemove.contains(int.tryParse(id) ?? -1));
+    if (ids.length != originalLength) {
+      await prefs.setStringList(_activeAlarmsKey, ids);
+    }
+  }
   static final ValueNotifier<String?> onNotificationTap = ValueNotifier<String?>(null);
 
   static bool _isBatching = false;
@@ -219,30 +239,13 @@ class NotificationService {
       final prefs = await SharedPreferences.getInstance();
 
       // --- Azkar ---
-      final morningMode = prefs.getString('azkar_morning_mode') ?? 'sound';
-      if (morningMode != 'none') {
-        final t = (prefs.getString('time_azkar_morning') ?? "06:00").split(":");
-        await _scheduleNative(1, "أذكار الصباح", "حان موعد أذكار الصباح", int.parse(t[0]), int.parse(t[1]), morningMode == 'silent_notif' ? 'silent_notif' : "sabah", payload: "sabah", customSoundName: "sabah");
-      }
-
-      final eveningMode = prefs.getString('azkar_evening_mode') ?? 'sound';
-      if (eveningMode != 'none') {
-        final t = (prefs.getString('time_azkar_evening') ?? "17:00").split(":");
-        await _scheduleNative(3, "أذكار المساء", "حان موعد أذكار المساء", int.parse(t[0]), int.parse(t[1]), eveningMode == 'silent_notif' ? 'silent_notif' : "masaa", payload: "masaa", customSoundName: "masaa");
-      }
-
-      final ruqyahEnabled = prefs.getBool('azkar_ruqyah_enabled') ?? false;
-      if (ruqyahEnabled) {
-        // الرقية تُرسَل صامتةً في نفس وقت أذكار الصباح
-        if (morningMode != 'none') {
-          final t = (prefs.getString('time_azkar_morning') ?? "06:00").split(":");
-          await _scheduleNative(4, "الرقية الشرعية", "لا تنس قراءة الرقية الشرعية صباحًا", int.parse(t[0]), int.parse(t[1]), 'silent_notif', payload: "ruqyah");
-        }
-        // الرقية تُرسَل صامتةً في نفس وقت أذكار المساء
-        if (eveningMode != 'none') {
-          final t = (prefs.getString('time_azkar_evening') ?? "17:00").split(":");
-          await _scheduleNative(5, "الرقية الشرعية", "لا تنس قراءة الرقية الشرعية مساءً", int.parse(t[0]), int.parse(t[1]), 'silent_notif', payload: "ruqyah");
-        }
+      // --- Azkar ---
+      // We no longer schedule Azkar IDs (1, 3, 4, 5) from Dart.
+      // We instruct the Kotlin side to schedule them using its NativeAzkarScheduler.
+      try {
+        await _platform.invokeMethod('rescheduleNativeAlarms', {});
+      } catch (e) {
+        debugPrint("Error rescheduling native alarms: $e");
       }
 
       await rescheduleWird();
@@ -505,36 +508,35 @@ class NotificationService {
   }
 
   static Future<void> cancelAll({bool includeWird = false, bool excludeIntervalAlarms = false}) async {
-    // NOTE: Prayer IDs (100-114, 3000-3014, 5000-5014) are intentionally excluded;
-    //       NativePrayerScheduler owns and manages them exclusively.
-    List<int> ids = [1, 2, 3, 4, 5] +
-        List.generate(40, (i) => 200 + i) + // 200-239 (Next Prayer Alerts)
-        List.generate(40, (i) => 1000 + i) + // 1000-1039
-        List.generate(100, (i) => 4000 + i) +
-        List.generate(200, (i) => 400 + i) +
-        List.generate(20, (i) => 500 + i) + // Eid/Ramadan
-        List.generate(100, (i) => 700 + i) + // 700-799 (Jumua 705, Kahf 710, Fasting 720-724, Qiyam 730, FirstThird 734, Duha 732, Sunrise 736, Midnight 738)
-        List.generate(100, (i) => 800 + i) + // 800-899 (Qadaa)
-        // ── Legacy / Ghost IDs from old versions (must cancel on every reschedule) ──
-        // Old qiyam system used IDs 2000-2009 (now replaced by 2550+i)
-        List.generate(20, (i) => 2000 + i) +
-        // New multi-day scheduling ranges (2100-2800)
-        List.generate(700, (i) => 2100 + i);
+    final prefs = await SharedPreferences.getInstance();
+    final activeIdsStrs = prefs.getStringList(_activeAlarmsKey) ?? [];
 
-    if (!excludeIntervalAlarms) {
-      ids += List.generate(500, (i) => 8000 + i);
-      ids += List.generate(200, (i) => 9000 + i);
-    }
-    ids += List.generate(100, (i) => 9600 + i);
+    List<int> idsToCancel = [];
+    for (String idStr in activeIdsStrs) {
+      final id = int.tryParse(idStr);
+      if (id == null) continue;
+      
+      // Determine if it's a Wird ID
+      bool isWirdId = (id >= 600 && id < 700) || (id >= 6000 && id < 7000);
+      if (!includeWird && isWirdId) continue;
 
-    if (includeWird) {
-      ids += List.generate(100, (i) => 600 + i);
-      ids += List.generate(1000, (i) => 6000 + i);
+      // Determine if it's an interval alarm ID
+      bool isIntervalAlarm = (id >= 8000 && id < 8500) || (id >= 9000 && id < 9200);
+      if (excludeIntervalAlarms && isIntervalAlarm) continue;
+
+      // Prayer IDs are intentionally excluded in Dart side
+      bool isPrayerId = (id >= 100 && id <= 114) || (id >= 3000 && id <= 3014) || (id >= 5000 && id <= 5014);
+      if (isPrayerId) continue;
+
+      idsToCancel.add(id);
     }
 
-    try {
-      await _platform.invokeMethod('cancelAlarms', {'ids': ids});
-    } catch (_) {}
+    if (idsToCancel.isNotEmpty) {
+      try {
+        await _platform.invokeMethod('cancelAlarms', {'ids': idsToCancel});
+        await _removeActiveAlarmIds(idsToCancel);
+      } catch (_) {}
+    }
   }
 
   static Future<void> rescheduleAllKhatmaNotifications() async {
@@ -542,10 +544,13 @@ class NotificationService {
   }
 
   static Future<void> cancelKhatmaNotifications(String id) async {
-    int idBase = 100000 + (id.hashCode.abs() % 40000) * 10;
-    List<int> ids = List.generate(10, (i) => idBase + i);
+    final cleanId = id.startsWith('khatma_') ? id.replaceFirst('khatma_', '') : id;
+    int idBase = 100000 + (_javaStringHashCode(cleanId) % 40000) * 10;
+    List<int> ids = List.generate(80, (i) => idBase + i);
+    ids.addAll(List.generate(80, (i) => (100000 + (id.hashCode.abs() % 40000) * 10) + i)); // Legacy cancel
     try {
       await _platform.invokeMethod('cancelAlarms', {'ids': ids});
+      await _removeActiveAlarmIds(ids);
     } catch (_) {}
   }
 
@@ -670,7 +675,7 @@ class NotificationService {
       for (int i = 0; i < 3; i++) { // Schedule for next 3 days
          final t = DateTime(now.year, now.month, now.day, hour, minute).add(Duration(days: i));
           if (t.isAfter(now)) {
-           final scheduledId = idBase + t.weekday;
+           final scheduledId = idBase + i;
            await _scheduleNative(scheduledId, "ورد ${khatma.name}", "$bodyPrefixحان وقت وردك اليومي$pageInfo", t.hour, t.minute, "ibad_al_rahmann_tone", year: t.year, month: t.month, day: t.day, payload: payload, customSoundName: "ibad_al_rahmann_tone");
           }
       }
@@ -694,7 +699,7 @@ class NotificationService {
           final time = entry.value;
           final t = time.add(Duration(minutes: khatma.notificationOffsetMinutes));
           if (t.isAfter(now)) {
-            final scheduledId = idBase + (targetDate.weekday * 10) + prayerIdx;
+            final scheduledId = idBase + (i * 10) + prayerIdx;
             await _scheduleNative(scheduledId, "ورد ${khatma.name}", "$bodyPrefixحان وقت وردك بعد صلاة $name$pageInfo", t.hour, t.minute, "ibad_al_rahmann_tone", year: t.year, month: t.month, day: t.day, payload: payload, customSoundName: "ibad_al_rahmann_tone");
           }
           prayerIdx++;
@@ -821,8 +826,10 @@ class NotificationService {
       };
       if (_isBatching) {
         _batchAlarms.add(alarmData);
+        await _addActiveAlarmId(id);
       } else {
         await _platform.invokeMethod('scheduleAlarm', alarmData);
+        await _addActiveAlarmId(id);
       }
     } catch (_) {}
   }

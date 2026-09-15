@@ -78,7 +78,20 @@ class PrayerNotificationService : Service() {
                 stopAudio()
             }
             "UPDATE_PRAYER_NOTIFICATION" -> handleUpdateIntent(intent!!)
-            else -> syncFromSharedPrefs(startId)
+            else -> {
+                // Offload heavy prayer-time calculation to a background thread.
+                // syncFromSharedPrefs calls NativePrayerManager.calculatePrayerTimes()
+                // twice — running it on the main service thread caused the persistent
+                // bar lag / UI freeze seen on every app launch.
+                val capturedStartId = startId
+                Thread {
+                    try {
+                        syncFromSharedPrefs(capturedStartId)
+                    } catch (e: Exception) {
+                        NativeLogger.log(this, "syncFromSharedPrefs error: ${e.message}")
+                    }
+                }.start()
+            }
         }
 
         refreshHandler.removeCallbacks(refreshRunnable)
@@ -316,6 +329,19 @@ class PrayerNotificationService : Service() {
         if (bitmap != null) builder.setLargeIcon(bitmap)
 
         notificationManager.cancel(alarmId)
+        // --- Notification Limit Guard ---
+        // Android limits visible notifications per app. Clean up old ones if limit reached.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val active = notificationManager.activeNotifications
+            // Keep persistent (777) and summaries (666,667). If > 20 others, cancel oldest.
+            val dismissable = active.filter { it.id != 777 && it.id != 666 && it.id != 667 }
+            if (dismissable.size >= 20) {
+                // Cancel the oldest notifications (sorted by post time)
+                dismissable.sortedBy { it.postTime }.take(dismissable.size - 15).forEach {
+                    notificationManager.cancel(it.id)
+                }
+            }
+        }
         notificationManager.notify(alarmId, builder.build())
 
         // Group summary — setOngoing(true) prevents swiping it (which would dismiss ALL notifications)

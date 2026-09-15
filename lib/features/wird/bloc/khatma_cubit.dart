@@ -107,6 +107,7 @@ class KhatmaCubit extends Cubit<KhatmaState> {
     int? startFromPage,
     String? dailyTime,
     int notificationOffsetMinutes = 30,
+    String accountabilityLabel = '+ بند جديد بنفس اسم الختمة',
   }) async {
     emit(KhatmaLoading());
     try {
@@ -168,6 +169,7 @@ class KhatmaCubit extends Cubit<KhatmaState> {
             : (30 * 20) ~/ totalSessions,
         dailyTime: dailyTime,
         notificationOffsetMinutes: notificationOffsetMinutes,
+        accountabilityLabel: accountabilityLabel == '+ بند جديد بنفس اسم الختمة' ? name : accountabilityLabel,
         // Record which prayer we started on so getDaysLate can offset correctly.
         startPrayerOffset: notificationType == 'prayer'
             ? _getPrayerOffset(
@@ -181,6 +183,7 @@ class KhatmaCubit extends Cubit<KhatmaState> {
       final box = Hive.box('appDataBox');
       final jsonData = jsonEncode(newKhatma.toJson());
       await box.put('khatma_$id', jsonData);
+      await prefs.setString('khatma_$id', jsonData); // Mirror to SharedPreferences
       await prefs.setString(_activeIdKey, id);
 
       await prefs.setString('${id}_wird_reminder_type', notificationType);
@@ -240,6 +243,9 @@ class KhatmaCubit extends Cubit<KhatmaState> {
       final box = Hive.box('appDataBox');
       final jsonData = jsonEncode(updatedKhatma.toJson());
       await box.put('khatma_${updatedKhatma.id}', jsonData);
+      
+      final prefs = CacheHelper.prefs;
+      await prefs.setString('khatma_${updatedKhatma.id}', jsonData); // Mirror to SharedPreferences
 
       // Cancel only THIS khatma's notifications, then reschedule all
       await NotificationService.cancelKhatmaNotifications(khatmaId);
@@ -356,11 +362,19 @@ class KhatmaCubit extends Cubit<KhatmaState> {
     final kIndex = khatmas.indexWhere((k) => k.id == khatmaId);
     if (kIndex == -1) return;
 
-    final updatedKhatma = khatmas[kIndex].copyWith(dailyTime: newTime);
+    final updatedKhatma = khatmas[kIndex].copyWith(
+      dailyTime: newTime,
+      enableNotifications: true,
+      notificationType: 'daily',
+    );
     khatmas[kIndex] = updatedKhatma;
 
     final box = Hive.box('appDataBox');
-    await box.put('khatma_$khatmaId', jsonEncode(updatedKhatma.toJson()));
+    final jsonStr = jsonEncode(updatedKhatma.toJson());
+    await box.put('khatma_$khatmaId', jsonStr);
+    
+    final prefs = CacheHelper.prefs;
+    await prefs.setString('khatma_$khatmaId', jsonStr);
 
     await NotificationService.cancelKhatmaNotifications(khatmaId);
     await NotificationService.rescheduleAllKhatmaNotifications();
@@ -383,8 +397,22 @@ class KhatmaCubit extends Cubit<KhatmaState> {
     }
 
     final keys = prefs.getKeys();
+    
+    // Find the khatma's accountability label before deleting it from state
+    String? accountabilityLabel;
+    final khatmas = List<KhatmaModel>.from((state as KhatmaLoaded).khatmas);
+    final idx = khatmas.indexWhere((k) => k.id == id);
+    if (idx != -1) {
+      accountabilityLabel = khatmas[idx].accountabilityLabel;
+      if (accountabilityLabel.isEmpty) accountabilityLabel = 'ورد التلاوة';
+    }
+
     for (String key in keys) {
       if (key.startsWith('wird_last_page_') || key.startsWith('${id}_')) {
+        await prefs.remove(key);
+      }
+      // Also delete its daily tracker completions
+      if (accountabilityLabel != null && key.startsWith('wird_done_$accountabilityLabel')) {
         await prefs.remove(key);
       }
     }
@@ -392,9 +420,6 @@ class KhatmaCubit extends Cubit<KhatmaState> {
     // Cancel ONLY this khatma's notifications (don't touch others)
     await NotificationService.cancelKhatmaNotifications(id);
 
-    List<KhatmaModel> khatmas = List<KhatmaModel>.from(
-      (state as KhatmaLoaded).khatmas,
-    );
     khatmas.removeWhere((k) => k.id == id);
 
     if (khatmas.isEmpty) {

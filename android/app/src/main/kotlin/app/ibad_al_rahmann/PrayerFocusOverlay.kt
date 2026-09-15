@@ -35,11 +35,17 @@ object PrayerFocusOverlay {
     private var snoozeHandler: Handler? = null
     private var snoozeRunnable: Runnable? = null
     private var liveTimer: CountDownTimer? = null
+    private var lastShowTimestamp: Long = 0L
+    private var lastShownPrayer: String = ""
 
     // ─── Dismiss ──────────────────────────────────────────────────────────────
 
     fun dismiss(context: Context) {
-        val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            Handler(Looper.getMainLooper()).post { dismiss(context) }
+            return
+        }
+        val wm = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager ?: return
         visualsView?.let {
             try { wm.removeView(it) } catch (e: Exception) { e.printStackTrace() }
             visualsView = null
@@ -218,6 +224,16 @@ object PrayerFocusOverlay {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
             !android.provider.Settings.canDrawOverlays(context)) return
 
+        val now = System.currentTimeMillis()
+        if (!isPreview && prayerName == lastShownPrayer && (now - lastShowTimestamp) < 1500L) {
+            NativeLogger.log(context, "PrayerFocusOverlay duplicate show debounced for $prayerName")
+            return
+        }
+        lastShowTimestamp = now
+        lastShownPrayer = prayerName
+
+        cancelSnooze(context)
+
         if (!isPreview) {
             val dayStr = resolveIslamicDay(prefs)
             val logKey = "flutter.prayer_focus_log_$dayStr"
@@ -233,10 +249,9 @@ object PrayerFocusOverlay {
             }
         }
 
-        dismiss(context)
-
         Handler(Looper.getMainLooper()).post {
             try {
+                dismiss(context)
                 val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
                 val dm = context.resources.displayMetrics
                 val goldColor  = 0xFFE2BA84.toInt()
@@ -432,8 +447,10 @@ object PrayerFocusOverlay {
                 }
 
                 val prayedButton = buildFullWidthButton(
-                    context, "صليتُ والله ✓", goldDark, Color.WHITE, 17f, dpToPx(dm, 12), 26f
+                    context, "صليتُ والله ✓ (10)", goldDark, Color.WHITE, 17f, dpToPx(dm, 12), 26f
                 )
+                prayedButton.isEnabled = false
+                prayedButton.alpha = 0.5f
 
                 val snoozeMins = try {
                     val bits = prefs.getLong("flutter.focus_snooze_duration", -1L)
@@ -445,27 +462,44 @@ object PrayerFocusOverlay {
                     snoozeBg, snoozeText, 14f, 0, 26f
                 )
                 snoozeButton.isEnabled = false
-                snoozeButton.alpha = 0.5f
+                snoozeButton.alpha = 0.6f
 
                 val countdownHandler = Handler(Looper.getMainLooper())
-                var secondsLeft = 5
+                var prayedSecondsLeft = 10
                 val countdownRunnable = object : Runnable {
                     override fun run() {
-                        secondsLeft--
-                        if (secondsLeft <= 0) {
-                            snoozeButton.text = "ذكرني بعد $snoozeMins دقائق"
-                            snoozeButton.isEnabled = true
-                            snoozeButton.alpha = 1.0f
+                        prayedSecondsLeft--
+                        if (prayedSecondsLeft <= 0) {
+                            prayedButton.text = "صليتُ والله ✓"
+                            prayedButton.isEnabled = true
+                            prayedButton.alpha = 1.0f
                         } else {
-                            snoozeButton.text = "ذكرني بعد $snoozeMins دقائق ($secondsLeft)"
+                            prayedButton.text = "صليتُ والله ✓ ($prayedSecondsLeft)"
                             countdownHandler.postDelayed(this, 1000L)
                         }
                     }
                 }
                 countdownHandler.postDelayed(countdownRunnable, 1000L)
 
+                var snoozeSecondsLeft = 5
+                val snoozeCountdownRunnable = object : Runnable {
+                    override fun run() {
+                        snoozeSecondsLeft--
+                        if (snoozeSecondsLeft <= 0) {
+                            snoozeButton.text = "ذكرني بعد $snoozeMins دقائق"
+                            snoozeButton.isEnabled = true
+                            snoozeButton.alpha = 1.0f
+                        } else {
+                            snoozeButton.text = "ذكرني بعد $snoozeMins دقائق ($snoozeSecondsLeft)"
+                            countdownHandler.postDelayed(this, 1000L)
+                        }
+                    }
+                }
+                countdownHandler.postDelayed(snoozeCountdownRunnable, 1000L)
+
                 snoozeButton.setOnClickListener {
                     countdownHandler.removeCallbacks(countdownRunnable)
+                    countdownHandler.removeCallbacks(snoozeCountdownRunnable)
                     if (isPreview) {
                         dismiss(context)
                     } else {
@@ -475,6 +509,7 @@ object PrayerFocusOverlay {
 
                 prayedButton.setOnClickListener {
                     countdownHandler.removeCallbacks(countdownRunnable)
+                    countdownHandler.removeCallbacks(snoozeCountdownRunnable)
                     showConfirmationButtons(context, controlsLayout, prayedButton, snoozeButton, prayerName, alarmId,
                         goldColor, goldDark, subColor, isPreview)
                 }
@@ -646,6 +681,28 @@ object PrayerFocusOverlay {
         isPreview: Boolean
     ) {
         cancelSnooze(context)
+
+        // Cancel this prayer's adhan + pre-adhan + iqama notifications
+        if (!isPreview) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            // alarmId is in 100-104 range for prayer adhans
+            val prayerIndex = when (alarmId) {
+                100, 110 -> 0  // Fajr
+                101, 111 -> 1  // Dhuhr / Jumuah
+                102, 112 -> 2  // Asr
+                103, 113 -> 3  // Maghrib
+                104, 114 -> 4  // Isha
+                else -> -1
+            }
+            if (prayerIndex >= 0) {
+                nm.cancel(100 + prayerIndex)            // Adhan
+                nm.cancel(3000 + prayerIndex)           // Pre-adhan
+                nm.cancel(5000 + prayerIndex)           // Iqama
+                nm.cancel(1000 + prayerIndex)           // Alternate adhan IDs
+                NativeLogger.log(context, "onPrayed: cancelled notifications for prayerIndex=$prayerIndex (adhan=${100+prayerIndex}, pre-adhan=${3000+prayerIndex}, iqama=${5000+prayerIndex})")
+            }
+        }
+
         val newStreak = if (!isPreview) {
             markPrayerInAccountability(context, prayerName)
             savePrayerLog(context, prayerName, if (isOnTime) "ontime" else "late")
@@ -810,6 +867,7 @@ object PrayerFocusOverlay {
         )
 
         val triggerAtMillis = System.currentTimeMillis() + (snoozeMins * 60 * 1000L)
+        var alarmScheduled = false
         if (alarmManager != null) {
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -817,17 +875,20 @@ object PrayerFocusOverlay {
                 } else {
                     alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
                 }
+                alarmScheduled = true
             } catch (e: Exception) {
                 NativeLogger.log(context, "PrayerFocus: Failed to schedule exact snooze AlarmManager: ${e.message}")
             }
         }
 
-        // 2. Active in-memory handler fallback
-        val h = Handler(Looper.getMainLooper())
-        val r = Runnable { show(context, prayerName, alarmId) }
-        snoozeHandler = h
-        snoozeRunnable = r
-        h.postDelayed(r, snoozeMins * 60 * 1000L)
+        // Active in-memory handler fallback only if AlarmManager was not scheduled
+        if (!alarmScheduled) {
+            val h = Handler(Looper.getMainLooper())
+            val r = Runnable { show(context, prayerName, alarmId) }
+            snoozeHandler = h
+            snoozeRunnable = r
+            h.postDelayed(r, snoozeMins * 60 * 1000L)
+        }
     }
 
     private fun markPrayerInAccountability(context: Context, prayerName: String) {
@@ -884,6 +945,17 @@ object PrayerFocusOverlay {
         }
         map.put(prayerName, entry)
         prefs.edit().putString(key, map.toString()).apply()
+
+        // Also automatically update flutter.temp_prayers for Hasib Nafsak
+        try {
+            val tempKey = "flutter.temp_prayers"
+            val tempJson = prefs.getString(tempKey, null)
+            val tempMap = if (tempJson != null) JSONObject(tempJson) else JSONObject()
+            var pKey = prayerName
+            if (pKey == "الجمعة") pKey = "الظهر"
+            tempMap.put(pKey, true)
+            prefs.edit().putString(tempKey, tempMap.toString()).apply()
+        } catch (_: Exception) {}
     }
 
     fun getPrayerStreak(context: Context, prayerName: String): Int {

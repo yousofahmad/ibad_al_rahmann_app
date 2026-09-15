@@ -69,10 +69,21 @@ class AlarmReceiver : BroadcastReceiver() {
             } catch (e: Exception) {
                 NativeLogger.log(context, "Midnight: generateThirtyDayCache failed: ${e.message}")
             }
-            refreshFromStoredEpochs(context) // الآن يجلب مواقيت اليوم الجديد من الكاش المحدَّث
-            NativeHijriHelper.updateNativeHijriDate(context) // حساب وتحديث التاريخ الهجري ذاتياً
-            WidgetUpdateHelper.scheduleMidnightRefresh(context) // جدولة منتصف الليل لليوم التالي
-            WidgetUpdateHelper.onPrayerAlarmFired(context, -1) // <--- CRITICAL: Refresh UI visually!
+            refreshFromStoredEpochs(context)
+            NativeHijriHelper.updateNativeHijriDate(context)
+            
+            val fp = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            val currentHijriDay = fp.getInt("flutter.current_hijri_day", 0)
+            if (currentHijriDay == 29) {
+                val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                val confirmedDate = fp.getString("flutter.local_hijri_confirmed_date", "")
+                if (confirmedDate != todayStr) {
+                    showHijri29Notification(context)
+                }
+            }
+
+            WidgetUpdateHelper.scheduleMidnightRefresh(context)
+            WidgetUpdateHelper.onPrayerAlarmFired(context, -1)
             return
         }
         
@@ -597,6 +608,41 @@ class AlarmReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        fun showHijri29Notification(context: Context) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val channelId = "hijri_check_channel"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    channelId,
+                    "تأكيد التاريخ الهجري",
+                    NotificationManager.IMPORTANCE_HIGH
+                )
+                notificationManager.createNotificationChannel(channel)
+            }
+
+            val intent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra("payload", "hijri_confirmation")
+            }
+            
+            val pendingIntentFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+            val pendingIntent = PendingIntent.getActivity(context, 99999, intent, pendingIntentFlags)
+
+            val builder = NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(context.resources.getIdentifier("ic_notification", "drawable", context.packageName))
+                .setContentTitle("تأكيد الشهر الهجري")
+                .setContentText("مش قادرين نتأكد إن الشهر الهجري خلص ولا لسه — افتح التطبيق عشان تتأكد")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+
+            notificationManager.notify(99999, builder.build())
+        }
+
         fun buildAndShowNotification(context: Context, notifId: Int, title: String, content: String, soundName: String, targetPage: String, audioPath: String?, customSoundName: String? = null) {
             val cleanSoundName = soundName.replace(".mp3", "").lowercase().trim()
 

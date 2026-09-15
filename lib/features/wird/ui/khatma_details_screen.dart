@@ -93,17 +93,15 @@ class KhatmaDetailsScreen extends StatelessWidget {
               if (state is KhatmaLoaded) {
                 try {
                   final khatma = state.khatmas.firstWhere((k) => k.id == khatmaId);
-                  if (khatma.notificationType == 'daily' && khatma.enableNotifications) {
-                    return IconButton(
-                      tooltip: 'تعديل وقت التنبيه',
-                      onPressed: () => _showTimePickerDialog(
-                        context,
-                        context.read<KhatmaCubit>(),
-                        khatma.dailyTime,
-                      ),
-                      icon: const Icon(Icons.access_time_rounded, color: Color(0xFFD0A871), size: 22),
-                    );
-                  }
+                  return IconButton(
+                    tooltip: 'تعديل وقت التنبيه',
+                    onPressed: () => _showTimePickerDialog(
+                      context,
+                      context.read<KhatmaCubit>(),
+                      khatma.dailyTime,
+                    ),
+                    icon: const Icon(Icons.access_time_rounded, color: Color(0xFFD0A871), size: 22),
+                  );
                 } catch (_) {}
               }
               return const SizedBox.shrink();

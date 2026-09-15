@@ -8,6 +8,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/main.dart'; // Import to access global keys
 
 import 'package:ibad_al_rahmann/screens/home_screen.dart';
+import 'package:ibad_al_rahmann/screens/hijri_confirmation_screen.dart';
 
 class QuranApp extends StatelessWidget {
   const QuranApp({super.key, required this.showCustomSplash});
@@ -36,6 +37,9 @@ class QuranApp extends StatelessWidget {
               home: showCustomSplash
                   ? const SplashScreen()
                   : const HomeScreen(),
+              routes: {
+                '/hijri_confirmation': (context) => const HijriConfirmationScreen(),
+              },
             );
           },
         );

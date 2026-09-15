@@ -357,7 +357,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
         try { tempMap.addAll(json.decode(tempRaw) as Map<String, dynamic>); } catch (_) {}
       }
       if (status == null) {
-        tempMap.remove(prayer);
+        tempMap[prayer] = false;
       } else {
         tempMap[prayer] = true;
       }

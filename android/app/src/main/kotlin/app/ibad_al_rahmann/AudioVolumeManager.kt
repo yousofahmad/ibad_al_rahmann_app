@@ -88,8 +88,8 @@ class AudioVolumeManager(private val context: Context) {
         if (!isStateCaptured) return
 
         try {
-            audioManager.isSpeakerphoneOn = originalSpeakerphoneOn
-            audioManager.mode = originalMode
+            audioManager.isSpeakerphoneOn = false
+            audioManager.mode = AudioManager.MODE_NORMAL
         } catch (e: Exception) {
             e.printStackTrace()
         }

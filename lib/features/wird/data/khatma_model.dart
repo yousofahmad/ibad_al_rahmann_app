@@ -12,6 +12,7 @@ class KhatmaModel {
   final int pagesPerWird;
   final String? dailyTime;
   final int notificationOffsetMinutes;
+  final String accountabilityLabel;
 
   /// For prayer-based khatmas: the prayer index (0=Fajr..4=Isha) at which the
   /// khatma was created. Used to offset the expected-index calculation so that
@@ -31,6 +32,7 @@ class KhatmaModel {
     this.dailyTime,
     this.notificationOffsetMinutes = 30,
     this.startPrayerOffset = 0,
+    this.accountabilityLabel = '',
   });
 
   KhatmaModel copyWith({
@@ -46,6 +48,7 @@ class KhatmaModel {
     String? dailyTime,
     int? notificationOffsetMinutes,
     int? startPrayerOffset,
+    String? accountabilityLabel,
   }) {
     return KhatmaModel(
       id: id ?? this.id,
@@ -60,6 +63,7 @@ class KhatmaModel {
       dailyTime: dailyTime ?? this.dailyTime,
       notificationOffsetMinutes: notificationOffsetMinutes ?? this.notificationOffsetMinutes,
       startPrayerOffset: startPrayerOffset ?? this.startPrayerOffset,
+      accountabilityLabel: accountabilityLabel ?? this.accountabilityLabel,
     );
   }
 
@@ -77,6 +81,7 @@ class KhatmaModel {
       'dailyTime': dailyTime,
       'notificationOffsetMinutes': notificationOffsetMinutes,
       'startPrayerOffset': startPrayerOffset,
+      'accountabilityLabel': accountabilityLabel,
     };
   }
 
@@ -94,6 +99,7 @@ class KhatmaModel {
       dailyTime: json['dailyTime'],
       notificationOffsetMinutes: json['notificationOffsetMinutes'] ?? 30,
       startPrayerOffset: json['startPrayerOffset'] ?? 0,
+      accountabilityLabel: json['accountabilityLabel'] ?? (json['name'] ?? 'ختمة'),
     );
   }
 }

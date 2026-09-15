@@ -37,6 +37,7 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 // Screens for Global Navigation
 import 'package:ibad_al_rahmann/screens/azkar_page.dart';
 import 'package:ibad_al_rahmann/screens/ruqyah_screen.dart';
+import 'package:ibad_al_rahmann/services/hijri_source_service.dart';
 import 'package:ibad_al_rahmann/features/wird/ui/wird_dashboard_screen.dart';
 import 'package:ibad_al_rahmann/features/wird/ui/isolated_wird_screen.dart';
 import 'package:ibad_al_rahmann/screens/fasting_days_screen.dart';
@@ -183,6 +184,10 @@ Future<void> _runBackgroundInits() async {
   PrayerService().init();
   AppLogger.log('BgInit', 'PrayerService.init triggered');
 
+  AppLogger.log('BgInit', 'HijriSourceService.syncOffsetIfNeeded start');
+  await HijriSourceService.syncOffsetIfNeeded();
+  AppLogger.log('BgInit', 'HijriSourceService.syncOffsetIfNeeded done');
+
   AppLogger.log('BgInit', 'BookmarkService.init start');
   await BookmarkService.init();
   AppLogger.log('BgInit', 'BookmarkService.init done');
@@ -273,6 +278,9 @@ Future<void> handleGlobalNavigation(String payload) async {
     case 'khatma':
     case 'wird':
       nav.push(MaterialPageRoute(builder: (_) => const WirdDashboardScreen()));
+      break;
+    case 'hijri_confirmation':
+      nav.pushNamed('/hijri_confirmation');
       break;
     case 'jumuah':
     case 'kahf':

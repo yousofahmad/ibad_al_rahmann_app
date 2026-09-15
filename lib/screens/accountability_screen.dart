@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ibad_al_rahmann/features/wird/bloc/khatma_cubit.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
+import 'package:ibad_al_rahmann/core/helpers/islamic_day.dart';
 import 'package:ibad_al_rahmann/widgets/app_skeleton.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
@@ -58,11 +61,11 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
   final Map<String, bool> _quran = {};
   final Map<String, bool> _azkar = {};
   final Map<String, bool> _goodDeeds = {};
+  final Map<String, bool> _dynamicWirds = {};
 
   bool _isLoading = true;
   bool _isKahfDone = false;
   bool _isFriday = false;
-  List<String> _wirdsDoneToday = [];
   int _salawatCount = 0;
 
   @override
@@ -120,7 +123,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
     _loadMapFromPrefs(prefs, 'temp_deeds', _goodDeeds);
 
     // ✅ دمج الصلوات المسجلة في صلاتي (Prayer Focus) لليوم الحالي
-    final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final todayKey = await IslamicDay.todayKey();
     final focusLogRaw = prefs.getString('prayer_focus_log_$todayKey');
     if (focusLogRaw != null) {
       try {
@@ -169,8 +172,23 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
       if (_isFriday) {
         _isKahfDone = await DailyTrackerService.isKahfDone();
       }
-      _wirdsDoneToday = await DailyTrackerService.getWirdsDoneToday();
       _salawatCount = prefs.getInt('salawat_count_$todayKey') ?? 0;
+
+      _dynamicWirds.clear();
+      final khatmaState = context.read<KhatmaCubit>().state;
+      if (khatmaState is KhatmaLoaded) {
+        for (final k in khatmaState.khatmas) {
+          final label = k.accountabilityLabel.isNotEmpty ? k.accountabilityLabel : 'ورد التلاوة';
+          if (k.notificationType == 'prayer') {
+            for (final p in ['الفجر', 'الظهر', 'العصر', 'المغرب', 'العشاء']) {
+               final key = '$label - $p';
+               _dynamicWirds[key] = await DailyTrackerService.isWirdDone(key);
+            }
+          } else {
+             _dynamicWirds[label] = await DailyTrackerService.isWirdDone(label);
+          }
+        }
+      }
 
       setState(() {
         _isLoading = false;
@@ -184,7 +202,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
       _salawatCount = newCount;
     });
     final prefs = CacheHelper.prefs;
-    final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final todayKey = await IslamicDay.todayKey();
     await prefs.setInt('salawat_count_$todayKey', newCount);
   }
 
@@ -224,7 +242,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
     await prefs.setString(key, json.encode(map));
 
     if (key == 'temp_prayers') {
-      final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final todayKey = await IslamicDay.todayKey();
       final logKey = 'prayer_focus_log_$todayKey';
       final focusLogRaw = prefs.getString(logKey);
       final focusMap = <String, dynamic>{};
@@ -270,7 +288,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
     double totalScore =
         (prayerScore + quranScore + azkarScore + deedsScore) / 4;
 
-    final String dateKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final String dateKey = await IslamicDay.todayKey();
     Map<String, dynamic> dailyData = {
       'date': dateKey,
       'prayer': prayerScore,
@@ -792,29 +810,8 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                               ),
                             ),
 
-                          // ✅ الورد المنجز اليوم (يتحدد تلقائياً)
-                          if (_wirdsDoneToday.isNotEmpty)
-                            Container(
-                              margin: EdgeInsets.only(bottom: 12.h),
-                              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(16.r),
-                                border: Border.all(color: Colors.green.withValues(alpha: 0.35)),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.check_circle, color: Colors.green, size: 22),
-                                  SizedBox(width: 10.w),
-                                  Expanded(
-                                    child: Text(
-                                      'أتممت الورد اليوم: ${_wirdsDoneToday.join('، ')} ✅',
-                                      style: TextStyle(fontFamily: AppConsts.expoArabic, fontSize: 13.sp, color: Colors.green),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                          // ✅ الأوراد (من הختمات النشطة)
+                          _buildDynamicWirdsSection(isDark, textColor),
 
                           // ✅ عداد الصلاة على النبي ﷺ
                           _buildSalawatCounterCard(isDark, textColor),
@@ -1120,6 +1117,93 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDynamicWirdsSection(bool isDark, Color textColor) {
+    if (_dynamicWirds.isEmpty) return const SizedBox.shrink();
+
+    final cardColor = isDark ? const Color(0xFF000000) : Colors.white;
+    final subTextColor = isDark ? Colors.grey[400] : Colors.grey[600];
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 20.h),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(
+          color: const Color(0xFFD0A871).withValues(alpha: 0.5),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10.r,
+            offset: Offset(0, 5.h),
+          ),
+        ],
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          collapsedIconColor: const Color(0xFFD0A871),
+          iconColor: const Color(0xFFD0A871),
+          tilePadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+          title: Text(
+            "الأوراد",
+            style: TextStyle(
+              fontFamily: AppConsts.expoArabic,
+              fontSize: 18.sp,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFFD0A871),
+            ),
+          ),
+          subtitle: Text(
+            "أوراد الختمات النشطة",
+            style: TextStyle(
+              fontFamily: AppConsts.expoArabic,
+              fontSize: 12.sp,
+              color: subTextColor,
+            ),
+          ),
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+              child: Column(
+                children: _dynamicWirds.keys.map((key) {
+                  final isDone = _dynamicWirds[key] ?? false;
+                  return Container(
+                    margin: EdgeInsets.only(bottom: 8.h),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.grey[900] : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            key,
+                            style: TextStyle(
+                              fontFamily: AppConsts.expoArabic,
+                              fontSize: 14.sp,
+                              color: textColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          isDone ? Icons.check_circle : Icons.radio_button_unchecked,
+                          color: isDone ? Colors.green : Colors.grey,
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

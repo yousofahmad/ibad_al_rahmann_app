@@ -176,6 +176,11 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
                     NativeLogger.log(context, sb.toString())
                     result.success(sb.toString())
                 }
+                "rescheduleNativeAlarms" -> {
+                    NativeAzkarScheduler.scheduleAzkar(context)
+                    NativeAzkarScheduler.scheduleWird(context)
+                    result.success("Rescheduled")
+                }
                 "updatePrayerNotification" -> {
                     try {
                         val fajr = call.argument<String>("fajr")
@@ -350,26 +355,26 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
                     result.success(true)
                 }
                 "startScreenUnlockService" -> {
-                    // Save salawat unlock settings to FlutterSharedPreferences so
-                    // ScreenUnlockService can read them without a running Flutter engine.
                     val mode   = call.argument<String>("mode")   ?: "saly_3ala_mo7amad"
                     val volume = call.argument<Double>("volume") ?: 1.0
                     val prefs  = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
                     prefs.edit()
                         .putString("flutter.salah_unlock_mode",   mode)
+                        .putString("salah_unlock_mode",   mode)
                         .putFloat("flutter.salah_unlock_volume",  volume.toFloat())
+                        .putFloat("salah_unlock_volume",  volume.toFloat())
                         .apply()
 
-                    val intent = Intent(context, ScreenUnlockService::class.java)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        try { context.startForegroundService(intent) } catch (e: Exception) { e.printStackTrace() }
-                    } else {
-                        context.startService(intent)
-                    }
+                    NativeLogger.log(context, "startScreenUnlockService called: mode=$mode, volume=$volume")
                     result.success(null)
                 }
                 "stopScreenUnlockService" -> {
-                    ScreenUnlockService.stop(context)
+                    val prefs  = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                    prefs.edit()
+                        .putString("flutter.salah_unlock_mode", "none")
+                        .putString("salah_unlock_mode", "none")
+                        .apply()
+                    NativeLogger.log(context, "stopScreenUnlockService called")
                     result.success(null)
                 }
                 else -> result.notImplemented()

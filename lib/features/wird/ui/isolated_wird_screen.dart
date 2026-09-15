@@ -13,7 +13,7 @@ import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cu
 import 'package:ibad_al_rahmann/features/quran/data/repo/quran_repo.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/widgets/menus/single_tap_menu.dart';
 import 'package:ibad_al_rahmann/features/wird/bloc/khatma_cubit.dart';
-import 'package:ibad_al_rahmann/services/daily_tracker_service.dart';
+import 'package:ibad_al_rahmann/features/wird/services/wird_completion_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/widgets/core/wbw_page_widget.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -150,19 +150,19 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen> with TickerProv
   }
 
   void _onFinishWird() async {
-    if (widget.isKahfMode) {
-      await DailyTrackerService.markKahfDone();
-    } else if (widget.isWirdMode && widget.khatmaId != null && widget.wirdIndex != null) {
-      context.read<KhatmaCubit>().markWirdAsCompleted(widget.khatmaId!, widget.wirdIndex!);
-      // Auto-save wird completion to daily tracker (Rule 22)
-      await DailyTrackerService.markWirdDone('ورد التلاوة');
-    }
+    await WirdCompletionService.complete(
+      context: context,
+      isKahfMode: widget.isKahfMode,
+      isWirdMode: widget.isWirdMode,
+      khatmaId: widget.khatmaId,
+      wirdIndex: widget.wirdIndex,
+    );
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
-          "تم إتمام القراءة بنجاح، تقبل الله منا ومنكم صالح الأعمال.",
+          "أتممت القراءة بنجاح، تقبل الله منا ومنكم صالح الأعمال.",
           style: TextStyle(fontFamily: AppConsts.cairo, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),

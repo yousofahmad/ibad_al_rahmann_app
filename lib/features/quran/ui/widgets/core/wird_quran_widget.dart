@@ -8,6 +8,7 @@ import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/core/services/intro_service.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
 import 'package:ibad_al_rahmann/features/wird/bloc/khatma_cubit.dart';
+import 'package:ibad_al_rahmann/features/wird/services/wird_completion_service.dart';
 
 import '../../../../../core/app_constants.dart';
 import '../menus/single_tap_menu.dart';
@@ -375,16 +376,17 @@ class _WirdQuranWidgetState extends State<WirdQuranWidget>
                                                 ),
                                               ),
                                             ),
-                                            onPressed: () {
-                                              context
-                                                  .read<KhatmaCubit>()
-                                                  .markWirdAsCompleted(
-                                                    state.khatmaId!,
-                                                    state.wirdIndex!,
-                                                  );
+                                            onPressed: () async {
+                                              await WirdCompletionService.complete(
+                                                context: context,
+                                                isKahfMode: state.isKahfMode,
+                                                isWirdMode: state.isWirdMode,
+                                                khatmaId: state.khatmaId,
+                                                wirdIndex: state.wirdIndex,
+                                              );
                                               _showTopNotification(
                                                 context,
-                                                'تقبل الله طاعتكم! تم إتمام الورد بنجاح',
+                                                'تقبل الله طاعتكم! تم إتمام القراءة بنجاح',
                                               );
                                             },
                                             child: const Text(
@@ -415,8 +417,14 @@ class _WirdQuranWidgetState extends State<WirdQuranWidget>
                                                     side: BorderSide(color: onBar, width: 1),
                                                   ),
                                                 ),
-                                                onPressed: () {
-                                                  context.read<KhatmaCubit>().markWirdAsCompleted(state.khatmaId!, state.wirdIndex!);
+                                                onPressed: () async {
+                                                  await WirdCompletionService.complete(
+                                                    context: context,
+                                                    isKahfMode: state.isKahfMode,
+                                                    isWirdMode: state.isWirdMode,
+                                                    khatmaId: state.khatmaId,
+                                                    wirdIndex: state.wirdIndex,
+                                                  );
                                                   context.read<QuranCubit>().jumpToWird(
                                                     startPage: nextWird.startPage,
                                                     endPage: nextWird.endPage,

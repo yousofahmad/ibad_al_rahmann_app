@@ -1,7 +1,7 @@
 name: ibad_al_rahmann
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.1.5+10
+version: 1.2.0+9
 
 environment:
   sdk: ^3.10.0
@@ -51,6 +51,7 @@ dependencies:
   path_provider: ^2.1.5
   dio: ^5.9.0
   just_audio: ^0.10.5
+  archive: ^4.0.7
   
   # 👇 Dependencies for Transferred Features (Quran, etc.)
   flutter_bloc: ^9.1.1

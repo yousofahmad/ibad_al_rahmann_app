@@ -152,11 +152,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  bool _showHijri29Banner = false;
+
+  void _checkHijri29() {
+    final prefs = CacheHelper.prefs;
+    final currentHijriDay = prefs.getInt('current_hijri_day') ?? 0;
+    if (currentHijriDay == 29) {
+      final todayStr = DateTime.now().toString().substring(0, 10);
+      final confirmedDate = prefs.getString('local_hijri_confirmed_date');
+      if (confirmedDate != todayStr) {
+        if (!_showHijri29Banner) {
+          setState(() {
+            _showHijri29Banner = true;
+          });
+        }
+        return;
+      }
+    }
+    if (_showHijri29Banner) {
+      setState(() {
+        _showHijri29Banner = false;
+      });
+    }
+  }
+
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         _updateCountdown();
+        _checkHijri29();
       }
     });
 
@@ -520,6 +545,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         context,
                         MaterialPageRoute(
                           builder: (_) => IsolatedWirdScreen(
+                            isWirdMode: true,
                             khatmaId: khatma.id,
                             wirdIndex: khatma.currentWirdIndex,
                             targetStartPage: w.startPage,
@@ -737,6 +763,41 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             SliverToBoxAdapter(
               child: SizedBox(height: MediaQuery.of(context).padding.top),
             ),
+            if (_showHijri29Banner)
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+                      SizedBox(width: 10.w),
+                      Expanded(
+                        child: Text(
+                          "يرجى تأكيد التاريخ الهجري لليوم الجديد",
+                          style: TextStyle(fontFamily: AppConsts.cairo, color: Colors.redAccent, fontSize: 13.sp),
+                        ),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.redAccent,
+                          padding: EdgeInsets.symmetric(horizontal: 16.w),
+                          minimumSize: Size(0, 36.h),
+                        ),
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/hijri_confirmation');
+                        },
+                        child: const Text("تأكيد", style: TextStyle(color: Colors.white)),
+                      )
+                    ],
+                  ),
+                ),
+              ),
             // Reminder cards (Alerts)
             SliverToBoxAdapter(child: _buildReminderCards()),
             // Header (Countdown)

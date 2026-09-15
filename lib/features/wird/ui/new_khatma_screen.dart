@@ -41,6 +41,38 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
 
   bool _isLoading = false;
 
+  // Accountability Label Selection
+  List<String> _accountabilityLabels = [];
+  String _selectedAccountabilityLabel = '+ بند جديد بنفس اسم الختمة';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAccountabilityLabels();
+  }
+
+  void _loadAccountabilityLabels() {
+    final prefs = CacheHelper.prefs;
+    final defaultQuran = [
+      'ورد التلاوة',
+      'حفظ جديد',
+      'مراجعة',
+      'سماع قرآن',
+    ];
+    final custom = prefs.getStringList('custom_items_temp_quran') ?? [];
+    final deleted = (prefs.getStringList('deleted_items_temp_quran') ?? []).toSet();
+    
+    final List<String> items = [
+      ...defaultQuran.where((e) => !deleted.contains(e)),
+      ...custom.where((e) => !deleted.contains(e)),
+    ];
+    
+    setState(() {
+      _accountabilityLabels = items;
+      _accountabilityLabels.add('+ بند جديد بنفس اسم الختمة');
+    });
+  }
+
   /// Remaining pages from the chosen start point
   int get _remainingPages {
     if (_startByJuz) {
@@ -203,6 +235,7 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
       startFromPage: _startByJuz ? null : _startPage,
       dailyTime: _effectiveDivision == 'daily' ? timeStr : null,
       notificationOffsetMinutes: _adhanDelayMinutes,
+      accountabilityLabel: _selectedAccountabilityLabel,
     );
 
     if (mounted) {
@@ -281,6 +314,37 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
                     borderSide: BorderSide(color: goldColor),
                   ),
                 ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // ═══ Accountability Label ═══
+            _buildCard(
+              context: context,
+              title: "الربط بحاسب نفسك (المتابعة اليومية)",
+              icon: FontAwesomeIcons.listCheck,
+              child: DropdownButton<String>(
+                value: _selectedAccountabilityLabel,
+                isExpanded: true,
+                dropdownColor: isDark ? Colors.grey[900] : Colors.white,
+                style: TextStyle(
+                  color: textColor,
+                  fontFamily: AppConsts.cairo,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+                underline: const SizedBox(),
+                items: _accountabilityLabels.map((label) {
+                  return DropdownMenuItem<String>(
+                    value: label,
+                    child: Text(label, overflow: TextOverflow.ellipsis),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _selectedAccountabilityLabel = val);
+                  }
+                },
               ),
             ),
             const SizedBox(height: 20),

@@ -272,23 +272,6 @@ class MainActivity: AudioServiceFragmentActivity() {
         flutterEngine.plugins.add(BackgroundMethodChannelPlugin())
         createNotificationChannels()
 
-        // Handle screen unlock service start/stop from Flutter
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.ibad_al_rahmann/background")
-            .setMethodCallHandler { call, result ->
-                when (call.method) {
-                    "startScreenUnlockService" -> {
-                        val svcIntent = Intent(this, PrayerNotificationService::class.java)
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(svcIntent)
-                        else startService(svcIntent)
-                        result.success(null)
-                    }
-                    "stopScreenUnlockService" -> {
-                        result.success(null)
-                    }
-                    else -> result.notImplemented()
-                }
-            }
-
         // ── Warm-restart payload delivery ──────────────────────────────────────
         // When the Android process is still alive (common on Samsung / MIUI),
         // swiping from Recent + tapping a notification triggers a NEW Activity

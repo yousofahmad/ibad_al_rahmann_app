@@ -2,7 +2,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'prayer_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import '../core/helpers/islamic_day.dart';
 
@@ -267,22 +266,17 @@ class DailyTrackerService {
 
   // ─── Wird Completion Helpers ──────────────────────────────────────────────
 
-  /// Marks a Wird as completed for today. Called automatically from isolated_wird_screen.
-  static Future<void> markWirdDone(String wirdTitle) async {
+  /// Marks a Wird as completed for today. Called automatically from WirdCompletionService.
+  static Future<void> markWirdDone(String label, {String? dateKey}) async {
     final prefs = CacheHelper.prefs;
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final key = 'wird_done_$today';
-    final existing = prefs.getStringList(key) ?? [];
-    if (!existing.contains(wirdTitle)) {
-      existing.add(wirdTitle);
-      await prefs.setStringList(key, existing);
-    }
+    final String dateStr = dateKey ?? await IslamicDay.todayKey();
+    await prefs.setBool('wird_done_${label}_$dateStr', true);
   }
 
-  /// Returns list of wirds completed today.
-  static Future<List<String>> getWirdsDoneToday() async {
+  /// Checks if a Wird is completed for today.
+  static Future<bool> isWirdDone(String label, {String? dateKey}) async {
     final prefs = CacheHelper.prefs;
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    return prefs.getStringList('wird_done_$today') ?? [];
+    final String dateStr = dateKey ?? await IslamicDay.todayKey();
+    return prefs.getBool('wird_done_${label}_$dateStr') ?? false;
   }
 }

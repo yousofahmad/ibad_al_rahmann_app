@@ -981,8 +981,18 @@ class PrayerService extends ChangeNotifier {
     return original.add(Duration(minutes: _adjustments[key] ?? 0));
   }
 
-  static HijriCalendar getHijriWithOffset(int offsetDays, [DateTime? date]) {
+  static HijriCalendar getHijriWithOffset(int remoteOffset, [DateTime? date]) {
     final baseDate = date ?? DateTime.now();
+    
+    // الأولوية 1: local_hijri_offset (المحسوب من API دار الإفتاء)
+    final localOffset = CacheHelper.prefs.getInt('local_hijri_offset');
+    final manualAdjustment = CacheHelper.prefs.getInt('manual_day_adjustment') ?? 0;
+    
+    // لو فيه تأكيد محلي، نتجاهل الفايربيز تماماً في مصر
+    final offsetDays = (localOffset != null) 
+        ? localOffset + manualAdjustment 
+        : remoteOffset + manualAdjustment;
+
     DateTime effectiveDate = baseDate.add(Duration(days: offsetDays));
 
     // في الشريعة الإسلامية يبدأ اليوم الهجري الجديد مع غروب الشمس (أذان المغرب)
@@ -1003,6 +1013,8 @@ class PrayerService extends ChangeNotifier {
   int get manualHijriOffset => _hijriOffset;
   int get localHijriDelta => _localHijriDelta;
   bool get is24Hour => _is24Hour;
+
+  void refreshUI() => notifyListeners();
 
   Future<void> setHijriOffset(int offset) async {
     _hijriOffset = offset;

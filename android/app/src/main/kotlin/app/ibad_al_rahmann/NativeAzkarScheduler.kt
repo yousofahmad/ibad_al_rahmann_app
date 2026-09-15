@@ -22,6 +22,7 @@ object NativeAzkarScheduler {
         val fp = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val prefs = context.getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE)
         val editor = prefs.edit()
+        val now = System.currentTimeMillis()
 
         // ── أذكار الصباح (ID 1) ──────────────────────────────────────────────
         val morningMode = fp.getString("flutter.azkar_morning_mode", "sound") ?: "sound"
@@ -83,6 +84,81 @@ object NativeAzkarScheduler {
             cancelAlarm(context, editor, 5)
         }
 
+        // ── سورة الكهف والصلاة على النبي يوم الجمعة ────────────────────────
+        // 2350 = بعد العشاء يوم الجمعة بساعة
+        // 2360 = بعد الفجر يوم الجمعة بساعة
+        val kahfSalawatEnabled = safeBool(fp, "flutter.notif_kahf_salawat", true)
+        if (kahfSalawatEnabled) {
+            val calFri = java.util.Calendar.getInstance()
+            calFri.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.FRIDAY)
+            val friTimes = NativePrayerManager.calculatePrayerTimes(context, calFri.time)
+
+            // ── إشعار بعد العشاء بساعة (2350) ──────────────────────────────
+            var ishaHour = 22
+            var ishaMin = 0
+            if (friTimes != null) {
+                val ishaCal = java.util.Calendar.getInstance().apply { time = friTimes.isha }
+                ishaCal.add(java.util.Calendar.HOUR_OF_DAY, 1)
+                ishaHour = ishaCal.get(java.util.Calendar.HOUR_OF_DAY)
+                ishaMin  = ishaCal.get(java.util.Calendar.MINUTE)
+            }
+            val calIshaFri = java.util.Calendar.getInstance()
+            calIshaFri.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.FRIDAY)
+            calIshaFri.set(java.util.Calendar.HOUR_OF_DAY, ishaHour)
+            calIshaFri.set(java.util.Calendar.MINUTE, ishaMin)
+            calIshaFri.set(java.util.Calendar.SECOND, 0)
+            if (calIshaFri.timeInMillis <= now) calIshaFri.add(java.util.Calendar.WEEK_OF_YEAR, 1)
+            MainActivity.scheduleAlarmInternal(
+                context, editor, 2350,
+                year = calIshaFri.get(java.util.Calendar.YEAR),
+                month = calIshaFri.get(java.util.Calendar.MONTH) + 1,
+                day = calIshaFri.get(java.util.Calendar.DAY_OF_MONTH),
+                hour = ishaHour, minute = ishaMin,
+                soundName = "saly_3ala_mo7amad",
+                title = "الجمعة — ليلة مباركة",
+                body = "لا تنس قراءة سورة الكهف والإكثار من الصلاة على النبي ﷺ",
+                payload = "kahf",
+                isRepeating = false,
+                audioPath = null,
+                intervalMinutes = 0,
+                customSoundName = "saly_3ala_mo7amad"
+            )
+
+            // ── إشعار بعد الفجر بساعة (2360) ──────────────────────────────
+            var friHour = 6
+            var friMin  = 30
+            if (friTimes != null) {
+                val fCal = java.util.Calendar.getInstance().apply { time = friTimes.fajr }
+                fCal.add(java.util.Calendar.HOUR_OF_DAY, 1)
+                friHour = fCal.get(java.util.Calendar.HOUR_OF_DAY)
+                friMin  = fCal.get(java.util.Calendar.MINUTE)
+            }
+            val calFajrFri = java.util.Calendar.getInstance()
+            calFajrFri.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.FRIDAY)
+            calFajrFri.set(java.util.Calendar.HOUR_OF_DAY, friHour)
+            calFajrFri.set(java.util.Calendar.MINUTE, friMin)
+            calFajrFri.set(java.util.Calendar.SECOND, 0)
+            if (calFajrFri.timeInMillis <= now) calFajrFri.add(java.util.Calendar.WEEK_OF_YEAR, 1)
+            MainActivity.scheduleAlarmInternal(
+                context, editor, 2360,
+                year = calFajrFri.get(java.util.Calendar.YEAR),
+                month = calFajrFri.get(java.util.Calendar.MONTH) + 1,
+                day = calFajrFri.get(java.util.Calendar.DAY_OF_MONTH),
+                hour = friHour, minute = friMin,
+                soundName = "saly_3ala_mo7amad",
+                title = "يوم الجمعة",
+                body = "لا تنس قراءة سورة الكهف والإكثار من الصلاة على النبي ﷺ",
+                payload = "kahf",
+                isRepeating = false,
+                audioPath = null,
+                intervalMinutes = 0,
+                customSoundName = "saly_3ala_mo7amad"
+            )
+        } else {
+            cancelAlarm(context, editor, 2350)
+            cancelAlarm(context, editor, 2360)
+        }
+
         editor.apply()
 
         // ── ورد الختمة (Khatma Wird notifications) ──────────────────────────
@@ -131,6 +207,15 @@ object NativeAzkarScheduler {
         for ((khatmaKey, value) in khatmaEntries) {
             try {
                 val json = org.json.JSONObject(value)
+                val khatmaId   = json.optString("id", khatmaKey)
+                val cleanId    = if (khatmaId.startsWith("khatma_")) khatmaId.removePrefix("khatma_") else khatmaId
+                val idBase     = 100000 + (cleanId.hashCode().let { if (it < 0) -it else it } % 40000) * 10
+
+                // Cancel previous alarms for this khatma first to avoid duplicate notifications
+                for (c in 0..30) {
+                    cancelAlarm(context, editor, idBase + c)
+                }
+
                 if (!json.optBoolean("enableNotifications", true)) {
                     NativeLogger.log(context, "scheduleWird: $khatmaKey — notifications disabled, skipping")
                     continue
@@ -139,12 +224,8 @@ object NativeAzkarScheduler {
                 val khatmaName = json.optString("name", "الختمة")
                 val notifType  = json.optString("notificationType", "daily")
                 val offsetMins = json.optInt("notificationOffsetMinutes", 30)
-                val khatmaId   = json.optString("id", khatmaKey)
-                val cleanId    = if (khatmaId.startsWith("khatma_")) khatmaId.removePrefix("khatma_") else khatmaId
-                val idBase     = 100000 + (cleanId.hashCode().let { if (it < 0) -it else it } % 40000) * 10
 
                 // Build a full deep-link payload that includes the current wird index + page range
-                // so handleGlobalNavigation() opens IsolatedWirdScreen directly on the right pages
                 val wirdsArray   = json.optJSONArray("wirds")
                 val wirdIdx      = json.optInt("currentWirdIndex", 0)
                 val clampedIdx   = if (wirdsArray != null) wirdIdx.coerceIn(0, wirdsArray.length() - 1) else 0
@@ -182,7 +263,7 @@ object NativeAzkarScheduler {
                                          else ""
                         val finalBody = bodyPrefix + "حان وقت وردك اليومي$pageInfo"
 
-                        val scheduledId = idBase + cal.get(java.util.Calendar.DAY_OF_WEEK)
+                        val scheduledId = idBase + i
                         MainActivity.scheduleAlarmInternal(
                             context, editor, scheduledId,
                             year = cal.get(java.util.Calendar.YEAR),
@@ -231,7 +312,7 @@ object NativeAzkarScheduler {
 
                             val pCal = java.util.Calendar.getInstance()
                             pCal.timeInMillis = pEpoch
-                            val scheduledId = idBase + (dayCal.get(java.util.Calendar.DAY_OF_WEEK) * 10) + pIdx
+                            val scheduledId = idBase + (i * 10) + pIdx
                             MainActivity.scheduleAlarmInternal(
                                 context, editor, scheduledId,
                                 year = pCal.get(java.util.Calendar.YEAR),

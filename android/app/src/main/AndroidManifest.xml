@@ -132,13 +132,14 @@
                 android:value="Prayer times countdown and details for user convenience."/>
         </service>
 
-        <!-- Screen Unlock Salawat Service — يشغّل الصلاة على النبي ﷺ عند فتح الشاشة -->
-        <service android:name=".ScreenUnlockService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Plays Salawat audio on screen unlock as a background reminder."/>
-        </service>
+        <!-- Screen Unlock Salawat Receiver — يشغّل الصلاة على النبي ﷺ عند فتح الشاشة بدون خدمة أو إشعار ثابت -->
+        <receiver android:name=".ScreenUnlockReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.USER_PRESENT" />
+            </intent-filter>
+        </receiver>
 
         <!-- Flutter Overlay Window Service (Bubble) -->
         <service
