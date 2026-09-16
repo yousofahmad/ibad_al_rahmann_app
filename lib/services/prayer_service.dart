@@ -14,6 +14,7 @@ import 'package:intl/intl.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:geocoding/geocoding.dart';
 import 'remote_config_service.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../../firebase_options.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
@@ -1006,6 +1007,7 @@ class PrayerService extends ChangeNotifier {
     }
 
     final h = HijriCalendar.fromDate(effectiveDate);
+    AppLogger.log("PrayerService", "getHijriWithOffset() -> baseDate: ${baseDate.toIso8601String()}, localOffset: $localOffset, manual: $manualAdjustment, remote: $remoteOffset, effective: ${effectiveDate.toIso8601String()}, Hijri: ${h.hDay} ${h.longMonthName} ${h.hYear}");
     return h;
   }
 

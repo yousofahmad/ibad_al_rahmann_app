@@ -7,9 +7,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gal/gal.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
-import 'package:ibad_al_rahmann/core/di/di.dart';
 import 'package:ibad_al_rahmann/core/theme/quran_theme_extension.dart';
-import 'package:ibad_al_rahmann/core/services/cache_service.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/core/helpers/share_helper.dart';
 import 'package:quran/quran.dart' as quran;
 import 'package:share_plus/share_plus.dart';
@@ -17,6 +16,7 @@ import 'package:ibad_al_rahmann/core/helpers/fonts_helper.dart';
 import 'package:ibad_al_rahmann/features/quran/data/db_helper.dart';
 import '../bloc/khatma_cubit.dart';
 import '../../quran/bloc/quran/quran_cubit.dart';
+import '../../quran/data/repo/quran_repo.dart';
 import '../../quran/ui/widgets/core/wbw_page_widget.dart';
 import '../../../main.dart';
 import 'isolated_wird_screen.dart';
@@ -63,12 +63,12 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
 
     final daysLate = context.read<KhatmaCubit>().getDaysLate(khatma.id);
 
-    final cache = getIt<CacheService>();
+    
     // Key must match exactly what IsolatedWirdScreen writes:
     // 'wird_{startDate}_{wirdIndex}_current_page'
     // We use the khatma startDate formatted as yyyy-MM-dd as the stable key prefix.
     final savedPage =
-        cache.getInt('wird_${khatma.id}_${currentWirdIndex}_current_page') ??
+        CacheHelper.prefs.getInt('wird_${khatma.id}_${currentWirdIndex}_current_page') ??
         0;
     final hasStartedReading = savedPage > 0;
 
@@ -336,7 +336,7 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
                                 khatma.id,
                                 currentWirdIndex,
                               );
-                              cache.setInt(
+                              CacheHelper.prefs.setInt(
                                 'wird_${khatma.id}_${currentWirdIndex}_current_page',
                                 0,
                               );
@@ -768,11 +768,13 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
 
     navigatorKey.currentState!.push(
       MaterialPageRoute(
-        builder: (_) => _ExportWirdRenderer(
-          wirdIndex: wirdIndex,
-          startPage: startPage,
-          endPage: endPage,
-          quality: quality,
+        builder: (_) => BlocProvider(
+          create: (context) => QuranCubit(QuranRepo()),
+          child: _ExportWirdRenderer(
+            wirdIndex: wirdIndex,
+            startPage: startPage,
+            endPage: endPage,
+            quality: quality,
           onProgress: (completed, total) {
             if (mounted) {
               setState(() {
@@ -784,6 +786,7 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
           onComplete: (paths) {
             completer.complete(paths);
           },
+        ),
         ),
       ),
     );
@@ -1366,7 +1369,7 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
 
   @override
   Widget build(BuildContext context) {
-    final int? wirdColorVal = getIt<CacheService>().getInt('wird_paper_color');
+    final int? wirdColorVal = CacheHelper.prefs.getInt('wird_paper_color');
     final Color? savedColor = (wirdColorVal != null && wirdColorVal != -1)
         ? Color(wirdColorVal)
         : null;

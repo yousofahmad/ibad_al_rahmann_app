@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:adhan/adhan.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
+import 'package:intl/intl.dart';
 import 'package:quran/quran.dart' as quran;
 import 'package:ibad_al_rahmann/services/notification_service.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
@@ -288,6 +290,7 @@ class KhatmaCubit extends Cubit<KhatmaState> {
     if (passedPeriods < 0) passedPeriods = 0;
 
     int completed = khatma.currentWirdIndex;
+    AppLogger.log("KhatmaCubit", "getDaysLate(`$khatmaId) -> daysSinceStart: $daysSinceStart, passedPeriods: $passedPeriods, completed: $completed");
 
     if (completed < passedPeriods) {
       // Late! User missed previous periods.

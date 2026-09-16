@@ -2,6 +2,7 @@ import 'package:intl/intl.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
 import 'package:ibad_al_rahmann/services/remote_config_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 
 class IslamicDay {
   /// Returns the Islamic-calendar date key (yyyy-MM-dd) for "now",
@@ -16,11 +17,13 @@ class IslamicDay {
         
     final h = PrayerService.getHijriWithOffset(
       RemoteConfigService.globalHijriOffset, 
-      now.isAfter(maghrib) ? now.add(const Duration(days: 1)) : now
+      date
     );
     await CacheHelper.prefs.setInt('current_hijri_day', h.hDay);
     
-    return DateFormat('yyyy-MM-dd').format(date);
+    final key = DateFormat('yyyy-MM-dd').format(date);
+    AppLogger.log("IslamicDay", "todayKey() -> now: ${now.toIso8601String()}, maghrib: ${maghrib.toIso8601String()}, key: $key");
+    return key;
   }
 
   static String todayKeySync() {
@@ -34,10 +37,12 @@ class IslamicDay {
     // Save current Hijri day for Kotlin background check
     final h = PrayerService.getHijriWithOffset(
       RemoteConfigService.globalHijriOffset, 
-      now.isAfter(maghrib) ? now.add(const Duration(days: 1)) : now
+      date
     );
     CacheHelper.prefs.setInt('current_hijri_day', h.hDay);
         
-    return DateFormat('yyyy-MM-dd').format(date);
+    final key = DateFormat('yyyy-MM-dd').format(date);
+    AppLogger.log("IslamicDay", "todayKeySync() -> now: ${now.toIso8601String()}, maghrib: ${maghrib.toIso8601String()}, key: $key");
+    return key;
   }
 }

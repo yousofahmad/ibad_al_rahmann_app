@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'dart:collection';
 import 'quran_word.dart';
 import 'models/page_line.dart';
 
@@ -13,15 +14,35 @@ class QuranWbwDbHelper {
   QuranWbwDbHelper._init();
 
   bool _isPreloading = false;
-  final Map<int, List<PageLine>> _pageLinesCache = {};
-  final Map<int, List<QuranWord>> _pageWordsCache = {};
-  final Map<String, String> _verseGlyphsCache =
-      {}; // key: 'surah_ayah', value: joined glyphs
+  final int _maxCachePages = 15;
 
-  List<PageLine>? getPageLinesSync(int pageNumber) =>
-      _pageLinesCache[pageNumber];
-  List<QuranWord>? getPageWordsSync(int pageNumber) =>
-      _pageWordsCache[pageNumber];
+  final LinkedHashMap<int, List<PageLine>> _pageLinesCache = LinkedHashMap<int, List<PageLine>>();
+  final LinkedHashMap<int, List<QuranWord>> _pageWordsCache = LinkedHashMap<int, List<QuranWord>>();
+  final Map<String, String> _verseGlyphsCache = {}; // key: 'surah_ayah', value: joined glyphs
+
+  void _updateLru<K, V>(LinkedHashMap<K, V> cache, K key, V value, int max) {
+    if (cache.containsKey(key)) { cache.remove(key); }
+    else if (cache.length >= max) { cache.remove(cache.keys.first); }
+    cache[key] = value;
+  }
+
+  List<PageLine>? getPageLinesSync(int pageNumber) {
+    if (_pageLinesCache.containsKey(pageNumber)) {
+      final val = _pageLinesCache.remove(pageNumber)!;
+      _pageLinesCache[pageNumber] = val;
+      return val;
+    }
+    return null;
+  }
+
+  List<QuranWord>? getPageWordsSync(int pageNumber) {
+    if (_pageWordsCache.containsKey(pageNumber)) {
+      final val = _pageWordsCache.remove(pageNumber)!;
+      _pageWordsCache[pageNumber] = val;
+      return val;
+    }
+    return null;
+  }
 
   /// Get cached glyphs for a verse synchronously
   String? getVerseGlyphsSync(int surah, int ayah) =>
@@ -36,17 +57,6 @@ class QuranWbwDbHelper {
 
     // Phase 1: Cache all verses glyphs in memory (very fast, one query)
     await cacheAllVersesGlyphs();
-
-    // Phase 2: Silently fetch and cache all pages from 1 to 604
-    for (int i = 1; i <= 604; i++) {
-      if (!_pageLinesCache.containsKey(i)) {
-        await getPageLines(i);
-        // CRITICAL: Yield to the main event loop frequently
-        // 50ms is safer for older devices like SM-T585 to keep the UI smooth
-        // and avoid database locking warnings.
-        await Future.delayed(const Duration(milliseconds: 50));
-      }
-    }
   }
 
   /// Single-pass caching of all verses in the Quran to memory.
@@ -175,8 +185,9 @@ class QuranWbwDbHelper {
   /// Query all words and headers for a specific page.
   /// Merges `words` from main DB and `pages` from map_db dynamically.
   Future<List<QuranWord>> getPageWords(int pageNumber) async {
-    if (_pageWordsCache.containsKey(pageNumber)) {
-      return _pageWordsCache[pageNumber]!;
+    final cached = getPageWordsSync(pageNumber);
+    if (cached != null) {
+      return cached;
     }
     try {
       final db = await instance.database;
@@ -215,7 +226,7 @@ class QuranWbwDbHelper {
           position: null, // No longer tracked internally like this
         );
       }).toList();
-      _pageWordsCache[pageNumber] = result;
+      _updateLru(_pageWordsCache, pageNumber, result, _maxCachePages);
       return result;
     } catch (e) {
       // debugPrint('🔴 Error in getPageWords($pageNumber): $e');
@@ -224,8 +235,9 @@ class QuranWbwDbHelper {
   }
 
   Future<List<PageLine>> getPageLines(int pageNumber) async {
-    if (_pageLinesCache.containsKey(pageNumber)) {
-      return _pageLinesCache[pageNumber]!;
+    final cached = getPageLinesSync(pageNumber);
+    if (cached != null) {
+      return cached;
     }
     try {
       final db = await instance.database;
@@ -246,7 +258,7 @@ class QuranWbwDbHelper {
         pageNumber,
       ]);
       final result = maps.map((map) => PageLine.fromJson(map)).toList();
-      _pageLinesCache[pageNumber] = result;
+      _updateLru(_pageLinesCache, pageNumber, result, _maxCachePages);
       return result;
     } catch (e) {
       // debugPrint('🔴 Error in getPageLines($pageNumber): $e');

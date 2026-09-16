@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:ibad_al_rahmann/core/di/di.dart';
-import 'package:ibad_al_rahmann/core/services/cache_service.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/features/quran/data/models/selected_verse_model.dart';
 import 'package:ibad_al_rahmann/features/quran/data/services/bookmark_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
@@ -110,13 +109,13 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   Map<String, String> get reciters => defaultReciters;
 
   void init() async {
-    reciter = await getIt<CacheService>().getString('reciter') ?? defaultReciters.keys.first;
-    autoPlayNext = getIt<CacheService>().getBool('verse_player_auto_play') ?? false;
+    reciter = CacheHelper.prefs.getString('reciter') ?? defaultReciters.keys.first;
+    autoPlayNext = CacheHelper.prefs.getBool('verse_player_auto_play') ?? false;
   }
 
   void changeReciter(String value) {
     reciter = value;
-    getIt<CacheService>().setString('reciter', value);
+    CacheHelper.prefs.setString('reciter', value);
     emit(
       VersePlayerInitial(
         showed: state.showed,
@@ -153,7 +152,7 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
 
   void toggleAutoPlayNext() {
     autoPlayNext = !autoPlayNext;
-    getIt<CacheService>().setBool('verse_player_auto_play', autoPlayNext);
+    CacheHelper.prefs.setBool('verse_player_auto_play', autoPlayNext);
     emit(
       VersePlayerInitial(
         showed: state.showed,

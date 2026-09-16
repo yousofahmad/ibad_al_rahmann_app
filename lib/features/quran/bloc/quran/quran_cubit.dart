@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:ibad_al_rahmann/core/di/di.dart';
-import 'package:ibad_al_rahmann/core/services/cache_service.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/core/services/intro_service.dart';
 import 'package:ibad_al_rahmann/features/quran/data/repo/quran_repo.dart';
 import 'package:ibad_al_rahmann/features/quran/data/quran_word.dart';
@@ -74,7 +73,7 @@ class QuranCubit extends Cubit<QuranState> {
 
   /// Initialize cache and load the last page
   Future<void> _initializeCache() async {
-    await getIt<CacheService>().init();
+    await CacheHelper.init();
     await _loadLastPage();
   }
 
@@ -85,24 +84,24 @@ class QuranCubit extends Cubit<QuranState> {
     if (isKahfMode) {
       lastPage = await DailyTrackerService.getKahfProgress();
     } else if (isWirdMode && khatmaId != null && wirdIndex != null) {
-      final int relative = getIt<CacheService>().getInt('wird_${khatmaId}_${wirdIndex}_current_page') ?? 0;
+      final int relative = CacheHelper.prefs.getInt('wird_${khatmaId}_${wirdIndex}_current_page') ?? 0;
       lastPage = (wirdStartPage ?? 1) - 1 + relative;
     } else if (isWirdMode) {
-      lastPage = getIt<CacheService>().getInt(_lastWirdPageKey);
+      lastPage = CacheHelper.prefs.getInt(_lastWirdPageKey);
     } else {
-      lastPage = getIt<CacheService>().getInt(_lastPageKey);
+      lastPage = CacheHelper.prefs.getInt(_lastPageKey);
     }
 
-    final String? lastLayoutString = await getIt<CacheService>().getString(
+    final String? lastLayoutString = CacheHelper.prefs.getString(
       _lastLayoutKey,
     );
     // Load saved paper colors from cache (-1 means not set)
-    final int? quranColorVal = getIt<CacheService>().getInt(_quranColorKey);
-    final int? wirdColorVal = getIt<CacheService>().getInt(_wirdColorKey);
-    final int? kahfColorVal = getIt<CacheService>().getInt(_kahfColorKey);
+    final int? quranColorVal = CacheHelper.prefs.getInt(_quranColorKey);
+    final int? wirdColorVal = CacheHelper.prefs.getInt(_wirdColorKey);
+    final int? kahfColorVal = CacheHelper.prefs.getInt(_kahfColorKey);
     
     final double savedMargin =
-        (getIt<CacheService>().getDouble(_quranMarginKey) ?? 16.0).clamp(
+        (CacheHelper.prefs.getDouble(_quranMarginKey) ?? 16.0).clamp(
           0.0,
           40.0,
         );
@@ -174,26 +173,26 @@ class QuranCubit extends Cubit<QuranState> {
     }
 
     if (state.isWirdMode && state.khatmaId != null && state.wirdIndex != null) {
-      final cache = getIt<CacheService>();
+      
       final int startPage = state.wirdStartPage ?? 1;
       final int relativeIndex = (pageIndex - (startPage - 1)).clamp(0, 604);
 
-      await cache.setInt(
+      await CacheHelper.prefs.setInt(
         'wird_${state.khatmaId}_${state.wirdIndex}_current_page',
         relativeIndex,
       );
       // Also update the global last_wird_page for fallback
-      await cache.setInt(_lastWirdPageKey, pageIndex);
+      await CacheHelper.prefs.setInt(_lastWirdPageKey, pageIndex);
       return;
     }
 
     const key = _lastPageKey;
-    await getIt<CacheService>().setInt(key, pageIndex);
+    await CacheHelper.prefs.setInt(key, pageIndex);
   }
 
   /// Save the current layout to cache
   Future<void> _saveCurrentLayout(QuranLayout layout) async {
-    await getIt<CacheService>().setString(_lastLayoutKey, layout.name);
+    await CacheHelper.prefs.setString(_lastLayoutKey, layout.name);
   }
 
   PageController get pagesController => _repo.pagesController;
@@ -418,7 +417,7 @@ class QuranCubit extends Cubit<QuranState> {
 
   /// Set color for regular Mushaf only (does NOT change app theme).
   void setPaperColor(Color? color) {
-    getIt<CacheService>().setInt(_quranColorKey, color?.toARGB32() ?? -1);
+    CacheHelper.prefs.setInt(_quranColorKey, color?.toARGB32() ?? -1);
     emit(
       state.copyWith(quranPaperColor: color, clearPaperColor: color == null),
     );
@@ -426,20 +425,20 @@ class QuranCubit extends Cubit<QuranState> {
 
   /// Set color for Wird Mushaf only (does NOT change app theme).
   void setWirdColor(Color? color) {
-    getIt<CacheService>().setInt(_wirdColorKey, color?.toARGB32() ?? -1);
+    CacheHelper.prefs.setInt(_wirdColorKey, color?.toARGB32() ?? -1);
     emit(state.copyWith(wirdPaperColor: color, clearWirdColor: color == null));
   }
 
   /// Set color for Kahf Mushaf only.
   void setKahfColor(Color? color) {
-    getIt<CacheService>().setInt(_kahfColorKey, color?.toARGB32() ?? -1);
+    CacheHelper.prefs.setInt(_kahfColorKey, color?.toARGB32() ?? -1);
     emit(state.copyWith(kahfPaperColor: color, clearKahfColor: color == null));
   }
 
   /// Set the horizontal margin for Mushaf pages.
   void setPageMargin(double margin) {
     final clamped = margin.clamp(0.0, 40.0);
-    getIt<CacheService>().setDouble(_quranMarginKey, clamped);
+    CacheHelper.prefs.setDouble(_quranMarginKey, clamped);
     emit(state.copyWith(quranPageMargin: clamped));
   }
 

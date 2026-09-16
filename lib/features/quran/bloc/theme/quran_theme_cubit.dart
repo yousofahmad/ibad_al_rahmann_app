@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/cache_keys.dart';
-import 'package:ibad_al_rahmann/core/di/di.dart';
-import 'package:ibad_al_rahmann/core/services/cache_service.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/core/theme/app_themes.dart';
 import 'package:ibad_al_rahmann/core/theme/custom_theme_model.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
 
 class QuranThemeCubit extends ThemeCubit {
-  final _cache = getIt<CacheService>();
+  
 
   QuranThemeCubit() : super() {
     _init();
@@ -20,8 +19,8 @@ class QuranThemeCubit extends ThemeCubit {
 
   Future<void> _init() async {
     // Load saved theme using Quran-specific keys (Isolated from main app)
-    final savedThemeKey = await _cache.getString(CacheKeys.quranSelectedTheme);
-    final themeMode = await _cache.getString(CacheKeys.quranThemeMode);
+    final savedThemeKey = CacheHelper.prefs.getString(CacheKeys.quranSelectedTheme);
+    final themeMode = CacheHelper.prefs.getString(CacheKeys.quranThemeMode);
 
     if (savedThemeKey != null && savedThemeKey.startsWith('custom_')) {
       try {
@@ -59,10 +58,10 @@ class QuranThemeCubit extends ThemeCubit {
   @override
   void switchTheme() {
     if (state.mode == ThemeMode.light) {
-      _cache.setString(CacheKeys.quranThemeMode, CacheKeys.darkTheme);
+      CacheHelper.prefs.setString(CacheKeys.quranThemeMode, CacheKeys.darkTheme);
       emit(ThemeChanged(theme: state.theme, mode: ThemeMode.dark));
     } else {
-      _cache.setString(CacheKeys.quranThemeMode, CacheKeys.lightTheme);
+      CacheHelper.prefs.setString(CacheKeys.quranThemeMode, CacheKeys.lightTheme);
       emit(ThemeChanged(theme: state.theme, mode: ThemeMode.light));
     }
   }
@@ -81,14 +80,14 @@ class QuranThemeCubit extends ThemeCubit {
 
     if (_quranThemes.containsKey(themeKey)) {
       final selectedTheme = _quranThemes[themeKey]!;
-      await _cache.setString(CacheKeys.quranSelectedTheme, themeKey);
+      await CacheHelper.prefs.setString(CacheKeys.quranSelectedTheme, themeKey);
       emit(ThemeChanged(theme: selectedTheme, mode: state.mode));
     }
   }
 
   @override
-  Future<String?> getCurrentThemeKey() {
-    return _cache.getString(CacheKeys.quranSelectedTheme);
+  Future<String?> getCurrentThemeKey() async {
+    return CacheHelper.prefs.getString(CacheKeys.quranSelectedTheme);
   }
 }
 

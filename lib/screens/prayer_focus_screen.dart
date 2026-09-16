@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/prayer_service.dart';
 import 'package:adhan/adhan.dart';
@@ -361,7 +362,10 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
       } else {
         tempMap[prayer] = true;
       }
+      AppLogger.log("PrayerFocus", "writing prayer_focus_log_$dateKey: ${json.encode(logMap)} AND temp_prayers: ${json.encode(tempMap)}");
       await prefs.setString('temp_prayers', json.encode(tempMap));
+    } else {
+      AppLogger.log("PrayerFocus", "writing prayer_focus_log_$dateKey: ${json.encode(logMap)} (NOT today)");
     }
 
     // إعادة حساب الاستريك الفعلي من السجل

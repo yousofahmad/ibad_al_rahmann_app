@@ -21,6 +21,7 @@ import '../features/qiblah/qiblah_screen.dart';
 import 'tasbeeh_screen.dart';
 import 'hisn_muslim_screen.dart'; // Import Hisn Screen
 import 'nawawi_screen.dart';
+import '../features/quran_reciters/ui/quran_readers_screen.dart';
 import 'ramadan_screen.dart';
 import 'widgets/prayer_ring_widget.dart';
 import 'more_screen.dart'; // Import More Screen
@@ -867,6 +868,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     const NawawiScreen(),
                     imagePath: "assets/images/nawawi_card.png",
                     hideTitle: true,
+                  ),
+                  _buildGridItem(
+                    "المصحف الصوتي",
+                    FontAwesomeIcons.headphones,
+                    const QuranReadersScreen(),
                   ),
                 ],
               ),

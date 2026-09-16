@@ -71,7 +71,7 @@ class AppInitializer {
   // static Future<void> _handleScheduleNotifications() async {
   //   final repo = PrayerTimesRepo();
   //   Future<void> getPrayerTimes() async {
-  //     switch (getIt<CacheService>().getString(AppConsts.locationMethod)) {}
+  //     switch (CacheHelper.prefs.getString(AppConsts.locationMethod)) {}
   //   }
   // }
 }

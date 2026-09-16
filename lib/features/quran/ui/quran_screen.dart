@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:ibad_al_rahmann/core/services/cache_service.dart';
-import 'package:ibad_al_rahmann/core/di/di.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/theme/quran_theme_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
@@ -66,18 +65,16 @@ class _QuranScreenState extends State<QuranScreen> {
 
   Future<void> _initializeCache() async {
     try {
-      final cacheService = getIt<CacheService>();
-      await cacheService.init();
-
+      
       // Load separate page progress for Mushaf vs Wird vs Kahf
       if (widget.initialPage != null) {
         _cachedPage = widget.initialPage;
       } else if (widget.isKahfMode) {
         _cachedPage = await DailyTrackerService.getKahfProgress();
       } else if (widget.isWirdMode) {
-        _cachedPage = cacheService.getInt('last_wird_page');
+        _cachedPage = CacheHelper.prefs.getInt('last_wird_page');
       } else {
-        _cachedPage = cacheService.getInt('last_quran_page');
+        _cachedPage = CacheHelper.prefs.getInt('last_quran_page');
       }
 
       _quranCubit = QuranCubit(

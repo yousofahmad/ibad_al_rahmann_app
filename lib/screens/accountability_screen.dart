@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/features/wird/bloc/khatma_cubit.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/core/helpers/islamic_day.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:ibad_al_rahmann/widgets/app_skeleton.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
@@ -254,6 +255,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
       } else {
         focusMap.remove(itemKey);
       }
+      AppLogger.log("Accountability", "writing $logKey: ${json.encode(focusMap)} AND temp_prayers: ${json.encode(map)}");
       await prefs.setString(logKey, json.encode(focusMap));
     }
 

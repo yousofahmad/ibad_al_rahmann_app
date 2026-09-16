@@ -9,11 +9,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'services/remote_config_service.dart';
 import 'services/fcm_service.dart';
-import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
-import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cubit.dart';
-import 'package:ibad_al_rahmann/features/quran/bloc/search/search_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/data/models/selected_verse_model.dart';
-import 'package:ibad_al_rahmann/features/quran/data/repo/quran_repo.dart';
 import 'package:ibad_al_rahmann/features/quran/data/services/bookmark_service.dart';
 import 'package:ibad_al_rahmann/features/quran/data/db_helper.dart';
 import 'package:ibad_al_rahmann/features/wird/bloc/khatma_cubit.dart';
@@ -134,9 +130,6 @@ Future<void> main() async {
     MultiBlocProvider(
       providers: [
         BlocProvider(create: (context) => ThemeCubit()),
-        BlocProvider(create: (context) => QuranCubit(QuranRepo())),
-        BlocProvider(create: (context) => VersePlayerCubit()),
-        BlocProvider(create: (context) => SearchCubit()),
         BlocProvider(create: (context) => KhatmaCubit()..loadKhatma()),
       ],
       child: const QuranApp(showCustomSplash: true),

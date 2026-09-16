@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:adhan/adhan.dart';
 import 'package:ibad_al_rahmann/services/daily_tracker_service.dart';
 import 'package:ibad_al_rahmann/features/wird/bloc/khatma_cubit.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
 
 class WirdCompletionService {
@@ -13,6 +14,7 @@ class WirdCompletionService {
     String? khatmaId,
     int? wirdIndex,
   }) async {
+    AppLogger.log("WirdCompletion", "complete() -> isKahf: $isKahfMode, isWird: $isWirdMode, khatmaId: $khatmaId, wirdIndex: $wirdIndex");
     if (isKahfMode) {
       await DailyTrackerService.markKahfDone();
     } else if (isWirdMode && khatmaId != null && wirdIndex != null) {

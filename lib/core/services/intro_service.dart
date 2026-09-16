@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ibad_al_rahmann/core/di/di.dart';
-import 'package:ibad_al_rahmann/core/services/cache_service.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 import 'package:ibad_al_rahmann/features/quran/ui/widgets/menus/double_tap_dialog.dart';
 
@@ -10,28 +9,28 @@ class IntroService {
 
   /// Check if the double tap intro has been shown before
   static bool hasShownDoubleTapIntro() {
-    return getIt<CacheService>().getBool(_doubleTapIntroKey) ?? false;
+    return CacheHelper.prefs.getBool(_doubleTapIntroKey) ?? false;
   }
 
   /// Mark the double tap intro as shown
   static Future<void> markDoubleTapIntroAsShown() async {
-    await getIt<CacheService>().setBool(_doubleTapIntroKey, true);
+    await CacheHelper.prefs.setBool(_doubleTapIntroKey, true);
   }
 
   /// Check if the wird double tap intro has been shown
   static bool hasShownWirdDoubleTapIntro() {
-    return getIt<CacheService>().getBool(_wirdDoubleTapIntroKey) ?? false;
+    return CacheHelper.prefs.getBool(_wirdDoubleTapIntroKey) ?? false;
   }
 
   /// Mark the wird double tap intro as shown
   static Future<void> markWirdDoubleTapIntroAsShown() async {
-    await getIt<CacheService>().setBool(_wirdDoubleTapIntroKey, true);
+    await CacheHelper.prefs.setBool(_wirdDoubleTapIntroKey, true);
   }
 
   /// Reset the double tap intro (for testing or user preference)
   static Future<void> resetDoubleTapIntro() async {
-    await getIt<CacheService>().setBool(_doubleTapIntroKey, false);
-    await getIt<CacheService>().setBool(_wirdDoubleTapIntroKey, false);
+    await CacheHelper.prefs.setBool(_doubleTapIntroKey, false);
+    await CacheHelper.prefs.setBool(_wirdDoubleTapIntroKey, false);
   }
 
   /// Show the detailed Quran navigation hints dialog
