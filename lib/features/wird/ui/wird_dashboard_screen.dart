@@ -1,3 +1,4 @@
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/app_formatters.dart';
 import 'package:flutter/services.dart';
@@ -128,8 +129,18 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
       builder: (ctx, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
     );
     if (picked != null) {
-      final newTime = ':';
+      final newTime = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
       await cubit.updateDailyTime(khatmaId, newTime);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'تم ضبط وقت التنبيه اليومي على الساعة $newTime بنجاح',
+              style: const TextStyle(fontFamily: AppConsts.cairo),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -181,9 +192,18 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
             ),
           ],
         ),
-        body: BlocBuilder<KhatmaCubit, KhatmaState>(
-          builder: (context, state) {
-            if (state is KhatmaLoading) {
+        body: ValueListenableBuilder(
+          valueListenable: Hive.box('appDataBox').listenable(),
+          builder: (context, box, _) {
+            // Force reload in case the cubit missed the update
+            final localState = context.read<KhatmaCubit>().state;
+            if (localState is KhatmaLoaded) {
+              // Try to reload from Hive silently to ensure sync
+              context.read<KhatmaCubit>().loadKhatma();
+            }
+            return BlocBuilder<KhatmaCubit, KhatmaState>(
+              builder: (context, state) {
+                if (state is KhatmaLoading) {
               return Padding(
                 padding: EdgeInsets.only(top: 20.h),
                 child: AppSkeleton.card(height: 200.h),
@@ -206,6 +226,8 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
               );
             }
             return const SizedBox.shrink();
+              },
+            );
           },
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,

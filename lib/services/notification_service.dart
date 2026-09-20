@@ -947,13 +947,23 @@ class NotificationService {
     final pageInfo = currentWird != null ? " (ص$startPage–$endPage)" : "";
 
     if (khatma.notificationType == 'daily') {
-      int hour = 22; // Default 10 PM
+      int hour = 20; // Default 8 PM
       int minute = 0;
 
       if (khatma.dailyTime != null && khatma.dailyTime!.contains(":")) {
         final parts = khatma.dailyTime!.split(":");
-        hour = int.tryParse(parts[0]) ?? 22;
-        minute = int.tryParse(parts[1]) ?? 0;
+        if (parts.isNotEmpty && parts[0].trim().isNotEmpty) {
+          final h = int.tryParse(parts[0].trim());
+          if (h != null && h >= 0 && h <= 23) {
+            hour = h;
+          }
+        }
+        if (parts.length > 1 && parts[1].trim().isNotEmpty) {
+          final m = int.tryParse(parts[1].trim());
+          if (m != null && m >= 0 && m <= 59) {
+            minute = m;
+          }
+        }
       }
 
       for (int i = 0; i < 3; i++) {

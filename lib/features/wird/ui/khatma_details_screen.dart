@@ -4,6 +4,7 @@ import 'package:ibad_al_rahmann/core/helpers/app_formatters.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import '../bloc/khatma_cubit.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'khatma_details_view.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
@@ -160,6 +161,16 @@ class KhatmaDetailsScreen extends StatelessWidget {
     if (picked != null) {
       final newTime = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
       await cubit.updateDailyTime(khatmaId, newTime);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'تم ضبط وقت التنبيه اليومي على الساعة $newTime بنجاح',
+              style: const TextStyle(fontFamily: AppConsts.cairo),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -220,7 +231,10 @@ return IconButton(
           ),
         ],
       ),
-      body: BlocBuilder<KhatmaCubit, KhatmaState>(
+      body: ValueListenableBuilder(
+        valueListenable: Hive.box('appDataBox').listenable(),
+        builder: (context, box, _) {
+          return BlocBuilder<KhatmaCubit, KhatmaState>(
         builder: (context, state) {
           if (state is KhatmaLoaded) {
             try {
@@ -236,6 +250,8 @@ return IconButton(
             }
           }
           return const SizedBox.shrink();
+        },
+      );
         },
       ),
     );
