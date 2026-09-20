@@ -23,7 +23,7 @@ class SurahWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const gold = Color(0xFFD0A871);
+    final primaryColor = Theme.of(context).primaryColor;
 
     return Center(
       child: Container(
@@ -31,20 +31,20 @@ class SurahWidget extends StatelessWidget {
         width: 330.w,
         decoration: BoxDecoration(
           color: selected
-              ? gold.withValues(alpha: isDark ? 0.2 : 0.12)
+              ? primaryColor.withValues(alpha: isDark ? 0.25 : 0.12)
               : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
           borderRadius: BorderRadius.circular(16.r),
           border: Border.all(
             color: selected
-                ? gold
-                : gold.withValues(alpha: isDark ? 0.25 : 0.3),
+                ? primaryColor
+                : primaryColor.withValues(alpha: isDark ? 0.25 : 0.25),
             width: selected ? 1.5 : 1.0,
           ),
           boxShadow: [
             BoxShadow(
               color: isDark
                   ? Colors.black.withValues(alpha: 0.2)
-                  : gold.withValues(alpha: 0.06),
+                  : primaryColor.withValues(alpha: 0.06),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -93,8 +93,8 @@ class SurahWidget extends StatelessWidget {
               icon: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
                 child: selected
-                    ? const Icon(Icons.pause_circle_filled_rounded, size: 36, color: gold)
-                    : const Icon(Icons.play_circle_fill_rounded, size: 36, color: gold),
+                    ? Icon(Icons.pause_circle_filled_rounded, size: 36, color: primaryColor)
+                    : Icon(Icons.play_circle_fill_rounded, size: 36, color: primaryColor),
               ),
             ),
           ],

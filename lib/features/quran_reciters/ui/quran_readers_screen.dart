@@ -12,8 +12,8 @@ class QuranReadersScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final defaultBg = isDark ? Colors.black : const Color(0xFFFFF9E5);
-    final primaryColor = isDark ? const Color(0xFFD0A871) : const Color(0xFF1B4D3E);
+    final defaultBg = isDark ? Colors.black : Colors.white;
+    final primaryColor = Theme.of(context).primaryColor;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -34,7 +34,7 @@ class QuranReadersScreen extends StatelessWidget {
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: isDark ? Colors.white70 : const Color(0xFF1B4D3E),
+            color: primaryColor,
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),

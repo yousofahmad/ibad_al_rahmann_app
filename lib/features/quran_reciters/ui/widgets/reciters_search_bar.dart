@@ -11,20 +11,20 @@ class RecitersSearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const gold = Color(0xFFD0A871);
+    final primaryColor = Theme.of(context).primaryColor;
 
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(100),
         border: Border.all(
-          color: gold.withValues(alpha: isDark ? 0.35 : 0.45),
+          color: primaryColor.withValues(alpha: isDark ? 0.35 : 0.35),
         ),
         boxShadow: [
           BoxShadow(
             color: isDark
                 ? Colors.black.withValues(alpha: 0.3)
-                : gold.withValues(alpha: 0.08),
+                : primaryColor.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -52,10 +52,10 @@ class RecitersSearchBar extends StatelessWidget {
           hintTextDirection: TextDirection.rtl,
           contentPadding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 20.w),
           border: InputBorder.none,
-          prefixIcon: Icon(Icons.search, color: gold, size: 22.sp),
+          prefixIcon: Icon(Icons.search, color: primaryColor, size: 22.sp),
           suffixIcon: context.read<QuranReadersCubit>().searchController.text.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close, color: gold, size: 18.sp),
+                  icon: Icon(Icons.close, color: primaryColor, size: 18.sp),
                   onPressed: () {
                     context.read<QuranReadersCubit>().searchController.clear();
                     context.read<QuranReadersCubit>().onSearch('');

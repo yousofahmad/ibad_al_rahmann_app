@@ -80,7 +80,7 @@ class _CategoryHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).primaryColor;
     return Padding(
       padding: EdgeInsets.fromLTRB(28.w, 16.h, 28.w, 6.h),
       child: Row(
@@ -89,7 +89,7 @@ class _CategoryHeader extends StatelessWidget {
             width: 4.w,
             height: 18.h,
             decoration: BoxDecoration(
-              color: const Color(0xFFD0A871),
+              color: primaryColor,
               borderRadius: BorderRadius.circular(2.r),
             ),
           ),
@@ -100,7 +100,7 @@ class _CategoryHeader extends StatelessWidget {
               fontFamily: AppConsts.expoArabic,
               fontSize: 14.sp,
               fontWeight: FontWeight.bold,
-              color: isDark ? const Color(0xFFD0A871) : const Color(0xFF3E2723),
+              color: primaryColor,
               letterSpacing: 0.3,
             ),
           ),

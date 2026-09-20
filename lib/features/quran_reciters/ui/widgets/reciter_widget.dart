@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/app_navigator.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
-import 'package:ibad_al_rahmann/core/theme/app_assets.dart';
 import 'package:ibad_al_rahmann/features/quran_audio/logic/quran_player/quran_player_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran_audio/ui/quran_audio_screen.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -17,7 +16,8 @@ class ReciterWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const gold = Color(0xFFD0A871);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).primaryColor;
 
     return Center(
       child: ZoomTapAnimation(
@@ -33,18 +33,17 @@ class ReciterWidget extends StatelessWidget {
           width: 340.w,
           padding: EdgeInsets.symmetric(vertical: 14.h, horizontal: 16.w),
           decoration: BoxDecoration(
-            image: const DecorationImage(
-              image: AssetImage(AppAssets.imagesGreenColor),
-              fit: BoxFit.cover,
-            ),
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(20.r),
             border: Border.all(
-              color: gold.withValues(alpha: 0.4),
+              color: primaryColor.withValues(alpha: isDark ? 0.35 : 0.25),
               width: 1.2,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF1B4D3E).withValues(alpha: 0.25),
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.3)
+                    : primaryColor.withValues(alpha: 0.08),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),
@@ -57,13 +56,13 @@ class ReciterWidget extends StatelessWidget {
                 width: 44.w,
                 height: 44.w,
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.2),
+                  color: primaryColor.withValues(alpha: isDark ? 0.2 : 0.1),
                   shape: BoxShape.circle,
-                  border: Border.all(color: gold.withValues(alpha: 0.5)),
+                  border: Border.all(color: primaryColor.withValues(alpha: 0.4)),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.headphones_rounded,
-                  color: gold,
+                  color: primaryColor,
                   size: 22,
                 ),
               ),
@@ -81,7 +80,7 @@ class ReciterWidget extends StatelessWidget {
                             ? 16.5.sp
                             : 15.5.sp,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: isDark ? Colors.white : Colors.black87,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -91,14 +90,14 @@ class ReciterWidget extends StatelessWidget {
                         Container(
                           padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
+                            color: primaryColor.withValues(alpha: isDark ? 0.2 : 0.1),
                             borderRadius: BorderRadius.circular(6.r),
                           ),
                           child: Text(
                             reciter.style,
                             style: TextStyle(
                               fontFamily: AppConsts.cairo,
-                              color: Colors.white,
+                              color: primaryColor,
                               fontSize: 10.5.sp,
                               fontWeight: FontWeight.bold,
                             ),
@@ -109,8 +108,8 @@ class ReciterWidget extends StatelessWidget {
                           padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
                           decoration: BoxDecoration(
                             color: reciter.hasSegments
-                                ? gold.withValues(alpha: 0.35)
-                                : Colors.white.withValues(alpha: 0.15),
+                                ? primaryColor.withValues(alpha: isDark ? 0.25 : 0.15)
+                                : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
                             borderRadius: BorderRadius.circular(6.r),
                           ),
                           child: Row(
@@ -121,7 +120,9 @@ class ReciterWidget extends StatelessWidget {
                                     ? Icons.auto_stories_rounded
                                     : Icons.library_music_rounded,
                                 size: 11.sp,
-                                color: Colors.white,
+                                color: reciter.hasSegments
+                                    ? primaryColor
+                                    : (isDark ? Colors.white70 : Colors.black54),
                               ),
                               SizedBox(width: 4.w),
                               Text(
@@ -130,7 +131,9 @@ class ReciterWidget extends StatelessWidget {
                                     : 'سورة كاملة',
                                 style: TextStyle(
                                   fontFamily: AppConsts.cairo,
-                                  color: Colors.white,
+                                  color: reciter.hasSegments
+                                      ? primaryColor
+                                      : (isDark ? Colors.white70 : Colors.black54),
                                   fontSize: 9.5.sp,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -143,10 +146,10 @@ class ReciterWidget extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 16,
-                color: Colors.white70,
+                color: isDark ? Colors.white38 : Colors.black26,
               ),
             ],
           ),

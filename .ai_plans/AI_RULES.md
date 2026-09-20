@@ -117,3 +117,16 @@
 - Completing a Wird (Khatma) in `isolated_wird_screen.dart` MUST call `DailyTrackerService.markWirdDone(wirdTitle)` automatically — the user should not need to manually tick a checkbox.
 - Completing Surah Al-Kahf on Friday MUST call `DailyTrackerService.markKahfDone()`. The Kahf checkbox in "حاسب نفسك" appears ONLY on Fridays.
 - A Salawat Al-Nabi counter (numeric, not just a checkbox) MUST be present in the Quran section of "حاسب نفسك", saved per-day and persisted across app restarts.
+
+## 23. Flip to Silence (قلب الهاتف للصمت)
+- When the phone is flipped face-down (z < -8.0f), the audio must mute IMMEDIATELY.
+- The phone remains silent AS LONG AS it is face-down. Even if a new Adhan or repeated notification starts while the phone is already face-down, it will immediately be muted (no face-up transition is required).
+- It will only ring again when the phone is flipped back to a normal/face-up position.
+
+## 24. Quran Reciters & Audio Theming Standards (ثيم القراء والمصحف الصوتي)
+- **Dynamic Theme Color**: Quran Reciters screen (`QuranReadersScreen`), Audio player screen (`QuranAudioScreenBody`), Reciter cards (`ReciterWidget`), Surah cards (`SurahWidget`), Search bar (`RecitersSearchBar`), and Category headers MUST strictly follow the active theme color (`Theme.of(context).primaryColor`) like Tafseer, Fehres, and Bookmarks.
+- **Adaptive Backgrounds**:
+  - Light mode: Pure white (`Colors.white` / `#FFFFFF`).
+  - Dark mode: Dark / Black (`Colors.black` / `const Color(0xFF000000)` / `const Color(0xFF1E1E1E)`).
+- Never hardcode fixed static colors (e.g. fixed emerald green texture background) that ignore the user-selected theme.
+
