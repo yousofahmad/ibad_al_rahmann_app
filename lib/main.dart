@@ -1,5 +1,6 @@
 import 'package:ibad_al_rahmann/features/quran_audio/logic/quran_player/quran_player_cubit.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -134,7 +135,10 @@ Future<void> main() async {
         BlocProvider(create: (context) => QuranPlayerCubit()),
         BlocProvider(create: (context) => KhatmaCubit()..loadKhatma()),
       ],
-      child: const QuranApp(showCustomSplash: true),
+      child: ChangeNotifierProvider<PrayerService>.value(
+        value: PrayerService(),
+        child: const QuranApp(showCustomSplash: true),
+      ),
     ),
   );
 
