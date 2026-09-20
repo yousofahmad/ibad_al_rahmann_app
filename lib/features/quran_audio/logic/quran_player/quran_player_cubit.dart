@@ -68,15 +68,11 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
     }
   }
 
-  Future<void> init(int surahNum) async {
+  Future<bool> init(int surahNum) async {
     currentReciterName = reciter?.name;
     try {
       selectedSurah = surahNum;
       final url = await getSurahUrl(surahNum);
-
-      if (reciter != null && reciter!.hasSegments) {
-        currentSegments = await ReciterAudioHelper.getSegments(reciter!);
-      }
 
       final surahTitle = (surahNum >= 1 && surahNum <= quranSurahs.length)
           ? quranSurahs[surahNum - 1]
@@ -107,9 +103,26 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
         );
       }
 
+      // Load segments asynchronously in background without blocking audio playback
+      if (reciter != null && reciter!.hasSegments) {
+        _loadSegmentsBackground(reciter!);
+      }
+
       emit(QuranBottomSheetShowed());
+      return true;
     } catch (e) {
       emit(QuranPlayerFailure(errMessage: 'تعذر تحميل ملف الصوت'));
+      return false;
+    }
+  }
+
+  void _loadSegmentsBackground(ReciterAudioModel reciterModel) async {
+    try {
+      final segments = await ReciterAudioHelper.getSegments(reciterModel)
+          .timeout(const Duration(seconds: 8));
+      currentSegments = segments;
+    } catch (_) {
+      // Ignored silently - word-by-word highlight is optional, audio continues playing
     }
   }
 
@@ -136,15 +149,19 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
 
   Future<void> playSurah(int surah) async {
     if (player.playing && surah != selectedSurah) {
-      player.stop();
+      await player.stop();
       sliderPosition = Duration.zero;
     }
 
     if (selectedSurah != surah) {
-      await init(surah);
+      final success = await init(surah);
+      if (!success) {
+        // If init failed, do NOT call player.play() or emit QuranBottomSheetShowed()
+        return;
+      }
     }
 
-    player.play();
+    await player.play();
     emit(QuranBottomSheetShowed());
   }
 
@@ -176,4 +193,3 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
     return super.close();
   }
 }
-

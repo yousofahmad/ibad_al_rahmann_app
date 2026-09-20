@@ -703,8 +703,8 @@ class ReciterAudioHelper {
       try {
         final dio = Dio(
           BaseOptions(
-            connectTimeout: const Duration(seconds: 15),
-            receiveTimeout: const Duration(minutes: 2),
+            connectTimeout: const Duration(seconds: 8),
+            receiveTimeout: const Duration(seconds: 8),
           ),
         );
 
