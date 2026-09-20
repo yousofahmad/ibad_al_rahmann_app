@@ -8,37 +8,54 @@ import 'package:ibad_al_rahmann/core/theme/app_styles.dart';
 import 'package:ibad_al_rahmann/features/quran_audio/logic/quran_player/quran_player_cubit.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import '../../../../core/theme/app_colors.dart';
 import '../../data/surah_list.dart';
 
 class SurahWidget extends StatelessWidget {
   const SurahWidget({
     super.key,
     required this.index,
-    // required this.surah,
     required this.selected,
   });
 
   final int index;
-  // final SurahAudioModel surah;
   final bool selected;
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const gold = Color(0xFFD0A871);
+
     return Center(
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-        width: 320.w,
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+        width: 330.w,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: selected
+              ? gold.withValues(alpha: isDark ? 0.2 : 0.12)
+              : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(
+            color: selected
+                ? gold
+                : gold.withValues(alpha: isDark ? 0.25 : 0.3),
+            width: selected ? 1.5 : 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.2)
+                  : gold.withValues(alpha: 0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.only(top: 8),
-              width: context.isLandscape ? 80.h : 40.w,
-              height: context.isLandscape ? 80.h : 40.w,
+              padding: const EdgeInsets.only(top: 6),
+              width: context.isLandscape ? 50.h : 38.w,
+              height: context.isLandscape ? 50.h : 38.w,
               decoration: const BoxDecoration(
                 image: DecorationImage(
                   image: AssetImage(AppAssets.imagesVerseFrame),
@@ -48,37 +65,36 @@ class SurahWidget extends StatelessWidget {
                 child: Text(
                   index.toArabicNums,
                   style: AppStyles.style16BFantezy.copyWith(
-                    color: const Color(0xff606060),
-                    fontSize: !context.isTablet ? 20.sp : null,
+                    color: isDark ? Colors.white70 : const Color(0xff606060),
+                    fontSize: !context.isTablet ? 18.sp : null,
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 20),
+            const SizedBox(width: 14),
             Text(
               quranSurahs[index - 1],
               style: AppStyles.style24harmattan.copyWith(
-                color: const Color(0xff606060),
+                color: isDark ? Colors.white : const Color(0xFF2D2D2D),
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
               ),
             ),
             const Spacer(),
-            _DownloadButton(reciterId: context.read<QuranPlayerCubit>().reciter?.folderName ?? '', surahNumber: index),
-              IconButton(
+            _DownloadButton(
+              reciterId: context.read<QuranPlayerCubit>().reciter?.folderName ?? '',
+              surahNumber: index,
+            ),
+            IconButton(
               padding: EdgeInsets.zero,
               onPressed: () {
                 context.read<QuranPlayerCubit>().playSurah(index);
               },
-              color: AppColors.green,
-              iconSize: 30.w,
+              iconSize: 32.w,
               icon: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
                 child: selected
-                    ? Icon(Icons.pause_circle_filled_rounded, size: 42.w)
-                    : Image.asset(
-                        AppAssets.imagesPlayIcon,
-                        width: 35.w,
-                        fit: BoxFit.scaleDown,
-                      ),
+                    ? const Icon(Icons.pause_circle_filled_rounded, size: 36, color: gold)
+                    : const Icon(Icons.play_circle_fill_rounded, size: 36, color: gold),
               ),
             ),
           ],

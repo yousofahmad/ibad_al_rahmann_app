@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-
-import 'package:ibad_al_rahmann/core/widgets/top_bar_widget.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:ibad_al_rahmann/core/app_constants.dart';
 
-import '../../../../core/helpers/extensions/screen_details.dart';
 import '../../data/models/reciter_model.dart';
 import 'reciter_widget.dart';
 import 'reciters_search_bar.dart';
@@ -14,25 +12,13 @@ class ReadersBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    return Column(
       children: [
-        Align(
-          alignment: Alignment.topCenter,
-          child: TopBar(height: 242.h, label: 'القــراء'),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
+          child: const RecitersSearchBar(),
         ),
-
-        Positioned.fill(
-          top: 180.h,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              width: context.screenWidth * .8,
-              child: const RecitersSearchBar(),
-            ),
-          ),
-        ),
-        Positioned.fill(
-          top: 260.h,
+        Expanded(
           child: ReadersListView(reciters: reciters),
         ),
       ],
@@ -77,7 +63,7 @@ class ReadersListView extends StatelessWidget {
                 return _CategoryHeader(label: item);
               }
               return Padding(
-                padding: const EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.only(bottom: 14),
                 child: ReciterWidget(reciter: item as ReciterAudioModel),
               );
             },
@@ -94,6 +80,7 @@ class _CategoryHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: EdgeInsets.fromLTRB(28.w, 16.h, 28.w, 6.h),
       child: Row(
@@ -110,9 +97,10 @@ class _CategoryHeader extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
+              fontFamily: AppConsts.expoArabic,
               fontSize: 14.sp,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF5A3E1B),
+              color: isDark ? const Color(0xFFD0A871) : const Color(0xFF3E2723),
               letterSpacing: 0.3,
             ),
           ),

@@ -29,7 +29,7 @@ class QuranListView extends StatelessWidget {
           );
         } else if (snapshot.hasData) {
           return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 100),
+            padding: const EdgeInsets.only(top: 12, bottom: 120),
             itemCount: cubit.quran.length,
             itemBuilder: (context, index) {
               final surahItem = cubit.quran[index];
@@ -45,7 +45,7 @@ class QuranListView extends StatelessWidget {
                 },
               );
             },
-            separatorBuilder: (context, index) => const SizedBox(height: 30),
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
           );
         } else {
           return Center(
