@@ -1,3 +1,4 @@
+import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -182,7 +183,7 @@ class _WbwMushafScreenState extends State<WbwMushafScreen> {
                               itemCount: 604,
                               reverse: true,
                               physics: const ClampingScrollPhysics(
-                                parent: PageScrollPhysics(),
+                                parent: EasyPageScrollPhysics(),
                               ),
                               onPageChanged: (idx) {
                                 _currentIndex = idx + 1;

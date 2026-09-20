@@ -1,5 +1,7 @@
+import '../services/wird_completion_service.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -63,12 +65,13 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
 
     final daysLate = context.read<KhatmaCubit>().getDaysLate(khatma.id);
 
-    
     // Key must match exactly what IsolatedWirdScreen writes:
     // 'wird_{startDate}_{wirdIndex}_current_page'
     // We use the khatma startDate formatted as yyyy-MM-dd as the stable key prefix.
     final savedPage =
-        CacheHelper.prefs.getInt('wird_${khatma.id}_${currentWirdIndex}_current_page') ??
+        CacheHelper.prefs.getInt(
+          'wird_${khatma.id}_${currentWirdIndex}_current_page',
+        ) ??
         0;
     final hasStartedReading = savedPage > 0;
 
@@ -170,7 +173,10 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
                   decoration: BoxDecoration(
                     color: const Color(0xFFD0A871).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFD0A871), width: 1.5),
+                    border: Border.all(
+                      color: const Color(0xFFD0A871),
+                      width: 1.5,
+                    ),
                   ),
                   child: const Row(
                     children: [
@@ -332,9 +338,11 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
                             ),
                             onPressed: () {
                               if (currentIndex >= totalWirds) return;
-                              context.read<KhatmaCubit>().markWirdAsCompleted(
-                                khatma.id,
-                                currentWirdIndex,
+                              WirdCompletionService.complete(
+                                context: context,
+                                isWirdMode: true,
+                                khatmaId: khatma.id,
+                                wirdIndex: currentWirdIndex,
                               );
                               CacheHelper.prefs.setInt(
                                 'wird_${khatma.id}_${currentWirdIndex}_current_page',
@@ -602,7 +610,9 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
           const gold = Color(0xFFD0A871);
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
             backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
             title: Text(
               isShare ? 'مشاركة صور الورد' : 'حفظ صور الورد',
@@ -627,7 +637,11 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.info_outline_rounded, color: gold, size: 20),
+                      const Icon(
+                        Icons.info_outline_rounded,
+                        color: gold,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -775,18 +789,18 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
             startPage: startPage,
             endPage: endPage,
             quality: quality,
-          onProgress: (completed, total) {
-            if (mounted) {
-              setState(() {
-                _exportCompleted = completed;
-                _exportTotal = total;
-              });
-            }
-          },
-          onComplete: (paths) {
-            completer.complete(paths);
-          },
-        ),
+            onProgress: (completed, total) {
+              if (mounted) {
+                setState(() {
+                  _exportCompleted = completed;
+                  _exportTotal = total;
+                });
+              }
+            },
+            onComplete: (paths) {
+              completer.complete(paths);
+            },
+          ),
         ),
       ),
     );
@@ -829,7 +843,11 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
         }
       } catch (e) {
         if (mounted) {
-          _showTopNotification(context, 'خطأ عام أثناء الحفظ: $e', isError: true);
+          _showTopNotification(
+            context,
+            'خطأ عام أثناء الحفظ: $e',
+            isError: true,
+          );
         }
       }
     } else {
@@ -841,13 +859,21 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
         );
       } catch (e) {
         if (mounted) {
-          _showTopNotification(context, 'خطأ أثناء المشاركة: $e', isError: true);
+          _showTopNotification(
+            context,
+            'خطأ أثناء المشاركة: $e',
+            isError: true,
+          );
         }
       }
     }
   }
 
-  static void _showTopNotification(BuildContext context, String message, {bool isError = false}) {
+  static void _showTopNotification(
+    BuildContext context,
+    String message, {
+    bool isError = false,
+  }) {
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -863,7 +889,10 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
               color: Colors.transparent,
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: isError ? Colors.red : Colors.green,
                   borderRadius: BorderRadius.circular(30),
@@ -1340,6 +1369,12 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
 
         final realPage = widget.startPage + i;
         final key = cubit.getPageKey(realPage);
+        
+        AppLogger.log("ExportWird", "Capturing page $realPage with key $key (current context $context)");
+
+        if (key.currentContext == null) {
+          AppLogger.log("ExportWird", "ERROR: key.currentContext is null for page $realPage!");
+        }
 
         // Rule 3: Explicit Extension
         final fileName = 'wird_page_$realPage.png';
@@ -1351,9 +1386,11 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
           quality: widget.quality,
         );
         capturedPaths.addAll(paths);
+        
+        AppLogger.log("ExportWird", "Successfully captured page $realPage to ${paths.isNotEmpty ? paths.first : 'empty'}");
       } catch (e) {
         // Rule 4: Graceful Error Handling (Log and continue)
-        debugPrint('Error capturing page index $i: $e');
+        AppLogger.log("ExportWird", 'Error capturing page index $i: $e');
       }
 
       widget.onProgress(i + 1, _totalPages);
@@ -1373,13 +1410,16 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
     final Color? savedColor = (wirdColorVal != null && wirdColorVal != -1)
         ? Color(wirdColorVal)
         : null;
-    
+
     final quranTheme = Theme.of(context).extension<QuranThemeColors>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    final Color effectivePaperColor = savedColor ??
-        (isDark ? (quranTheme?.paperColorDark ?? Colors.black) : (quranTheme?.paperColorLight ?? Colors.white));
-        
+
+    final Color effectivePaperColor =
+        savedColor ??
+        (isDark
+            ? (quranTheme?.paperColorDark ?? Colors.black)
+            : (quranTheme?.paperColorLight ?? Colors.white));
+
     final textColor = effectivePaperColor.computeLuminance() < 0.5
         ? Colors.white
         : Colors.black;
@@ -1388,11 +1428,14 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
 
     return Scaffold(
       backgroundColor: effectivePaperColor,
-      body: SizedBox(
-        width: MediaQuery.of(context).size.width,
-        height: MediaQuery.of(context).size.height,
-        child: PageView.builder(
-      allowImplicitScrolling: true,
+      body: Center(
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: SizedBox(
+            width: 1080.0, // Force high-res width like ShareCard
+            height: 1920.0, // Force high-res height
+            child: PageView.builder(
+          allowImplicitScrolling: true,
           controller: _pageController,
           itemCount: _totalPages,
           physics: const NeverScrollableScrollPhysics(),
@@ -1406,10 +1449,13 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
               endAyah: eAyah,
               collapseOutOfRange: sSura != null,
               isZoomEnabled: false,
-              paperColorOverride: savedColor, // Pass null to allow default creamy colors
+              paperColorOverride:
+                  savedColor, // Pass null to allow default creamy colors
               textColorOverride: textColor,
             );
           },
+        ),
+      ),
         ),
       ),
     );
@@ -1418,22 +1464,27 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
   (int?, int?, int?, int?) _getWirdBounds(BuildContext ctx) {
     final state = ctx.read<KhatmaCubit>().state;
     if (state is KhatmaLoaded) {
-      // Find the specific khatma that contains this wird. 
-      // Since _ExportWirdRenderer doesn't have khatmaId, we might need to find it 
+      // Find the specific khatma that contains this wird.
+      // Since _ExportWirdRenderer doesn't have khatmaId, we might need to find it
       // or pass it. But usually only one khatma is active in this context.
       // Looking at KhatmaDetailsView, it HAS the khatma.
       // Wait, I should have passed khatmaId to _ExportWirdRenderer.
-      
-      // Let's see if we can find the khatma from the state by matching wirds? 
+
+      // Let's see if we can find the khatma from the state by matching wirds?
       // Better: let's check how _ExportWirdRenderer is instantiated.
-      
+
       // For now, let's look at all khatmas and find one that matches the start/end pages.
       for (final k in state.khatmas) {
         if (widget.wirdIndex < k.wirds.length) {
           final w = k.wirds[widget.wirdIndex];
           if (w.startPage == widget.startPage && w.endPage == widget.endPage) {
             if (w.isPartial) {
-              return (w.startSuraNumber, w.startAyah, w.endSuraNumber, w.endAyah);
+              return (
+                w.startSuraNumber,
+                w.startAyah,
+                w.endSuraNumber,
+                w.endAyah,
+              );
             }
           }
         }

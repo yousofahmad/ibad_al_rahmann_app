@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:ibad_al_rahmann/features/quran_reciters/ui/quran_readers_screen.dart';
+import 'package:ibad_al_rahmann/core/helpers/extensions/app_navigator.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/theme/quran_theme_cubit.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
@@ -512,6 +515,19 @@ class _PageActionBarState extends State<PageActionBar>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+
+                      _ActionButton(
+                        icon: FontAwesomeIcons.headphones,
+                        label: 'المصحف الصوتي',
+                        onTap: () {
+                          widget.onDismiss();
+                          context.push(QuranReadersScreen(paperColor: null));
+                        },
+                        isEnabled: !_isBusy,
+                        color: onBar,
+                        
+                      ),
+                      _divider(onBarSubtle),
                       _ActionButton(
                         icon: Icons.color_lens_rounded,
                         label: 'الألوان',

@@ -17,7 +17,7 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   VersePlayerCubit() : super(VersePlayerInitial(showed: false)) {
     init();
   }
-  final player = AudioPlayer();
+  AudioPlayer player = AudioPlayer();
 
   VerseModel? currnetVerse;
 
@@ -27,7 +27,9 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   String? reciter;
   double playbackSpeed = 1.0;
   bool isLooping = false;
-  bool autoPlayNext = false;
+  bool autoPlayNext = true;
+  bool isHighlightWordByWord = CacheHelper.prefs.getBool('verse_player_highlight_wbw') ?? true;
+  ReciterAudioModel? currentReciterModel;
 
   static const Map<String, String> defaultReciters = {
     'ar.alafasy': 'مشاري راشد العفاسي',
@@ -150,6 +152,12 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
     );
   }
 
+    void toggleHighlightMode() {
+    isHighlightWordByWord = !isHighlightWordByWord;
+    CacheHelper.prefs.setBool('verse_player_highlight_wbw', isHighlightWordByWord);
+    emit(VersePlayerInitial(showed: state.showed, loading: state.loading, currentVerse: currnetVerse, activeWordIndex: state.activeWordIndex));
+  }
+
   void toggleAutoPlayNext() {
     autoPlayNext = !autoPlayNext;
     CacheHelper.prefs.setBool('verse_player_auto_play', autoPlayNext);
@@ -257,12 +265,39 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   void _loadSegmentsAsync(String activeReciter, int surahNum, int verseNum) async {
     try {
       final recitersList = await ReciterAudioHelper.getReciters();
-      final reciterModel = recitersList.firstWhere(
-        (r) =>
-            r.id == activeReciter ||
-            r.folderName.contains(activeReciter.replaceFirst('ar.', '')),
-        orElse: () => ReciterAudioModel(id: '', name: '', style: '', folderName: ''),
-      );
+      final Map<String, String> everyAyahToReciterModelId = {
+        'ar.alafasy': 'mishari_alafasy',
+        'ar.minshawi': 'minshawi_murattal',
+        'ar.abdulbasitmurattal': 'abdulbasit_murattal',
+        'ar.abdulbasitmujawwad': 'abdulbasit_mujawwad',
+        'ar.husary': 'mahmoud_husary_murattal',
+        'ar.husarymuallim': 'husary_muallim',
+        'ar.saoodshuraym': 'shuraim',
+        'ar.abdurrahmaansudais': 'sudais',
+        'ar.mahermuaiqly': 'muaiqly',
+        'ar.yasseraddossari': 'dosari',
+        'ar.saadalghamdi': 'ghamdi',
+        'ar.muhammadjibreel': 'jibreel',
+        'ar.muhammadayyoub': 'ayyoob',
+        'ar.hudhaify': 'huthaify',
+        'ar.abdullahbasfar': 'basfar',
+        'ar.faresabbad': 'fares_abbad',
+        'ar.shaatree': 'shatri',
+        'ar.banna': 'banna',
+        'ar.tablawi': 'tablawi',
+        'ar.nasserqatami': 'qatami',
+        'ar.ali_jaber': 'ali_jaber',
+        'ar.aljuhany': 'juhani',
+        'ar.mustafaismail': 'mustafa_ismail',
+        'ar.salahbudair': 'budair',
+        'ar.salahbukhatir': 'bukhatir',
+        'ar.abdullahmatroud': 'matroud',
+      };
+      
+      final mappedId = everyAyahToReciterModelId[activeReciter] ?? activeReciter;
+
+      final reciterModel = recitersList.firstWhere((r) => r.id == mappedId, orElse: () => ReciterAudioModel(id: '', name: '', style: '', folderName: ''));
+      currentReciterModel = reciterModel;
 
       if (reciterModel.id.isNotEmpty || reciterModel.folderName.isNotEmpty) {
         final segmentsMap = await ReciterAudioHelper.getSegments(reciterModel);
@@ -279,10 +314,12 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
               if (currnetVerse == null) return;
               final ms = pos.inMilliseconds;
               int? currentWord;
-              for (final seg in wordSegments) {
-                if (ms >= seg.startMs && ms <= seg.endMs) {
-                  currentWord = seg.wordIndex;
-                  break;
+              if (isHighlightWordByWord) {
+                for (final seg in wordSegments) {
+                  if (ms >= seg.startMs && ms <= seg.endMs) {
+                    currentWord = seg.wordIndex;
+                    break;
+                  }
                 }
               }
               if (currentWord != state.activeWordIndex) {
@@ -471,12 +508,11 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   }
 
   @override
-  Future<void> close() {
+  Future<void> close() async {
     playerStateSubscription?.cancel();
     positionSubscription?.cancel();
-    if (player.playing) {
-      player.stop();
-    }
+    await player.stop();
+    await player.dispose();
     return super.close();
   }
 }

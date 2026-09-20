@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:ibad_al_rahmann/features/accountability/accountability_sync_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
@@ -199,10 +200,17 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
               if (decoded.containsKey('الظهر')) val = decoded['الظهر'];
             }
             if (val == null) return null;
-            if (val is Map) return (val['status'] as String?) ?? 'on_time';
-            if (val is bool) return val ? 'on_time' : null;
-            if (val is String) return val.isNotEmpty ? val : null;
-            return 'on_time';
+            if (val is Map) {
+                final st = (val['status'] as String?) ?? 'ontime';
+                if (st == 'present' || st == 'on_time') return 'ontime';
+                return st;
+              }
+              if (val is bool) return val ? 'ontime' : null;
+              if (val is String) {
+                if (val == 'present' || val == 'on_time') return 'ontime';
+                return val.isNotEmpty ? val : null;
+              }
+              return 'ontime';
           }(),
       };
     } catch (_) {
@@ -210,17 +218,18 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
     }
   }
 
-  Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
+Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
     int streak = 0;
     bool shouldContinue = true;
     final now = DateTime.now();
 
-    // فحص التاريخ بالكامل دون التقيد بشهر واحد (حتى سنتين رجوعاً للخلف)
     for (int dayOffset = 0; dayOffset < 730; dayOffset++) {
       if (!shouldContinue) break;
       final d = now.subtract(Duration(days: dayOffset));
-      final dateStr = DateFormat('yyyy-MM-dd').format(d);
-      final log = _parseLog(prefs, dateStr);
+      final dNext = d.add(const Duration(days: 1));
+      
+      final logDay = _parseLog(prefs, DateFormat('yyyy-MM-dd').format(d));
+      final logNext = _parseLog(prefs, DateFormat('yyyy-MM-dd').format(dNext));
 
       final isFriday = d.weekday == DateTime.friday;
       final prayersInReverse = [
@@ -232,9 +241,8 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
       ];
 
       if (dayOffset == 0) {
-        // اليوم الحالي: فحص الصلوات التي انقضى وقتها (Rule 21)
         try {
-          final prayersToday = await PrayerService().getExtendedPrayers(date: now);
+          final prayersToday = await PrayerService().getExtendedPrayers(date: d);
           final prayerMap = {
             'الفجر': prayersToday.firstWhere((p) => p.id == 'fajr').time,
             if (isFriday)
@@ -249,21 +257,21 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
           for (final p in prayersInReverse) {
             final pTime = prayerMap[p];
             final isPassed = pTime != null && now.isAfter(pTime);
+            final log = (p == 'المغرب' || p == 'العشاء') ? logNext : logDay;
             final isLogged = log[p] != null;
 
             if (isLogged) {
               streak++;
             } else if (isPassed) {
-              // انقضى وقت الصلاة ولم تُسجل -> كسر الاستريك فوراً
               shouldContinue = false;
               streak = 0;
               break;
             }
           }
         } catch (_) {
-          // Fallback
           bool foundLatest = false;
           for (final p in prayersInReverse) {
+            final log = (p == 'المغرب' || p == 'العشاء') ? logNext : logDay;
             final isLogged = log[p] != null;
             if (isLogged) {
               foundLatest = true;
@@ -275,8 +283,8 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
           }
         }
       } else {
-        // الأيام السابقة: كل صلاة غير مسجلة تكسر الاستريك
         for (final p in prayersInReverse) {
+          final log = (p == 'المغرب' || p == 'العشاء') ? logNext : logDay;
           final isLogged = log[p] != null;
           if (isLogged) {
             streak++;
@@ -368,6 +376,8 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
       AppLogger.log("PrayerFocus", "writing prayer_focus_log_$dateKey: ${json.encode(logMap)} (NOT today)");
     }
 
+    await AccountabilitySyncService.syncAndSaveTodayStats();
+    
     // إعادة حساب الاستريك الفعلي من السجل
     final newStreak = await _recalculateTrueStreak(prefs);
 

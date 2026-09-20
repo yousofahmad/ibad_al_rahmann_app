@@ -1,19 +1,22 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:http/http.dart' as http;
 import 'package:hijri/hijri_calendar.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import 'package:home_widget/home_widget.dart';
 
 abstract class HijriSourceProvider {
   Future<int?> fetchOffset();
 }
 
 class EgyptDarAlIftaProvider extends HijriSourceProvider {
-  static const String apiUrl = 'http://di107.dar-alifta.org/api/HijriDate?langID=2';
+  static const String apiUrl = 'https://di107.dar-alifta.org/api/HijriDate?langID=2';
 
   @override
   Future<int?> fetchOffset() async {
     try {
+      AppLogger.log('HijriSync', 'Fetching from $apiUrl');
       final response = await http.get(Uri.parse(apiUrl)).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         // e.g. "3 Rabi' Al-Akhir 1448"
@@ -39,8 +42,11 @@ class EgyptDarAlIftaProvider extends HijriSourceProvider {
             }
           }
         }
+      } else {
+        AppLogger.log('HijriSync', 'Error: Status code ${response.statusCode}, Body: ${response.body}');
       }
     } catch (e) {
+      AppLogger.log('HijriSync', 'Exception: $e');
       debugPrint("Dar Al-Ifta fetch error: $e");
     }
     return null;
@@ -67,6 +73,7 @@ class HijriSourceService {
       await prefs.setInt(_localOffsetKey, offset);
       await prefs.setString(_lastFetchDateKey, todayStr);
       await prefs.setString(_confirmedDateKey, todayStr); // Confirmed by API
+      await HomeWidget.updateWidget(name: 'PrayerWidgetProvider');
     }
   }
 

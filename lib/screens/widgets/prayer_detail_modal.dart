@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ibad_al_rahmann/core/helpers/app_formatters.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
 import 'package:ibad_al_rahmann/screens/muezzin_selection_screen.dart';
@@ -609,9 +610,9 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
               ],
               const SizedBox(height: 5),
               Text(
-                timerStr,
+                AppFormatters.toArabicDigits(timerStr),
                 style: TextStyle(
-                  fontFamily: 'Courier', // Monospace
+                  fontFamily: AppConsts.expoArabic,
                   color: isFuture
                       ? const Color(0xFFD0A871)
                       : (isDark ? Colors.white : Colors.black),

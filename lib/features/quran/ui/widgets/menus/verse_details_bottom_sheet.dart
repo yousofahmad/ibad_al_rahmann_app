@@ -12,6 +12,7 @@ import 'package:ibad_al_rahmann/core/helpers/tafsir_helper.dart';
 import 'package:ibad_al_rahmann/core/theme/app_styles.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/data/models/selected_verse_model.dart';
+import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cubit.dart';
 
 class VerseDetailsBottomSheet extends StatefulWidget {
   const VerseDetailsBottomSheet({
@@ -28,6 +29,7 @@ class VerseDetailsBottomSheet extends StatefulWidget {
 }
 
 class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
+  int _lastLoadedSurah = 0;
   late String _selectedBookId;
   final Map<String, bool> _downloadedStatus = {};
   final Map<String, double> _downloadProgress = {};
@@ -52,16 +54,16 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
         });
       }
     }
-    await _loadTafsirForSelected();
+    await _loadTafsirForSelected(widget.currentVerse);
   }
 
-  Future<void> _loadTafsirForSelected() async {
+  Future<void> _loadTafsirForSelected(VerseModel verse) async {
     setState(() => _isLoadingTafsir = true);
     final isDownloaded = await TafsirHelper.isBookDownloaded(_selectedBookId);
     if (isDownloaded || _selectedBookId == 'muyassar') {
       await TafsirHelper.loadSurahTafsir(
         _selectedBookId,
-        widget.currentVerse.surahNumber,
+        verse.surahNumber,
       );
     }
     if (mounted) {
@@ -77,7 +79,7 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
       _selectedBookId = book.id;
     });
     await TafsirHelper.setSelectedBookId(book.id);
-    await _loadTafsirForSelected();
+    await _loadTafsirForSelected(widget.currentVerse);
   }
 
   Future<void> _startDownload(TafsirBook book) async {
@@ -105,7 +107,7 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
           });
           if (mounted) {
             if (success) {
-              await _loadTafsirForSelected();
+              await _loadTafsirForSelected(widget.currentVerse);
               if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -134,11 +136,26 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
     );
   }
 
+
+  @override
+  void dispose() {
+    // Stop the audio player when the bottom sheet is closed
+    if (mounted) {
+      context.read<VersePlayerCubit>().hide();
+    }
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final activeVerse = context.watch<VersePlayerCubit>().state.currentVerse ?? widget.currentVerse;
+    if (_lastLoadedSurah != activeVerse.surahNumber) {
+      _lastLoadedSurah = activeVerse.surahNumber;
+      _loadTafsirForSelected(activeVerse);
+    }
     final translation = getVerseTranslation(
-      widget.currentVerse.surahNumber,
-      widget.currentVerse.verseNumber,
+      activeVerse.surahNumber,
+      activeVerse.verseNumber,
     );
 
     final paperColor =
@@ -164,8 +181,8 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
 
     final tafsirText = isCurrentDownloaded
         ? TafsirHelper.getVerseTafsir(
-            widget.currentVerse.surahNumber,
-            widget.currentVerse.verseNumber,
+            activeVerse.surahNumber,
+            activeVerse.verseNumber,
             bookId: _selectedBookId,
           )
         : '';
@@ -204,7 +221,7 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                 children: [
                   const SizedBox(width: 40),
                   Text(
-                    'سورة ${getSurahNameArabic(widget.currentVerse.surahNumber)}, الآية: ${widget.currentVerse.verseNumber.toArabicNums}',
+                    'سورة ${getSurahNameArabic(activeVerse.surahNumber)}, الآية: ${activeVerse.verseNumber.toArabicNums}',
                     style: context.headlineLarge.copyWith(color: Colors.white),
                   ),
                   IconButton(
@@ -227,11 +244,11 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                   const SizedBox(height: 16),
                   // Verse Text
                   Text(
-                    widget.currentVerse.verse,
+                    activeVerse.verse,
                     textAlign: TextAlign.center,
                     textDirection: TextDirection.rtl,
                     style: context.headlineMedium.copyWith(
-                      fontFamily: widget.currentVerse.fontFamily,
+                      fontFamily: activeVerse.fontFamily,
                       fontSize: 27.sp,
                       height: 1.2,
                       color: onSurface,

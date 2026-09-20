@@ -939,7 +939,7 @@ class _VersesSection extends StatelessWidget {
             fontFamily: fontFamily,
             fontSize: normalFontSize,
             color: textColor,
-            height: 1.6, 
+            height: 1.95, 
           ),
         ));
         if (i < allWords.length - 1 && allWords[i+1].lineType != 'surah_name' && !_isMarker(allWords[i+1])) {
@@ -961,7 +961,7 @@ class _VersesSection extends StatelessWidget {
           strutStyle: StrutStyle(
             fontFamily: firstFontFamily,
             fontSize: normalFontSize,
-            height: 1.6,
+            height: 1.95,
             forceStrutHeight: true,
           ),
         ),

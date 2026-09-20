@@ -1,3 +1,4 @@
+import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -44,6 +45,7 @@ class _LandscapeQuranWidgetState extends State<LandscapeQuranWidget> {
         height: context.screenHeight,
         color: context.onPrimary,
         child: PageView.builder(
+      physics: const EasyPageScrollPhysics(),
       allowImplicitScrolling: true,
           controller: context.read<QuranCubit>().fullQuranController,
           itemCount: totalPagesCount,

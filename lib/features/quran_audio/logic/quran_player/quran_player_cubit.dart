@@ -171,9 +171,8 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
 
   @override
   Future<void> close() async {
-    if (player.playing) {
-      await player.stop();
-    }
+    await player.stop();
+    await player.dispose();
     return super.close();
   }
 }

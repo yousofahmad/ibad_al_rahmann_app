@@ -14,6 +14,7 @@ import '../services/daily_tracker_service.dart';
 
 import 'package:ibad_al_rahmann/main.dart'; // To access scaffoldMessengerKey
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import 'package:ibad_al_rahmann/features/accountability/accountability_sync_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 
 class AccountabilityScreen extends StatefulWidget {
@@ -251,13 +252,14 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
         try { focusMap.addAll(json.decode(focusLogRaw)); } catch (_) {}
       }
       if (value) {
-        focusMap[itemKey] = {'status': 'present', 'ts': DateTime.now().millisecondsSinceEpoch};
+        focusMap[itemKey] = {'status': 'ontime', 'ts': DateTime.now().millisecondsSinceEpoch};
       } else {
         focusMap.remove(itemKey);
       }
       AppLogger.log("Accountability", "writing $logKey: ${json.encode(focusMap)} AND temp_prayers: ${json.encode(map)}");
       await prefs.setString(logKey, json.encode(focusMap));
     }
+    await AccountabilitySyncService.syncAndSaveTodayStats();
 
     // ✅ حفظ فوري للإحصائيات (Auto-Save)
     await _saveStatsSilent();
@@ -1045,14 +1047,15 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                   child: Column(
                     children: [
                       Text(
-                        title,
-                        style: TextStyle(
-                          fontFamily: AppConsts.expoArabic,
-                          fontSize: 16.5.sp,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFFD0A871),
+                          title,
+                          style: TextStyle(
+                            fontFamily: AppConsts.motoNastaliq,
+                            fontSize: 22.sp,
+                            fontWeight: FontWeight.normal,
+                            color: const Color(0xFFD0A871),
+                            height: 1.5,
+                          ),
                         ),
-                      ),
                       SizedBox(height: 3.h),
                       Text(
                         subtitle,
@@ -1148,16 +1151,18 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
+          initiallyExpanded: true,
           collapsedIconColor: const Color(0xFFD0A871),
           iconColor: const Color(0xFFD0A871),
           tilePadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
           title: Text(
             "الأوراد",
             style: TextStyle(
-              fontFamily: AppConsts.expoArabic,
-              fontSize: 18.sp,
-              fontWeight: FontWeight.bold,
+              fontFamily: AppConsts.motoNastaliq,
+              fontSize: 22.sp,
+              fontWeight: FontWeight.normal,
               color: const Color(0xFFD0A871),
+              height: 1.5,
             ),
           ),
           subtitle: Text(

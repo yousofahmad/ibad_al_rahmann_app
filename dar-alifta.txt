@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Icons  -->
+    <link href="/Content/themes/awesome/css/all.min.css" rel="stylesheet" />
+    <!-- Vendor CSS Files -->
+    <link href="/Content/themes/css/swiper-bundle.min.css" rel="stylesheet" />
+    <link href="/Content/themes/css/bootstrap.rtl.css" rel="stylesheet" />
+    <link href="/Content/themes/fonts/icomoon/style.css" rel="stylesheet" />
+    <!-- Template Main CSS File -->
+    <link href="/Content/themes/css/Site.css?v=2.3" rel="stylesheet" />
+    <link href="/Content/themes/aos/aos.css" rel="stylesheet" />
+    <link href="/Content/themes/glightbox/css/glightbox.min.css" rel="stylesheet" />
+    
+    <meta name="facebook-domain-verification" content="rjq5yrhg77xnzjlqpoefqkcn0j78ph" />
+    <meta name="facebook-domain-verification" content="ho0yi9j6ipsjb9eeourna7mcda6do0" />
+    <meta name="facebook-domain-verification" content="t37acfl2bytb9ryczgfxj92bw39vls" />
+    <meta name="facebook-domain-verification" content="6iq3e8at69aax4leofy67h3mp1immr" />
+    <meta name="facebook-domain-verification" content="np9j4aigojy8a9rm136rrgyovd6os9" />
+    <meta name="facebook-domain-verification" content="89r8mggzf8262f2w7zl739d2jh2vi7" />
+    <meta name="facebook-domain-verification" content="qrbntmxxkn0pr8kco2qj01asy77xz6" />
+    <meta name="facebook-domain-verification" content="zk0x8digo00vq9uwiqt4wbgskyonsv" />
+    <meta name="_globalsign-domain-verification" content="YC3S1Z4RTUaO9yMzqM2Zs-4lIKrCN3U9aeOyAPLM6_" />
+    
+    <!-- SEO -->
+    
+<!-- Primary Meta Tags -->
+<link rel="icon" href="/Content/themes/images/favicon.ico" />
+<meta name="title" content="البحث" />
+<meta name="description" content="دار الإفتاء المصرية هي منظمة حكومية غير ربحية تعمل بشكل مستقل على المستوى الإقليمي، وتقدم إرشادات عملية ذات صلة للمسلمين لمساعدتهم على ممارسة شعائرهم " />
+<meta name="keywords" content="دار الإفتاء المصرية,دار الإفتاء المصرية,أحكام التجويد,أحكام الحج,أحكام الصلاة,أحكام الصيام,أحكام الفقه,الأديان,الحديث,الإسلام,الحج,الدين,الزكاة, النبي، الصلاة، الصيام، القرآن، العقائد الإسلامية، المكتبة الإسلامية، عقيدة المسلمين، رسول الله، علم الحديث، الفتاوى، الفقه، أصول الفقه، أصول الفقه، الكتب الإسلامية، محمد، المواقع الإسلامية، أون لاين الخدمة، خدمة التوصيل، خدمة الهاتف، خدمة البريد، خدمة الفاكس، خدمة الحضور">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://www.dar-alifta.org/ar/Search?404;http://dar-alifta.org:8080/api/HijriDate?langID=2" />
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="البحث" />
+<meta property="og:description" content="دار الإفتاء المصرية هي منظمة حكومية غير ربحية تعمل بشكل مستقل على المستوى الإقليمي، وتقدم إرشادات عملية ذات صلة للمسلمين لمساعدتهم على ممارسة شعائرهم " />
+<meta property="og:image" content="https://www.dar-alifta.org/Content/themes/modern/assets/default-sharer.jpg" />
+<meta property="og:url" content="https://www.dar-alifta.org/ar/Search?404;http://dar-alifta.org:8080/api/HijriDate?langID=2" />
+<meta property="og:locale" content="ar-EG" />
+<meta property="og:site_name" content="موقع  دار الإفتاء المصرية" />
+<!-- twitter -->
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="البحث" />
+<meta name="twitter:description" content="دار الإفتاء المصرية هي منظمة حكومية غير ربحية تعمل بشكل مستقل على المستوى الإقليمي، وتقدم إرشادات عملية ذات صلة للمسلمين لمساعدتهم على ممارسة شعائرهم " />
+<meta name="twitter:image" content="https://www.dar-alifta.org/Content/themes/modern/assets/default-sharer.jpg" />
+<!-- Apple & Mobile Support -->
+<meta name="apple-mobile-web-app-title" content="البحث">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+
+
+
+    <title>البحث -  دار الإفتاء المصرية</title>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-252821622-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        gtag('config', 'UA-252821622-1');
+    </script>
+
+</head>
+<body dir="rtl">
+      <!--====================/* start wrap and social */========================= -->
+<div class="wrap">
+    <div class="container">
+        <div class="row justify-content-between align-items-center">
+            <div class="col-4 col-md-auto ">
+                <div class="top-links">
+                    <ul class="top-links-container p-0">
+                        <li class="top-links-item">
+                            <a href="#"><img class="langar" src="/Content/themes/images/flags/ar.png" /> العربية<i class="fa-solid fa-angle-down"></i></a>
+                            <ul class="top-links-sub-menu d-block " style="z-index:1500">
+                                <li class="top-links-item"><a href="/en"><img src="/Content/themes/images/flags/en.png" alt="English"> English</a></li>
+                                <li class="top-links-item"><a href="/fr"><img src="/Content/themes/images/flags/fr.png" alt="French"> French</a></li>
+                                <li class="top-links-item"><a href="/de"><img src="/Content/themes/images/flags/de.png" alt="Deutsch"> Deutsch</a></li>
+                                <li class="top-links-item"><a href="/ur"><img src="/Content/themes/images/flags/ur.png" alt="Urdu"> Urdu</a></li>
+                                <li class="top-links-item"><a href="/ps"><img src="/Content/themes/images/flags/ps.png" alt="Pashto"> Pashto</a></li>
+                                <li class="top-links-item"><a href="/sw"><img src="/Content/themes/images/flags/sw.png" alt="Swahili"> Swahili</a></li>
+                                <li class="top-links-item"><a href="/ha"><img src="/Content/themes/images/flags/ha.png" alt="Hausa"> Hausa</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+
+            </div>
+            <div class="col-8 col-md-auto text-center date"> الخميس, 17 سبتمبر 2026 &ndash; ﻿5 ربيع الآخر 1448 هـ  </div>
+            <div class="col-12 col-md-auto d-none d-lg-block">
+                <ul id="top-social">
+                    <li><a href="https://www.facebook.com/EgyptDarAlIfta" target="_blank" class="si-facebook"><span class="ts-icon"><i class="fa-brands fa-facebook-f"></i></span><span class="ts-text">Facebook</span></a></li>
+                    <li><a href="https://twitter.com/EgyptDarAlIfta" target="_blank" class="si-twitter"><span class="ts-icon"><i class="fa-brands fa-x-twitter"></i></span><span class="ts-text">X</span></a></li>
+                    <li><a href="https://www.youtube.com/egyptdaralifta" target="_blank" class="si-youtube"><span class="ts-icon"><i class="fa-brands fa-youtube"></i></span><span class="ts-text">Youtube</span></a></li>
+                    <li><a href="tel:+20225970400" class="si-call"><span class="ts-icon"><i class="fa-solid fa-phone"></i></span><span class="ts-text">+20 2 25970400</span></a></li>
+                    <li><a href="mailto:ask@dar-alifta.org" class="si-email3"><span class="ts-icon"><i class="fa-solid fa-envelope"></i></span><span class="ts-text">ask@dar-alifta.org</span></a></li>
+                    <li><a href="https://appgallery.huawei.com/app/C112106555" target="_blank" class="si-huawei"><span class="ts-icon"><i class="fa-solid fa-suitcase"></i></span><span class="ts-text">huawei</span></a></li>
+                    <li><a href="https://apps.apple.com/us/app/dar-alafta/id1119538483?ls=1" target="_blank" class="si-twitter"><span class="ts-icon"><i class="fa-brands fa-app-store"></i></span><span class="ts-text">App Store</span></a></li>
+                    <li><a href="https://play.google.com/store/apps/details?id=com.dareleftaa" target="_blank" class="si-google-play"><span class="ts-icon"><i class="fa-brands fa-google-play"></i></span><span class="ts-text">Google Play</span></a></li>
+
+                </ul>
+
+            </div>
+        </div>
+
+    </div>
+
+</div>
+<!--====================/* End wrap and social */========================= -->
+
+    <!--====================/* Start navbar */========================= -->
+<div class="site-mobile-menu">
+    <div class="site-mobile-menu-header">
+        <div class="site-mobile-menu-close mt-3" id="site-mobile-menu-close">
+            <span class="icon-close2 js-menu-toggle"></span>
+        </div>
+    </div>
+    <div class="site-mobile-menu-body"></div>
+</div>
+
+<header class="site-navbar" role="banner" id="site-navbar">
+
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="d-inline-block col-2 d-xl-none ml-md-0 mr-auto py-3" style="position: relative; top: 3px;"><a href="#" class="site-menu-toggle js-menu-toggle text-decoration-none"><span class="icon-menu h3"></span></a></div>
+            <div class="col-5 col-xl-1">
+                <h1 class="mb-0 site-logo"><a href="/" title="دار الإفتاء المصرية"><img class="img_logo" src="/Content/themes/images/logo.png" alt="دار الإفتاء المصرية"  ></a></h1>
+            </div>
+
+            <div class="col-xl-9 d-none d-xl-block">
+                <nav class="site-navigation position-relative text-right" role="navigation">
+
+                    <ul class="site-menu js-clone-nav mr-auto text-center d-none d-lg-block">
+                        <li><a class="active" href="/" title="الرئيسية"><span>الرئيسية</span></a></li>
+                        <li><a href="/ar/mofti" title="فضيلة المفتى"><span>فضيلة المفتى</span></a></li>
+                        <li><a href="/ar/fatwa" title="الفتاوى"><span> الفتاوى</span></a></li>
+                        <li class="has-children">
+                            <a href="javascript:" title="الإصدارات"><span>الإصدارات</span></a>
+                            <ul class="dropdown arrow-top">
+                                <li><a href="/ar/magazine" title="المجلة">المجلة</a></li>
+                                <li><a href="/ar/release" title="الكتب والموسوعات">الكتب والموسوعات </a></li>
+                                <li><a href="/ar/conference" title="المؤتمرات">المؤتمرات </a></li>
+                            </ul>
+                        </li>
+
+                        <li><a href="/ar/services" title="الخدمات"><span>الخدمات</span></a></li>
+                        <li><a href="/ar/mediacenter" title="المركز الإعلامى"><span>المركز الإعلامى</span></a></li>
+                        <li><a href="/ar/video" title="المرئيات"><span>المرئيات</span></a></li>
+                        <li><a href="/ar/ourreligion" title="هذا ديننا"><span>هذا ديننا</span></a></li>
+                        <li><a href="https://ifta-learning.net/" target="_blank" title="التعليم عن بعد"><span>التعليم عن بعد</span></a></li>
+
+                    </ul>
+
+
+
+                </nav>
+            </div>
+            <div class="col-5 col-xl-2 loginandsearch d-flex ">
+                <div class="search">
+                    <a href="javascript:" title="البحث" id="top-search-trigger" onclick="toggleSearch()"><i class="fa-solid fa-magnifying-glass"></i></a>
+                </div>
+                
+            </div>
+            <form id="search" class="header_search" action="/ar/home/search" method="post" onsubmit="redirectToSearch(event)">
+                <div class="input-holder">
+                    <i class="fa-solid fa-xmark" onclick="closeSearch()"></i>
+                    <a href="javascript:void(0);" title="البحث المتقدم" onclick="submitSearch(event);">
+                        البحث المتقدم
+                    </a>
+                    <div class="search_content">
+                        <input id="searchQueryInput" type="text" class="search-input" name="searchQuery" placeholder="كلمة البحث" onkeyup="fetchSuggestions()" />
+                        <button onclick="submitSearch(event);"><i class="fas fa-search"></i></button>
+                    </div>
+                </div>
+            </form>
+
+
+
+
+        </div>
+
+    </div>
+
+
+</header>
+<!--====================/* End navbar */========================= -->
+
+    <!--====================/* start body  content */========================= -->
+    <div class="renderbody">
+        
+
+
+<!--====================/* start  breadcrumb   */========================= -->
+<section class="bread">
+    <div class="breadcrumbbg d-flex justify-content-center">
+        <div class="container d-flex justify-content-between align-items-center text-center ">
+            <nav aria-label="breadcrumb " class="breadcrumbs">
+                <ol class="breadcrumb align-items-center ">
+                    <li class="breadcrumb-item"><a href="/ar" role="button" title="الرئيسية" tabindex="0">الرئيسية</a></li>
+                    <li class="breadcrumb-item active" aria-current="page"> البحث</li>
+                </ol>
+            </nav>
+            <div class="breadcrumb_logo"><img src="/Content/themes/images/breadcrumb/fatwa.png" /></div>
+        </div>
+    </div>
+
+    <div class="breadcrumb_imgbg"></div>
+</section>
+<!--====================/* End  breadcrumb  */========================= -->
+<section class="Search_Section">
+    <div class="container ">
+        <div class="col-12">
+            <div class="row gy-5">
+                <div class="col-xl-8 col-lg-7 ">
+                        <div class="search-box">
+                            <form action="/ar/Search" method="post" class="searchbox">
+                                <input id="word" type="text" class="search-input" name="searchQuery" placeholder="كلمة البحث">
+                                <div class="search_filter ">
+                                    <button type="submit" class="search-button">
+                                        <i title="البحث" class="fas fa-search"></i>
+                                    </button>
+                                    <div class="wrapper">
+                                        <div class="custom-popup js-custom-popup" id="custom-popup" data-popup="custom-popup">
+                                            <div class="custom-popup__holder js-custom-popup-holder">
+                                                <span class="custom-popup__close js-close-popup"></span>
+                                                <div class="custom-popup__title">
+                                                    خيارات البحث
+                                                </div>
+                                                <div class="custom-popup__content">
+                                                    <div class="search_index">
+                                                        <ul class="Listsearch">
+                                                            <li>
+                                                                <input type="radio" name="tab" id="All" class="tab-radio" checked>
+                                                                <label for="All">الكل </label>
+                                                            </li>
+                                                            <li>
+                                                                <input type="radio" name="tab" id="Fatwa" class="tab-radio">
+                                                                <label for="Fatwa">الفتاوى</label>
+                                                            </li>
+                                                            <li>
+                                                                <input type="radio" name="tab" id="Articles" class="tab-radio">
+                                                                <label for="Articles">الأخبار</label>
+                                                            </li>
+                                                            <li>
+                                                                <input type="radio" name="tab" id="Video" class="tab-radio">
+                                                                <label for="Video">المواد المصورة</label>
+                                                            </li>
+
+                                                            <li>
+                                                                <input type="radio" name="tab" id="OurReligion" class="tab-radio">
+                                                                <label for="OurReligion">هذا ديننا </label>
+                                                            </li>
+                                                        </ul>
+
+                                                    </div>
+                                                </div>
+                                                <div class="custom-popup__footer">
+                                                    <a href="" class="btn_search">بحث</a>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </form>
+                        </div>
+                        <div class="search_index">
+
+                            <ul class="Listsearch">
+                                <li>
+                                    <input type="radio" name="tab" id="All" class="tab-radio" checked>
+                                    <label for="All">الكل </label>
+                                </li>
+                                <li>
+                                    <input type="radio" name="tab" id="Fatwa" class="tab-radio">
+                                    <label for="Fatwa">الفتاوى</label>
+                                </li>
+                                <li>
+                                    <input type="radio" name="tab" id="Articles" class="tab-radio">
+                                    <label for="Articles">الأخبار</label>
+                                </li>
+                                <li>
+                                    <input type="radio" name="tab" id="Video" class="tab-radio">
+                                    <label for="Video">المواد المصورة</label>
+                                </li>
+
+                                <li>
+                                    <input type="radio" name="tab" id="OurReligion" class="tab-radio">
+                                    <label for="OurReligion">هذا ديننا </label>
+                                </li>
+                            </ul>
+
+
+
+                        </div>
+                </div>
+<div class="col-xl-4 col-lg-5 d-none d-md-block sidbar">
+    <div class="row gy-5">
+        <section class="fatwasupmenu_fatwadetails">
+            <div class="container fatwa">
+                <div class="row gy-5">
+                    <div class="box_fatwa">
+                        <div class="card_fatwa">
+                            <a class="text-decoration-none" href="/ar/fatwa/fatwa-request" title="طلب فتوى">
+                                <div class="img_fatwa">
+                                    <img src="/Content/themes/images/fatwalogo/fatwa.png" alt="طلب فتوى" />
+                                </div>
+                                <div class="content_fatwa">
+                                    <span title="طلب فتوى">طلب فتوى</span>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="card_fatwa">
+                            <a class="text-decoration-none" href="/ar/fatwa/fatwa-answer" title="استعلام عن فتوى">
+                                <div class="img_fatwa">
+                                    <img src="/Content/themes/images/fatwalogo/requestcall.png" alt="استعلام عن فتوى" />
+                                </div>
+                                <div class="content_fatwa">
+                                    <span title="استعلام عن فتوى">استعلام عن فتوى</span>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="card_fatwa">
+                            <a class="text-decoration-none" href="/ar/appointment/booking" title="حجز موعد">
+                                <div class="img_fatwa">
+                                    <img src="/Content/themes/images/fatwalogo/time.png" alt="حجز موعد" />
+                                </div>
+                                <div class="content_fatwa">
+                                    <span title="حجز موعد">حجز موعد</span>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="card_fatwa">
+                            <a class="text-decoration-none" href="/ar/services/details/1/الفتوى-الهاتفية-" title="الفتوى الهاتفية">
+                                <div class="img_fatwa">
+                                    <img src="/Content/themes/images/fatwalogo/fatwacall.png" alt="الفتوى الهاتفية" />
+                                </div>
+                                <div class="content_fatwa">
+                                    <span title="الفتوى الهاتفية"> الفتوى الهاتفية</span>
+                                </div>
+
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+    </div>
+
+    <swiper-container class="advert" centered-slides="true" pagination="true" pagination-clickable="true">
+            <swiper-slide>
+                <div class="row">
+                    <a href="https://www.dar-alifta.org/ar/conference/details/22" title="مؤتمر 2026" >
+                        <div class="fatwa_prayer" style="background-image:url(https://www.dar-alifta.org/images/Ads/Conf08-202601.jpg)">
+                            <div class="content_fatwa_prayer"> </div>
+                        </div>
+                    </a>
+                </div>
+            </swiper-slide>
+    </swiper-container>
+
+    <div class="row p-3">
+            <div class="mosque" style="background-image:url(/Content/themes/images/mosque.jpg)">
+                <div class="content_mosque_prayer">
+                    <div class="prayer-now">
+    <div class="header-prayer py-3">
+        <h3> مَواقِيتُ الصَّـــلاة </h3>
+        <span>القاهرة · 17  سبتمبر  2026 م</span>
+    </div>
+    <div class="time-prayer">
+        <div class="time" id="fajr">الفجر<br>5 :13 </div>
+        <div class="time" id="shroq">الشروق<br>6 :40 </div>
+        <div class="time" id="dhuhr">الظهر<br>12 : 49</div>
+        <div class="time" id="asr">العصر<br>4:19 </div>
+        <div class="time" id="maghrib">المغرب<br>6 : 58</div>
+        <div class="time" id="isha">العشاء<br>8 :16</div>
+    </div>
+
+    <div class="time-location py-3">
+        <i class="fa-solid fa-location-dot"></i>
+        <select id="townSelect" name="town" onchange="updatePrayerTimes()" >
+                <option value="القاهرة" selected>القاهرة</option>
+                <option value="الاسكندرية" >الاسكندرية</option>
+                <option value="بورسعيد" >بورسعيد</option>
+                <option value="السويس" >السويس</option>
+                <option value="العريش" >العريش</option>
+                <option value="دمنهور" >دمنهور</option>
+                <option value="طنطا" >طنطا</option>
+                <option value="الزقازيق" >الزقازيق</option>
+                <option value="الفيوم" >الفيوم</option>
+                <option value="بني سويف" >بني سويف</option>
+                <option value="المنيا" >المنيا</option>
+                <option value="اسيوط" >اسيوط</option>
+                <option value="سوهاج" >سوهاج</option>
+                <option value="قنا" >قنا</option>
+                <option value="اسوان" >اسوان</option>
+                <option value="مطروح" >مطروح</option>
+                <option value="الغردقة" >الغردقة</option>
+                <option value="الخارجة" >الخارجة</option>
+                <option value="الاسماعيلية" >الاسماعيلية</option>
+                <option value="دمياط" >دمياط</option>
+                <option value="السلوم" >السلوم</option>
+                <option value="نويبع" >نويبع</option>
+                <option value="حلايب" >حلايب</option>
+                <option value="سفاجا" >سفاجا</option>
+                <option value="مرسي علم" >مرسي علم</option>
+                <option value="سيدي براني" >سيدي براني</option>
+                <option value="الضبعه" >الضبعه</option>
+                <option value="موط (الداخلة)" >موط (الداخلة)</option>
+                <option value="البويطي" >البويطي</option>
+                <option value="المحلة الكبري" >المحلة الكبري</option>
+                <option value="نجع حمادي" >نجع حمادي</option>
+                <option value="45792" >45792</option>
+                <option value="بني مزار الجديدة" >بني مزار الجديدة</option>
+                <option value="الاقصر" >الاقصر</option>
+                <option value="توشكي" >توشكي</option>
+                <option value="المنصورة" >المنصورة</option>
+                <option value="شرم الشيخ" >شرم الشيخ</option>
+                <option value="6أكتـوبر" >6أكتـوبر</option>
+                <option value="كفر الشيخ" >كفر الشيخ</option>
+                <option value="الحامول" >الحامول</option>
+                <option value="بلطيم" >بلطيم</option>
+                <option value="طابا" >طابا</option>
+                <option value="راس سدر" >راس سدر</option>
+                <option value="الطور" >الطور</option>
+                <option value="دهب" >دهب</option>
+                <option value="ابوزنيمة" >ابوزنيمة</option>
+                <option value="راس غارب" >راس غارب</option>
+                <option value="القصير" >القصير</option>
+                <option value="برنيس" >برنيس</option>
+                <option value="شلاتين" >شلاتين</option>
+                <option value="العلمين" >العلمين</option>
+                <option value="واحة سيوة" >واحة سيوة</option>
+                <option value="الفرافرة" >الفرافرة</option>
+                <option value="باريس" >باريس</option>
+                <option value="الحمام" >الحمام</option>
+                <option value="ادفو" >ادفو</option>
+                <option value="اسنا" >اسنا</option>
+                <option value="القاهرة الجديدة" >القاهرة الجديدة</option>
+                <option value="الدلنجات" >الدلنجات</option>
+                <option value="كاترين" >كاترين</option>
+                <option value="السادات" >السادات</option>
+                <option value="الصالحية الجديدة" >الصالحية الجديدة</option>
+                <option value="العاشر من رمضان" >العاشر من رمضان</option>
+                <option value="العاصمة الادارية الجديدة" >العاصمة الادارية الجديدة</option>
+                <option value="العبور" >العبور</option>
+                <option value="الفشن الجديدة" >الفشن الجديدة</option>
+                <option value="المنصورة الجديدة" >المنصورة الجديدة</option>
+                <option value="النوبارية الجديدة" >النوبارية الجديدة</option>
+                <option value="بدر" >بدر</option>
+                <option value="بورسعيد الجديدة سلام" >بورسعيد الجديدة سلام</option>
+                <option value="بئر العبد الجديدة" >بئر العبد الجديدة</option>
+                <option value="توشكى الجديدة" >توشكى الجديدة</option>
+                <option value="حدائق العاصمة" >حدائق العاصمة</option>
+                <option value="رشيد الجديدة" >رشيد الجديدة</option>
+                <option value="رفح الجديدة" >رفح الجديدة</option>
+                <option value="سفنكس الجديدة" >سفنكس الجديدة</option>
+                <option value="شرق العوينات" >شرق العوينات</option>
+                <option value="غرب النوبارية" >غرب النوبارية</option>
+        </select>
+
+    </div>
+    <div class="d-flex justify-content-start p-3">
+        <a href="/ar/prayer" title="عرض مواقيت الصلاة" class="btn-prayer btn-sm">عرض مواقيت الصلاة</a>
+    </div>
+</div>
+
+<script type="text/javascript">
+    function updatePrayerTimes() {
+        var selectedTown = document.getElementById("townSelect").value;
+        $.ajax({
+            url: '/ar/Partial/_TimePrayer',
+            type: 'GET',
+            data: { town: selectedTown },
+            success: function (data) {
+                $(".prayer-now").html(data);
+                highlightNextPrayer();
+            }
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        if (true) {
+            highlightNextPrayer();
+        }
+    });
+
+    function highlightNextPrayer() {
+        if (!true) {
+            console.warn("❌ لا توجد بيانات لمواقيت الصلاة.");
+            return;
+        }
+
+        var now = new Date();
+        var currentHour = now.getHours();
+        var currentMinute = now.getMinutes();
+        var prayerTimes = [
+            { id: "fajr", hour: 5 ?? 0, minute: 13 ?? 0 },
+            { id: "shroq", hour: 6 ?? 0, minute: 40 ?? 0 },
+            { id: "dhuhr", hour: 12 ?? 0, minute: 49 ?? 0 },
+            { id: "asr", hour: 4 ?? 0, minute: 19 ?? 0 },
+            { id: "maghrib", hour: 6 ?? 0, minute: 58 ?? 0 },
+            { id: "isha", hour: 8 ?? 0, minute: 16 ?? 0 }
+        ];
+
+        document.querySelectorAll(".time").forEach(e => e.classList.remove("highlight"));
+
+        for (var i = 0; i < prayerTimes.length; i++) {
+            var prayer = prayerTimes[i];
+            if (currentHour < prayer.hour || (currentHour === prayer.hour && currentMinute < prayer.minute)) {
+                document.getElementById(prayer.id).classList.add("highlight");
+                break;
+            }
+        }
+    }
+</script>
+
+                </div>
+            </div>
+    </div>
+    <div class="row p-3">
+        <div class="page-icons">
+            <div class="main">
+                <div class="slides-4 swiper">
+                    <div class="swiper-wrapper">
+                        <div class="swiper-slide">
+                            <div class="swiper_card">
+                                <a href="/ar/haj" title="الحج والعمرة" target="_blank">
+                                    <div class="swiper_img">
+                                        <img src="/Content/themes/images/pages/cubeblue.png" alt="الحج والعمرة" />
+                                    </div>
+                                    <div class="swiper_content">
+                                        <span>الحج والعمرة</span>
+                                    </div>
+                                </a>
+                            </div>
+
+                        </div>
+                        <div class="swiper-slide">
+                            <div class="swiper_card">
+                                <a href="https://ramadan.dar-alifta.org/" title="رمضان" target="_blank">
+                                    <div class="swiper_img">
+                                        <img src="/Content/themes/images/pages/ramdanblue.png" alt="رمضان" />
+                                    </div>
+                                    <div class="swiper_content">
+                                        <span>رمضان</span>
+                                    </div>
+                                </a>
+                            </div>
+
+                        </div>
+
+                        <div class="swiper-slide">
+                            <div class="swiper_card">
+                                <a href="http://family.dar-alifta.org/" target="_blank" title="تنمية الأسرة">
+                                    <div class="swiper_img">
+                                        <img src="/Content/themes/images/pages/familyblue.png" alt="تنمية الأسرة" />
+                                    </div>
+                                    <div class="swiper_content">
+                                        <span>تنمية الأسرة</span>
+                                    </div>
+                                </a>
+                            </div>
+
+                        </div>
+                        <div class="swiper-slide">
+                            <div class="swiper_card">
+                                <a href="/ar/fatwaconcepts" target="_blank" title="مفاهيم إفتائية">
+                                    <div class="swiper_img">
+                                        <img src="/Content/themes/images/pages/understandblue.png" alt="مفاهيم إفتائية" />
+                                    </div>
+                                    <div class="swiper_content">
+                                        <span>مفاهيم إفتائية</span>
+                                    </div>
+                                </a>
+                            </div>
+
+                        </div>
+
+
+                    </div>
+                    
+                    <div class="swiper-button-prev"></div>
+                    <div class="swiper-button-next"></div>
+                </div>
+
+            </div>
+        </div>
+       
+    </div>
+</div>
+
+            </div>
+
+        </div>
+    </div>
+</section>
+
+ 
+    </div>
+    <!-- ======= preloader page ======= -->
+    <svg class="spinner" id="spinner" width="65px" height="65px" viewBox="0 0 66 66" xmlns="http://www.w3.org/2000/svg">
+        <circle class="path-submit" fill="none" stroke-width="6" stroke-linecap="round" cx="33" cy="33" r="30"></circle>
+    </svg>
+    <!-- ======= Widget Button ======= -->
+    <div class="widget">
+        <button class="" id="chatme" title="خدمات الدار">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
+                <path fill-rule="evenodd" d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" />
+            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" class="close" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
+                <path fill-rule="evenodd" d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" />
+            </svg>
+        </button>
+        <div class="socials">
+            <div class="phone">
+                <a href="tel:+107" title="اتصل بنا">
+                    <i class="fa-solid fa-phone"></i>
+                    <span> اتصل بنا </span>
+                </a>
+
+            </div>
+            <div class="Appointement">
+                <a href="/ar/appointment/booking" title="حجز موعد">
+                    <img src="/Content/themes/images/fatwalogo/time.png" alt="حجز موعد" />
+                    <span> حجز موعد </span>
+                </a>
+
+            </div>
+            <div class="AnswerFatwa">
+                <a href="/ar/fatwa/fatwa-answer" title="استعلام عن فتوى">
+                    <img src="/Content/themes/images/fatwalogo/requestcall.png" alt="استعلام عن فتوى" />
+                    <span> استعلام عن فتوى </span>
+                </a>
+
+            </div>
+            <div class="RequestFatwa">
+                <a href="/ar/fatwa/fatwa-request" title="طلب فتوى">
+                    <img src="/Content/themes/images/fatwalogo/fatwa.png" alt="طلب فتوى" />
+                    <span>  طلب فتوى </span>
+                </a>
+
+            </div>
+        </div>
+    </div>
+    <!-- ======= Back To top ======= -->
+    <a id="button"></a>
+    <!-- ======= Footer ======= -->
+     <!--====================/* start  footer  */========================= -->
+<div class="secfooter">
+    <div class="bgdown"></div>
+    <footer class="footer-section">
+        <div class="container">
+            <div class="footer-content pt-5 pb-3">
+                <div class="row">
+                    <div class="col-xl-2 col-lg-2 mb-50">
+                        <div class="footer-widget">
+                            <div class="footer-logo">
+                                <a href="/ar"><img src="/Content/themes/images/logo/llogo.png" alt="دار الإفتاء المصرية"></a>
+
+                            </div>
+
+                            <div class="col-xl-6 col-lg-6 d-block  d-lg-none   text-center">
+                                <div class="footer-menu">
+                                    <ul>
+                                        <li>
+                                            <a href="https://www.facebook.com/EgyptDarAlIfta" target="_blank"><i class="fab fa-facebook-f "></i></a>
+                                            <a href="https://twitter.com/EgyptDarAlIfta" target="_blank"><i class="fab fa-twitter "></i></a>
+                                            <a href="https://www.youtube.com/egyptdaralifta" target="_blank"><i class="fab fa-youtube "></i></a>
+                                            <a href="https://www.tiktok.com/@egyptdaralifta?lang=ar" target="_blank"><i class="fab fa-tiktok "></i></a>
+                                            <a href="https://www.instagram.com/EgyptDarAlIfta/" target="_blank"><i class="fab fa-instagram "></i></a>
+
+                                        </li>
+
+                                    </ul>
+                                </div>
+                            </div>
+
+
+                            <div class="footer-text">
+                                <a href="https://apps.apple.com/us/app/dar-alafta/id1119538483?ls=1" target="_blank">
+                                    <img src="/Content/themes/images/logo/Apple.png" alt="دار الافتاء المصرية متجر تطبيقات" />
+                                </a>
+                                <a href="https://play.google.com/store/apps/details?id=com.dareleftaa" target="_blank">
+                                    <img src="/Content/themes/images/logo/Google.png" alt="دار الافتاء المصرية جوجل بلاي" />
+                                </a>
+                                <a href="https://appgallery.huawei.com/app/C112106555" class="huawei-logo" target="_blank">
+                                    <img src="/Content/themes/images/logo/huawei.png" alt="دار الافتاء المصرية جوجل بلاي" />
+                                </a>
+                            </div>
+
+                        </div>
+                    </div>
+                    <div class="col-xl-7 col-lg-7 col-md-7 mb-30 ">
+                        <div class="footer-widget ">
+                            <ul class="links">
+                                <li><a href="/ar/fatwaconcepts/fatwa-approach" title="منهج الفتوى" target="_blank"> منهج الفتوى </a></li>
+                                <li><a href="/ar/services/details/9" title="فتاوى المحاكم والمؤسسات " target="_blank">فتاوى المحاكم والمؤسسات </a></li>
+                                <li><a href="/ar/ourreligion" title="هذا ديننا" target="_blank"> هذا ديننا </a></li>
+                                <li><a href="/ar/fatwaresearch" title="الفتاوى البحثية" target="_blank"> الفتاوى البحثية </a></li>
+                                <li><a href="/ar/services/details/1" title="الفتوى الهاتفية" target="_blank">الفتوى الهاتفية </a></li>
+                                <li><a href="/ar/services/details/8" title="حساب الزكاة" target="_blank">حساب الزكاة </a></li>
+                                <li><a href="/ar/fatwamoslem" title="فتاوى الأقليات" target="_blank"> فتاوى الأقليات </a></li>
+                                <li><a href="https://www.ifta-learning.net" title="التعليم عن بعد" target="_blank">التعليم عن بعد</a></li>
+                                <li><a href="/ar/fatwa/fatwa-request" title="طلب فتوى" target="_blank">طلب فتوى</a></li>
+                                <li><a href="https://family.dar-alifta.org/" target="_blank" title="تنمية الأسرة">تنمية الأسرة </a></li>
+                                <li><a href="/ar/services/details/3" title="الفتوى الإلكترونية" target="_blank"> الفتوى الإلكترونية </a></li>
+                                <li><a href="/ar/mediacenter" title="المركز الإعلامى" target="_blank">  المركز الإعلامى </a></li>
+                                <li><a href="/ar/services/details/5" title="الفتوى الشفوية" target="_blank"> الفتوى الشفوية </a></li>
+                                <li><a href="/ar/services/details/4" title="الفتوى المكتوبة" target="_blank"> الفتوى المكتوبة </a></li>
+                                <li><a href="/ar/services/details/12" title="التاريخ الهجري" target="_blank">التاريخ الهجري </a></li>
+                                <li><a href="/ar/services/details/85" title="فروع الدار" target="_blank">فروع الدار</a></li>
+                                <li><a href="/ar/services/details/8 " title="الحساب الشرعي" target="_blank">  الحساب الشرعي </a></li>
+                                <li><a href="/ar/sitemap" title="خريطة الموقع" target="_blank">  خريطة الموقع </a></li>
+                                <li><a href="/ar/services/details/22" title="فض المنازعات" target="_blank"> فض المنازعات </a></li>
+                                <li><a href="/ar/services/details/18" title="تدريب الوافدين على الإفتاء" target="_blank"> تدريب الوافدين على الإفتاء</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-lg-3 col-md-6 mb-50 cllas">
+                        <div class="footer-widget ">
+                            <div class="footer-widget-heading">
+                                <h3>اتصل بنا</h3>
+                            </div>
+                            <div class="footer-text mb-25">
+                                <ul>
+                                    <li class="lastitem"><a href="https://maps.app.goo.gl/Xr7HLbyMTi2bfRd4A" title=""><i class="fa-solid fa-location-pin" style="padding-left:10px; "></i>حديقة الخالدين - الدراسة - القاهرة ص.ب 11675</a></li>
+                                    <li><a href="tel:107" title=""><i class="fa-solid fa-mobile " style="padding-left:10px;"></i>107</a></li>
+                                    <li class="lastitem"><a href="tel:20225970400" title=""><i class="fa-solid fa-phone " style="padding-left:10px;"></i>202-25970400</a></li>
+                                    <li class="lastitem"><a href="mailto:info@dar-alifta.org" title=""><i class="fa-solid fa-envelope" style="padding-left:10px; "></i>info@dar-alifta.org</a></li>
+                                </ul>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="copyright-area">
+            <div class="container">
+                <div class="row p-2">
+                    <div class="line"></div>
+                    <div class="col-xl-6 col-lg-6  text-lg-end text-center">
+                        <div class="copyright-text">
+                            <p> &copy;جميع الحقوق محفوظة ل  <a href="https://www.dar-alifta.org/ar" title="دار الإفتاء المصرية">دار الإفتاء المصرية</a></p>
+                        </div>
+                    </div>
+                    <div class="col-xl-6 col-lg-6  d-none d-lg-block text-right">
+                        <div class="footer-menu">
+                            <ul>
+                                <li>
+                                    <a href="https://www.facebook.com/EgyptDarAlIfta" target="_blank"><i class="fab fa-facebook-f "></i></a>
+                                    <a href="https://twitter.com/EgyptDarAlIfta" target="_blank"><i class="fa-brands fa-x-twitter"></i></a>
+                                    <a href="https://www.youtube.com/egyptdaralifta" target="_blank"><i class="fab fa-youtube "></i></a>
+                                    <a href="https://www.tiktok.com/@egyptdaralifta?lang=ar" target="_blank"><i class="fab fa-tiktok "></i></a>
+                                    <a href="https://www.instagram.com/EgyptDarAlIfta/" target="_blank"><i class="fab fa-instagram "></i></a>
+
+                                </li>
+
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+</div>
+<!--====================/* End footer */========================= -->
+
+    <!--===================/* js code */========================= -->
+    <script src="/Content/themes/js/jquery-3.7.1.min.js"></script>
+    <script src="/Content/themes/js/bootstrap.bundle.min.js"></script>
+    <script src="/Content/themes/js/jquery.sticky.js"></script>
+    <script src="/Content/themes/js/owl.carousel.min.js"></script>
+    <script src="/Content/themes/aos/aos.js"></script>
+    <script src="/Content/themes/js/sweetalert.min.js"></script>
+    <script src="/Content/themes/js/swiper-bundle.min.js"></script>
+    <script src="/Content/themes/js/swiper-element-bundle.min.js"></script>
+    <!-- Template Main JS File -->
+    <script src="/Content/themes/glightbox/js/glightbox.min.js"></script>
+    <script src="/Content/themes/js/custom.js"></script>
+    <!-- Vendor JS Files -->
+    
+    <script type="text/javascript">
+        document.addEventListener("DOMContentLoaded", function () {
+            const searchInput = document.getElementById("searchQueryInput");
+            const wordInput = document.getElementById("word");
+
+            const urlParams = new URLSearchParams(window.location.search);
+            let searchQuery = urlParams.get("searchQuery");
+
+            if (searchQuery) {
+                searchQuery = decodeURIComponent(searchQuery);
+                searchInput.value = searchQuery;
+                wordInput.value = searchQuery;
+            }
+
+            searchInput.addEventListener("input", function () {
+                wordInput.value = searchInput.value;
+            });
+
+            wordInput.addEventListener("input", function () {
+                searchInput.value = wordInput.value;
+            });
+        });
+        $(document).ready(function () {
+            $('[id*=All]').prop('checked', true).trigger('change').trigger('click');
+        });
+    </script>
+
+
+
+
+
+</body>
+
+</html>

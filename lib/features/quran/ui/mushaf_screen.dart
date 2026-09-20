@@ -1,3 +1,4 @@
+import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -10,7 +11,7 @@ import 'widgets/menus/single_tap_menu.dart';
 import '../bloc/quran/quran_cubit.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import '../../../widgets/app_skeleton.dart';
-import 'widgets/scroll/easy_page_scroll_physics.dart';
+
 
 
 class MushafScreen extends StatefulWidget {
@@ -164,7 +165,7 @@ class _MushafScreenState extends State<MushafScreen>
                               controller: _pageController,
                               itemCount: 604,
                               reverse: true,
-                              physics: const EasyPageScrollPhysics(),
+                              physics: const BouncingScrollPhysics(parent: EasyPageScrollPhysics()),
                               onPageChanged: (idx) {
                                 _currentIndex = idx + 1;
                                 context.read<QuranCubit>().onQuranPageChanged(

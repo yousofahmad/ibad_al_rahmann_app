@@ -1,3 +1,4 @@
+import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,13 +28,14 @@ class _QuranPagesListState extends State<QuranPagesList> {
       buildWhen: (prev, curr) => prev.currentPage != curr.currentPage,
       builder: (context, state) {
         return PageView.builder(
+      physics: const EasyPageScrollPhysics(),
       allowImplicitScrolling: true,
           controller: cubit.pagesController,
           scrollDirection: Axis.horizontal,
           clipBehavior: Clip.none,
           // PageView naturally supports snapping "one-by-one" with PageScrollPhysics (default)
           // We can also use BouncingScrollPhysics() wrapped in PageScrollPhysics if we want
-          physics: const BouncingScrollPhysics(parent: PageScrollPhysics()),
+          physics: const BouncingScrollPhysics(parent: EasyPageScrollPhysics()),
           onPageChanged: (index) {
             cubit.onPagesListChanged(index);
             HapticFeedback.selectionClick();

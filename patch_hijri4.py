@@ -1,0 +1,40 @@
+﻿import re
+with open("lib/services/prayer_service.dart", "r", encoding="utf-8") as f:
+    content = f.read()
+
+content = re.sub(
+    r"int get hijriOffset => RemoteConfigService\.globalHijriOffset \+ _hijriOffset \+ _localHijriDelta;",
+    r"int get hijriOffset => _hijriOffset + _localHijriDelta;",
+    content
+)
+
+target = r'''static HijriCalendar getHijriWithOffset\(int remoteOffset, \[DateTime\? date\]\) \{
+    final baseDate = date \?\? DateTime\.now\(\);
+    
+    // الأولوية 1: local_hijri_offset \(المحسوب من API دار الإفتاء\)
+    final localOffset = CacheHelper\.prefs\.getInt\('local_hijri_offset'\);
+    final manualAdjustment = CacheHelper\.prefs\.getInt\('manual_day_adjustment'\) \?\? 0;
+
+    // لو فيه تأكيد محلي، نتجاهل الفايربيز تماماً في مصر
+    final offsetDays = \(localOffset != null\)
+        \? localOffset \+ manualAdjustment
+        : remoteOffset \+ manualAdjustment;
+
+    DateTime effectiveDate = baseDate\.add\(Duration\(days: offsetDays\)\);'''
+
+replacement = r'''static HijriCalendar getHijriWithOffset(int remoteOffset, [DateTime? date]) {
+    final baseDate = date ?? DateTime.now();
+    
+    final localOffset = CacheHelper.prefs.getInt('local_hijri_offset') ?? 0;
+    final manualAdjustment = CacheHelper.prefs.getInt('manual_day_adjustment') ?? 0;
+    final offsetDays = localOffset + manualAdjustment;
+
+    DateTime effectiveDate = baseDate.add(Duration(days: offsetDays));'''
+
+if re.search(target, content):
+    content = re.sub(target, replacement, content)
+    with open("lib/services/prayer_service.dart", "w", encoding="utf-8") as f:
+        f.write(content)
+    print("Replaced successfully")
+else:
+    print("Target not found!")

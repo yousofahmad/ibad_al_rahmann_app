@@ -1,3 +1,4 @@
+import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -69,6 +70,7 @@ class _MinQuranTabletState extends State<MinQuranTablet> {
                 child: _TapListener(
                   onDoubleTap: () => context.read<QuranCubit>().changeLayout(),
                   child: PageView.builder(
+      physics: const EasyPageScrollPhysics(),
       allowImplicitScrolling: true,
                     controller: context.read<QuranCubit>().minQuranController,
                     itemCount: 604,

@@ -15,19 +15,28 @@ import 'package:hive_flutter/hive_flutter.dart';
 class NotificationContentService {
   static String getNotificationBody(String prayerName) {
     switch (prayerName) {
-      case 'Fajr': return "حان الآن موعد صلاة الفجر";
-      case 'Sunrise': return "حان الآن وقت الشروق";
-      case 'Dhuhr': return "حان الآن موعد صلاة الظهر";
-      case 'Asr': return "حان الآن موعد صلاة العصر";
-      case 'Maghrib': return "حان الآن موعد صلاة المغرب";
-      case 'Isha': return "حان الآن موعد صلاة العشاء";
-      default: return "حان الآن موعد الصلاة";
+      case 'Fajr':
+        return "حان الآن موعد صلاة الفجر";
+      case 'Sunrise':
+        return "حان الآن وقت الشروق";
+      case 'Dhuhr':
+        return "حان الآن موعد صلاة الظهر";
+      case 'Asr':
+        return "حان الآن موعد صلاة العصر";
+      case 'Maghrib':
+        return "حان الآن موعد صلاة المغرب";
+      case 'Isha':
+        return "حان الآن موعد صلاة العشاء";
+      default:
+        return "حان الآن موعد الصلاة";
     }
   }
 }
 
 class NotificationService {
-  static const _platform = MethodChannel('app.ibad_al_rahmann/native_notifications');
+  static const _platform = MethodChannel(
+    'app.ibad_al_rahmann/native_notifications',
+  );
   static const _activeAlarmsKey = 'active_alarm_ids';
 
   static Future<void> _addActiveAlarmId(int id) async {
@@ -48,7 +57,9 @@ class NotificationService {
       await prefs.setStringList(_activeAlarmsKey, ids);
     }
   }
-  static final ValueNotifier<String?> onNotificationTap = ValueNotifier<String?>(null);
+
+  static final ValueNotifier<String?> onNotificationTap =
+      ValueNotifier<String?>(null);
 
   static bool _isBatching = false;
   static final List<Map<String, dynamic>> _batchAlarms = [];
@@ -62,12 +73,8 @@ class NotificationService {
       name: 'PrayerWidgetProvider', // Android Class Name
       iOSName: 'PrayerWidgetProvider',
     );
-    await HomeWidget.updateWidget(
-      name: 'PrayerWidgetLargeProvider',
-    );
-    await HomeWidget.updateWidget(
-      name: 'PrayerWidgetWideProvider',
-    );
+    await HomeWidget.updateWidget(name: 'PrayerWidgetLargeProvider');
+    await HomeWidget.updateWidget(name: 'PrayerWidgetWideProvider');
   }
 
   static Future<void> init() async {
@@ -76,7 +83,9 @@ class NotificationService {
 
   /// Writes a message to the native NativeLogger file for release-build debugging.
   static void nativeLog(String message) {
-    _platform.invokeMethod('nativeLog', {'message': message}).catchError((_) {});
+    _platform
+        .invokeMethod('nativeLog', {'message': message})
+        .catchError((_) {});
   }
 
   static Future<void> _handleMethodCall(MethodCall call) async {
@@ -84,7 +93,8 @@ class NotificationService {
       final String? payload = call.arguments;
       nativeLog('onPayloadReceived: $payload');
       if (payload != null) {
-        onNotificationTap.value = null; // Force trigger even for identical consecutive payloads
+        onNotificationTap.value =
+            null; // Force trigger even for identical consecutive payloads
         onNotificationTap.value = payload;
       }
     }
@@ -103,13 +113,16 @@ class NotificationService {
 
   static Future<bool> isBatteryOptimizationIgnored() async {
     try {
-      return await _platform.invokeMethod('isBatteryOptimizationIgnored') ?? true;
+      return await _platform.invokeMethod('isBatteryOptimizationIgnored') ??
+          true;
     } catch (_) {
       return true;
     }
   }
 
-  static Future<void> checkAndRequestBatteryPermission(BuildContext context) async {
+  static Future<void> checkAndRequestBatteryPermission(
+    BuildContext context,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool('has_seen_battery_dialog') == true) return;
@@ -129,7 +142,10 @@ class NotificationService {
           title: const Text(
             "تحسين البطارية",
             textAlign: TextAlign.right,
-            style: TextStyle(fontFamily: AppConsts.cairo, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontFamily: AppConsts.cairo,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           content: const Text(
             "لضمان وصول الأذان والأذكار في موعدها بدقة، يرجى اختيار 'غير مقيد' (Unrestricted) في إعدادات البطارية للتطبيق.\n\nسيتم فتح الإعدادات الآن، يرجى التأكد من اختيار الخيار المناسب.",
@@ -139,11 +155,23 @@ class NotificationService {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text("لا تسألني مرة أخرى", style: TextStyle(fontFamily: AppConsts.cairo, color: Colors.grey)),
+              child: const Text(
+                "لا تسألني مرة أخرى",
+                style: TextStyle(
+                  fontFamily: AppConsts.cairo,
+                  color: Colors.grey,
+                ),
+              ),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text("فتح الإعدادات", style: TextStyle(fontFamily: AppConsts.cairo, fontWeight: FontWeight.bold)),
+              child: const Text(
+                "فتح الإعدادات",
+                style: TextStyle(
+                  fontFamily: AppConsts.cairo,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         ),
@@ -172,7 +200,8 @@ class NotificationService {
         'month': now.month,
         'day': now.day,
         'hour': now.hour,
-        'minute': now.minute, // Triggers immediately if time is exact or slightly past
+        'minute': now
+            .minute, // Triggers immediately if time is exact or slightly past
         'title': title,
         'body': body,
         'soundName': soundName,
@@ -205,7 +234,9 @@ class NotificationService {
     try {
       final now = DateTime.now();
       final tomorrow = now.add(const Duration(days: 1));
-      final tomorrowTimes = await PrayerService.getPrayerTimesForDateStatic(tomorrow);
+      final tomorrowTimes = await PrayerService.getPrayerTimesForDateStatic(
+        tomorrow,
+      );
 
       await updateWidgetData({
         'fajr_epoch': times.fajr.millisecondsSinceEpoch,
@@ -213,7 +244,9 @@ class NotificationService {
         'asr_epoch': times.asr.millisecondsSinceEpoch,
         'maghrib_epoch': times.maghrib.millisecondsSinceEpoch,
         'isha_epoch': times.isha.millisecondsSinceEpoch,
-        'next_fajr_epoch': tomorrowTimes?.fajr.millisecondsSinceEpoch ?? (times.isha.millisecondsSinceEpoch + 8 * 3600000),
+        'next_fajr_epoch':
+            tomorrowTimes?.fajr.millisecondsSinceEpoch ??
+            (times.isha.millisecondsSinceEpoch + 8 * 3600000),
       });
 
       // Store today's Fajr epoch in SharedPreferences so PrayerFocusOverlay.kt can
@@ -232,9 +265,11 @@ class NotificationService {
       // ── CRITICAL: Clear all old alarms ──────────────────────────────────────
       await cancelAll(includeWird: true, excludeIntervalAlarms: !isUserAction);
 
-      await Future.delayed(const Duration(milliseconds: 300)); 
+      await Future.delayed(const Duration(milliseconds: 300));
 
-      debugPrint("Native: Preparing Batch Schedule... (isUserAction: $isUserAction)");
+      debugPrint(
+        "Native: Preparing Batch Schedule... (isUserAction: $isUserAction)",
+      );
       final now = DateTime.now();
       final prefs = await SharedPreferences.getInstance();
 
@@ -252,11 +287,15 @@ class NotificationService {
 
       // --- Interval Alarms (ONLY on User Action) ---
       if (isUserAction) {
-        if (prefs.getBool('notif_takbeerat') ?? false) await scheduleTakbeerat(times);
-        if (prefs.getBool('eid_fitr_takbeer') ?? false) await scheduleEidFitrTakbeerat(times);
+        if (prefs.getBool('notif_takbeerat') ?? false)
+          await scheduleTakbeerat(times);
+        if (prefs.getBool('eid_fitr_takbeer') ?? false)
+          await scheduleEidFitrTakbeerat(times);
         if (prefs.getBool('salawat_reminder_enabled') ?? false) {
           final intervalMins = prefs.getInt('salawat_reminder_minutes') ?? 60;
-          final daysList = prefs.getStringList('salawat_reminder_days') ?? [DateTime.friday.toString()];
+          final daysList =
+              prefs.getStringList('salawat_reminder_days') ??
+              [DateTime.friday.toString()];
           final selectedDays = daysList.map((e) => int.parse(e)).toList();
           if (intervalMins > 0 && selectedDays.isNotEmpty) {
             await scheduleSalawatReminders(intervalMins, selectedDays);
@@ -271,20 +310,25 @@ class NotificationService {
 
       // --- Seasonal & Special (Check Current & Next Day) ---
       final hijriOffset = PrayerService().hijriOffset;
-      
+
       for (int i = 0; i < 3; i++) {
         final targetDate = now.add(Duration(days: i));
-        final targetHijri = PrayerService.getHijriWithOffset(hijriOffset, targetDate);
+        final targetHijri = PrayerService.getHijriWithOffset(
+          hijriOffset,
+          targetDate,
+        );
         final int hMonth = targetHijri.hMonth;
         final int hDay = targetHijri.hDay;
-        
-        final dayTimes = await PrayerService.getPrayerTimesForDateStatic(targetDate);
+
+        final dayTimes = await PrayerService.getPrayerTimesForDateStatic(
+          targetDate,
+        );
         if (dayTimes == null) continue;
 
         // Ramadan / Fasting Iftar/Suhoor
         final bool isIftarOn = prefs.getBool('iftar_alarm') ?? false;
         final bool isSuhoorOn = prefs.getBool('suhoor_alarm') ?? false;
-        
+
         if (isIftarOn) {
           final mode = prefs.getString('iftar_mode') ?? 'ramadan';
           bool shouldShow = false;
@@ -292,15 +336,23 @@ class NotificationService {
             shouldShow = true;
           } else if (mode == 'all_year') {
             final days = prefs.getInt('iftar_all_year_days') ?? 0x7F;
-            if ((days & (1 << (targetDate.weekday - 1))) != 0) shouldShow = true;
+            if ((days & (1 << (targetDate.weekday - 1))) != 0)
+              shouldShow = true;
           }
           if (shouldShow) {
             final mins = prefs.getInt('iftar_minutes_before') ?? 30;
             final time = dayTimes.maghrib.subtract(Duration(minutes: mins));
-            if (time.isAfter(now)) await scheduleRamadanAlert(400 + i, 'اقتراب الإفطار', 'باقي $mins دقيقة على المغرب', time, customSoundName: 'pre_iftar');
+            if (time.isAfter(now))
+              await scheduleRamadanAlert(
+                400 + i,
+                'اقتراب الإفطار',
+                'باقي $mins دقيقة على المغرب',
+                time,
+                customSoundName: 'pre_iftar',
+              );
           }
         }
-        
+
         if (isSuhoorOn) {
           final mode = prefs.getString('suhoor_mode') ?? 'ramadan';
           bool shouldShow = false;
@@ -308,12 +360,20 @@ class NotificationService {
             shouldShow = true;
           } else if (mode == 'all_year') {
             final days = prefs.getInt('suhoor_all_year_days') ?? 0x7F;
-            if ((days & (1 << (targetDate.weekday - 1))) != 0) shouldShow = true;
+            if ((days & (1 << (targetDate.weekday - 1))) != 0)
+              shouldShow = true;
           }
           if (shouldShow) {
             final mins = prefs.getInt('suhoor_minutes_before') ?? 60;
             final time = dayTimes.fajr.subtract(Duration(minutes: mins));
-            if (time.isAfter(now)) await scheduleRamadanAlert(410 + i, 'وقت السحور', 'باقي $mins دقيقة على الفجر', time, customSoundName: 'time_suhoor');
+            if (time.isAfter(now))
+              await scheduleRamadanAlert(
+                410 + i,
+                'وقت السحور',
+                'باقي $mins دقيقة على الفجر',
+                time,
+                customSoundName: 'time_suhoor',
+              );
           }
         }
 
@@ -321,18 +381,43 @@ class NotificationService {
         if (prefs.getBool('eid_fitr_alarm') ?? false) {
           if (hMonth == 9 && (hDay == 29 || hDay == 30)) {
             final alertTime = dayTimes.maghrib;
-            if (alertTime.isAfter(now)) await scheduleEidAlert(2200 + i, 'تكبيرات ليلة العيد', 'الله أكبر الله أكبر...', alertTime, sound: 'eid_takbeerat');
+            if (alertTime.isAfter(now))
+              await scheduleEidAlert(
+                2200 + i,
+                'تكبيرات ليلة العيد',
+                'الله أكبر الله أكبر...',
+                alertTime,
+                sound: 'eid_takbeerat',
+              );
           }
           if (hMonth == 10 && hDay == 1) {
             final eidHour = prefs.getInt('eid_fitr_hour');
             final eidMin = prefs.getInt('eid_fitr_minute');
             DateTime eidTime;
             if (eidHour != null && eidMin != null) {
-              eidTime = DateTime(targetDate.year, targetDate.month, targetDate.day, eidHour, eidMin);
+              eidTime = DateTime(
+                targetDate.year,
+                targetDate.month,
+                targetDate.day,
+                eidHour,
+                eidMin,
+              );
             } else {
-              eidTime = dayTimes.sunrise.add(Duration(minutes: prefs.getInt('eid_prayer_minutes_after_sunrise') ?? 20));
+              eidTime = dayTimes.sunrise.add(
+                Duration(
+                  minutes:
+                      prefs.getInt('eid_prayer_minutes_after_sunrise') ?? 20,
+                ),
+              );
             }
-            if (eidTime.isAfter(now)) await scheduleEidAlert(2100 + i, 'عيد الفطر - صلاة العيد', 'كل عام وأنتم بخير', eidTime, sound: 'eid_takbeerat');
+            if (eidTime.isAfter(now))
+              await scheduleEidAlert(
+                2100 + i,
+                'عيد الفطر - صلاة العيد',
+                'كل عام وأنتم بخير',
+                eidTime,
+                sound: 'eid_takbeerat',
+              );
           }
         }
         if (prefs.getBool('notif_eid_dhulhijjah') ?? false) {
@@ -341,148 +426,312 @@ class NotificationService {
             final eidMin = prefs.getInt('eid_adha_minute');
             DateTime eidTime;
             if (eidHour != null && eidMin != null) {
-              eidTime = DateTime(targetDate.year, targetDate.month, targetDate.day, eidHour, eidMin);
+              eidTime = DateTime(
+                targetDate.year,
+                targetDate.month,
+                targetDate.day,
+                eidHour,
+                eidMin,
+              );
             } else {
-              eidTime = dayTimes.sunrise.add(Duration(minutes: prefs.getInt('eid_adha_minutes_after_sunrise') ?? 20));
+              eidTime = dayTimes.sunrise.add(
+                Duration(
+                  minutes: prefs.getInt('eid_adha_minutes_after_sunrise') ?? 20,
+                ),
+              );
             }
-            if (eidTime.isAfter(now)) await scheduleEidAlert(2150 + i, 'عيد الأضحى - صلاة العيد', 'كل عام وأنتم بخير', eidTime, sound: 'eid_takbeerat');
+            if (eidTime.isAfter(now))
+              await scheduleEidAlert(
+                2150 + i,
+                'عيد الأضحى - صلاة العيد',
+                'كل عام وأنتم بخير',
+                eidTime,
+                sound: 'eid_takbeerat',
+              );
           }
         }
-        if ((prefs.getBool('notif_arafah') ?? false) && hMonth == 12 && hDay == 9) {
+        if ((prefs.getBool('notif_arafah') ?? false) &&
+            hMonth == 12 &&
+            hDay == 9) {
           await scheduleArafahForDate(dayTimes, now, i);
         }
 
         // Jumua
-        if (targetDate.weekday == DateTime.friday && (prefs.getBool('notif_jumua') ?? false)) {
+        if (targetDate.weekday == DateTime.friday &&
+            (prefs.getBool('notif_jumua') ?? false)) {
           final minsBefore = prefs.getInt('jumua_minutes_before') ?? 60;
-          final jumuaTime = dayTimes.dhuhr.subtract(Duration(minutes: minsBefore));
+          final jumuaTime = dayTimes.dhuhr.subtract(
+            Duration(minutes: minsBefore),
+          );
           if (jumuaTime.isAfter(now)) {
-            await _scheduleNative(2300 + i, 'صلاة الجمعة', 'باقي $minsBefore دقيقة على صلاة الجمعة', jumuaTime.hour, jumuaTime.minute, 'ibad_al_rahmann_tone', payload: 'jumuah', year: jumuaTime.year, month: jumuaTime.month, day: jumuaTime.day, customSoundName: 'ibad_al_rahmann_tone');
+            await _scheduleNative(
+              2300 + i,
+              'صلاة الجمعة',
+              'باقي $minsBefore دقيقة على صلاة الجمعة',
+              jumuaTime.hour,
+              jumuaTime.minute,
+              'ibad_al_rahmann_tone',
+              payload: 'jumuah',
+              year: jumuaTime.year,
+              month: jumuaTime.month,
+              day: jumuaTime.day,
+              customSoundName: 'ibad_al_rahmann_tone',
+            );
           }
         }
 
         // Kahf & Friday Night Salawat (Thursday Night)
-        if (targetDate.weekday == DateTime.thursday && (prefs.getBool('notif_kahf_salawat') ?? true)) {
-          final kahfTime = dayTimes.isha.add(const Duration(minutes: 60)); 
+        if (targetDate.weekday == DateTime.thursday &&
+            (prefs.getBool('notif_kahf_salawat') ?? true)) {
+          final kahfTime = dayTimes.isha.add(const Duration(minutes: 60));
           if (kahfTime.isAfter(now)) {
-            await _scheduleNative(2350 + i, 'ليلة الجمعة', 'لا تنس قراءة سورة الكهف والإكثار من الصلاة على النبي ﷺ', kahfTime.hour, kahfTime.minute, 'saly_3ala_mo7amad', payload: 'kahf', year: kahfTime.year, month: kahfTime.month, day: kahfTime.day, customSoundName: 'saly_3ala_mo7amad');
+            await _scheduleNative(
+              2350 + i,
+              'ليلة الجمعة',
+              'لا تنس قراءة سورة الكهف والإكثار من الصلاة على النبي ﷺ',
+              kahfTime.hour,
+              kahfTime.minute,
+              'saly_3ala_mo7amad',
+              payload: 'kahf',
+              year: kahfTime.year,
+              month: kahfTime.month,
+              day: kahfTime.day,
+              customSoundName: 'saly_3ala_mo7amad',
+            );
           }
         }
 
         // Kahf & Friday Salawat (Friday Morning 09:00 AM)
-        if (targetDate.weekday == DateTime.friday && (prefs.getBool('notif_kahf_salawat') ?? true)) {
-          final fridayMorningTime = DateTime(targetDate.year, targetDate.month, targetDate.day, 9, 0);
+        if (targetDate.weekday == DateTime.friday &&
+            (prefs.getBool('notif_kahf_salawat') ?? true)) {
+          final fridayMorningTime = DateTime(
+            targetDate.year,
+            targetDate.month,
+            targetDate.day,
+            9,
+            0,
+          );
           if (fridayMorningTime.isAfter(now)) {
-            await _scheduleNative(2360 + i, 'يوم الجمعة', 'لا تنس قراءة سورة الكهف والإكثار من الصلاة على النبي ﷺ', 9, 0, 'saly_3ala_mo7amad', payload: 'kahf', year: fridayMorningTime.year, month: fridayMorningTime.month, day: fridayMorningTime.day, customSoundName: 'saly_3ala_mo7amad');
+            await _scheduleNative(
+              2360 + i,
+              'يوم الجمعة',
+              'لا تنس قراءة سورة الكهف والإكثار من الصلاة على النبي ﷺ',
+              9,
+              0,
+              'saly_3ala_mo7amad',
+              payload: 'kahf',
+              year: fridayMorningTime.year,
+              month: fridayMorningTime.month,
+              day: fridayMorningTime.day,
+              customSoundName: 'saly_3ala_mo7amad',
+            );
           }
         }
 
         // Qadaa Reminders
         if (prefs.getBool('qadaa_daily_prayer_reminder') ?? false) {
-           final timeStr = prefs.getString('qadaa_daily_prayer_time') ?? '20:00';
-           final parts = timeStr.split(':');
-           final qadaaTime = DateTime(targetDate.year, targetDate.month, targetDate.day, int.parse(parts[0]), int.parse(parts[1]));
-           if (qadaaTime.isAfter(now)) {
-             await _scheduleNative(2700 + i, 'تذكير القضاء', 'لا تنس إضافة الصلوات التي قضيتها اليوم', qadaaTime.hour, qadaaTime.minute, 'default', year: qadaaTime.year, month: qadaaTime.month, day: qadaaTime.day, payload: 'qadaa');
-           }
+          final timeStr = prefs.getString('qadaa_daily_prayer_time') ?? '20:00';
+          final parts = timeStr.split(':');
+          final qadaaTime = DateTime(
+            targetDate.year,
+            targetDate.month,
+            targetDate.day,
+            int.parse(parts[0]),
+            int.parse(parts[1]),
+          );
+          if (qadaaTime.isAfter(now)) {
+            await _scheduleNative(
+              2700 + i,
+              'تذكير القضاء',
+              'لا تنس إضافة الصلوات التي قضيتها اليوم',
+              qadaaTime.hour,
+              qadaaTime.minute,
+              'default',
+              year: qadaaTime.year,
+              month: qadaaTime.month,
+              day: qadaaTime.day,
+              payload: 'qadaa',
+            );
+          }
         }
-        
-        final qadaaFastingFreq = prefs.getString('qadaa_fasting_reminder_freq') ?? 'إيقاف';
+
+        final qadaaFastingFreq =
+            prefs.getString('qadaa_fasting_reminder_freq') ?? 'إيقاف';
         if (qadaaFastingFreq != 'إيقاف') {
-           bool shouldRemind = false;
-           if (qadaaFastingFreq == 'يومياً') {
-             shouldRemind = true;
-           } else if (qadaaFastingFreq == 'أسبوعياً') {
-             final fastDay = prefs.getInt('qadaa_fasting_reminder_day') ?? 7;
-             // Remind the night before (Sunday=7, Monday=1...)
-             if (targetDate.weekday == (fastDay == 1 ? 7 : fastDay - 1)) shouldRemind = true;
-           } else if (qadaaFastingFreq == 'شهرياً') {
-             final fastDay = prefs.getInt('qadaa_fasting_reminder_day') ?? 1;
-             // Remind the night before in Hijri
-             if (hDay == (fastDay == 1 ? 29 : fastDay - 1)) shouldRemind = true; 
-           }
-           
-           if (shouldRemind) {
-             final fastingTime = dayTimes.isha.add(const Duration(minutes: 60)); // Remind 1 hour after Isha
-             if (fastingTime.isAfter(now)) {
-               await _scheduleNative(2750 + i, 'تنبيه صيام القضاء', 'تذكير بصيام القضاء غداً', fastingTime.hour, fastingTime.minute, 'default', year: fastingTime.year, month: fastingTime.month, day: fastingTime.day, payload: 'qadaa');
-             }
-           }
+          bool shouldRemind = false;
+          if (qadaaFastingFreq == 'يومياً') {
+            shouldRemind = true;
+          } else if (qadaaFastingFreq == 'أسبوعياً') {
+            final fastDay = prefs.getInt('qadaa_fasting_reminder_day') ?? 7;
+            // Remind the night before (Sunday=7, Monday=1...)
+            if (targetDate.weekday == (fastDay == 1 ? 7 : fastDay - 1))
+              shouldRemind = true;
+          } else if (qadaaFastingFreq == 'شهرياً') {
+            final fastDay = prefs.getInt('qadaa_fasting_reminder_day') ?? 1;
+            // Remind the night before in Hijri
+            if (hDay == (fastDay == 1 ? 29 : fastDay - 1)) shouldRemind = true;
+          }
+
+          if (shouldRemind) {
+            final fastingTime = dayTimes.isha.add(
+              const Duration(minutes: 60),
+            ); // Remind 1 hour after Isha
+            if (fastingTime.isAfter(now)) {
+              await _scheduleNative(
+                2750 + i,
+                'تنبيه صيام القضاء',
+                'تذكير بصيام القضاء غداً',
+                fastingTime.hour,
+                fastingTime.minute,
+                'default',
+                year: fastingTime.year,
+                month: fastingTime.month,
+                day: fastingTime.day,
+                payload: 'qadaa',
+              );
+            }
+          }
         }
 
         // Fasting Reminders (Scheduled the night before)
         // Use date-based IDs (day of week 1-7) to prevent duplicate scheduling
         // when scheduleAll is called multiple times rapidly.
-        final dayId = targetDate.weekday; // 1=Mon..7=Sun, always unique per weekday
+        final dayId =
+            targetDate.weekday; // 1=Mon..7=Sun, always unique per weekday
         // Monday Fasting (Reminder on Sunday night)
-        if (targetDate.weekday == DateTime.sunday && (prefs.getBool('notif_fasting_monday') ?? true)) {
+        if (targetDate.weekday == DateTime.sunday &&
+            (prefs.getBool('notif_fasting_monday') ?? true)) {
           final reminderTime = dayTimes.isha.add(const Duration(minutes: 60));
           if (reminderTime.isAfter(now)) {
-            await _scheduleNative(2400 + dayId, 'غداً الإثنين,, صوم يقربك لله 🤲', 'اغتنم سنة الحبيب ﷺ.. فالصيام طريق للبركة والنور 🥰', reminderTime.hour, reminderTime.minute, 'default', payload: 'fasting', year: reminderTime.year, month: reminderTime.month, day: reminderTime.day);
+            await _scheduleNative(
+              2400 + dayId,
+              'غداً الإثنين,, صوم يقربك لله 🤲',
+              'اغتنم سنة الحبيب ﷺ.. فالصيام طريق للبركة والنور 🥰',
+              reminderTime.hour,
+              reminderTime.minute,
+              'default',
+              payload: 'fasting',
+              year: reminderTime.year,
+              month: reminderTime.month,
+              day: reminderTime.day,
+            );
           }
         }
         // Thursday Fasting (Reminder on Wednesday night)
-        if (targetDate.weekday == DateTime.wednesday && (prefs.getBool('notif_fasting_thursday') ?? true)) {
+        if (targetDate.weekday == DateTime.wednesday &&
+            (prefs.getBool('notif_fasting_thursday') ?? true)) {
           final reminderTime = dayTimes.isha.add(const Duration(minutes: 60));
           if (reminderTime.isAfter(now)) {
-            await _scheduleNative(2450 + dayId, 'غداً الخميس,, صوم يقربك لله 🤲', 'اغتنم سنة الحبيب ﷺ.. فالصيام طريق للبركة والنور 🥰', reminderTime.hour, reminderTime.minute, 'default', payload: 'fasting', year: reminderTime.year, month: reminderTime.month, day: reminderTime.day);
+            await _scheduleNative(
+              2450 + dayId,
+              'غداً الخميس,, صوم يقربك لله 🤲',
+              'اغتنم سنة الحبيب ﷺ.. فالصيام طريق للبركة والنور 🥰',
+              reminderTime.hour,
+              reminderTime.minute,
+              'default',
+              payload: 'fasting',
+              year: reminderTime.year,
+              month: reminderTime.month,
+              day: reminderTime.day,
+            );
           }
         }
         // White Days Fasting (13, 14, 15 of Hijri month - Remind on 12, 13, 14 night)
-        if ((hDay == 12 || hDay == 13 || hDay == 14) && (prefs.getBool('notif_fasting_white_days') ?? true)) {
+        if ((hDay == 12 || hDay == 13 || hDay == 14) &&
+            (prefs.getBool('notif_fasting_white_days') ?? true)) {
           final reminderTime = dayTimes.isha.add(const Duration(minutes: 60));
           if (reminderTime.isAfter(now)) {
-            await _scheduleNative(2500 + dayId, 'غداً الأيام البيض,, صوم يقربك لله 🤲', 'اغتنم سنة الحبيب ﷺ.. فالصيام طريق للبركة والنور 🥰', reminderTime.hour, reminderTime.minute, 'default', payload: 'fasting', year: reminderTime.year, month: reminderTime.month, day: reminderTime.day);
+            await _scheduleNative(
+              2500 + dayId,
+              'غداً الأيام البيض,, صوم يقربك لله 🤲',
+              'اغتنم سنة الحبيب ﷺ.. فالصيام طريق للبركة والنور 🥰',
+              reminderTime.hour,
+              reminderTime.minute,
+              'default',
+              payload: 'fasting',
+              year: reminderTime.year,
+              month: reminderTime.month,
+              day: reminderTime.day,
+            );
           }
         }
 
         // Qiyam — Last Third of Night
         final qiyamMode = prefs.getString('adhan_mode_Last_third') ?? 'none';
         if (qiyamMode != 'none') {
-          final nextDayTimes = await PrayerService.getPrayerTimesForDateStatic(targetDate.add(const Duration(days: 1)));
+          final nextDayTimes = await PrayerService.getPrayerTimesForDateStatic(
+            targetDate.add(const Duration(days: 1)),
+          );
           if (nextDayTimes != null) {
-            final nightDuration = nextDayTimes.fajr.difference(dayTimes.maghrib);
-            final lastThird   = nextDayTimes.fajr.subtract(Duration(seconds: (nightDuration.inSeconds / 3).round()));
-            final firstThird  = dayTimes.maghrib.add(Duration(seconds: (nightDuration.inSeconds / 3).round()));
-            final midNight    = dayTimes.maghrib.add(Duration(seconds: (nightDuration.inSeconds / 2).round()));
+            final nightDuration = nextDayTimes.fajr.difference(
+              dayTimes.maghrib,
+            );
+            final lastThird = nextDayTimes.fajr.subtract(
+              Duration(seconds: (nightDuration.inSeconds / 3).round()),
+            );
+            final firstThird = dayTimes.maghrib.add(
+              Duration(seconds: (nightDuration.inSeconds / 3).round()),
+            );
+            final midNight = dayTimes.maghrib.add(
+              Duration(seconds: (nightDuration.inSeconds / 2).round()),
+            );
 
             // Last third (Qiyam) — Use date-based ID to prevent duplicate from rapid calls
             if (lastThird.isAfter(now)) {
               await _scheduleNative(
-                2550 + targetDate.weekday, 'قيام الليل', 'حان وقت ثلث الليل الأخير',
-                lastThird.hour, lastThird.minute,
+                2550 + targetDate.weekday,
+                'قيام الليل',
+                'حان وقت ثلث الليل الأخير',
+                lastThird.hour,
+                lastThird.minute,
                 qiyamMode == 'silent_notif' ? 'silent_notif' : 'night_last',
                 customSoundName: 'night_last',
-                year: lastThird.year, month: lastThird.month, day: lastThird.day,
+                year: lastThird.year,
+                month: lastThird.month,
+                day: lastThird.day,
               );
             }
 
             // First third
-            final firstThirdMode = prefs.getString('adhan_mode_First_third') ?? 'none';
+            final firstThirdMode =
+                prefs.getString('adhan_mode_First_third') ?? 'none';
             if (firstThirdMode != 'none' && firstThird.isAfter(now)) {
               await _scheduleNative(
-                2600 + i, 'ثلث الليل الأول', 'دخل ثلث الليل الأول',
-                firstThird.hour, firstThird.minute,
-                firstThirdMode == 'silent_notif' ? 'silent_notif' : 'night_first',
+                2600 + i,
+                'ثلث الليل الأول',
+                'دخل ثلث الليل الأول',
+                firstThird.hour,
+                firstThird.minute,
+                firstThirdMode == 'silent_notif'
+                    ? 'silent_notif'
+                    : 'night_first',
                 customSoundName: 'night_first',
-                year: firstThird.year, month: firstThird.month, day: firstThird.day,
+                year: firstThird.year,
+                month: firstThird.month,
+                day: firstThird.day,
               );
             }
 
             // Midnight
-            final midnightMode = prefs.getString('adhan_mode_Midnight') ?? 'none';
+            final midnightMode =
+                prefs.getString('adhan_mode_Midnight') ?? 'none';
             if (midnightMode != 'none' && midNight.isAfter(now)) {
               await _scheduleNative(
-                2650 + i, 'منتصف الليل', 'حان منتصف الليل',
-                midNight.hour, midNight.minute,
+                2650 + i,
+                'منتصف الليل',
+                'حان منتصف الليل',
+                midNight.hour,
+                midNight.minute,
                 midnightMode == 'silent_notif' ? 'silent_notif' : 'night_mid',
                 customSoundName: 'night_mid',
-                year: midNight.year, month: midNight.month, day: midNight.day,
+                year: midNight.year,
+                month: midNight.month,
+                day: midNight.day,
               );
             }
           }
         }
-        
+
         // --- Core Prayers, Sunrise, and Duha are delegated entirely to Native Prayer Engine ---
       }
 
@@ -494,20 +743,25 @@ class NotificationService {
       } catch (_) {}
 
       if (_batchAlarms.isNotEmpty) {
-        await _platform.invokeMethod('scheduleAlarms', {'alarms': _batchAlarms});
+        await _platform.invokeMethod('scheduleAlarms', {
+          'alarms': _batchAlarms,
+        });
         _batchAlarms.clear();
       }
 
       // Start/Sync the native foreground service to ensure persistent notification & widgets are updated
       await _platform.invokeMethod('updatePrayerNotification', {});
-      } catch (e) {
+    } catch (e) {
       debugPrint("Error in scheduleAll: $e");
     } finally {
       _isBatching = false;
     }
   }
 
-  static Future<void> cancelAll({bool includeWird = false, bool excludeIntervalAlarms = false}) async {
+  static Future<void> cancelAll({
+    bool includeWird = false,
+    bool excludeIntervalAlarms = false,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     final activeIdsStrs = prefs.getStringList(_activeAlarmsKey) ?? [];
 
@@ -515,17 +769,21 @@ class NotificationService {
     for (String idStr in activeIdsStrs) {
       final id = int.tryParse(idStr);
       if (id == null) continue;
-      
+
       // Determine if it's a Wird ID
       bool isWirdId = (id >= 600 && id < 700) || (id >= 6000 && id < 7000);
       if (!includeWird && isWirdId) continue;
 
       // Determine if it's an interval alarm ID
-      bool isIntervalAlarm = (id >= 8000 && id < 8500) || (id >= 9000 && id < 9200);
+      bool isIntervalAlarm =
+          (id >= 8000 && id < 8500) || (id >= 9000 && id < 9200);
       if (excludeIntervalAlarms && isIntervalAlarm) continue;
 
       // Prayer IDs are intentionally excluded in Dart side
-      bool isPrayerId = (id >= 100 && id <= 114) || (id >= 3000 && id <= 3014) || (id >= 5000 && id <= 5014);
+      bool isPrayerId =
+          (id >= 100 && id <= 114) ||
+          (id >= 3000 && id <= 3014) ||
+          (id >= 5000 && id <= 5014);
       if (isPrayerId) continue;
 
       idsToCancel.add(id);
@@ -544,10 +802,14 @@ class NotificationService {
   }
 
   static Future<void> cancelKhatmaNotifications(String id) async {
-    final cleanId = id.startsWith('khatma_') ? id.replaceFirst('khatma_', '') : id;
+    final cleanId = id.startsWith('khatma_')
+        ? id.replaceFirst('khatma_', '')
+        : id;
     int idBase = 100000 + (_javaStringHashCode(cleanId) % 40000) * 10;
     List<int> ids = List.generate(80, (i) => idBase + i);
-    ids.addAll(List.generate(80, (i) => (100000 + (id.hashCode.abs() % 40000) * 10) + i)); // Legacy cancel
+    ids.addAll(
+      List.generate(80, (i) => (100000 + (id.hashCode.abs() % 40000) * 10) + i),
+    ); // Legacy cancel
     try {
       await _platform.invokeMethod('cancelAlarms', {'ids': ids});
       await _removeActiveAlarmIds(ids);
@@ -617,25 +879,42 @@ class NotificationService {
     return h.abs();
   }
 
-  static Future<void> _scheduleKhatmaNotifications(KhatmaModel khatma, SharedPreferences prefs) async {
-    final cleanId = khatma.id.startsWith('khatma_') ? khatma.id.replaceFirst('khatma_', '') : khatma.id;
+  static Future<void> _scheduleKhatmaNotifications(
+    KhatmaModel khatma,
+    SharedPreferences prefs,
+  ) async {
+    final cleanId = khatma.id.startsWith('khatma_')
+        ? khatma.id.replaceFirst('khatma_', '')
+        : khatma.id;
     int idBase = 100000 + (_javaStringHashCode(cleanId) % 40000) * 10;
     final now = DateTime.now();
 
     // Cancel existing khatma alarms first to avoid duplicates when rescheduleWird is called multiple times
     final cancelIds = <int>[];
     cancelIds.addAll(List.generate(80, (i) => idBase + i));
-    cancelIds.addAll(List.generate(80, (i) => (100000 + (khatma.id.hashCode.abs() % 40000) * 10) + i));
-    try { await _platform.invokeMethod('cancelAlarms', {'ids': cancelIds}); } catch (_) {}
+    cancelIds.addAll(
+      List.generate(
+        80,
+        (i) => (100000 + (khatma.id.hashCode.abs() % 40000) * 10) + i,
+      ),
+    );
+    try {
+      await _platform.invokeMethod('cancelAlarms', {'ids': cancelIds});
+    } catch (_) {}
 
     // حساب ما إذا كان المستخدم متأخراً عن الورد
-    final startDay = DateTime(khatma.startDate.year, khatma.startDate.month, khatma.startDate.day);
+    final startDay = DateTime(
+      khatma.startDate.year,
+      khatma.startDate.month,
+      khatma.startDate.day,
+    );
     final today = DateTime(now.year, now.month, now.day);
     final daysSinceStart = today.difference(startDay).inDays;
 
     int passedPeriods;
     if (khatma.notificationType == 'prayer') {
-      final cp = PrayerService().getPrayerTimes()?.currentPrayer() ?? Prayer.none;
+      final cp =
+          PrayerService().getPrayerTimes()?.currentPrayer() ?? Prayer.none;
       int prayerOffset = 0;
       if (cp == Prayer.dhuhr) {
         prayerOffset = 1;
@@ -646,13 +925,18 @@ class NotificationService {
       } else if (cp == Prayer.isha) {
         prayerOffset = 4;
       }
-      passedPeriods = (daysSinceStart * 5 + prayerOffset - khatma.startPrayerOffset);
+      passedPeriods =
+          (daysSinceStart * 5 + prayerOffset - khatma.startPrayerOffset);
     } else {
       passedPeriods = daysSinceStart;
     }
     if (passedPeriods < 0) passedPeriods = 0;
     int delayedWirds = passedPeriods - khatma.currentWirdIndex;
-    String bodyPrefix = delayedWirds > 0 ? "⚠️ أنت متأخر بمقدار $delayedWirds ورد .. " : (delayedWirds < 0 ? "🌟 أنت متقدم بمقدار ${-delayedWirds} ورد .. " : "");
+    String bodyPrefix = delayedWirds > 0
+        ? "⚠️ أنت متأخر بمقدار $delayedWirds ورد .. "
+        : (delayedWirds < 0
+              ? "🌟 أنت متقدم بمقدار ${-delayedWirds} ورد .. "
+              : "");
 
     // Encode current wird page range into the payload for precise deep-link navigation
     final wirdIdx = khatma.currentWirdIndex.clamp(0, khatma.wirds.length - 1);
@@ -665,24 +949,45 @@ class NotificationService {
     if (khatma.notificationType == 'daily') {
       int hour = 22; // Default 10 PM
       int minute = 0;
-      
+
       if (khatma.dailyTime != null && khatma.dailyTime!.contains(":")) {
         final parts = khatma.dailyTime!.split(":");
         hour = int.tryParse(parts[0]) ?? 22;
         minute = int.tryParse(parts[1]) ?? 0;
       }
 
-      for (int i = 0; i < 3; i++) { // Schedule for next 3 days
-         final t = DateTime(now.year, now.month, now.day, hour, minute).add(Duration(days: i));
-          if (t.isAfter(now)) {
-           final scheduledId = idBase + i;
-           await _scheduleNative(scheduledId, "ورد ${khatma.name}", "$bodyPrefixحان وقت وردك اليومي$pageInfo", t.hour, t.minute, "ibad_al_rahmann_tone", year: t.year, month: t.month, day: t.day, payload: payload, customSoundName: "ibad_al_rahmann_tone");
-          }
+      for (int i = 0; i < 3; i++) {
+        // Schedule for next 3 days
+        final t = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          hour,
+          minute,
+        ).add(Duration(days: i));
+        if (t.isAfter(now)) {
+          final scheduledId = idBase + i;
+          await _scheduleNative(
+            scheduledId,
+            "ورد ${khatma.name}",
+            "$bodyPrefixحان وقت وردك اليومي$pageInfo",
+            t.hour,
+            t.minute,
+            "ibad_al_rahmann_tone",
+            year: t.year,
+            month: t.month,
+            day: t.day,
+            payload: payload,
+            customSoundName: "ibad_al_rahmann_tone",
+          );
+        }
       }
     } else if (khatma.notificationType == 'prayer') {
       for (int i = 0; i < 3; i++) {
         final targetDate = now.add(Duration(days: i));
-        final dayTimes = await PrayerService.getPrayerTimesForDateStatic(targetDate);
+        final dayTimes = await PrayerService.getPrayerTimesForDateStatic(
+          targetDate,
+        );
         if (dayTimes == null) continue;
 
         final prayers = {
@@ -690,17 +995,31 @@ class NotificationService {
           'الظهر': dayTimes.dhuhr,
           'العصر': dayTimes.asr,
           'المغرب': dayTimes.maghrib,
-          'العشاء': dayTimes.isha
+          'العشاء': dayTimes.isha,
         };
 
         int prayerIdx = 0;
         for (final entry in prayers.entries) {
           final name = entry.key;
           final time = entry.value;
-          final t = time.add(Duration(minutes: khatma.notificationOffsetMinutes));
+          final t = time.add(
+            Duration(minutes: khatma.notificationOffsetMinutes),
+          );
           if (t.isAfter(now)) {
             final scheduledId = idBase + (i * 10) + prayerIdx;
-            await _scheduleNative(scheduledId, "ورد ${khatma.name}", "$bodyPrefixحان وقت وردك بعد صلاة $name$pageInfo", t.hour, t.minute, "ibad_al_rahmann_tone", year: t.year, month: t.month, day: t.day, payload: payload, customSoundName: "ibad_al_rahmann_tone");
+            await _scheduleNative(
+              scheduledId,
+              "ورد ${khatma.name}",
+              "$bodyPrefixحان وقت وردك بعد صلاة $name$pageInfo",
+              t.hour,
+              t.minute,
+              "ibad_al_rahmann_tone",
+              year: t.year,
+              month: t.month,
+              day: t.day,
+              payload: payload,
+              customSoundName: "ibad_al_rahmann_tone",
+            );
           }
           prayerIdx++;
         }
@@ -711,7 +1030,8 @@ class NotificationService {
   static Future<void> scheduleTakbeerat(PrayerTimes times) async {
     final prefs = await SharedPreferences.getInstance();
     int intervalMins = prefs.getInt('takbeerat_interval_hours') ?? 60;
-    if (intervalMins < 2) intervalMins = 2; // enforce minimum to prevent audio overlap
+    if (intervalMins < 2)
+      intervalMins = 2; // enforce minimum to prevent audio overlap
     final offsetMins = prefs.getInt('takbeerat_offset') ?? 0;
     final off = PrayerService().hijriOffset;
     final hijriNow = PrayerService.getHijriWithOffset(off);
@@ -719,27 +1039,58 @@ class NotificationService {
     if (hijriNow.hMonth == 12 && hijriNow.hDay >= 1 && hijriNow.hDay <= 10) {
       final DateTime now = DateTime.now();
       DateTime slotTime = now.add(const Duration(seconds: 2));
-      if (offsetMins > 0) slotTime = slotTime.add(Duration(minutes: offsetMins));
+      if (offsetMins > 0)
+        slotTime = slotTime.add(Duration(minutes: offsetMins));
 
-      await _scheduleNative(9000, "تكبيرات عشر ذي الحجّة", "الله أكبر الله أكبر الله أكبر، لا إله إلا الله، الله أكبر الله أكبر ولله الحمد", slotTime.hour, slotTime.minute, "eid_takbeerat", payload: "home", year: slotTime.year, month: slotTime.month, day: slotTime.day, intervalMinutes: intervalMins);
+      await _scheduleNative(
+        9000,
+        "تكبيرات عشر ذي الحجّة",
+        "الله أكبر الله أكبر الله أكبر، لا إله إلا الله، الله أكبر الله أكبر ولله الحمد",
+        slotTime.hour,
+        slotTime.minute,
+        "eid_takbeerat",
+        payload: "home",
+        year: slotTime.year,
+        month: slotTime.month,
+        day: slotTime.day,
+        intervalMinutes: intervalMins,
+      );
     }
   }
 
   static Future<void> scheduleEidFitrTakbeerat(PrayerTimes times) async {
     final prefs = await SharedPreferences.getInstance();
     int intervalMins = prefs.getInt('eid_fitr_takbeer_interval') ?? 15;
-    if (intervalMins < 2) intervalMins = 2; // enforce minimum to prevent audio overlap
+    if (intervalMins < 2)
+      intervalMins = 2; // enforce minimum to prevent audio overlap
     final off = PrayerService().hijriOffset;
     final hijriNow = PrayerService.getHijriWithOffset(off);
 
-    if ((hijriNow.hMonth == 9 && (hijriNow.hDay == 29 || hijriNow.hDay == 30)) || (hijriNow.hMonth == 10 && hijriNow.hDay == 1)) {
+    if ((hijriNow.hMonth == 9 &&
+            (hijriNow.hDay == 29 || hijriNow.hDay == 30)) ||
+        (hijriNow.hMonth == 10 && hijriNow.hDay == 1)) {
       final DateTime now = DateTime.now();
       DateTime slotTime = now.add(const Duration(seconds: 2));
-      await _scheduleNative(9100, "تكبيرات العيد", "الله أكبر الله أكبر الله أكبر، لا إله إلا الله، الله أكبر الله أكبر ولله الحمد", slotTime.hour, slotTime.minute, "eid_takbeerat", payload: "home", year: slotTime.year, month: slotTime.month, day: slotTime.day, intervalMinutes: intervalMins);
+      await _scheduleNative(
+        9100,
+        "تكبيرات العيد",
+        "الله أكبر الله أكبر الله أكبر، لا إله إلا الله، الله أكبر الله أكبر ولله الحمد",
+        slotTime.hour,
+        slotTime.minute,
+        "eid_takbeerat",
+        payload: "home",
+        year: slotTime.year,
+        month: slotTime.month,
+        day: slotTime.day,
+        intervalMinutes: intervalMins,
+      );
     }
   }
 
-  static Future<void> scheduleSalawatReminders(int intervalMinutes, List<int> days) async {
+  static Future<void> scheduleSalawatReminders(
+    int intervalMinutes,
+    List<int> days,
+  ) async {
     final List<int> cancelIds = [950, ...List.generate(500, (i) => 8000 + i)];
     await _platform.invokeMethod('cancelAlarms', {'ids': cancelIds});
     if (intervalMinutes <= 0 || days.isEmpty) return;
@@ -753,11 +1104,19 @@ class NotificationService {
       while (!days.contains(((now.weekday + daysUntilNext - 1) % 7) + 1)) {
         daysUntilNext++;
       }
-      targetDate = DateTime(now.year, now.month, now.day, 6, 0).add(Duration(days: daysUntilNext));
+      targetDate = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        6,
+        0,
+      ).add(Duration(days: daysUntilNext));
     }
 
     final prefs = await SharedPreferences.getInstance();
-    final soundName = prefs.getString('flutter.salawat_periodic_sound') ?? 'saly_3ala_mo7amad';
+    final soundName =
+        prefs.getString('flutter.salawat_periodic_sound') ??
+        'saly_3ala_mo7amad';
 
     await _scheduleNative(
       950,
@@ -776,15 +1135,54 @@ class NotificationService {
     );
   }
 
-  static Future<void> scheduleEidAlert(int id, String title, String body, DateTime time, {String sound = 'default'}) async {
-    await _scheduleNative(id, title, body, time.hour, time.minute, sound, year: time.year, month: time.month, day: time.day);
+  static Future<void> scheduleEidAlert(
+    int id,
+    String title,
+    String body,
+    DateTime time, {
+    String sound = 'default',
+  }) async {
+    await _scheduleNative(
+      id,
+      title,
+      body,
+      time.hour,
+      time.minute,
+      sound,
+      year: time.year,
+      month: time.month,
+      day: time.day,
+    );
   }
 
-  static Future<void> scheduleRamadanAlert(int id, String title, String body, DateTime time, {String sound = 'default', String? customSoundName}) async {
-    await _scheduleNative(id, title, body, time.hour, time.minute, sound, payload: 'fasting', year: time.year, month: time.month, day: time.day, customSoundName: customSoundName);
+  static Future<void> scheduleRamadanAlert(
+    int id,
+    String title,
+    String body,
+    DateTime time, {
+    String sound = 'default',
+    String? customSoundName,
+  }) async {
+    await _scheduleNative(
+      id,
+      title,
+      body,
+      time.hour,
+      time.minute,
+      sound,
+      payload: 'fasting',
+      year: time.year,
+      month: time.month,
+      day: time.day,
+      customSoundName: customSoundName,
+    );
   }
 
-  static Future<void> scheduleArafahForDate(PrayerTimes times, DateTime now, int indexOffset) async {
+  static Future<void> scheduleArafahForDate(
+    PrayerTimes times,
+    DateTime now,
+    int indexOffset,
+  ) async {
     final prefs = await SharedPreferences.getInstance();
     final suhoorMins = prefs.getInt('suhoor_minutes_before') ?? 60;
     final iftarMins = prefs.getInt('iftar_minutes_before') ?? 30;
@@ -792,15 +1190,43 @@ class NotificationService {
     final suhoorTime = times.fajr.subtract(Duration(minutes: suhoorMins));
     final iftarTime = times.maghrib.subtract(Duration(minutes: iftarMins));
     // Use IDs 410+i and 400+i to override regular suhoor/iftar
-    if (suhoorTime.isAfter(now)) await scheduleRamadanAlert(410 + indexOffset, "سحور يوم عرفة", "باقي $suhoorMins دقيقة على الفجر — تذكير بالسحور", suhoorTime, customSoundName: "time_suhoor");
-    if (iftarTime.isAfter(now)) await scheduleRamadanAlert(400 + indexOffset, "إفطار يوم عرفة", "باقي $iftarMins دقيقة على المغرب — تقبل الله صيامكم", iftarTime, customSoundName: "pre_iftar");
+    if (suhoorTime.isAfter(now))
+      await scheduleRamadanAlert(
+        410 + indexOffset,
+        "سحور يوم عرفة",
+        "باقي $suhoorMins دقيقة على الفجر — تذكير بالسحور",
+        suhoorTime,
+        customSoundName: "time_suhoor",
+      );
+    if (iftarTime.isAfter(now))
+      await scheduleRamadanAlert(
+        400 + indexOffset,
+        "إفطار يوم عرفة",
+        "باقي $iftarMins دقيقة على المغرب — تقبل الله صيامكم",
+        iftarTime,
+        customSoundName: "pre_iftar",
+      );
   }
 
   static Future<void> scheduleArafah(PrayerTimes times) async {
     await scheduleArafahForDate(times, DateTime.now(), 0);
   }
 
-  static Future<void> _scheduleNative(int id, String title, String body, int hour, int minute, String soundName, {String? payload, int year = -1, int month = -1, int day = -1, int intervalMinutes = 0, String? customSoundName, String? allowedDays}) async {
+  static Future<void> _scheduleNative(
+    int id,
+    String title,
+    String body,
+    int hour,
+    int minute,
+    String soundName, {
+    String? payload,
+    int year = -1,
+    int month = -1,
+    int day = -1,
+    int intervalMinutes = 0,
+    String? customSoundName,
+    String? allowedDays,
+  }) async {
     try {
       String? audioPath;
       if (soundName != 'silent_notif') {
@@ -834,5 +1260,8 @@ class NotificationService {
     } catch (_) {}
   }
 
-  static Future<void> schedulePrayerNotifications(PrayerTimes times, {bool isUserAction = false}) async => scheduleAll(times, isUserAction: isUserAction);
+  static Future<void> schedulePrayerNotifications(
+    PrayerTimes times, {
+    bool isUserAction = false,
+  }) async => scheduleAll(times, isUserAction: isUserAction);
 }

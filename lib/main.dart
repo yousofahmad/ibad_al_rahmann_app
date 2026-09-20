@@ -1,3 +1,4 @@
+import 'package:ibad_al_rahmann/features/quran_audio/logic/quran_player/quran_player_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -130,6 +131,7 @@ Future<void> main() async {
     MultiBlocProvider(
       providers: [
         BlocProvider(create: (context) => ThemeCubit()),
+        BlocProvider(create: (context) => QuranPlayerCubit()),
         BlocProvider(create: (context) => KhatmaCubit()..loadKhatma()),
       ],
       child: const QuranApp(showCustomSplash: true),

@@ -91,6 +91,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
   int _localHijriDelta = 0;
   bool _persistentNotification = true;
   bool _autoSyncDrive = false;
+  bool _isPersistentSwitchLoading = false;
   bool _flipToMute = false;
   bool _overrideSilent = false;
   bool _useCustomVolume = false;
@@ -413,24 +414,11 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
           // 1. General
           _buildSectionHeader("عام"),
           _buildListTile(
-            "تنسيق 24 ساعة",
-            "عرض الوقت بصيغة 24 ساعة",
-            FontAwesomeIcons.clock,
-            trailing: Switch(
-              value: _is24Hour,
-              activeThumbColor: const Color(0xFFD0A871),
-              onChanged: (val) async {
-                await _prayerService.setIs24Hour(val);
-                setState(() => _is24Hour = val);
-              },
+              "ضبط التاريخ الهجري",
+              "تحديث ومزامنة وتعديل التاريخ يدوياً",
+              FontAwesomeIcons.calendarDays,
+              onTap: () => Navigator.pushNamed(context, '/hijri_confirmation'),
             ),
-          ),
-          _buildListTile(
-            "تاريخ الهجري",
-            "يدوي: ${_hijriOffset >= 0 ? '+$_hijriOffset' : '$_hijriOffset'} | بلد: ${_localHijriDelta >= 0 ? '+$_localHijriDelta' : '$_localHijriDelta'} | مجموع: ${(_hijriOffset + _localHijriDelta) >= 0 ? '+${_hijriOffset + _localHijriDelta}' : '${_hijriOffset + _localHijriDelta}'}",
-            FontAwesomeIcons.calendarDays,
-            onTap: _showHijriDialog,
-          ),
 
           // 2. Appearance
           _buildSectionHeader("المظهر"),
@@ -455,6 +443,22 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 ),
               );
             },
+          ),
+
+                    // 2.5 Quran
+          _buildSectionHeader("القرآن الكريم"),
+          _buildListTile(
+            "نوع تظليل الآيات",
+            "تظليل كلمة بكلمة أو تظليل الآية كاملة",
+            Icons.highlight_alt_rounded,
+            trailing: Switch(
+              value: CacheHelper.prefs.getBool('verse_player_highlight_wbw') ?? true,
+              activeTrackColor: const Color(0xFFD0A871),
+              onChanged: (value) async {
+                await CacheHelper.prefs.setBool('verse_player_highlight_wbw', value);
+                setState(() {});
+              },
+            ),
           ),
 
           // 3. Account / Location
@@ -491,21 +495,37 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             ),
           ),
           _buildListTile(
-            "الإشعار الثابت",
-            "عرض أوقات الصلاة دائمًا في شريط الإشعارات",
-            FontAwesomeIcons.mobileScreen,
-            trailing: Switch(
-              value: _persistentNotification,
-              activeThumbColor: const Color(0xFFD0A871),
-              onChanged: (val) async {
-                final prefs = CacheHelper.prefs;
-                await prefs.setBool('persistent_notification_enabled', val);
-                await prefs.setBool('flutter.persistent_notification_enabled', val);
-                setState(() => _persistentNotification = val);
-                _prayerService.scheduleNotifications();
-              },
+              "الإشعار الثابت",
+              "عرض أوقات الصلاة دائمًا في شريط الإشعارات",
+              FontAwesomeIcons.mobileScreen,
+              trailing: _isPersistentSwitchLoading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFD0A871)),
+                    )
+                  : Switch(
+                      value: _persistentNotification,
+                      activeThumbColor: const Color(0xFFD0A871),
+                      onChanged: (val) async {
+                        setState(() => _isPersistentSwitchLoading = true);
+                        
+                        // Yield to let the UI draw the loading indicator
+                        await Future.delayed(const Duration(milliseconds: 50));
+                        
+                        final prefs = CacheHelper.prefs;
+                        await prefs.setBool('persistent_notification_enabled', val);
+                        await prefs.setBool('flutter.persistent_notification_enabled', val);
+                        setState(() => _persistentNotification = val);
+                        
+                        await _prayerService.scheduleNotifications();
+                        
+                        if (mounted) {
+                          setState(() => _isPersistentSwitchLoading = false);
+                        }
+                      },
+                    ),
             ),
-          ),
           _buildListTile(
             "صوت الأذان",
             "اختر المؤذن المفضل لديك",

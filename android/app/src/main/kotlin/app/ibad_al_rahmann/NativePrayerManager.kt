@@ -150,6 +150,12 @@ object HijriCalendarHelper {
         val localDelta = parseOffset("flutter.hijri_local_delta")
         val generalOffset = parseOffset("flutter.hijri_offset")
         
+        // --- NEW LOGIC FOR PHASE 9.4 ---
+        // HijriSourceService saves local_hijri_offset via CacheHelper (which prefixes it with flutter.)
+        // It also has manual_day_adjustment (from Phase 1d if implemented)
+        val sourceOffset = parseOffset("flutter.local_hijri_offset")
+        val manualDayAdjustment = parseOffset("flutter.manual_day_adjustment")
+        
         // Auto-reset manual offset if the month has rolled over
         if (storedMonth > 0 && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
             try {
@@ -163,7 +169,9 @@ object HijriCalendarHelper {
             } catch (_: Exception) {}
         }
 
-        val totalOffset = if (prefs.contains("flutter.hijri_offset_manual") || prefs.contains("flutter.hijri_local_delta")) {
+        val totalOffset = if (prefs.contains("flutter.local_hijri_offset")) {
+            sourceOffset + manualDayAdjustment
+        } else if (prefs.contains("flutter.hijri_offset_manual") || prefs.contains("flutter.hijri_local_delta")) {
             manualOffset + localDelta + parseOffset("flutter.global_hijri_offset")
         } else {
             generalOffset
@@ -242,6 +250,20 @@ object HijriCalendarHelper {
 
     fun getArabicDate(context: Context, date: Date): String {
         try {
+            val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            val gDateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ENGLISH).format(date)
+            val flutterHijri = prefs.getString("flutter.shared_hijri_date_$gDateStr", null) ?: prefs.getString("flutter.shared_hijri_date", null)
+            
+            // Only use shared_hijri_date if we are asking for today's date, or if we have exact match
+            val isToday = gDateStr == java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ENGLISH).format(Date())
+            val matchedHijri = prefs.getString("flutter.shared_hijri_date_$gDateStr", null)
+            
+            if (!matchedHijri.isNullOrEmpty()) {
+                return toArabicDigits(matchedHijri)
+            } else if (isToday && !flutterHijri.isNullOrEmpty()) {
+                return toArabicDigits(flutterHijri)
+            }
+
             val (hDay, hMonth, hYear) = getHijriDateComponents(context, date)
             val monthsAr = arrayOf(
                 "محرم", "صفر", "ربيع الأول", "ربيع الثاني", "جمادى الأولى", "جمادى الآخرة",

@@ -1,3 +1,4 @@
+import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
@@ -64,6 +65,7 @@ class _MinQuranMobileState extends State<MinQuranMobile> {
             ),
             Expanded(
               child: PageView.builder(
+      physics: const EasyPageScrollPhysics(),
       allowImplicitScrolling: true,
                 controller: context.read<QuranCubit>().minQuranController,
                 itemCount: 604,

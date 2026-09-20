@@ -357,12 +357,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        countdownStr,
+                        AppFormatters.toArabicDigits(countdownStr),
                         style: TextStyle(
                           color: const Color(0xFFD0A871),
                           fontSize: 28.sp,
                           fontWeight: FontWeight.bold,
-                          fontFamily: 'Courier',
+                          fontFamily: AppConsts.expoArabic,
                         ),
                       ),
                     ),
@@ -868,11 +868,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     const NawawiScreen(),
                     imagePath: "assets/images/nawawi_card.png",
                     hideTitle: true,
-                  ),
-                  _buildGridItem(
-                    "المصحف الصوتي",
-                    FontAwesomeIcons.headphones,
-                    const QuranReadersScreen(),
                   ),
                 ],
               ),

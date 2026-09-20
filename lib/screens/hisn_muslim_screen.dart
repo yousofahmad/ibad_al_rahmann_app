@@ -1,3 +1,4 @@
+import 'package:ibad_al_rahmann/core/helpers/arabic_search_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -87,7 +88,7 @@ class _HisnMuslimScreenState extends State<HisnMuslimScreen> {
         ? baseChapters
         : baseChapters
               .where(
-                (c) => (c['title'] as String? ?? '').contains(_searchQuery),
+                (c) => ArabicSearchHelper.normalizeArabic(c['title'] as String? ?? '').contains(ArabicSearchHelper.normalizeArabic(_searchQuery)) || (c['text'] as List<String>).any((t) => ArabicSearchHelper.normalizeArabic(t).contains(ArabicSearchHelper.normalizeArabic(_searchQuery))),
               )
               .toList();
 
@@ -289,6 +290,7 @@ class HisnDetailScreen extends StatefulWidget {
   final List<String> footnotes;
   final bool isFavorite;
   final VoidCallback onFavoriteToggle;
+  final String? searchQuery;
 
   const HisnDetailScreen({
     super.key,
@@ -297,6 +299,7 @@ class HisnDetailScreen extends StatefulWidget {
     required this.footnotes,
     required this.isFavorite,
     required this.onFavoriteToggle,
+    this.searchQuery,
   });
 
   @override
@@ -390,17 +393,52 @@ class _HisnDetailScreenState extends State<HisnDetailScreen> {
             ),
             child: Column(
               children: [
-                Text(
-                  widget.texts[index],
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: AppConsts.amiri,
-                    fontSize: 20.sp,
-                    height: 1.8,
-                    color: textColor,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                Builder(builder: (context) {
+                  final String textStr = widget.texts[index];
+                  if (widget.searchQuery != null && widget.searchQuery!.isNotEmpty && textStr.contains(widget.searchQuery!)) {
+                    final query = widget.searchQuery!;
+                    final parts = textStr.split(query);
+                    final spans = <TextSpan>[];
+                    for (int i = 0; i < parts.length; i++) {
+                      spans.add(TextSpan(text: parts[i]));
+                      if (i != parts.length - 1) {
+                        spans.add(TextSpan(
+                          text: query,
+                          style: TextStyle(
+                            backgroundColor: Colors.yellow.withOpacity(0.4),
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ));
+                      }
+                    }
+                    return RichText(
+                      textAlign: TextAlign.center,
+                      textDirection: TextDirection.rtl,
+                      text: TextSpan(
+                        style: TextStyle(
+                          fontFamily: AppConsts.amiri,
+                          fontSize: 20.sp,
+                          height: 1.8,
+                          color: textColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        children: spans,
+                      ),
+                    );
+                  }
+                  return Text(
+                    textStr,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: AppConsts.amiri,
+                      fontSize: 20.sp,
+                      height: 1.8,
+                      color: textColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  );
+                }),
 
                 if (currentFootnote.isNotEmpty) ...[
                   Divider(

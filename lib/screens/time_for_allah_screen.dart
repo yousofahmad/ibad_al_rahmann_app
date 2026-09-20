@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:ibad_al_rahmann/core/helpers/app_formatters.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/widgets/app_skeleton.dart';
@@ -174,7 +175,7 @@ class _TimeForAllahScreenState extends State<TimeForAllahScreen> {
                     style: TextStyle(
                       fontSize: 48.sp,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'Courier',
+                      fontFamily: AppConsts.expoArabic,
                       color: isDark ? Colors.white : Colors.black,
                     ),
                   ),

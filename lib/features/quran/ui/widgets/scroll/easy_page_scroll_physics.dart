@@ -13,7 +13,7 @@ class EasyPageScrollPhysics extends PageScrollPhysics {
   /// Lower velocity threshold = easier to fling to next page.
   /// Default PageScrollPhysics is ~365. We use 80 for comfortable swipe.
   @override
-  double get minFlingVelocity => 80.0;
+  double get minFlingVelocity => 20.0;
 
   /// Use PageScrollPhysics default spring (critically damped, no oscillation).
   /// Do NOT override spring here — overriding with custom values caused

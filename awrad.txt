@@ -1,0 +1,35 @@
+535:         child: ExpansionTile(
+536:           collapsedIconColor: const Color(0xFFD0A871),
+537:           iconColor: const Color(0xFFD0A871),
+538:           tilePadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+539:           title: Text(
+540:             "الأوراد",
+541:             style: TextStyle(
+542:               fontFamily: AppConsts.expoArabic,
+543:               fontSize: 18.sp,
+544:               fontWeight: FontWeight.bold,
+545:               color: const Color(0xFFD0A871),
+546:             ),
+547:           ),
+548:           subtitle: Text(
+549:             "أوراد الختمات النشطة",
+550:             style: TextStyle(
+551:               fontFamily: AppConsts.expoArabic,
+552:               fontSize: 12.sp,
+553:               color: subTextColor,
+554:             ),
+555:           ),
+556:           children: [
+557:             Padding(
+558:               padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+559:               child: Column(
+560:                 children: _dynamicWirds.keys.map((key) {
+561:                   final isDone = _dynamicWirds[key] ?? false;
+562:                   return Container(
+563:                     margin: EdgeInsets.only(bottom: 8.h),
+564:                     decoration: BoxDecoration(
+565:                       color: isDark ? Colors.grey[900] : Colors.grey[100],
+566:                       borderRadius: BorderRadius.circular(12.r),
+567:                     ),
+568:                     padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+569:                     child: Row(

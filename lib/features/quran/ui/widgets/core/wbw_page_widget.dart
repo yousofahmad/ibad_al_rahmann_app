@@ -398,7 +398,7 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
             width: double.infinity,
             color: Colors.transparent,
             padding: EdgeInsets.only(
-              right: isTablet ? 36 : 28,
+              right: isTablet ? 24 : 16,
               left: isTablet ? 24 : 16,
               top: 4,
               bottom: 4,
@@ -411,23 +411,25 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                 Flexible(
                   child: Align(
                     alignment: Alignment.centerRight,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          'juz${juzNum.toString().padLeft(3, '0')}',
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontFamily: AppConsts.quranCommon,
-                            color: headerTextColor,
-                            fontSize: hizbText.isNotEmpty
-                                ? (isTablet ? 24 : 18)
-                                : (isTablet ? 28 : 20),
-                            height: 1.0,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            'juz${juzNum.toString().padLeft(3, '0')}',
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                              fontFamily: AppConsts.quranCommon,
+                              color: headerTextColor,
+                              fontSize: hizbText.isNotEmpty
+                                  ? (isTablet ? 24 : 16)
+                                  : (isTablet ? 28 : 20),
+                              height: 1.0,
+                            ),
                           ),
-                        ),
                         if (hizbText.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(left: 6),
@@ -455,6 +457,7 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                             ),
                           ),
                       ],
+                    ),
                     ),
                   ),
                 ),

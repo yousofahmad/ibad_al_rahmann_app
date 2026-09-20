@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ibad_al_rahmann/core/theme/app_assets.dart';
+
 import 'package:ibad_al_rahmann/core/widgets/top_bar_widget.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -16,16 +16,11 @@ class ReadersBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Positioned.fill(
-          child: Image.asset(
-            AppAssets.imagesWhiteBackground,
-            fit: BoxFit.cover,
-          ),
-        ),
         Align(
           alignment: Alignment.topCenter,
-          child: TopBar(height: 242.h, label: 'القـــراء'),
+          child: TopBar(height: 242.h, label: 'القــراء'),
         ),
+
         Positioned.fill(
           top: 180.h,
           child: Align(

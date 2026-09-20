@@ -1,0 +1,40 @@
+500:                           ),
+501:                         ),
+502:                       );
+503:                     }).toList(),
+504:                   ),
+505:           ),
+506:         ],
+507:       ),
+508:     );
+509:   }
+510: 
+511:   Widget _buildDynamicWirdsSection(bool isDark, Color textColor) {
+512:     if (_dynamicWirds.isEmpty) return const SizedBox.shrink();
+513: 
+514:     final cardColor = isDark ? const Color(0xFF000000) : Colors.white;
+515:     final subTextColor = isDark ? Colors.grey[400] : Colors.grey[600];
+516: 
+517:     return Container(
+518:       margin: EdgeInsets.only(bottom: 20.h),
+519:       decoration: BoxDecoration(
+520:         color: cardColor,
+521:         borderRadius: BorderRadius.circular(20.r),
+522:         border: Border.all(
+523:           color: const Color(0xFFD0A871).withValues(alpha: 0.5),
+524:         ),
+525:         boxShadow: [
+526:           BoxShadow(
+527:             color: Colors.black.withValues(alpha: 0.05),
+528:             blurRadius: 10.r,
+529:             offset: Offset(0, 5.h),
+530:           ),
+531:         ],
+532:       ),
+533:       child: Theme(
+534:         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+535:         child: ExpansionTile(
+536:           collapsedIconColor: const Color(0xFFD0A871),
+537:           iconColor: const Color(0xFFD0A871),
+538:           tilePadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+539:           title: Text(

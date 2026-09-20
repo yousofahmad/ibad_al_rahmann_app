@@ -317,37 +317,6 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            
-            // ═══ Accountability Label ═══
-            _buildCard(
-              context: context,
-              title: "الربط بحاسب نفسك (المتابعة اليومية)",
-              icon: FontAwesomeIcons.listCheck,
-              child: DropdownButton<String>(
-                value: _selectedAccountabilityLabel,
-                isExpanded: true,
-                dropdownColor: isDark ? Colors.grey[900] : Colors.white,
-                style: TextStyle(
-                  color: textColor,
-                  fontFamily: AppConsts.cairo,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-                underline: const SizedBox(),
-                items: _accountabilityLabels.map((label) {
-                  return DropdownMenuItem<String>(
-                    value: label,
-                    child: Text(label, overflow: TextOverflow.ellipsis),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() => _selectedAccountabilityLabel = val);
-                  }
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
             // ═══ Mode Selection ═══
             Container(
               decoration: BoxDecoration(
@@ -949,6 +918,37 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
                 ],
               ),
             ),
+            
+            // ═══ Accountability Label ═══
+            _buildCard(
+              context: context,
+              title: "الربط بحاسب نفسك (المتابعة اليومية)",
+              icon: FontAwesomeIcons.listCheck,
+              child: DropdownButton<String>(
+                value: _isPerPrayer ? '+ بند جديد بنفس اسم الختمة' : _selectedAccountabilityLabel,
+                isExpanded: true,
+                dropdownColor: isDark ? Colors.grey[900] : Colors.white,
+                style: TextStyle(
+                  color: textColor,
+                  fontFamily: AppConsts.cairo,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+                underline: const SizedBox(),
+                items: (_isPerPrayer ? ['+ بند جديد بنفس اسم الختمة'] : _accountabilityLabels).map((label) {
+                  return DropdownMenuItem<String>(
+                    value: label,
+                    child: Text(label, overflow: TextOverflow.ellipsis),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _selectedAccountabilityLabel = val);
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 20),
 
             const SizedBox(height: 30),
 

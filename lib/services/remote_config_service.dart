@@ -17,42 +17,9 @@ class RemoteConfigService {
   }
 
   static Future<void> init() async {
-    try {
-      final config = _remoteConfig;
-      await config.setConfigSettings(
-        RemoteConfigSettings(
-          fetchTimeout: const Duration(seconds: 10),
-          minimumFetchInterval: Duration.zero,
-        ),
-      );
-      await config.setDefaults(const {"global_hijri_offset": 0});
-      await config.fetchAndActivate();
-
-      // Save remote offset under its OWN key – never overwrites the user's
-      // manual 'hijri_offset' key stored by PrayerService.
-      final offset = config.getInt("global_hijri_offset");
-      final prefs = CacheHelper.prefs;
-      await prefs.setInt("remote_hijri_offset", offset);
-      await HomeWidget.saveWidgetData<int>("widget_hijri_offset", offset);
-      await HomeWidget.updateWidget(
-        name: 'PrayerWidgetProvider',
-        androidName: 'PrayerWidgetProvider',
-      );
-    } catch (e) {
-      debugPrint("Remote Config Error: $e");
-    }
+    // Disabled: Replaced by local Dar Al-Ifta offline calculation
   }
 
-  /// The global correction offset pushed from Firebase Console.
-  /// This is intentionally separate from the user's manual offset.
-  static int get globalHijriOffset {
-    try {
-      // Check if Firebase is initialized before trying to get instance
-      if (Firebase.apps.isEmpty) return 0;
-      return _remoteConfig.getInt("global_hijri_offset");
-    } catch (e) {
-      debugPrint("Error getting globalHijriOffset: $e");
-      return 0;
-    }
-  }
+  /// The global correction offset pushed from Firebase Console (Deprecated in favor of Dar Al-Ifta).
+  static int get globalHijriOffset => 0;
 }

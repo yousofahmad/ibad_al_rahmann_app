@@ -378,6 +378,8 @@ class AlarmReceiver : BroadcastReceiver() {
 
     private fun isInQuietHours(context: Context, prefix: String): Boolean {
         val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        val isEnabled = prefs.getBoolean("flutter.${prefix}_enabled", false) || prefs.getBoolean("${prefix}_enabled", false)
+        if (!isEnabled) return false
         
         // Flutter's shared_preferences stores ints as Longs on Android.
         // Reading as getInt() will crash if the value was saved by Flutter.
@@ -501,6 +503,31 @@ class AlarmReceiver : BroadcastReceiver() {
 
             val interval = intent.getIntExtra("interval_minutes", 0)
             if (interval > 0) {
+                var durationMs = 0
+                try {
+                    val cleanName = soundName?.replace(".mp3", "")?.lowercase()?.trim()
+                    val resId = if (cleanName != null) context.resources.getIdentifier(cleanName, "raw", context.packageName) else 0
+                    val uri = if (audioPath != null && java.io.File(audioPath).exists()) android.net.Uri.fromFile(java.io.File(audioPath))
+                              else if (resId != 0) android.net.Uri.parse("android.resource://${context.packageName}/$resId")
+                              else null
+                              
+                    if (uri != null) {
+                        val retriever = android.media.MediaMetadataRetriever()
+                        retriever.setDataSource(context, uri)
+                        val durationStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                        if (durationStr != null) durationMs = durationStr.toInt()
+                        retriever.release()
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                
+                // Rule 20: Cancel repeat if interval <= duration
+                if (interval * 60000L <= durationMs) {
+                    NativeLogger.log(context, "AlarmReceiver: Dropping repeat alarm $alarmId because interval ($interval min) <= duration (${durationMs/1000} sec)")
+                    return
+                }
+
                 val cal = Calendar.getInstance()
                 
                 // Use the intended trigger time as base to prevent drift

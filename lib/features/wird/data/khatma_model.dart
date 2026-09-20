@@ -11,7 +11,9 @@ class KhatmaModel {
   final int days;
   final int pagesPerWird;
   final String? dailyTime;
-  final int notificationOffsetMinutes;
+  final int notificationOffsetMinutes; // Legacy or fallback
+  final Map<String, int>?
+  notificationOffsetMinutesMap; // Prayer-specific offsets
   final String accountabilityLabel;
 
   /// For prayer-based khatmas: the prayer index (0=Fajr..4=Isha) at which the
@@ -31,6 +33,7 @@ class KhatmaModel {
     this.pagesPerWird = 20,
     this.dailyTime,
     this.notificationOffsetMinutes = 30,
+    this.notificationOffsetMinutesMap,
     this.startPrayerOffset = 0,
     this.accountabilityLabel = '',
   });
@@ -47,6 +50,7 @@ class KhatmaModel {
     int? pagesPerWird,
     String? dailyTime,
     int? notificationOffsetMinutes,
+    Map<String, int>? notificationOffsetMinutesMap,
     int? startPrayerOffset,
     String? accountabilityLabel,
   }) {
@@ -61,7 +65,10 @@ class KhatmaModel {
       days: days ?? this.days,
       pagesPerWird: pagesPerWird ?? this.pagesPerWird,
       dailyTime: dailyTime ?? this.dailyTime,
-      notificationOffsetMinutes: notificationOffsetMinutes ?? this.notificationOffsetMinutes,
+      notificationOffsetMinutes:
+          notificationOffsetMinutes ?? this.notificationOffsetMinutes,
+      notificationOffsetMinutesMap:
+          notificationOffsetMinutesMap ?? this.notificationOffsetMinutesMap,
       startPrayerOffset: startPrayerOffset ?? this.startPrayerOffset,
       accountabilityLabel: accountabilityLabel ?? this.accountabilityLabel,
     );
@@ -80,6 +87,7 @@ class KhatmaModel {
       'pagesPerWird': pagesPerWird,
       'dailyTime': dailyTime,
       'notificationOffsetMinutes': notificationOffsetMinutes,
+      'notificationOffsetMinutesMap': notificationOffsetMinutesMap,
       'startPrayerOffset': startPrayerOffset,
       'accountabilityLabel': accountabilityLabel,
     };
@@ -98,8 +106,12 @@ class KhatmaModel {
       pagesPerWird: json['pagesPerWird'] ?? 20,
       dailyTime: json['dailyTime'],
       notificationOffsetMinutes: json['notificationOffsetMinutes'] ?? 30,
+      notificationOffsetMinutesMap: json['notificationOffsetMinutesMap'] != null
+          ? Map<String, int>.from(json['notificationOffsetMinutesMap'])
+          : null,
       startPrayerOffset: json['startPrayerOffset'] ?? 0,
-      accountabilityLabel: json['accountabilityLabel'] ?? (json['name'] ?? 'ختمة'),
+      accountabilityLabel:
+          json['accountabilityLabel'] ?? (json['name'] ?? 'ختمة'),
     );
   }
 }

@@ -11,6 +11,15 @@ class AppFormatters {
   static const List<String> _arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
 
   /// Converts any string or number containing English digits (0-9) to Eastern Arabic digits (٠-٩).
+  static String toEnglishDigits(dynamic input) {
+    if (input == null) return '';
+    String str = input.toString();
+    for (int i = 0; i < 10; i++) {
+      str = str.replaceAll(_arabicDigits[i], _englishDigits[i]);
+    }
+    return str;
+  }
+
   static String toArabicDigits(dynamic input) {
     if (input == null) return '';
     String str = input.toString();

@@ -395,37 +395,20 @@ class PrayerService extends ChangeNotifier {
     await prefs.setInt('hijri_offset', hijriOffset);
   }
 
-  Future<void> scheduleNotifications({bool isUserAction = true}) async {
-    await _syncNativeEngineConfig();
+  bool _isScheduling = false;
 
-    final times = getPrayerTimes();
-    if (times != null) {
-      // Offload heavy notification scheduling & updates to background so caller/UI doesn't freeze
-      unawaited(() async {
-        try {
-          await NotificationService.schedulePrayerNotifications(times, isUserAction: isUserAction);
-          await updatePersistentElements();
-          
-          final now = DateTime.now();
-          // Schedule refresh 1 hour after Isha
-          DateTime scheduleTime = times.isha.add(const Duration(hours: 1));
-          if (scheduleTime.isBefore(now)) {
-            scheduleTime = scheduleTime.add(const Duration(days: 1));
-          }
-          
-          AndroidAlarmManager.periodic(
-            const Duration(hours: 24),
-            0,
-            backgroundWidgetUpdateCallback,
-            startAt: scheduleTime,
-            exact: true,
-            wakeup: true,
-            rescheduleOnReboot: true,
-          );
-        } catch (e) {
-          debugPrint("Error in async notification scheduling: $e");
-        }
-      }());
+  Future<void> scheduleNotifications({bool isUserAction = true}) async {
+    if (_isScheduling) return;
+    _isScheduling = true;
+    try {
+      await _syncNativeEngineConfig();
+      final times = getPrayerTimes();
+      if (times != null) {
+        await NotificationService.schedulePrayerNotifications(times, isUserAction: isUserAction);
+        await updatePersistentElements();
+      }
+    } finally {
+      _isScheduling = false;
     }
   }
 
@@ -1007,7 +990,11 @@ class PrayerService extends ChangeNotifier {
     }
 
     final h = HijriCalendar.fromDate(effectiveDate);
-    AppLogger.log("PrayerService", "getHijriWithOffset() -> baseDate: ${baseDate.toIso8601String()}, localOffset: $localOffset, manual: $manualAdjustment, remote: $remoteOffset, effective: ${effectiveDate.toIso8601String()}, Hijri: ${h.hDay} ${h.longMonthName} ${h.hYear}");
+    final hijriStr = "\u200F${h.hDay} ${h.longMonthName} ${h.hYear}\u200F";
+    final gDateStr = "${baseDate.year}-${baseDate.month.toString().padLeft(2, '0')}-${baseDate.day.toString().padLeft(2, '0')}";
+    CacheHelper.prefs.setString('shared_hijri_date', hijriStr);
+    CacheHelper.prefs.setString('shared_hijri_date_$gDateStr', hijriStr);
+    AppLogger.log("PrayerService", "getHijriWithOffset() -> baseDate: ${baseDate.toIso8601String()}, localOffset: $localOffset, manual: $manualAdjustment, remote: $remoteOffset, effective: ${effectiveDate.toIso8601String()}, Hijri: $hijriStr");
     return h;
   }
 
@@ -1022,8 +1009,9 @@ class PrayerService extends ChangeNotifier {
     _hijriOffset = offset;
     final prefs = CacheHelper.prefs;
     await prefs.setInt(keyHijriOffset, offset);
-    // احفظ الشهر الهجري المُعدَّل (مع الـ offset) وليس raw الشهر
-    await prefs.setInt(keyHijriOffsetMonth, getHijriWithOffset(offset).hMonth);
+    final hDate = getHijriWithOffset(offset);
+    await prefs.setInt(keyHijriOffsetMonth, hDate.hMonth);
+    await prefs.setString('shared_hijri_date', "\u200F${hDate.hDay} ${hDate.longMonthName} ${hDate.hYear}\u200F");
     notifyListeners();
     await scheduleNotifications(isUserAction: true);
   }

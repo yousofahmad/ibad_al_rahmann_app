@@ -40,7 +40,7 @@ class FullHeaderWidget extends StatelessWidget {
                   color: color,
                   fontFamily: 'SurahNames',
                   fontWeight: FontWeight.normal,
-                  height: 0.7,
+                  height: 1.2,
                 ),
               ),
             ),
@@ -82,7 +82,7 @@ class MinHeaderWidget extends StatelessWidget {
                     color: color,
                     fontFamily: 'SurahNames', // Use the new font
                     fontWeight: FontWeight.normal,
-                    height: 0.7,
+                    height: 1.2,
                   ),
                 ),
               ),

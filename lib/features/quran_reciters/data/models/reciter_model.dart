@@ -1,3 +1,4 @@
+import 'package:ibad_al_rahmann/core/data/quran_audio_index.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -602,7 +603,7 @@ class ReciterAudioHelper {
 
   static Future<String> _getReciterDir(String folderName) async {
     final dir = await getApplicationDocumentsDirectory();
-    final reciterDir = Directory('${dir.path}/audio_reciters/$folderName');
+    final reciterDir = Directory('${dir.path}/quran_offline/$folderName');
     if (!await reciterDir.exists()) {
       await reciterDir.create(recursive: true);
     }
@@ -612,6 +613,17 @@ class ReciterAudioHelper {
   static Future<Map<int, SurahAudioItem>> getSurahs(ReciterAudioModel reciter) async {
     if (_surahsCache.containsKey(reciter.folderName) && _surahsCache[reciter.folderName]!.isNotEmpty) {
       return _surahsCache[reciter.folderName]!;
+    }
+
+    if (QuranAudioIndex.surahData.containsKey(reciter.folderName)) {
+      final data = QuranAudioIndex.surahData[reciter.folderName]!;
+      final result = <int, SurahAudioItem>{};
+      data.forEach((k, v) {
+        final item = SurahAudioItem.fromJson(Map<String, dynamic>.from(v));
+        result[item.surahNumber] = item;
+      });
+      _surahsCache[reciter.folderName] = result;
+      return result;
     }
 
     final localDir = await _getReciterDir(reciter.folderName);

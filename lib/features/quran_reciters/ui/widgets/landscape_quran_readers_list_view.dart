@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/theme/app_assets.dart';
+import 'package:flutter/material.dart';
+
 import 'package:ibad_al_rahmann/core/widgets/top_bar_widget.dart';
 import 'package:ibad_al_rahmann/features/quran_reciters/ui/widgets/quran_readers_list_view.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';

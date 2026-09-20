@@ -30,7 +30,7 @@ class MainApplication : Application() {
                 addAction(Intent.ACTION_SCREEN_ON)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+                registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
             } else {
                 registerReceiver(receiver, filter)
             }

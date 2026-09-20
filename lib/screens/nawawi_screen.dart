@@ -1,3 +1,4 @@
+import 'package:ibad_al_rahmann/core/helpers/arabic_search_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter/services.dart';
@@ -14,6 +15,23 @@ class NawawiScreen extends StatefulWidget {
 }
 
 class _NawawiScreenState extends State<NawawiScreen> {
+  String _getSnippet(String text, String query) {
+    if (query.isEmpty) return text.length > 50 ? text.substring(0, 50) + '...' : text;
+    final qLower = query.toLowerCase();
+    final tLower = text.toLowerCase();
+    final idx = tLower.indexOf(qLower);
+    if (idx == -1) return text.length > 50 ? text.substring(0, 50) + '...' : text;
+    
+    int start = (idx - 30) < 0 ? 0 : idx - 30;
+    int end = (idx + query.length + 30) > text.length ? text.length : idx + query.length + 30;
+    
+    String snippet = text.substring(start, end);
+    if (start > 0) snippet = '...' + snippet;
+    if (end < text.length) snippet = snippet + '...';
+    
+    return snippet;
+  }
+
   List<String> _favoriteHadiths = [];
   bool _showFavoritesOnly = false;
   List<Map<String, dynamic>> _allHadiths = [];
@@ -140,8 +158,8 @@ class _NawawiScreenState extends State<NawawiScreen> {
         : baseHadiths
               .where(
                 (h) =>
-                    (h['title'] as String? ?? '').contains(_searchQuery) ||
-                    (h['hadith'] as String? ?? '').contains(_searchQuery),
+                    ArabicSearchHelper.normalizeArabic(h['title'] as String? ?? '').contains(ArabicSearchHelper.normalizeArabic(_searchQuery)) ||
+                    ArabicSearchHelper.normalizeArabic(h['hadith'] as String? ?? '').contains(ArabicSearchHelper.normalizeArabic(_searchQuery)),
               )
               .toList();
 
@@ -268,7 +286,18 @@ class _NawawiScreenState extends State<NawawiScreen> {
                       width: 1.w,
                     ),
                   ),
-                  child: ListTile(
+                  child: ListTile(                    subtitle: _searchQuery.isNotEmpty
+                        ? Text(
+                            _getSnippet(hadith['hadith'] ?? '', _searchQuery),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: AppConsts.cairo,
+                              fontSize: 13.sp,
+                              color: textColor.withValues(alpha: 0.7),
+                            ),
+                          )
+                        : null,
                     title: Text(
                       hadith['title'],
                       style: TextStyle(
@@ -331,6 +360,7 @@ class NawawiDetailScreen extends StatefulWidget {
 
   final bool isFavorite;
   final VoidCallback onFavoriteToggle;
+  final String? searchQuery;
 
   const NawawiDetailScreen({
     super.key,
@@ -339,6 +369,7 @@ class NawawiDetailScreen extends StatefulWidget {
     required this.description,
     required this.isFavorite,
     required this.onFavoriteToggle,
+    this.searchQuery,
   });
 
   @override
@@ -427,17 +458,52 @@ class _NawawiDetailScreenState extends State<NawawiDetailScreen> {
               ),
               child: Column(
                 children: [
-                  Text(
-                    widget.hadithText,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: AppConsts.amiri,
-                      fontSize: 20.sp,
-                      height: 1.8,
-                      color: textColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+                  Builder(builder: (context) {
+                    final String textStr = widget.hadithText;
+                    if (widget.searchQuery != null && widget.searchQuery!.isNotEmpty && textStr.contains(widget.searchQuery!)) {
+                      final query = widget.searchQuery!;
+                      final parts = textStr.split(query);
+                      final spans = <TextSpan>[];
+                      for (int i = 0; i < parts.length; i++) {
+                        spans.add(TextSpan(text: parts[i]));
+                        if (i != parts.length - 1) {
+                          spans.add(TextSpan(
+                            text: query,
+                            style: TextStyle(
+                              backgroundColor: Colors.yellow.withOpacity(0.4),
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ));
+                        }
+                      }
+                      return RichText(
+                        textAlign: TextAlign.center,
+                        textDirection: TextDirection.rtl,
+                        text: TextSpan(
+                          style: TextStyle(
+                            fontFamily: AppConsts.amiri,
+                            fontSize: 20.sp,
+                            height: 1.8,
+                            color: textColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          children: spans,
+                        ),
+                      );
+                    }
+                    return Text(
+                      textStr,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: AppConsts.amiri,
+                        fontSize: 20.sp,
+                        height: 1.8,
+                        color: textColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    );
+                  }),
                   SizedBox(height: 15.h),
                   // Copy Button
                   InkWell(

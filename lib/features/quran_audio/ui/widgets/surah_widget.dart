@@ -1,3 +1,4 @@
+import 'package:ibad_al_rahmann/features/quran_reciters/services/quran_audio_download_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
@@ -61,7 +62,8 @@ class SurahWidget extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            IconButton(
+            _DownloadButton(reciterId: context.read<QuranPlayerCubit>().reciter?.folderName ?? '', surahNumber: index),
+              IconButton(
               padding: EdgeInsets.zero,
               onPressed: () {
                 context.read<QuranPlayerCubit>().playSurah(index);
@@ -82,6 +84,61 @@ class SurahWidget extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _DownloadButton extends StatefulWidget {
+  final String reciterId;
+  final int surahNumber;
+  const _DownloadButton({required this.reciterId, required this.surahNumber});
+
+  @override
+  State<_DownloadButton> createState() => _DownloadButtonState();
+}
+
+class _DownloadButtonState extends State<_DownloadButton> {
+  @override
+  void initState() {
+    super.initState();
+    QuranAudioDownloadService().checkState(widget.reciterId, widget.surahNumber);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.reciterId.isEmpty) return const SizedBox();
+
+    return AnimatedBuilder(
+      animation: QuranAudioDownloadService(),
+      builder: (context, child) {
+        final state = QuranAudioDownloadService().getState(widget.reciterId, widget.surahNumber);
+        final progress = QuranAudioDownloadService().getProgress(widget.reciterId, widget.surahNumber);
+
+        if (state == AudioDownloadState.downloaded) {
+          return IconButton(
+            icon: const Icon(Icons.check_circle, color: Colors.green),
+            onPressed: () {
+              QuranAudioDownloadService().deleteSurah(widget.reciterId, widget.surahNumber);
+            },
+          );
+        } else if (state == AudioDownloadState.downloading) {
+          return Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(value: progress > 0 ? progress : null, strokeWidth: 2),
+            ),
+          );
+        } else {
+          return IconButton(
+            icon: const Icon(Icons.download, color: Colors.grey),
+            onPressed: () {
+              QuranAudioDownloadService().downloadSurah(widget.reciterId, widget.surahNumber);
+            },
+          );
+        }
+      },
     );
   }
 }

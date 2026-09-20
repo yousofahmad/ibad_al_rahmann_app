@@ -1,0 +1,139 @@
+<USER_REQUEST>
+"D:\flutter\ibad_al_rahmann\ibad_al_rahmann_master_execution_plan.md"
+اقرا ملف الخطة ده ونفذ اللي مطلوب فيه
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-15T10:45:24+03:00.
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Gemini 3.1 Pro (High). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>
+---
+<USER_REQUEST>
+فين نتيجة البرومت اللي في الاخر ابعتهولي ولا تيجي عايزني اعمل تيست ابني نسخة ريليس
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-15T10:55:15+03:00.
+</ADDITIONAL_METADATA>
+---
+<USER_REQUEST>
+عايزك تعمل زي فولدر معزول مش بيترفع لملفات ال .md عامة ويتقرا اللي فيهدايما والقواعد ثابتة فيه واي حاجة جديدة اتنفذت خلاص تتشال بحيث كل مرة تخش تقرا كل الملفات اللي فيه لما اقولك اشتغل
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-15T11:01:27+03:00.
+</ADDITIONAL_METADATA>
+---
+<USER_REQUEST>
+يلا اقرا الملفات اهو
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-15T11:16:47+03:00.
+</ADDITIONAL_METADATA>
+---
+<USER_REQUEST>
+يلا حدثت الخطة كمل شغل
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-15T19:17:39+03:00.
+</ADDITIONAL_METADATA>
+---
+<USER_REQUEST>
+ibad_al_rahmann_master_plan_v2 ده ملف الخطة المعدل اشتغل بيه مع ملف القواعد
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-16T00:06:58+03:00.
+</ADDITIONAL_METADATA>
+---
+<USER_REQUEST>
+ابني نسخة بقي علشان اتيست قولي ايه اتيسته من المراحل اللي فاتت كلها دي
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-16T00:44:52+03:00.
+</ADDITIONAL_METADATA>
+---
+<USER_REQUEST>
+ibad_al_rahmann_master_plan_v3
+كمل اهو ملف الخطة المعدل الجديد
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-16T08:46:57+03:00.
+</ADDITIONAL_METADATA>
+---
+<USER_REQUEST>
+اشتغل علطول علي اللي بعدها وخلاص ونراجع كلو طالما مفيش حاجة ضرورية تتراجع لسة
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-16T09:02:13+03:00.
+</ADDITIONAL_METADATA>
+---
+<USER_REQUEST>
+p'dj lgt hgo'm hg[]d] ;lg ,vrk 7.1 uhd. lk; jh;d] ugdih
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-16T14:34:50+03:00.
+</ADDITIONAL_METADATA>
+---
+<USER_REQUEST>
+7.2 خلاص متعملش تاني، والمطلوب دلوقتي هو المرحلة 8 والمرحلة 9 (ورد الصلوات + تخصيص وقت كل صلاة + إصلاحات الفريز عند التفعيل + مزامنة الهجري للنيتف والويدجت) — دول اللي لسه معلّقين فعليًا في الملف.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-16T14:40:40+03:00.
+</ADDITIONAL_METADATA>
+---
+<USER_REQUEST>
+ابني نسخة جديدة بقي علشان اجرب كل التعديلات
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-16T14:58:48+03:00.
+</ADDITIONAL_METADATA>
+---
+<USER_REQUEST>
+ريليس
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-16T15:04:12+03:00.
+</ADDITIONAL_METADATA>
+---
+<USER_REQUEST>
+وبعدين يعني هي نفس المشاكل تقريبا الويدجيت لسة التاريخ بايظ حلو وصفحة المواقيت الرقم مكتوب انجليزي 
+الختمة فعلا اتعلمت صح بس في مشكلة تانية ليه خانة القران الكريم الخانات فيها بقت علامات استفهام والعناوين كلها بقت خط عادي مش الخط المميز وخلي الافتراضي ان خانة الاوراد مفتوحة ولو مفيش ولا ورد متظهرش او لو المستخدم اختار خانة من القدام
+اذكار الصباح والمساء برضو خليها لو اتحسبت تتحسب في حاسب نفسك تلقائي وتتسيف يعني الاقي نسبتها اتحسبت في الاحصائيات علشان صلاتي لما بتعلم مبتحسبش ظبطها برضو
+ختمة اللي متوزعة علي الصلوات ليه في خانة الربط بحاسب نفسك بيظهر برضو الخانات التانية مش قولنا مش هينفع غير بند جديد مخصص بس وبرضو تعديل وقت الختمة مش بيظهر لو في ختمة واحدة بيظهر لما يبقي في اكتر منختمة ركز في دي انت محليتهاش برضو 
+صلاتي وحاسب نفسك لما بسجل في صلاتي سواء من النافذة او من جوا البرنامج مش بتتحسب في حاسب نفسك في الاحصائيات هي بتتعلم بس مش بتتسيف  ولو لغيتها من حاسب نفسك بتبوظ بتاعت صلاتي 
+المصحف الصوتي مش شغال بدوس علي القراء مش بيعمل حاجة ومتحطوش في الهوم حطه في الوضع المصغر للمصحف وحط معلومات عنه في التعليمات وظبطه وبلاش الخلفية البضا د خليه ماشي مع ثيم وستايل المصحف والمفروض برضو النظام الصوتي الجديد يتر
+<truncated 77 bytes>
+ متتالي منه برضو عادي ظبط المشغل اللي بتحديد الايات برضو متسيبوش كده 
+ المصحف الشريط اللي فوق من غير علامة الحزب رقم الجزء بعيد بزيادة ومع ثلاثة ارباع الحزب رقم الجزء بيتاكل جزء كبير منه 
+البحث في الاربعون النووية برضو بيظهرلي شرايط بس مكتوب فيها عنوان الحديث مش بيظهر المحتوي اللي جوا هو اه بيبحث فعلا ويطلع اللي فيه المحتوي بس لازم افتح علشان اشوف
+حتة المصحف الصوتي دي برضو انا المشاكل كنت بقولك عليها في القايمة بتاعت الصوت اللي بتشتغل من الضغطة المطولة علي الاية 
+السحبة في المصحف مشكلتها لازم خفيف في الاول وفي الخر قبل ما اقرب من الطرف لازم اسحب بسرعة علشان يصفح يا اما هيرجع تاني
+ستريك صلاتي هختبره بعد شوية مع العصر لسة 
+عايزك تعمل افضل حل للمشاكل دي مش اسهل او الحل الشائع يعني تمام وياريت بقي تظبط كل حاجة المرة دي وتركز كده ولو في اي اضافة او حاجة مش عارفها زي صفحة القراء اللي حطيتها في الهوم من غير ما تسال دي عرفني الاول وخلي بالك برضو الصلاة علي النبي عند فتح الشاشة لسة مش شغالة وصحيح اتاكد في اشعارات الصلاة انك مبوظتش اني لما اقلب يسكت او مستوي الصوت المخص المهم اي سؤال هجاوبك عليه او تفاصيل في الكود ابعتلي ابعت اسئلة الاداة عادي ومعاك للوج اهو كمان
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-16T20:38:06+03:00.
+</ADDITIONAL_METADATA>
+---
+<USER_REQUEST>
+546 , 449 الاتنين زي بعض
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-16T22:55:51+03:00.
+</ADDITIONAL_METADATA>
+---
+<USER_REQUEST>
+مشيلتش المتكرر وسيبت الاحسن فيهم كجودة ليه
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-16T22:56:12+03:00.
+</ADDITIONAL_METADATA>
+---
+<USER_REQUEST>
+476 
+534
+برضو
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-16T22:57:43+03:00.
+</ADDITIONAL_METADATA>
+---

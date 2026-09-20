@@ -1,3 +1,4 @@
+import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -230,7 +231,7 @@ class _WirdQuranWidgetState extends State<WirdQuranWidget>
       allowImplicitScrolling: true,
                                 controller: _controller,
                                 physics: const BouncingScrollPhysics(
-                                  parent: PageScrollPhysics(),
+                                  parent: EasyPageScrollPhysics(),
                                 ),
                                 itemCount: _itemCount,
                                 reverse: false,

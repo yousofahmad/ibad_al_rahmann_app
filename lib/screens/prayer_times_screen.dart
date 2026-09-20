@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:ibad_al_rahmann/core/helpers/app_formatters.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/services/notification_service.dart';
 import 'package:intl/intl.dart';
@@ -309,9 +310,11 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     final hijriOffset = PrayerService().hijriOffset;
     final adjustedDate = _selectedDate.add(Duration(days: hijriOffset));
     final selectedHijri = HijriCalendar.fromDate(adjustedDate);
-    final hijriStr =
+    final hijriStrRaw =
         "${selectedHijri.hDay} ${selectedHijri.longMonthName} ${selectedHijri.hYear}";
-    final gregStr = DateFormat('d MMMM yyyy', 'ar').format(_selectedDate);
+    final hijriStr = AppFormatters.toArabicDigits(hijriStrRaw);
+    final gregStrRaw = DateFormat('d MMMM yyyy', 'ar').format(_selectedDate);
+    final gregStr = AppFormatters.toArabicDigits(gregStrRaw);
     final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
 
     return Scaffold(
@@ -401,9 +404,9 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                                   child: FittedBox(
                                     fit: BoxFit.scaleDown,
                                     child: Text(
-                                      _formatDuration(_timeToNext),
+                                      AppFormatters.toArabicDigits(_formatDuration(_timeToNext)),
                                       style: TextStyle(
-                                        fontFamily: 'Courier',
+                                        fontFamily: AppConsts.expoArabic,
                                         color: Theme.of(
                                           context,
                                         ).textTheme.bodyLarge?.color,
@@ -622,7 +625,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                   SizedBox(width: 10.w),
                 ],
                 Text(
-                  PrayerService().formatTime(p.time),
+                  AppFormatters.toArabicDigits(PrayerService().formatTime(p.time)),
                   style: TextStyle(
                     fontFamily: AppConsts.expoArabic,
                     color: timeColor,

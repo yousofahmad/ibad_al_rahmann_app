@@ -6,12 +6,14 @@ import 'package:ibad_al_rahmann/features/quran_reciters/logic/quran_readers_cubi
 import 'widgets/quran_readers_screen_body.dart';
 
 class QuranReadersScreen extends StatelessWidget {
-  const QuranReadersScreen({super.key});
+  const QuranReadersScreen({super.key, this.paperColor});
+  final Color? paperColor;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: false,
+      backgroundColor: paperColor ?? (Theme.of(context).brightness == Brightness.dark ? Colors.black : const Color(0xFFFFF9E5)),
       body: BlocProvider(
         create: (context) => QuranReadersCubit(),
         child: const QuranReadersScreenBody(),

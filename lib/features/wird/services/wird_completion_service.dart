@@ -26,7 +26,7 @@ class WirdCompletionService {
       
       if (khatma != null && khatma.accountabilityLabel.isNotEmpty) {
         if (khatma.notificationType == 'prayer') {
-          final pName = _currentPrayerArabicName();
+          final pName = _prayerNameFromIndex(wirdIndex);
           if (pName.isNotEmpty) {
             await DailyTrackerService.markWirdDone('${khatma.accountabilityLabel} - $pName');
           }
@@ -40,21 +40,13 @@ class WirdCompletionService {
     }
   }
 
-  static String _currentPrayerArabicName() {
-    // We cannot use read<PrayerService> here easily if we don't have context, but we can if we want.
-    // PrayerService has getPrayerTimes() which is a sync getter if we have a global instance or similar.
-    // Wait, PrayerService is provided at root. We can use PrayerService().getPrayerTimes() if it's a singleton, but it's a ChangeNotifier usually.
-    // I'll just check if there's a static way or use the current time.
-    final times = PrayerService().getPrayerTimes();
-    if (times == null) return '';
-    final prayer = times.currentPrayer();
-    switch (prayer) {
-      case Prayer.fajr: return 'الفجر';
-      case Prayer.sunrise: return 'الفجر';
-      case Prayer.dhuhr: return 'الظهر';
-      case Prayer.asr: return 'العصر';
-      case Prayer.maghrib: return 'المغرب';
-      case Prayer.isha: return 'العشاء';
+static String _prayerNameFromIndex(int index) {
+    switch (index % 5) {
+      case 0: return 'الفجر';
+      case 1: return 'الظهر';
+      case 2: return 'العصر';
+      case 3: return 'المغرب';
+      case 4: return 'العشاء';
       default: return '';
     }
   }

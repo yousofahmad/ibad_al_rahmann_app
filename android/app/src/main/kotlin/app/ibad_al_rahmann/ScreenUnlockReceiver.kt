@@ -79,9 +79,11 @@ class ScreenUnlockReceiver : BroadcastReceiver() {
         if (now - lastPlayTime < 10000L) return
 
         val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        val isEnabled = prefs.getBoolean("flutter.salah_unlock_enabled", false)
-            || prefs.getBoolean("salah_unlock_enabled", false)
-        if (!isEnabled) return
+        val mode = prefs.getString("flutter.salah_unlock_mode", "none")
+            ?: prefs.getString("salah_unlock_mode", "none")
+            ?: "none"
+
+        if (mode == "none") return
 
         // Check Silent / Vibrate mode - never play sound if user set device to Silent or Vibrate
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -100,10 +102,6 @@ class ScreenUnlockReceiver : BroadcastReceiver() {
             Log.d(TAG, "Skipping screen unlock salawat due to active quiet hours")
             return
         }
-
-        val mode = prefs.getString("flutter.salah_unlock_mode", "saly_3ala_mo7amad")
-            ?: prefs.getString("salah_unlock_mode", "saly_3ala_mo7amad")
-            ?: "saly_3ala_mo7amad"
 
         lastPlayTime = now
         playSalawat(context, mode)
