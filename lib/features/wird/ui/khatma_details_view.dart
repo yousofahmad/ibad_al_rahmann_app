@@ -47,7 +47,7 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
   bool _isExporting = false;
   int _exportCompleted = 0;
   int _exportTotal = 0;
-  double _selectedQuality = 5.0; // Default High
+  double _selectedQuality = 1.0; // Default Full HD
 
   @override
   Widget build(BuildContext context) {
@@ -672,24 +672,24 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     _buildQualityChip(
-                      label: 'عالية',
-                      value: 5.0,
-                      isSelected: _selectedQuality == 5.0,
-                      onTap: () => setDlgState(() => _selectedQuality = 5.0),
+                      label: 'فائقة (4K)',
+                      value: 1.5,
+                      isSelected: _selectedQuality == 1.5,
+                      onTap: () => setDlgState(() => _selectedQuality = 1.5),
                     ),
                     const SizedBox(width: 8),
                     _buildQualityChip(
-                      label: 'متوسطة',
-                      value: 3.0,
-                      isSelected: _selectedQuality == 3.0,
-                      onTap: () => setDlgState(() => _selectedQuality = 3.0),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildQualityChip(
-                      label: 'منخفضة',
+                      label: 'عالية (FHD)',
                       value: 1.0,
                       isSelected: _selectedQuality == 1.0,
                       onTap: () => setDlgState(() => _selectedQuality = 1.0),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildQualityChip(
+                      label: 'سريعة',
+                      value: 0.8,
+                      isSelected: _selectedQuality == 0.8,
+                      onTap: () => setDlgState(() => _selectedQuality = 0.8),
                     ),
                   ],
                 ),
@@ -768,8 +768,29 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
     required int startPage,
     required int endPage,
     required bool saveToGallery,
-    double quality = 5.0,
+    double quality = 1.0,
   }) async {
+    if (saveToGallery) {
+      try {
+        final hasAccess = await Gal.hasAccess(toAlbum: true);
+        if (!hasAccess) {
+          final granted = await Gal.requestAccess(toAlbum: true);
+          if (!granted) {
+            if (mounted) {
+              _showTopNotification(
+                context,
+                'يرجى إعطاء صلاحية الوصول للصور لحفظ صفحات الورد في المعرض',
+                isError: true,
+              );
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('Gal access check error: $e');
+      }
+    }
+
     final totalPages = (endPage - startPage + 1).clamp(0, 604);
 
     setState(() {
@@ -821,8 +842,12 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
         int savedCount = 0;
         for (final path in capturedPaths) {
           try {
-            // Sequential saving
-            await Gal.putImage(path, album: 'عباد الرحمن');
+            // Sequential saving with fallback if custom album fails on some Android versions
+            try {
+              await Gal.putImage(path, album: 'عباد الرحمن');
+            } catch (_) {
+              await Gal.putImage(path);
+            }
             savedCount++;
 
             // Small delay between gal saves
@@ -1325,6 +1350,7 @@ class _ExportWirdRenderer extends StatefulWidget {
 class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
   late PageController _pageController;
   int _totalPages = 0;
+  int _currentCapturingPage = 0;
 
   @override
   void initState() {
@@ -1357,6 +1383,12 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
     cubit.toggleExporting(true);
 
     for (int i = 0; i < _totalPages; i++) {
+      if (mounted) {
+        setState(() {
+          _currentCapturingPage = i + 1;
+        });
+      }
+
       try {
         if (_pageController.hasClients) {
           _pageController.jumpToPage(i);
@@ -1426,36 +1458,89 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
 
     final (sSura, sAyah, eSura, eAyah) = _getWirdBounds(context);
 
-    return Scaffold(
-      backgroundColor: effectivePaperColor,
-      body: Center(
-        child: FittedBox(
-          fit: BoxFit.contain,
-          child: SizedBox(
-            width: 1080.0, // Force high-res width like ShareCard
-            height: 1920.0, // Force high-res height
-            child: PageView.builder(
-          allowImplicitScrolling: true,
-          controller: _pageController,
-          itemCount: _totalPages,
-          physics: const NeverScrollableScrollPhysics(),
-          itemBuilder: (context, index) {
-            final realPage = widget.startPage + index;
-            return WbwPageWidget(
-              pageNumber: realPage,
-              startSuraNumber: sSura,
-              startAyah: sAyah,
-              endSuraNumber: eSura,
-              endAyah: eAyah,
-              collapseOutOfRange: sSura != null,
-              isZoomEnabled: false,
-              paperColorOverride:
-                  savedColor, // Pass null to allow default creamy colors
-              textColorOverride: textColor,
-            );
-          },
-        ),
-      ),
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: effectivePaperColor,
+        body: Stack(
+          children: [
+            Center(
+              child: FittedBox(
+                fit: BoxFit.contain,
+                child: SizedBox(
+                  width: 1080.0, // Force high-res width like ShareCard
+                  height: 1920.0, // Force high-res height
+                  child: PageView.builder(
+                    allowImplicitScrolling: true,
+                    controller: _pageController,
+                    itemCount: _totalPages,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemBuilder: (context, index) {
+                      final realPage = widget.startPage + index;
+                      return WbwPageWidget(
+                        pageNumber: realPage,
+                        startSuraNumber: sSura,
+                        startAyah: sAyah,
+                        endSuraNumber: eSura,
+                        endAyah: eAyah,
+                        collapseOutOfRange: sSura != null,
+                        isZoomEnabled: false,
+                        paperColorOverride: savedColor,
+                        textColorOverride: textColor,
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            // Progress Overlay to avoid blank/white canvas appearance
+            Container(
+              color: Colors.black.withValues(alpha: 0.7),
+              child: Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(color: Color(0xFFD0A871)),
+                      const SizedBox(height: 20),
+                      Text(
+                        'جاري تجهيز وتصدير صفحات الورد...',
+                        style: TextStyle(
+                          fontFamily: AppConsts.cairo,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '$_currentCapturingPage / $_totalPages',
+                        style: const TextStyle(
+                          fontFamily: AppConsts.cairo,
+                          fontSize: 15,
+                          color: Color(0xFFD0A871),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
