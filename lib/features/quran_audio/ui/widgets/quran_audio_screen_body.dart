@@ -17,7 +17,8 @@ class QuranAudioScreenBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const gold = Color(0xFFD0A871);
+    final mushafPaperColor = isDark ? Colors.black : const Color(0xFFFFF9E5);
+    final headerColor = isDark ? const Color(0xFFD0A871) : const Color(0xFF1B4D3E);
 
     return BlocListener<QuranPlayerCubit, QuranPlayerState>(
       listener: (context, state) {
@@ -29,14 +30,14 @@ class QuranAudioScreenBody extends StatelessWidget {
         }
       },
       child: Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: mushafPaperColor,
         appBar: AppBar(
           title: Text(
             reciter.name,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: AppConsts.expoArabic,
               fontWeight: FontWeight.bold,
-              color: gold,
+              color: headerColor,
             ),
           ),
           centerTitle: true,
@@ -46,7 +47,7 @@ class QuranAudioScreenBody extends StatelessWidget {
           leading: IconButton(
             icon: Icon(
               Icons.arrow_back_ios_new_rounded,
-              color: isDark ? Colors.white70 : const Color(0xFF3E2723),
+              color: headerColor,
             ),
             onPressed: () => Navigator.of(context).pop(),
           ),

@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:adhan/adhan.dart';
 import 'package:ibad_al_rahmann/services/daily_tracker_service.dart';
 import 'package:ibad_al_rahmann/features/wird/bloc/khatma_cubit.dart';
 import 'package:ibad_al_rahmann/services/app_logger.dart';
-import 'package:ibad_al_rahmann/services/prayer_service.dart';
 
 class WirdCompletionService {
   static Future<void> complete({
@@ -17,14 +15,30 @@ class WirdCompletionService {
     AppLogger.log("WirdCompletion", "complete() -> isKahf: $isKahfMode, isWird: $isWirdMode, khatmaId: $khatmaId, wirdIndex: $wirdIndex");
     if (isKahfMode) {
       await DailyTrackerService.markKahfDone();
-    } else if (isWirdMode && khatmaId != null && wirdIndex != null) {
+    } else if (isWirdMode) {
       // ignore: use_build_context_synchronously
       final cubit = context.read<KhatmaCubit>();
-      final khatma = cubit.getKhatmaById(khatmaId);
       
-      await cubit.markWirdAsCompleted(khatmaId, wirdIndex);
+      String? actualKhatmaId = khatmaId;
+      if (actualKhatmaId == null && cubit.state is KhatmaLoaded) {
+          final khatmas = (cubit.state as KhatmaLoaded).khatmas;
+          if (khatmas.isNotEmpty) {
+              actualKhatmaId = khatmas.first.id;
+          }
+      }
       
-      if (khatma != null && khatma.accountabilityLabel.isNotEmpty) {
+      if (actualKhatmaId == null) return;
+      
+      final khatma = cubit.getKhatmaById(actualKhatmaId);
+      if (khatma == null) return;
+      
+      final indexToMark = wirdIndex ?? khatma.currentWirdIndex;
+      await cubit.markWirdAsCompleted(actualKhatmaId, indexToMark);
+      
+      // Update wirdIndex reference for accountability below
+      wirdIndex = indexToMark;
+      
+      if (khatma.accountabilityLabel.isNotEmpty) {
         if (khatma.notificationType == 'prayer') {
           final pName = _prayerNameFromIndex(wirdIndex);
           if (pName.isNotEmpty) {

@@ -47,7 +47,7 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
   bool _isExporting = false;
   int _exportCompleted = 0;
   int _exportTotal = 0;
-  double _selectedQuality = 1.0; // Default Full HD
+  double _selectedQuality = 5.0; // Default High
 
   @override
   Widget build(BuildContext context) {
@@ -672,24 +672,24 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     _buildQualityChip(
-                      label: 'فائقة (4K)',
-                      value: 1.5,
-                      isSelected: _selectedQuality == 1.5,
-                      onTap: () => setDlgState(() => _selectedQuality = 1.5),
+                      label: 'عالية',
+                      value: 5.0,
+                      isSelected: _selectedQuality == 5.0,
+                      onTap: () => setDlgState(() => _selectedQuality = 5.0),
                     ),
                     const SizedBox(width: 8),
                     _buildQualityChip(
-                      label: 'عالية (FHD)',
+                      label: 'متوسطة',
+                      value: 3.0,
+                      isSelected: _selectedQuality == 3.0,
+                      onTap: () => setDlgState(() => _selectedQuality = 3.0),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildQualityChip(
+                      label: 'منخفضة',
                       value: 1.0,
                       isSelected: _selectedQuality == 1.0,
                       onTap: () => setDlgState(() => _selectedQuality = 1.0),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildQualityChip(
-                      label: 'سريعة',
-                      value: 0.8,
-                      isSelected: _selectedQuality == 0.8,
-                      onTap: () => setDlgState(() => _selectedQuality = 0.8),
                     ),
                   ],
                 ),
@@ -768,7 +768,7 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
     required int startPage,
     required int endPage,
     required bool saveToGallery,
-    double quality = 1.0,
+    double quality = 5.0,
   }) async {
     if (saveToGallery) {
       try {
@@ -1464,33 +1464,28 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
         backgroundColor: effectivePaperColor,
         body: Stack(
           children: [
-            Center(
-              child: FittedBox(
-                fit: BoxFit.contain,
-                child: SizedBox(
-                  width: 1080.0, // Force high-res width like ShareCard
-                  height: 1920.0, // Force high-res height
-                  child: PageView.builder(
-                    allowImplicitScrolling: true,
-                    controller: _pageController,
-                    itemCount: _totalPages,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemBuilder: (context, index) {
-                      final realPage = widget.startPage + index;
-                      return WbwPageWidget(
-                        pageNumber: realPage,
-                        startSuraNumber: sSura,
-                        startAyah: sAyah,
-                        endSuraNumber: eSura,
-                        endAyah: eAyah,
-                        collapseOutOfRange: sSura != null,
-                        isZoomEnabled: false,
-                        paperColorOverride: savedColor,
-                        textColorOverride: textColor,
-                      );
-                    },
-                  ),
-                ),
+            SizedBox(
+              width: MediaQuery.of(context).size.width,
+              height: MediaQuery.of(context).size.height,
+              child: PageView.builder(
+                allowImplicitScrolling: true,
+                controller: _pageController,
+                itemCount: _totalPages,
+                physics: const NeverScrollableScrollPhysics(),
+                itemBuilder: (context, index) {
+                  final realPage = widget.startPage + index;
+                  return WbwPageWidget(
+                    pageNumber: realPage,
+                    startSuraNumber: sSura,
+                    startAyah: sAyah,
+                    endSuraNumber: eSura,
+                    endAyah: eAyah,
+                    collapseOutOfRange: true,
+                    isZoomEnabled: false,
+                    paperColorOverride: savedColor,
+                    textColorOverride: textColor,
+                  );
+                },
               ),
             ),
             // Progress Overlay to avoid blank/white canvas appearance
