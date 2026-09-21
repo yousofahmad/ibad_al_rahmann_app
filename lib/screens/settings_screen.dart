@@ -566,7 +566,8 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             FontAwesomeIcons.calendarDay,
             onTap: _showHijriSystemDialog,
           ),
-          _buildListTile(
+          if (_hijriSystem != PrayerService.systemEgyptian)
+            _buildListTile(
               "ضبط التاريخ الهجري",
               "تحديث ومزامنة وتعديل التاريخ يدوياً",
               FontAwesomeIcons.calendarDays,

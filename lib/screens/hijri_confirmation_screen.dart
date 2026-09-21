@@ -122,71 +122,73 @@ class _HijriConfirmationScreenState extends State<HijriConfirmationScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 48),
-            const Divider(),
-            const SizedBox(height: 16),
-            const Text(
-              "ضبط يدوي إضافي",
-              style: TextStyle(fontSize: 18, fontFamily: AppConsts.cairo, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              "في حالة وجود خطأ دائم رغم التأكيد، يمكنك تعديل التاريخ يدوياً.",
-              style: TextStyle(fontSize: 14, fontFamily: AppConsts.cairo, color: Colors.grey),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
+            if (!PrayerService.isEgyptianSystem) ...[
+              const SizedBox(height: 48),
+              const Divider(),
+              const SizedBox(height: 16),
+              const Text(
+                "ضبط يدوي إضافي",
+                style: TextStyle(fontSize: 18, fontFamily: AppConsts.cairo, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                "في حالة وجود خطأ دائم رغم التأكيد، يمكنك تعديل التاريخ يدوياً.",
+                style: TextStyle(fontSize: 14, fontFamily: AppConsts.cairo, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      CacheHelper.prefs.setInt('manual_day_adjustment', currentManualAdjustment + 1);
+                      Provider.of<PrayerService>(context, listen: false).refreshUI();
+                      setState(() {});
+                    },
+                    icon: const Icon(Icons.add_circle_outline),
+                    color: const Color(0xFFD0A871),
+                    iconSize: 32,
+                  ),
+                  const SizedBox(width: 16),
+                  Column(
+                    children: [
+                      Text(
+                        "التاريخ: ${Provider.of<PrayerService>(context).getAdjustedHijriString()}",
+                        style: const TextStyle(fontSize: 18, fontFamily: AppConsts.cairo, fontWeight: FontWeight.bold, color: Color(0xFFD0A871)),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "التعديل: $currentManualAdjustment يوم",
+                        style: const TextStyle(fontSize: 14, fontFamily: AppConsts.cairo, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  IconButton(
+                    onPressed: () {
+                      CacheHelper.prefs.setInt('manual_day_adjustment', currentManualAdjustment - 1);
+                      Provider.of<PrayerService>(context, listen: false).refreshUI();
+                      setState(() {});
+                    },
+                    icon: const Icon(Icons.remove_circle_outline),
+                    color: const Color(0xFFD0A871),
+                    iconSize: 32,
+                  ),
+                ],
+              ),
+              if (currentManualAdjustment != 0) ...[
+                const SizedBox(height: 8),
+                TextButton(
                   onPressed: () {
-                    CacheHelper.prefs.setInt('manual_day_adjustment', currentManualAdjustment + 1);
+                    CacheHelper.prefs.setInt('manual_day_adjustment', 0);
                     Provider.of<PrayerService>(context, listen: false).refreshUI();
                     setState(() {});
                   },
-                  icon: const Icon(Icons.add_circle_outline),
-                  color: const Color(0xFFD0A871),
-                  iconSize: 32,
-                ),
-                const SizedBox(width: 16),
-                Column(
-                  children: [
-                    Text(
-                      "التاريخ: ${Provider.of<PrayerService>(context).getAdjustedHijriString()}",
-                      style: const TextStyle(fontSize: 18, fontFamily: AppConsts.cairo, fontWeight: FontWeight.bold, color: Color(0xFFD0A871)),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "التعديل: $currentManualAdjustment يوم",
-                      style: const TextStyle(fontSize: 14, fontFamily: AppConsts.cairo, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                IconButton(
-                  onPressed: () {
-                    CacheHelper.prefs.setInt('manual_day_adjustment', currentManualAdjustment - 1);
-                    Provider.of<PrayerService>(context, listen: false).refreshUI();
-                    setState(() {});
-                  },
-                  icon: const Icon(Icons.remove_circle_outline),
-                  color: const Color(0xFFD0A871),
-                  iconSize: 32,
+                  child: const Text("إعادة ضبط", style: TextStyle(fontFamily: AppConsts.cairo, color: Colors.red)),
                 ),
               ],
-            ),
-            if (currentManualAdjustment != 0) ...[
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () {
-                  CacheHelper.prefs.setInt('manual_day_adjustment', 0);
-                  Provider.of<PrayerService>(context, listen: false).refreshUI();
-                  setState(() {});
-                },
-                child: const Text("إعادة ضبط", style: TextStyle(fontFamily: AppConsts.cairo, color: Colors.red)),
-              ),
             ],
             const SizedBox(height: 32),
           ],

@@ -4,8 +4,10 @@ import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:http/http.dart' as http;
 import 'package:hijri/hijri_calendar.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import 'package:intl/intl.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
+import 'package:ibad_al_rahmann/services/notification_service.dart';
 
 class EgyptDarAlIftaProvider {
   static const String apiUrl = 'https://di107.dar-alifta.org/api/HijriDate?langID=2';
@@ -94,19 +96,92 @@ class HijriSourceService {
       return;
     }
 
+    // 1. Critical layer check on the eve of day 29 after Maghrib
+    await checkEveOf29CriticalSync();
+
     final prefs = CacheHelper.prefs;
     final todayStr = DateTime.now().toString().substring(0, 10);
     
     final lastFetch = prefs.getString(_lastFetchDateKey);
     if (lastFetch == todayStr) return;
 
+    // 2. Middle layer silent dual sync
     await _performDualSync(todayStr);
+  }
+
+  /// Critical Layer: Single live check on the eve of day 29 after Maghrib.
+  static Future<bool> checkEveOf29CriticalSync() async {
+    if (!PrayerService.isEgyptianSystem) {
+      AppLogger.log('HijriSync', 'checkEveOf29CriticalSync: Skipped (active system is Umm Al-Qura).');
+      return true;
+    }
+
+    final now = DateTime.now();
+    final times = PrayerService().getPrayerTimesForDate(now);
+    final maghrib = times?.maghrib ?? DateTime(now.year, now.month, now.day, 18, 0);
+
+    final isAfterMaghrib = now.isAfter(maghrib);
+    final effectiveDate = isAfterMaghrib ? now.add(const Duration(days: 1)) : now;
+    
+    // Base astronomical Hijri day for the active Islamic day
+    final baseHijri = HijriCalendar.fromDate(effectiveDate);
+
+    AppLogger.log(
+      'HijriSync',
+      'Critical Layer Check -> now: ${now.toIso8601String()}, maghrib: ${maghrib.toIso8601String()}, isAfterMaghrib: $isAfterMaghrib, baseHijriDay: ${baseHijri.hDay}',
+    );
+
+    // Only trigger on the eve of day 29 after Maghrib
+    if (baseHijri.hDay != 29 || !isAfterMaghrib) {
+      AppLogger.log('HijriSync', 'Critical Layer: Not eve of day 29 after Maghrib (Day: ${baseHijri.hDay}, afterMaghrib: $isAfterMaghrib). Skipping critical check.');
+      return true;
+    }
+
+    final todayStr = DateFormat('yyyy-MM-dd').format(now);
+    final prefs = CacheHelper.prefs;
+    final isAlreadyConfirmed = prefs.getString(_confirmedDateKey) == todayStr;
+
+    if (isAlreadyConfirmed) {
+      AppLogger.log('HijriSync', 'Critical Layer: Eve of 29 already confirmed for $todayStr.');
+      return true;
+    }
+
+    AppLogger.log('HijriSync', 'Critical Layer Triggered: Eve of day 29 after Maghrib! Calling Dar Al-Ifta API for crescent confirmation...');
+    
+    final darAlIftaDay = await _darAlIftaProvider.fetchDay();
+    if (darAlIftaDay != null) {
+      final diff = darAlIftaDay - baseHijri.hDay;
+      if (diff >= -2 && diff <= 2) {
+        await prefs.setInt(_localOffsetKey, diff);
+        await prefs.setString(_lastFetchDateKey, todayStr);
+        await prefs.setString(_confirmedDateKey, todayStr);
+        await HomeWidget.updateWidget(name: 'PrayerWidgetProvider');
+        AppLogger.log('HijriSync', 'Critical Layer Success: Dar Al-Ifta confirmed day: $darAlIftaDay (offset: $diff). Date updated.');
+        return true;
+      }
+    }
+
+    // Call failed or returned null (no internet / server down)
+    AppLogger.log('HijriSync', 'Critical Layer Failed: Unable to verify crescent with Dar Al-Ifta on eve of day 29. Sending notification to user.');
+    await NotificationService.showImmediateNotification(
+      title: 'تأكيد التاريخ الهجري (ليلة الرؤية)',
+      body: 'تعذر الاتصال بدار الإفتاء للتأكد من بداية الشهر الجديد. اضغط هنا للتحديث.',
+      payload: 'hijri_confirmation',
+    );
+    return false;
   }
 
   /// Force fetch the offset right now.
   static Future<bool> forceSync() async {
     final todayStr = DateTime.now().toString().substring(0, 10);
-    return await _performDualSync(todayStr);
+    AppLogger.log('HijriSync', 'Manual forceSync requested for $todayStr.');
+    final success = await _performDualSync(todayStr);
+    if (success) {
+      AppLogger.log('HijriSync', 'Manual forceSync succeeded.');
+    } else {
+      AppLogger.log('HijriSync', 'Manual forceSync failed to fetch from official sources.');
+    }
+    return success;
   }
 
   static Future<bool> _performDualSync(String todayStr) async {
