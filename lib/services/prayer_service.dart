@@ -1025,6 +1025,22 @@ class PrayerService extends ChangeNotifier {
     await scheduleNotifications(isUserAction: true);
   }
 
+  static const String keyHijriSystem = 'hijri_system';
+  static const String systemUmmAlQura = 'umm_alqura';
+  static const String systemEgyptian = 'egyptian';
+
+  static String get hijriSystem =>
+      CacheHelper.prefs.getString(keyHijriSystem) ?? systemUmmAlQura;
+
+  static bool get isEgyptianSystem => hijriSystem == systemEgyptian;
+
+  Future<void> setHijriSystem(String system) async {
+    final prefs = CacheHelper.prefs;
+    await prefs.setString(keyHijriSystem, system);
+    notifyListeners();
+    await scheduleNotifications(isUserAction: true);
+  }
+
   static const String unconfirmedHijriMessage = "محتاج اتصال إنترنت لعرض التوقيت المصري المؤكد";
 
   static bool get isStrictConfirmedMode =>

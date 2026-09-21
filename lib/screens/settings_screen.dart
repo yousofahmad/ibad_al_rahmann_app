@@ -97,6 +97,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
   bool _useCustomVolume = false;
   int _customVolume = 100;
   String _audioStream = 'alarm';
+  String _hijriSystem = PrayerService.systemUmmAlQura;
   bool _strictConfirmedHijri = false;
   bool _enableNativeLogging = true;
   bool _isSyncingToDrive = false;
@@ -119,6 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     final syncTime = await BackupService.getLastSyncTime();
     if (context.mounted) {
       setState(() {
+        _hijriSystem = PrayerService.hijriSystem;
         _persistentNotification =
             prefs.getBool('persistent_notification_enabled') ?? true;
         _strictConfirmedHijri =
@@ -389,6 +391,146 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     );
   }
 
+  Widget _buildHijriSystemOption({
+    required String title,
+    required String subtitle,
+    required String value,
+    required String selectedValue,
+    required bool isDark,
+    required Color gold,
+    required VoidCallback onTap,
+  }) {
+    final isSelected = value == selectedValue;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? gold.withValues(alpha: 0.12)
+              : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03)),
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(
+            color: isSelected ? gold : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: isSelected ? gold : (isDark ? Colors.grey[500] : Colors.grey[400]),
+              size: 20.sp,
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: AppConsts.cairo,
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  SizedBox(height: 2.h),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontFamily: AppConsts.cairo,
+                      fontSize: 11.sp,
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showHijriSystemDialog() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const gold = Color(0xFFD0A871);
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        String selected = _hijriSystem;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              title: Text(
+                "نظام التاريخ الهجري",
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  color: gold,
+                  fontFamily: AppConsts.cairo,
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildHijriSystemOption(
+                    title: "أم القرى (الافتراضي)",
+                    subtitle: "حساب فلكي محلي مع إمكانية التعديل اليدوي",
+                    value: PrayerService.systemUmmAlQura,
+                    selectedValue: selected,
+                    isDark: isDark,
+                    gold: gold,
+                    onTap: () => setDialogState(() => selected = PrayerService.systemUmmAlQura),
+                  ),
+                  SizedBox(height: 8.h),
+                  _buildHijriSystemOption(
+                    title: "المصري",
+                    subtitle: "نظام طبقي تلقائي (دار الإفتاء وهيئة المساحة)",
+                    value: PrayerService.systemEgyptian,
+                    selectedValue: selected,
+                    isDark: isDark,
+                    gold: gold,
+                    onTap: () => setDialogState(() => selected = PrayerService.systemEgyptian),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  child: Text(
+                    "إلغاء",
+                    style: TextStyle(color: Colors.grey, fontSize: 14.sp, fontFamily: AppConsts.cairo),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                TextButton(
+                  child: Text(
+                    "حفظ",
+                    style: TextStyle(color: gold, fontWeight: FontWeight.bold, fontSize: 14.sp, fontFamily: AppConsts.cairo),
+                  ),
+                  onPressed: () async {
+                    final navigator = Navigator.of(context);
+                    await _prayerService.setHijriSystem(selected);
+                    setState(() {
+                      _hijriSystem = selected;
+                    });
+                    if (mounted) navigator.pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -416,6 +558,14 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
         children: [
           // 1. General
           _buildSectionHeader("عام"),
+          _buildListTile(
+            "نظام التاريخ الهجري",
+            _hijriSystem == PrayerService.systemEgyptian
+                ? "المصري (نظام طبقي تلقائي)"
+                : "أم القرى (حساب فلكي محلي مع تعديل يدوي)",
+            FontAwesomeIcons.calendarDay,
+            onTap: _showHijriSystemDialog,
+          ),
           _buildListTile(
               "ضبط التاريخ الهجري",
               "تحديث ومزامنة وتعديل التاريخ يدوياً",
