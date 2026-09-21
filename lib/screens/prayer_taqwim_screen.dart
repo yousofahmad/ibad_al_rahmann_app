@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:intl/intl.dart';
-import 'package:hijri/hijri_calendar.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
@@ -493,8 +492,7 @@ class _TaqwimPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final hijriOffset = PrayerService().hijriOffset;
-    final adjustedDate = date.add(Duration(days: hijriOffset));
-    final hijri = HijriCalendar.fromDate(adjustedDate);
+    final hijri = PrayerService.getHijriWithOffset(hijriOffset, date);
 
     final dayName = DateFormat('EEEE', 'ar').format(date);
     final gregDay = date.day.toString();

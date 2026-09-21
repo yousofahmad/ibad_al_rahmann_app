@@ -308,8 +308,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   @override
   Widget build(BuildContext context) {
     final hijriOffset = PrayerService().hijriOffset;
-    final adjustedDate = _selectedDate.add(Duration(days: hijriOffset));
-    final selectedHijri = HijriCalendar.fromDate(adjustedDate);
+    final selectedHijri = PrayerService.getHijriWithOffset(hijriOffset, _selectedDate);
     final hijriStrRaw =
         "${selectedHijri.hDay} ${selectedHijri.longMonthName} ${selectedHijri.hYear}";
     final hijriStr = AppFormatters.toArabicDigits(hijriStrRaw);
