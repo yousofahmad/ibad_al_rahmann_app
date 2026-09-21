@@ -429,24 +429,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             else
               Icon(icon, size: 40.w, color: const Color(0xFFD0A871)),
             if (!hideTitle) ...[
-              SizedBox(height: 12.h),
+              SizedBox(height: 10.h),
               Transform.translate(
                 offset: Offset(0, textOffset.h),
-                child: ShaderMask(
-                  blendMode: BlendMode.srcIn,
-                  shaderCallback: (bounds) => const LinearGradient(
-                    colors: [Color(0xFFF2D69D), Color(0xFFD0A871), Color(0xFFB88A4A)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height + 10.h)),
-                  child: Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: const Color(0xFFD0A871),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16.sp,
-                      fontFamily: 'Cairo',
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 6.h),
+                  child: ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [Color(0xFFF2D69D), Color(0xFFD0A871), Color(0xFFB88A4A)],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height + 10.h)),
+                    child: Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: const Color(0xFFD0A871),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16.sp,
+                        fontFamily: 'Cairo',
+                      ),
                     ),
                   ),
                 ),
@@ -820,8 +823,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     imagePath: Theme.of(context).brightness == Brightness.dark
                         ? AppImages.sectionsQuranDark
                         : AppImages.sectionsQuranLight,
-                    customIconSize: 75.w,
-                    textOffset: -10.0,
+                    customIconSize: 60.w,
+                    textOffset: 0.0,
                   ),
                   _buildGridItem(
                     "الأذكار",

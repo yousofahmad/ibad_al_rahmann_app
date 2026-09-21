@@ -771,7 +771,7 @@ class NotificationService {
       if (id == null) continue;
 
       // Determine if it's a Wird ID
-      bool isWirdId = (id >= 600 && id < 700) || (id >= 6000 && id < 7000);
+      bool isWirdId = (id >= 600 && id < 700) || (id >= 100000 && id < 600000);
       if (!includeWird && isWirdId) continue;
 
       // Determine if it's an interval alarm ID
@@ -782,8 +782,11 @@ class NotificationService {
       // Prayer IDs are intentionally excluded in Dart side
       bool isPrayerId =
           (id >= 100 && id <= 114) ||
+          (id >= 1000 && id <= 1014) ||
           (id >= 3000 && id <= 3014) ||
-          (id >= 5000 && id <= 5014);
+          (id >= 4000 && id <= 4014) ||
+          (id >= 5000 && id <= 5014) ||
+          (id >= 6000 && id <= 6014);
       if (isPrayerId) continue;
 
       idsToCancel.add(id);

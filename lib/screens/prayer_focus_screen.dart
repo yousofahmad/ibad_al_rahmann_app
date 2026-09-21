@@ -365,10 +365,12 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
       if (tempRaw != null) {
         try { tempMap.addAll(json.decode(tempRaw) as Map<String, dynamic>); } catch (_) {}
       }
-      if (status == null) {
-        tempMap[prayer] = false;
+      String actualKey = prayer;
+      if (actualKey == 'الجمعة') actualKey = 'الظهر';
+      if (status == null || status == 'missed') {
+        tempMap[actualKey] = false;
       } else {
-        tempMap[prayer] = true;
+        tempMap[actualKey] = true;
       }
       AppLogger.log("PrayerFocus", "writing prayer_focus_log_$dateKey: ${json.encode(logMap)} AND temp_prayers: ${json.encode(tempMap)}");
       await prefs.setString('temp_prayers', json.encode(tempMap));

@@ -235,7 +235,8 @@ object PrayerFocusOverlay {
         cancelSnooze(context)
 
         if (!isPreview) {
-            val dayStr = resolveIslamicDay(prefs)
+            val todayCivilStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(now))
+            val dayStr = if (prayerName == "الفجر" || alarmId == 100) todayCivilStr else resolveIslamicDay(prefs)
             val logKey = "flutter.prayer_focus_log_$dayStr"
             val logStr = prefs.getString(logKey, null) ?: prefs.getString("prayer_focus_log_$dayStr", null)
             if (logStr != null) {
@@ -923,7 +924,9 @@ object PrayerFocusOverlay {
             (raw as? Number)?.toLong() ?: raw?.toString()?.toLongOrNull() ?: -1L
         } catch (_: Exception) { -1L }
 
-        if (fajrEpoch > 0 && now < fajrEpoch) {
+        // Only consider it yesterday if it is strictly before Fajr by a clear margin (more than 15 minutes before Fajr)
+        // Within 15 minutes of Fajr or after Fajr, it belongs to today's civil date!
+        if (fajrEpoch > 0 && now < (fajrEpoch - 15 * 60 * 1000L)) {
             cal.timeInMillis = now
             cal.add(Calendar.DAY_OF_YEAR, -1)
             return sdf.format(cal.time)
@@ -946,7 +949,7 @@ object PrayerFocusOverlay {
         map.put(prayerName, entry)
         prefs.edit().putString(key, map.toString()).apply()
 
-        // Also automatically update flutter.temp_prayers for Hasib Nafsak
+        // Also automatically update flutter.temp_prayers and current_day_date for Hasib Nafsak
         try {
             val tempKey = "flutter.temp_prayers"
             val tempJson = prefs.getString(tempKey, null)
@@ -954,7 +957,10 @@ object PrayerFocusOverlay {
             var pKey = prayerName
             if (pKey == "الجمعة") pKey = "الظهر"
             tempMap.put(pKey, true)
-            prefs.edit().putString(tempKey, tempMap.toString()).apply()
+            prefs.edit()
+                .putString(tempKey, tempMap.toString())
+                .putString("flutter.current_day_date", dayStr)
+                .apply()
         } catch (_: Exception) {}
     }
 

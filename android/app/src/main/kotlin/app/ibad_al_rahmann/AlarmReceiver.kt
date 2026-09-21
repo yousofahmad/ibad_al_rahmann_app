@@ -570,18 +570,6 @@ class AlarmReceiver : BroadcastReceiver() {
     }
 
     private fun refreshFromStoredEpochs(context: Context) {
-        // Clear ghost broadcast alarms from the old broken logic
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        for (id in 100..115) {
-            val intent = Intent(context, AlarmReceiver::class.java)
-            val pi = PendingIntent.getBroadcast(
-                context, id, intent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            alarmManager.cancel(pi)
-            pi.cancel()
-        }
-
         NativePrayerScheduler.scheduleToday(context)
         NativeAzkarScheduler.scheduleAzkar(context)
 
@@ -596,7 +584,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 // Use startForegroundService on Android 8+ (it works reliably from alarm receivers)
                 // On Android 12+ it may throw, which we catch below
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(svcIntent)
+                    try { context.startForegroundService(svcIntent) } catch (e: Exception) { e.printStackTrace(); try { context.startService(svcIntent) } catch (e2: Exception) {} }
                 } else {
                     context.startService(svcIntent)
                 }
@@ -628,7 +616,7 @@ class AlarmReceiver : BroadcastReceiver() {
         }
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(svcIntent)
+            try { context.startForegroundService(svcIntent) } catch (e: Exception) { e.printStackTrace(); try { context.startService(svcIntent) } catch (e2: Exception) {} }
         } else {
             context.startService(svcIntent)
         }
@@ -688,7 +676,7 @@ class AlarmReceiver : BroadcastReceiver() {
             }
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(svcIntent)
+                try { context.startForegroundService(svcIntent) } catch (e: Exception) { e.printStackTrace(); try { context.startService(svcIntent) } catch (e2: Exception) {} }
             } else {
                 context.startService(svcIntent)
             }
