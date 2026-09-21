@@ -968,15 +968,17 @@ class PrayerService extends ChangeNotifier {
 
   static HijriCalendar getHijriWithOffset(int remoteOffset, [DateTime? date]) {
     final baseDate = date ?? DateTime.now();
+    final isEgyptian = isEgyptianSystem;
     
-    // الأولوية 1: local_hijri_offset (المحسوب من API دار الإفتاء)
-    final localOffset = CacheHelper.prefs.getInt('local_hijri_offset');
-    final manualAdjustment = CacheHelper.prefs.getInt('manual_day_adjustment') ?? 0;
+    // الأولوية 1: local_hijri_offset (خاص بالنظام المصري فقط عند توفره)
+    final localOffset = isEgyptian ? CacheHelper.prefs.getInt('local_hijri_offset') : null;
+    final manualAdjustment = isEgyptian ? 0 : (CacheHelper.prefs.getInt('manual_day_adjustment') ?? 0);
     
-    // لو فيه تأكيد محلي، نتجاهل الفايربيز تماماً في مصر
+    // في النظام المصري نعتمد على localOffset أو remoteOffset تلقائياً
+    // في نظام أم القرى نعتمد على الحساب الفلكي + التعديل اليدوي فقط دون تدخل أي مصدر خارجي
     final offsetDays = (localOffset != null) 
-        ? localOffset + manualAdjustment 
-        : remoteOffset + manualAdjustment;
+        ? localOffset 
+        : (isEgyptian ? remoteOffset : remoteOffset + manualAdjustment);
 
     DateTime effectiveDate = baseDate.add(Duration(days: offsetDays));
 
@@ -995,7 +997,7 @@ class PrayerService extends ChangeNotifier {
     final gDateStr = "${baseDate.year}-${baseDate.month.toString().padLeft(2, '0')}-${baseDate.day.toString().padLeft(2, '0')}";
     CacheHelper.prefs.setString('shared_hijri_date', hijriStr);
     CacheHelper.prefs.setString('shared_hijri_date_$gDateStr', hijriStr);
-    AppLogger.log("PrayerService", "getHijriWithOffset() -> baseDate: ${baseDate.toIso8601String()}, localOffset: $localOffset, manual: $manualAdjustment, remote: $remoteOffset, effective: ${effectiveDate.toIso8601String()}, Hijri: $hijriStr");
+    AppLogger.log("PrayerService", "getHijriWithOffset() [${isEgyptian ? 'Egyptian' : 'UmmAlQura'}] -> baseDate: ${baseDate.toIso8601String()}, localOffset: $localOffset, manual: $manualAdjustment, remote: $remoteOffset, effective: ${effectiveDate.toIso8601String()}, Hijri: $hijriStr");
     return h;
   }
 

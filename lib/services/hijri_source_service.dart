@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:hijri/hijri_calendar.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:home_widget/home_widget.dart';
+import 'package:ibad_al_rahmann/services/prayer_service.dart';
 
 class EgyptDarAlIftaProvider {
   static const String apiUrl = 'https://di107.dar-alifta.org/api/HijriDate?langID=2';
@@ -88,6 +89,11 @@ class HijriSourceService {
 
   /// Attempts to fetch and save the offset once per day.
   static Future<void> syncOffsetIfNeeded() async {
+    if (!PrayerService.isEgyptianSystem) {
+      AppLogger.log('HijriSync', 'syncOffsetIfNeeded: Skipped because active system is Umm Al-Qura.');
+      return;
+    }
+
     final prefs = CacheHelper.prefs;
     final todayStr = DateTime.now().toString().substring(0, 10);
     
