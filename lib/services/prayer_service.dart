@@ -15,7 +15,6 @@ import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:geocoding/geocoding.dart';
 import 'remote_config_service.dart';
 import 'package:ibad_al_rahmann/services/app_logger.dart';
-import 'package:ibad_al_rahmann/services/hijri_source_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../../firebase_options.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
@@ -1016,7 +1015,7 @@ class PrayerService extends ChangeNotifier {
     await prefs.setInt(keyHijriOffsetMonth, hDate.hMonth);
     await prefs.setString('shared_hijri_date', "\u200F${hDate.hDay} ${hDate.longMonthName} ${hDate.hYear}\u200F");
     notifyListeners();
-    await scheduleNotifications(isUserAction: true);
+    try { await scheduleNotifications(isUserAction: true); } catch (_) {}
   }
 
   Future<void> setLocalHijriDelta(int delta) async {
@@ -1024,7 +1023,7 @@ class PrayerService extends ChangeNotifier {
     final prefs = CacheHelper.prefs;
     await prefs.setInt(keyLocalHijriDelta, delta);
     notifyListeners();
-    await scheduleNotifications(isUserAction: true);
+    try { await scheduleNotifications(isUserAction: true); } catch (_) {}
   }
 
   static const String keyHijriSystem = 'hijri_system';
@@ -1040,25 +1039,12 @@ class PrayerService extends ChangeNotifier {
     final prefs = CacheHelper.prefs;
     await prefs.setString(keyHijriSystem, system);
     notifyListeners();
-    await scheduleNotifications(isUserAction: true);
-  }
-
-  static const String unconfirmedHijriMessage = "محتاج اتصال إنترنت لعرض التوقيت المصري المؤكد";
-
-  static bool get isStrictConfirmedMode =>
-      CacheHelper.prefs.getBool('strict_confirmed_hijri_mode') ?? false;
-
-  static bool get isHijriDateReadyForDisplay {
-    if (!isStrictConfirmedMode) return true;
-    return HijriSourceService.hasConfirmedToday();
+    try { await scheduleNotifications(isUserAction: true); } catch (_) {}
   }
 
   HijriCalendar getAdjustedHijri() => getHijriWithOffset(hijriOffset);
 
   String getAdjustedHijriString() {
-    if (isStrictConfirmedMode && !HijriSourceService.hasConfirmedToday()) {
-      return unconfirmedHijriMessage;
-    }
     HijriCalendar.setLocal('ar');
     final h = getAdjustedHijri();
     return '${h.hDay} ${h.longMonthName} ${h.hYear} هـ';

@@ -499,8 +499,6 @@ class _TaqwimPage extends StatelessWidget {
     final gregMonthYear = DateFormat('MMMM yyyy', 'ar').format(date);
 
     final isFriday = date.weekday == DateTime.friday;
-    final isToday = DateUtils.isSameDay(date, DateTime.now());
-    final isUnconfirmedToday = isToday && !PrayerService.isHijriDateReadyForDisplay;
     const goldColor = Color(0xFFD0A871);
 
     // Use forced color if provided, otherwise theme-based default
@@ -586,29 +584,13 @@ class _TaqwimPage extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          isUnconfirmedToday
-                              ? Expanded(
-                                  child: Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 4.w),
-                                    child: Text(
-                                      PrayerService.unconfirmedHijriMessage,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontFamily: AppConsts.cairo,
-                                        fontSize: 10.5.sp,
-                                        color: goldColor,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              : _buildDateSide(
-                                  hijri.hDay.toString(),
-                                  hijri.longMonthName,
-                                  "${hijri.hYear} هـ",
-                                  isFriday ? Colors.redAccent : goldColor,
-                                  textColor,
-                                ),
+                          _buildDateSide(
+                            hijri.hDay.toString(),
+                            hijri.longMonthName,
+                            "${hijri.hYear} هـ",
+                            isFriday ? Colors.redAccent : goldColor,
+                            textColor,
+                          ),
                           Container(
                             height: 40.h,
                             width: 1.w,
