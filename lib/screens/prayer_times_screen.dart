@@ -309,12 +309,17 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   Widget build(BuildContext context) {
     final hijriOffset = PrayerService().hijriOffset;
     final selectedHijri = PrayerService.getHijriWithOffset(hijriOffset, _selectedDate);
-    final hijriStrRaw =
-        "${selectedHijri.hDay} ${selectedHijri.longMonthName} ${selectedHijri.hYear}";
-    final hijriStr = AppFormatters.toArabicDigits(hijriStrRaw);
+    final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
+    final String hijriStr;
+    if (isToday && !PrayerService.isHijriDateReadyForDisplay) {
+      hijriStr = PrayerService.unconfirmedHijriMessage;
+    } else {
+      final hijriStrRaw =
+          "${selectedHijri.hDay} ${selectedHijri.longMonthName} ${selectedHijri.hYear}";
+      hijriStr = AppFormatters.toArabicDigits(hijriStrRaw);
+    }
     final gregStrRaw = DateFormat('d MMMM yyyy', 'ar').format(_selectedDate);
     final gregStr = AppFormatters.toArabicDigits(gregStrRaw);
-    final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,

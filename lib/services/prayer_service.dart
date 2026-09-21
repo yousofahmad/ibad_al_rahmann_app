@@ -15,6 +15,7 @@ import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:geocoding/geocoding.dart';
 import 'remote_config_service.dart';
 import 'package:ibad_al_rahmann/services/app_logger.dart';
+import 'package:ibad_al_rahmann/services/hijri_source_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../../firebase_options.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
@@ -1024,8 +1025,26 @@ class PrayerService extends ChangeNotifier {
     await scheduleNotifications(isUserAction: true);
   }
 
+  static const String unconfirmedHijriMessage = "محتاج اتصال إنترنت لعرض التوقيت المصري المؤكد";
+
+  static bool get isStrictConfirmedMode =>
+      CacheHelper.prefs.getBool('strict_confirmed_hijri_mode') ?? false;
+
+  static bool get isHijriDateReadyForDisplay {
+    if (!isStrictConfirmedMode) return true;
+    return HijriSourceService.hasConfirmedToday();
+  }
+
   HijriCalendar getAdjustedHijri() => getHijriWithOffset(hijriOffset);
-  String getAdjustedHijriString() { HijriCalendar.setLocal('ar'); final h = getAdjustedHijri(); return '${h.hDay} ${h.longMonthName} ${h.hYear} هـ'; }
+
+  String getAdjustedHijriString() {
+    if (isStrictConfirmedMode && !HijriSourceService.hasConfirmedToday()) {
+      return unconfirmedHijriMessage;
+    }
+    HijriCalendar.setLocal('ar');
+    final h = getAdjustedHijri();
+    return '${h.hDay} ${h.longMonthName} ${h.hYear} هـ';
+  }
   Future<void> setIs24Hour(bool value) async { _is24Hour = value; final prefs = CacheHelper.prefs; await prefs.setBool(keyIs24Hour, value); notifyListeners(); }
   String formatTime(DateTime time) => _is24Hour ? DateFormat('HH:mm').format(time) : DateFormat.jm('ar').format(time);
 

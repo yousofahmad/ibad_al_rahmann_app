@@ -278,13 +278,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final countdownStr =
         "${twoDigits(_timeUntilNext.inHours)}:${twoDigits(_timeUntilNext.inMinutes.remainder(60))}:${twoDigits(_timeUntilNext.inSeconds.remainder(60))}";
 
+    final dateText = PrayerService.isHijriDateReadyForDisplay
+        ? "${hijri.toFormat("dd MMMM yyyy")} | ${DateFormat("EEEE", 'ar').format(now)}"
+        : "${PrayerService.unconfirmedHijriMessage} | ${DateFormat("EEEE", 'ar').format(now)}";
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.only(left: 20.w, right: 20.w, bottom: 10.h, top: 5.h),
       child: Column(
         children: [
           Text(
-            "${hijri.toFormat("dd MMMM yyyy")} | ${DateFormat("EEEE", 'ar').format(now)}",
+            dateText,
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: const Color(0xFFD0A871),
               fontSize: 11.sp,

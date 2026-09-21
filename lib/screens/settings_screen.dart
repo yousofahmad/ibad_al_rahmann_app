@@ -97,6 +97,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
   bool _useCustomVolume = false;
   int _customVolume = 100;
   String _audioStream = 'alarm';
+  bool _strictConfirmedHijri = false;
   bool _enableNativeLogging = true;
   bool _isSyncingToDrive = false;
   String? _googleEmail;
@@ -120,6 +121,8 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
       setState(() {
         _persistentNotification =
             prefs.getBool('persistent_notification_enabled') ?? true;
+        _strictConfirmedHijri =
+            prefs.getBool('strict_confirmed_hijri_mode') ?? false;
         _autoSyncDrive = prefs.getBool('auto_sync_drive') ?? false;
         _flipToMute = prefs.getBool('flip_to_mute') ?? false;
         _overrideSilent = prefs.getBool('override_silent_mode') ?? false;
@@ -419,6 +422,20 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
               FontAwesomeIcons.calendarDays,
               onTap: () => Navigator.pushNamed(context, '/hijri_confirmation'),
             ),
+          _buildListTile(
+            "توقيت مصر المؤكد",
+            "التاريخ الهجري من مصدر رسمي مؤكد بس، محتاج إنترنت دايمًا",
+            FontAwesomeIcons.circleCheck,
+            trailing: Switch(
+              value: _strictConfirmedHijri,
+              activeThumbColor: const Color(0xFFD0A871),
+              onChanged: (val) async {
+                setState(() => _strictConfirmedHijri = val);
+                await CacheHelper.prefs.setBool('strict_confirmed_hijri_mode', val);
+                _prayerService.refreshUI();
+              },
+            ),
+          ),
 
           // 2. Appearance
           _buildSectionHeader("المظهر"),
