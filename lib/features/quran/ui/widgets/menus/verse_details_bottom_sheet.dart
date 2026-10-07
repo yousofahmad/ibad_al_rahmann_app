@@ -25,7 +25,8 @@ class VerseDetailsBottomSheet extends StatefulWidget {
   final bool? isDarkOverride;
 
   @override
-  State<VerseDetailsBottomSheet> createState() => _VerseDetailsBottomSheetState();
+  State<VerseDetailsBottomSheet> createState() =>
+      _VerseDetailsBottomSheetState();
 }
 
 class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
@@ -61,10 +62,7 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
     setState(() => _isLoadingTafsir = true);
     final isDownloaded = await TafsirHelper.isBookDownloaded(_selectedBookId);
     if (isDownloaded || _selectedBookId == 'muyassar') {
-      await TafsirHelper.loadSurahTafsir(
-        _selectedBookId,
-        verse.surahNumber,
-      );
+      await TafsirHelper.loadSurahTafsir(_selectedBookId, verse.surahNumber);
     }
     if (mounted) {
       setState(() {
@@ -136,19 +134,16 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
     );
   }
 
-
   @override
   void dispose() {
-    // Stop the audio player when the bottom sheet is closed
-    if (mounted) {
-      context.read<VersePlayerCubit>().hide();
-    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final activeVerse = context.watch<VersePlayerCubit>().state.currentVerse ?? widget.currentVerse;
+    final activeVerse =
+        context.watch<VersePlayerCubit>().state.currentVerse ??
+        widget.currentVerse;
     if (_lastLoadedSurah != activeVerse.surahNumber) {
       _lastLoadedSurah = activeVerse.surahNumber;
       _loadTafsirForSelected(activeVerse);
@@ -175,9 +170,11 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
       (b) => b.id == _selectedBookId,
       orElse: () => TafsirHelper.defaultBooks.first,
     );
-    final bool isCurrentDownloaded = _downloadedStatus[currentBook.id] ?? currentBook.isBuiltIn;
+    final bool isCurrentDownloaded =
+        _downloadedStatus[currentBook.id] ?? currentBook.isBuiltIn;
     final bool isDownloadingCurrent = _isDownloading[currentBook.id] == true;
-    final double downloadProgressCurrent = _downloadProgress[currentBook.id] ?? 0.0;
+    final double downloadProgressCurrent =
+        _downloadProgress[currentBook.id] ?? 0.0;
 
     final tafsirText = isCurrentDownloaded
         ? TafsirHelper.getVerseTafsir(
@@ -212,7 +209,9 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                 ),
                 border: Border(
                   bottom: BorderSide(
-                    color: !isPaperDark ? Colors.grey.withAlpha(50) : Colors.white10,
+                    color: !isPaperDark
+                        ? Colors.grey.withAlpha(50)
+                        : Colors.white10,
                   ),
                 ),
               ),
@@ -286,16 +285,25 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                           },
                           borderRadius: BorderRadius.circular(8.r),
                           child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10.w,
+                              vertical: 4.h,
+                            ),
                             decoration: BoxDecoration(
                               color: goldColor.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8.r),
-                              border: Border.all(color: goldColor.withValues(alpha: 0.4)),
+                              border: Border.all(
+                                color: goldColor.withValues(alpha: 0.4),
+                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.copy_rounded, size: 14.sp, color: goldColor),
+                                Icon(
+                                  Icons.copy_rounded,
+                                  size: 14.sp,
+                                  color: goldColor,
+                                ),
                                 SizedBox(width: 4.w),
                                 Text(
                                   'نسخ التفسير',
@@ -321,7 +329,8 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                     child: Row(
                       children: books.map((book) {
                         final isSelected = book.id == _selectedBookId;
-                        final isDownloaded = _downloadedStatus[book.id] ?? book.isBuiltIn;
+                        final isDownloaded =
+                            _downloadedStatus[book.id] ?? book.isBuiltIn;
                         final isDown = _isDownloading[book.id] == true;
 
                         return Padding(
@@ -331,14 +340,23 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                             borderRadius: BorderRadius.circular(12.r),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
-                              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 12.w,
+                                vertical: 8.h,
+                              ),
                               decoration: BoxDecoration(
                                 color: isSelected
                                     ? goldColor.withValues(alpha: 0.15)
-                                    : (isPaperDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.08)),
+                                    : (isPaperDark
+                                          ? Colors.white10
+                                          : Colors.grey.withValues(
+                                              alpha: 0.08,
+                                            )),
                                 borderRadius: BorderRadius.circular(12.r),
                                 border: Border.all(
-                                  color: isSelected ? goldColor : Colors.transparent,
+                                  color: isSelected
+                                      ? goldColor
+                                      : Colors.transparent,
                                   width: 1.5,
                                 ),
                               ),
@@ -351,7 +369,9 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                                       height: 14.w,
                                       child: const CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation(goldColor),
+                                        valueColor: AlwaysStoppedAnimation(
+                                          goldColor,
+                                        ),
                                       ),
                                     ),
                                     SizedBox(width: 6.w),
@@ -359,7 +379,9 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                                     Icon(
                                       Icons.cloud_download_outlined,
                                       size: 15.sp,
-                                      color: isSelected ? goldColor : Colors.grey,
+                                      color: isSelected
+                                          ? goldColor
+                                          : Colors.grey,
                                     ),
                                     SizedBox(width: 4.w),
                                   ],
@@ -368,7 +390,9 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                                     style: TextStyle(
                                       fontFamily: AppConsts.expoArabic,
                                       fontSize: 12.sp,
-                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
                                       color: isSelected
                                           ? goldColor
                                           : onSurface.withValues(alpha: 0.75),
@@ -392,10 +416,12 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                           padding: EdgeInsets.all(20.0),
                           child: CircularProgressIndicator(color: goldColor),
                         ),
-                      )
+                      ),
                     ] else ...[
                       SelectableText(
-                        tafsirText.isNotEmpty ? tafsirText : 'لا يتوفر نص تفسير لهذه الآية.',
+                        tafsirText.isNotEmpty
+                            ? tafsirText
+                            : 'لا يتوفر نص تفسير لهذه الآية.',
                         textAlign: TextAlign.right,
                         textDirection: TextDirection.rtl,
                         style: TextStyle(
@@ -412,9 +438,13 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                       width: double.infinity,
                       padding: EdgeInsets.all(16.w),
                       decoration: BoxDecoration(
-                        color: isPaperDark ? const Color(0xFF1E1E1E) : const Color(0xFFF9F9F9),
+                        color: isPaperDark
+                            ? const Color(0xFF1E1E1E)
+                            : const Color(0xFFF9F9F9),
                         borderRadius: BorderRadius.circular(16.r),
-                        border: Border.all(color: goldColor.withValues(alpha: 0.25)),
+                        border: Border.all(
+                          color: goldColor.withValues(alpha: 0.25),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -446,7 +476,10 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                           if (currentBook.size != null) ...[
                             SizedBox(height: 6.h),
                             Container(
-                              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 3.h),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 10.w,
+                                vertical: 3.h,
+                              ),
                               decoration: BoxDecoration(
                                 color: goldColor.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(8.r),
@@ -469,10 +502,16 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(6.r),
                                   child: LinearProgressIndicator(
-                                    value: downloadProgressCurrent > 0 ? downloadProgressCurrent : null,
+                                    value: downloadProgressCurrent > 0
+                                        ? downloadProgressCurrent
+                                        : null,
                                     minHeight: 8.h,
-                                    backgroundColor: goldColor.withValues(alpha: 0.15),
-                                    valueColor: const AlwaysStoppedAnimation(goldColor),
+                                    backgroundColor: goldColor.withValues(
+                                      alpha: 0.15,
+                                    ),
+                                    valueColor: const AlwaysStoppedAnimation(
+                                      goldColor,
+                                    ),
                                   ),
                                 ),
                                 SizedBox(height: 6.h),
@@ -501,7 +540,10 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                                   elevation: 0,
                                 ),
                                 onPressed: () => _startDownload(currentBook),
-                                icon: const Icon(Icons.download_rounded, size: 20),
+                                icon: const Icon(
+                                  Icons.download_rounded,
+                                  size: 20,
+                                ),
                                 label: Text(
                                   'تحميل ${currentBook.name}',
                                   style: TextStyle(
@@ -567,4 +609,3 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
     );
   }
 }
-

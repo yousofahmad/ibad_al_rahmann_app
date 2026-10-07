@@ -58,7 +58,9 @@ class ReciterWidget extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: primaryColor.withValues(alpha: isDark ? 0.2 : 0.1),
                   shape: BoxShape.circle,
-                  border: Border.all(color: primaryColor.withValues(alpha: 0.4)),
+                  border: Border.all(
+                    color: primaryColor.withValues(alpha: 0.4),
+                  ),
                 ),
                 child: Icon(
                   Icons.headphones_rounded,
@@ -88,9 +90,14 @@ class ReciterWidget extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 8.w,
+                            vertical: 2.h,
+                          ),
                           decoration: BoxDecoration(
-                            color: primaryColor.withValues(alpha: isDark ? 0.2 : 0.1),
+                            color: primaryColor.withValues(
+                              alpha: isDark ? 0.2 : 0.1,
+                            ),
                             borderRadius: BorderRadius.circular(6.r),
                           ),
                           child: Text(
@@ -105,35 +112,52 @@ class ReciterWidget extends StatelessWidget {
                         ),
                         SizedBox(width: 6.w),
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 8.w,
+                            vertical: 2.h,
+                          ),
                           decoration: BoxDecoration(
                             color: reciter.hasSegments
-                                ? primaryColor.withValues(alpha: isDark ? 0.25 : 0.15)
-                                : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                                ? primaryColor.withValues(
+                                    alpha: isDark ? 0.25 : 0.15,
+                                  )
+                                : (isDark
+                                      ? Colors.white10
+                                      : Colors.black.withValues(alpha: 0.05)),
                             borderRadius: BorderRadius.circular(6.r),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                reciter.hasSegments
-                                    ? Icons.auto_stories_rounded
-                                    : Icons.library_music_rounded,
+                                reciter.highlightSupport ==
+                                        ReciterHighlightSupport.wordByWord
+                                    ? Icons.spellcheck_rounded
+                                    : (reciter.hasSegments
+                                        ? Icons.auto_stories_rounded
+                                        : Icons.library_music_rounded),
                                 size: 11.sp,
                                 color: reciter.hasSegments
                                     ? primaryColor
-                                    : (isDark ? Colors.white70 : Colors.black54),
+                                    : (isDark
+                                          ? Colors.white70
+                                          : Colors.black54),
                               ),
                               SizedBox(width: 4.w),
                               Text(
-                                reciter.hasSegments
-                                    ? 'أصوات متقسمة آيات'
-                                    : 'سورة كاملة',
+                                reciter.highlightSupport ==
+                                        ReciterHighlightSupport.wordByWord
+                                    ? 'مقسم كلمات وآيات'
+                                    : (reciter.hasSegments
+                                        ? 'أصوات مقسمة آيات'
+                                        : 'سورة كاملة'),
                                 style: TextStyle(
                                   fontFamily: AppConsts.cairo,
                                   color: reciter.hasSegments
                                       ? primaryColor
-                                      : (isDark ? Colors.white70 : Colors.black54),
+                                      : (isDark
+                                            ? Colors.white70
+                                            : Colors.black54),
                                   fontSize: 9.5.sp,
                                   fontWeight: FontWeight.bold,
                                 ),

@@ -3,8 +3,8 @@ import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
-import 'package:ibad_al_rahmann/features/accountability/accountability_sync_service.dart';
 import '../core/helpers/islamic_day.dart';
+import '../core/helpers/prayer_day_helper.dart';
 
 class DailyTrackerService {
   static const String _lastStreakDateKey = 'last_streak_date';
@@ -61,7 +61,8 @@ class DailyTrackerService {
     if (currentTotalCount >= (requiredTotalCount * 0.5)) {
       final prefs = CacheHelper.prefs;
       final String dateStr = await _getCycleDate(category);
-      final String streakRecordedKey = '$_dailyPrefix${dateStr}_${category}_streak_recorded';
+      final String streakRecordedKey =
+          '$_dailyPrefix${dateStr}_${category}_streak_recorded';
       if (!prefs.containsKey(streakRecordedKey)) {
         await prefs.setBool(streakRecordedKey, true);
         await _updateStreak(prefs, dateStr, category);
@@ -202,14 +203,14 @@ class DailyTrackerService {
     final prefs = CacheHelper.prefs;
     final weekId = getKahfWeekId();
     final lastWeek = prefs.getString('kahf_last_week_reset');
-    
+
     if (lastWeek != weekId) {
       // It's a new week, reset progress automatically
       await prefs.setString('kahf_last_week_reset', weekId);
       await prefs.remove('progress_kahf_page');
       return null;
     }
-    
+
     return prefs.getInt('progress_kahf_page');
   }
 
@@ -233,7 +234,7 @@ class DailyTrackerService {
   /// Also handles resetting temporary progress keys for the new day.
   static Future<void> initStatsForToday() async {
     final prefs = CacheHelper.prefs;
-    final String today = await IslamicDay.todayKey();
+    final String today = PrayerDayHelper.getActivePrayerCycleDate();
 
     // 1. Handle Reset of Temporary Keys
     final String? lastResetDate = prefs.getString('current_day_date');
@@ -270,14 +271,16 @@ class DailyTrackerService {
   /// Marks a Wird as completed for today. Called automatically from WirdCompletionService.
   static Future<void> markWirdDone(String label, {String? dateKey}) async {
     final prefs = CacheHelper.prefs;
-    final String dateStr = dateKey ?? await IslamicDay.todayKey();
+    final String dateStr =
+        dateKey ?? PrayerDayHelper.getActivePrayerCycleDate();
     await prefs.setBool('wird_done_${label}_$dateStr', true);
   }
 
   /// Checks if a Wird is completed for today.
   static Future<bool> isWirdDone(String label, {String? dateKey}) async {
     final prefs = CacheHelper.prefs;
-    final String dateStr = dateKey ?? await IslamicDay.todayKey();
+    final String dateStr =
+        dateKey ?? PrayerDayHelper.getActivePrayerCycleDate();
     return prefs.getBool('wird_done_${label}_$dateStr') ?? false;
   }
 }

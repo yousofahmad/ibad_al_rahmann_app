@@ -213,7 +213,7 @@ class MainActivity: AudioServiceFragmentActivity() {
                 val isPersistentEnabled = fp.getBoolean("flutter.persistent_notification_enabled", true)
                 if (isPersistentEnabled) {
                     val svcIntent = Intent(this, PrayerNotificationService::class.java).apply { action = "SYNC" }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(svcIntent)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) try { startForegroundService(svcIntent) } catch (e: Exception) { e.printStackTrace(); try { startService(svcIntent) } catch (e2: Exception) {} }
                     else startService(svcIntent)
                 }
 
@@ -299,9 +299,15 @@ class MainActivity: AudioServiceFragmentActivity() {
 
 
 
+    override fun onResume() {
+        super.onResume()
+        NotificationDismissReceiver.cleanupEmptyGroupSummaries(this)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        NotificationDismissReceiver.cleanupEmptyGroupSummaries(this)
         val target = intent.getStringExtra("target_page") ?: intent.getStringExtra("payload")
         NativeLogger.log(this, "MainActivity.onNewIntent payload detected: $target | channel ready: ${BackgroundMethodChannelPlugin.currentChannel != null}")
         if (target != null) {

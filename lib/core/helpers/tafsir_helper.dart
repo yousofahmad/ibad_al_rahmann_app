@@ -104,7 +104,8 @@ class TafsirHelper {
   static String normalizeDownloadUrl(String url) {
     // 1. Google Drive Links
     if (url.contains('drive.google.com')) {
-      final match = RegExp(r'/d/([a-zA-Z0-9_-]+)').firstMatch(url) ??
+      final match =
+          RegExp(r'/d/([a-zA-Z0-9_-]+)').firstMatch(url) ??
           RegExp(r'id=([a-zA-Z0-9_-]+)').firstMatch(url);
       if (match != null) {
         final fileId = match.group(1);
@@ -145,7 +146,9 @@ class TafsirHelper {
         const configUrl = '${_repoBaseUrl}app_config.json';
         final response = await dio.get(configUrl);
         if (response.statusCode == 200) {
-          final data = response.data is String ? json.decode(response.data) : response.data;
+          final data = response.data is String
+              ? json.decode(response.data)
+              : response.data;
           if (data is Map && data['tafseer_books'] is List) {
             _mergeBooks(data['tafseer_books'] as List);
             return;
@@ -157,7 +160,9 @@ class TafsirHelper {
       const indexUrl = '${_repoBaseUrl}tafseer/tafseer_index.json';
       final response = await dio.get(indexUrl);
       if (response.statusCode == 200) {
-        final data = response.data is String ? json.decode(response.data) : response.data;
+        final data = response.data is String
+            ? json.decode(response.data)
+            : response.data;
         if (data is List) {
           _mergeBooks(data);
         }
@@ -226,9 +231,20 @@ class TafsirHelper {
       if (jsonResponse is List) {
         for (var item in jsonResponse) {
           if (item is Map) {
-            final surah = item['number'] ?? item['surah'] ?? item['sura'] ?? item['surah_number'] ?? 0;
-            final ayah = item['aya'] ?? item['ayah'] ?? item['verse'] ?? item['verse_number'] ?? 0;
-            final text = item['text'] ?? item['tafsir'] ?? item['tafseer'] ?? '';
+            final surah =
+                item['number'] ??
+                item['surah'] ??
+                item['sura'] ??
+                item['surah_number'] ??
+                0;
+            final ayah =
+                item['aya'] ??
+                item['ayah'] ??
+                item['verse'] ??
+                item['verse_number'] ??
+                0;
+            final text =
+                item['text'] ?? item['tafsir'] ?? item['tafseer'] ?? '';
             final sNum = int.tryParse(surah.toString()) ?? 0;
             final aNum = int.tryParse(ayah.toString()) ?? 0;
             if (sNum > 0 && aNum > 0) {
@@ -247,15 +263,23 @@ class TafsirHelper {
     if (raw.isEmpty) return '';
     var text = raw;
     // Format paragraph breaks
-    text = text.replaceAll(RegExp(r'</p>\s*<p[^>]*>', caseSensitive: false), '\n\n');
+    text = text.replaceAll(
+      RegExp(r'</p>\s*<p[^>]*>', caseSensitive: false),
+      '\n\n',
+    );
     text = text.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
     text = text.replaceAll(RegExp(r'</?p[^>]*>', caseSensitive: false), '');
     // Replace Quranic text span tags with text
-    text = text.replaceAllMapped(RegExp(r'<span[^>]*>(.*?)</span>', dotAll: true), (m) => m.group(1) ?? '');
+    text = text.replaceAllMapped(
+      RegExp(r'<span[^>]*>(.*?)</span>', dotAll: true),
+      (m) => m.group(1) ?? '',
+    );
     // Strip remaining HTML tags like <div>, etc.
     text = text.replaceAll(RegExp(r'<[^>]*>'), '');
     // Clean footnotes [[...]] into (..)
-    text = text.replaceAllMapped(RegExp(r'\[\[(.*?)\]\]', dotAll: true), (match) {
+    text = text.replaceAllMapped(RegExp(r'\[\[(.*?)\]\]', dotAll: true), (
+      match,
+    ) {
       final inside = match.group(1)?.trim() ?? '';
       return inside.isNotEmpty ? ' ($inside)' : '';
     });
@@ -325,7 +349,11 @@ class TafsirHelper {
   }
 
   /// Synchronously or cached retrieval of verse Tafsir.
-  static String getVerseTafsir(int surahNumber, int verseNumber, {String? bookId}) {
+  static String getVerseTafsir(
+    int surahNumber,
+    int verseNumber, {
+    String? bookId,
+  }) {
     final targetId = bookId ?? getSelectedBookId();
     if (targetId == 'muyassar') {
       return _muyassarCache['${surahNumber}_$verseNumber'] ?? '';
@@ -365,11 +393,15 @@ class TafsirHelper {
       // Clean previous failed attempts or leftover temp files
       final tempZipFile = File('${bookDir.path}/download_temp.zip');
       if (await tempZipFile.exists()) {
-        try { await tempZipFile.delete(); } catch (_) {}
+        try {
+          await tempZipFile.delete();
+        } catch (_) {}
       }
       final completeFile = File('${bookDir.path}/.complete');
       if (await completeFile.exists()) {
-        try { await completeFile.delete(); } catch (_) {}
+        try {
+          await completeFile.delete();
+        } catch (_) {}
       }
 
       final zipUrl = normalizeDownloadUrl(book.url ?? book.id);
@@ -434,7 +466,10 @@ class TafsirHelper {
         }
         if (jsonFile == null) {
           if (await tempZipFile.exists()) await tempZipFile.delete();
-          onComplete(false, 'الملف المضغوط لا يحتوي على بيانات التفسير المطلوبة.');
+          onComplete(
+            false,
+            'الملف المضغوط لا يحتوي على بيانات التفسير المطلوبة.',
+          );
           return;
         }
         final jsonContent = utf8.decode(jsonFile.content as List<int>);
@@ -488,24 +523,28 @@ class TafsirHelper {
           }
           if (sNum >= 1 && sNum <= 114 && aNum > 0) {
             // Extract the specific ayah text if it is grouped using brackets
-            final regex = RegExp(r'[\{\(\[﴿]' + aNum.toString() + r'[\}\)\]﴾](.*?)(?=\s*[\{\(\[﴿]\d+[\}\)\]﴾]|$)', dotAll: true);
+            final regex = RegExp(
+              r'[\{\(\[﴿]' +
+                  aNum.toString() +
+                  r'[\}\)\]﴾](.*?)(?=\s*[\{\(\[﴿]\d+[\}\)\]﴾]|$)',
+              dotAll: true,
+            );
             final match = regex.firstMatch(text);
             if (match != null) {
               text = match.group(0)!.trim();
             }
 
             final cleaned = cleanTafsirText(text);
-            surahsAyahs[sNum]?.add({
-              'ayah': aNum,
-              'text': cleaned,
-            });
+            surahsAyahs[sNum]?.add({'ayah': aNum, 'text': cleaned});
           }
         }
       });
 
       for (int s = 1; s <= 114; s++) {
         final ayahsList = surahsAyahs[s] ?? [];
-        ayahsList.sort((a, b) => (a['ayah'] as int).compareTo(b['ayah'] as int));
+        ayahsList.sort(
+          (a, b) => (a['ayah'] as int).compareTo(b['ayah'] as int),
+        );
         final surahJson = json.encode({'ayahs': ayahsList});
         final surahFile = File('${bookDir.path}/$s.json');
         await surahFile.writeAsString(surahJson);
@@ -539,28 +578,33 @@ class TafsirHelper {
   }
 }
 
-
 class TafsirExtractor {
   static String extractAyah(String text, int verseNumber) {
     if (text.isEmpty) return text;
-    
-    final markerRegex = RegExp(r'[\{\(\[﴿<]' + verseNumber.toString() + r'[\}\)\]﴾>]');
-    final prevMarkerRegex = RegExp(r'[\{\(\[﴿<]' + (verseNumber - 1).toString() + r'[\}\)\]﴾>]');
-    
+
+    final markerRegex = RegExp(
+      r'[\{\(\[﴿<]' + verseNumber.toString() + r'[\}\)\]﴾>]',
+    );
+    final prevMarkerRegex = RegExp(
+      r'[\{\(\[﴿<]' + (verseNumber - 1).toString() + r'[\}\)\]﴾>]',
+    );
+
     final currentMatch = markerRegex.firstMatch(text);
     final prevMatch = prevMarkerRegex.firstMatch(text);
-    
+
     bool hasAnyMarkers = RegExp(r'[\{\(\[﴿<]\d+[\}\)\]﴾>]').hasMatch(text);
     if (!hasAnyMarkers) return text;
 
     int startIndex = 0;
     int endIndex = text.length;
-    
+
     if (currentMatch != null) {
       if (prevMatch != null) {
         startIndex = prevMatch.end;
       } else {
-        final matches = RegExp(r'[\{\(\[﴿<](\d+)[\}\)\]﴾>]').allMatches(text.substring(0, currentMatch.start));
+        final matches = RegExp(
+          r'[\{\(\[﴿<](\d+)[\}\)\]﴾>]',
+        ).allMatches(text.substring(0, currentMatch.start));
         if (matches.isNotEmpty) {
           startIndex = matches.last.end;
         } else {
@@ -570,14 +614,16 @@ class TafsirExtractor {
       endIndex = currentMatch.end;
     } else if (prevMatch != null) {
       startIndex = prevMatch.end;
-      final matches = RegExp(r'[\{\(\[﴿<](\d+)[\}\)\]﴾>]').allMatches(text.substring(startIndex));
+      final matches = RegExp(
+        r'[\{\(\[﴿<](\d+)[\}\)\]﴾>]',
+      ).allMatches(text.substring(startIndex));
       if (matches.isNotEmpty) {
         endIndex = startIndex + matches.first.start;
       } else {
         endIndex = text.length;
       }
     }
-    
+
     return text.substring(startIndex, endIndex).trim();
   }
 }

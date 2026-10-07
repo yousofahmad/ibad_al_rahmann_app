@@ -7,7 +7,8 @@ class ShareCardCategory {
   factory ShareCardCategory.fromJson(Map<String, dynamic> json) {
     return ShareCardCategory(
       categoryName: json['category'] ?? '',
-      items: (json['items'] as List?)
+      items:
+          (json['items'] as List?)
               ?.map((i) => ShareCardItem.fromJson(i))
               .toList() ??
           [],
@@ -22,9 +23,6 @@ class ShareCardItem {
   ShareCardItem({required this.title, required this.url});
 
   factory ShareCardItem.fromJson(Map<String, dynamic> json) {
-    return ShareCardItem(
-      title: json['title'] ?? '',
-      url: json['url'] ?? '',
-    );
+    return ShareCardItem(title: json['title'] ?? '', url: json['url'] ?? '');
   }
 }

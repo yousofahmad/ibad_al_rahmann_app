@@ -68,10 +68,11 @@ class _BookmarksDialogState extends State<BookmarksDialog> {
     final paperColor = quranState.isWirdMode
         ? quranState.wirdPaperColor
         : quranState.quranPaperColor;
-    
+
     // Body background follows the Mushaf paper's brightness
-    final bool isPaperDark = (paperColor ?? Colors.white).computeLuminance() < 0.5;
-    
+    final bool isPaperDark =
+        (paperColor ?? Colors.white).computeLuminance() < 0.5;
+
     final dialogBg = isPaperDark ? const Color(0xFF000000) : Colors.white;
 
     return Dialog(

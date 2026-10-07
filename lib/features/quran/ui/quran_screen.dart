@@ -65,7 +65,6 @@ class _QuranScreenState extends State<QuranScreen> {
 
   Future<void> _initializeCache() async {
     try {
-      
       // Load separate page progress for Mushaf vs Wird vs Kahf
       if (widget.initialPage != null) {
         _cachedPage = widget.initialPage;
@@ -144,7 +143,8 @@ class _QuranScreenState extends State<QuranScreen> {
         listener: (context, playerState) {
           final verse = playerState.currentVerse;
           if (verse != null) {
-            final pageIndex = quran.getPageNumber(verse.surahNumber, verse.verseNumber) - 1;
+            final pageIndex =
+                quran.getPageNumber(verse.surahNumber, verse.verseNumber) - 1;
             final quranCubit = context.read<QuranCubit>();
             if (quranCubit.state.currentPage != pageIndex) {
               quranCubit.jumpToPage(pageIndex);
@@ -152,69 +152,69 @@ class _QuranScreenState extends State<QuranScreen> {
           }
         },
         child: BlocBuilder<ThemeCubit, ThemeState>(
-        builder: (context, themeState) {
-          return BlocBuilder<QuranCubit, QuranState>(
-            builder: (context, quranState) {
-              ThemeData themeData = themeState.mode == ThemeMode.dark
-                  ? themeState.theme.dark
-                  : themeState.theme.light;
+          builder: (context, themeState) {
+            return BlocBuilder<QuranCubit, QuranState>(
+              builder: (context, quranState) {
+                ThemeData themeData = themeState.mode == ThemeMode.dark
+                    ? themeState.theme.dark
+                    : themeState.theme.light;
 
-              final paperColor = quranState.isKahfMode
-                  ? quranState.kahfPaperColor
-                  : (quranState.isWirdMode
-                      ? quranState.wirdPaperColor
-                      : quranState.quranPaperColor);
+                final paperColor = quranState.isKahfMode
+                    ? quranState.kahfPaperColor
+                    : (quranState.isWirdMode
+                          ? quranState.wirdPaperColor
+                          : quranState.quranPaperColor);
 
-              final isFullLayout =
-                  quranState.layout == QuranLayout.full ||
-                  quranState.isWirdMode ||
-                  quranState.isKahfMode;
+                final isFullLayout =
+                    quranState.layout == QuranLayout.full ||
+                    quranState.isWirdMode ||
+                    quranState.isKahfMode;
 
-              // The Mushaf background has two states:
-              // 1. Full Layout: Entire screen is the paper color (Special Treatment).
-              // 2. Minimized Layout: Background follows the app's primary theme color.
-              final effectiveBg = isFullLayout
-                  ? (paperColor ?? themeData.scaffoldBackgroundColor)
-                  : themeData.primaryColor;
+                // The Mushaf background has two states:
+                // 1. Full Layout: Entire screen is the paper color (Special Treatment).
+                // 2. Minimized Layout: Background follows the app's primary theme color.
+                final effectiveBg = isFullLayout
+                    ? (paperColor ?? themeData.scaffoldBackgroundColor)
+                    : themeData.primaryColor;
 
-              final isLight = effectiveBg.computeLuminance() > 0.5;
+                final isLight = effectiveBg.computeLuminance() > 0.5;
 
-              themeData = themeData.copyWith(
-                brightness: isLight ? Brightness.light : Brightness.dark,
-                scaffoldBackgroundColor: effectiveBg,
-                // Removed forced primaryColor/canvasColor overrides to respect the original theme colors
-                iconTheme: const IconThemeData(color: Colors.grey),
-              );
+                themeData = themeData.copyWith(
+                  brightness: isLight ? Brightness.light : Brightness.dark,
+                  scaffoldBackgroundColor: effectiveBg,
+                  // Removed forced primaryColor/canvasColor overrides to respect the original theme colors
+                  iconTheme: const IconThemeData(color: Colors.grey),
+                );
 
-              final bgColor = effectiveBg;
+                final bgColor = effectiveBg;
 
-              return Theme(
-                data: themeData,
-                child: AnnotatedRegion<SystemUiOverlayStyle>(
-                  value: SystemUiOverlayStyle(
-                    statusBarColor: Colors.transparent,
-                    statusBarIconBrightness: isLight
-                        ? Brightness.dark
-                        : Brightness.light,
-                    systemNavigationBarColor: Colors.transparent,
-                  ),
-                  child: Container(
-                    color: bgColor,
-                    child: Scaffold(
-                      backgroundColor: bgColor,
-                      extendBody: true, // FIX: Extends body behind bottom nav
-                      extendBodyBehindAppBar:
-                          true, // FIX: Extends body behind app bar
-                      resizeToAvoidBottomInset: false,
-                      body: const QuranScreenBody(),
+                return Theme(
+                  data: themeData,
+                  child: AnnotatedRegion<SystemUiOverlayStyle>(
+                    value: SystemUiOverlayStyle(
+                      statusBarColor: Colors.transparent,
+                      statusBarIconBrightness: isLight
+                          ? Brightness.dark
+                          : Brightness.light,
+                      systemNavigationBarColor: Colors.transparent,
+                    ),
+                    child: Container(
+                      color: bgColor,
+                      child: Scaffold(
+                        backgroundColor: bgColor,
+                        extendBody: true, // FIX: Extends body behind bottom nav
+                        extendBodyBehindAppBar:
+                            true, // FIX: Extends body behind app bar
+                        resizeToAvoidBottomInset: false,
+                        body: const QuranScreenBody(),
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
-          );
-        },
-      ),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }

@@ -128,7 +128,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               PageView(
                 controller: _controller,
                 onPageChanged: (index) {
-                  setState(() => isLastPage = index == 9); // 10 Pages total (0-9)
+                  setState(
+                    () => isLastPage = index == 9,
+                  ); // 10 Pages total (0-9)
                 },
                 children: [
                   // 0. Welcome Screen (Splash Style)

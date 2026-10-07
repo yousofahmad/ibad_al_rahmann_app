@@ -67,7 +67,10 @@ class _AzkarStatisticsScreenState extends State<AzkarStatisticsScreen> {
               return Directionality(
                 textDirection: TextDirection.rtl,
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.w,
+                    vertical: 12.h,
+                  ),
                   child: Column(
                     children: [
                       // Handle bar
@@ -113,10 +116,20 @@ class _AzkarStatisticsScreenState extends State<AzkarStatisticsScreen> {
                           separatorBuilder: (_, __) => SizedBox(height: 12.h),
                           itemBuilder: (context, i) {
                             final item = list[i];
-                            final text = (item['zekr'] ?? item['ARABIC_TEXT'] ?? item['content'] ?? '').toString().trim();
-                            final requiredCount = item['count'] is int ? item['count'] as int : 1;
-                            final itemTotalKey = 'azkar_item_total_${jsonFile}_$i';
-                            final totalRepeats = prefs.getInt(itemTotalKey) ?? 0;
+                            final text =
+                                (item['zekr'] ??
+                                        item['ARABIC_TEXT'] ??
+                                        item['content'] ??
+                                        '')
+                                    .toString()
+                                    .trim();
+                            final requiredCount = item['count'] is int
+                                ? item['count'] as int
+                                : 1;
+                            final itemTotalKey =
+                                'azkar_item_total_${jsonFile}_$i';
+                            final totalRepeats =
+                                prefs.getInt(itemTotalKey) ?? 0;
 
                             return Container(
                               padding: EdgeInsets.all(14.w),
@@ -143,13 +156,21 @@ class _AzkarStatisticsScreenState extends State<AzkarStatisticsScreen> {
                                   ),
                                   SizedBox(height: 10.h),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Container(
-                                        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 10.w,
+                                          vertical: 4.h,
+                                        ),
                                         decoration: BoxDecoration(
-                                          color: goldColor.withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(8.r),
+                                          color: goldColor.withValues(
+                                            alpha: 0.15,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8.r,
+                                          ),
                                         ),
                                         child: Text(
                                           "التكرار بالجلسة: ${requiredCount.toArabicDigits}",
@@ -162,12 +183,21 @@ class _AzkarStatisticsScreenState extends State<AzkarStatisticsScreen> {
                                         ),
                                       ),
                                       Container(
-                                        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 10.w,
+                                          vertical: 4.h,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: totalRepeats > 0
-                                              ? const Color(0xFF2E7D32).withValues(alpha: 0.15)
-                                              : Colors.grey.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(8.r),
+                                              ? const Color(
+                                                  0xFF2E7D32,
+                                                ).withValues(alpha: 0.15)
+                                              : Colors.grey.withValues(
+                                                  alpha: 0.1,
+                                                ),
+                                          borderRadius: BorderRadius.circular(
+                                            8.r,
+                                          ),
                                         ),
                                         child: Text(
                                           "إجمالي التكرار: ${totalRepeats.toArabicDigits} مرة",

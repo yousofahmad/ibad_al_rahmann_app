@@ -4,15 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cubit.dart';
+
 import 'package:ibad_al_rahmann/core/services/intro_service.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../menus/single_tap_menu.dart';
 import '../scroll/auto_scroll_control_overlay.dart';
 
-
 import './wbw_page_widget.dart';
-
 
 class FullQuranWidget extends StatefulWidget {
   const FullQuranWidget({super.key, this.currentPage});
@@ -48,10 +48,10 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
     _pageController = PageController(initialPage: _currentIndex);
     _autoScrollController = ScrollController();
     _ticker = createTicker(_onTick);
-    
+
     // Start in immersive mode (status bar hidden) as it's full Mushaf view by default.
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    
+
     super.initState();
     _showIntroIfNeeded();
 
@@ -256,7 +256,9 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
                     if (state.isAutoScrolling) {
                       context.read<QuranCubit>().setAutoScrollPaused(true);
                       setState(() => _showAutoScrollMenu = true);
-                      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+                      SystemChrome.setEnabledSystemUIMode(
+                        SystemUiMode.edgeToEdge,
+                      );
                       _hideMenuTimer?.cancel();
                     } else {
                       _toggleOverlays();
@@ -269,8 +271,7 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
                       ? ListView.builder(
                           controller: _autoScrollController,
                           scrollDirection: Axis.vertical,
-                          cacheExtent:
-                              MediaQuery.of(context).size.height * 3.0,
+                          cacheExtent: MediaQuery.of(context).size.height * 3.0,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: 604,
                           itemBuilder: (context, index) {
@@ -290,15 +291,17 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
                       : PageView.builder(
                           allowImplicitScrolling: true,
                           controller: _pageController,
-                          physics: const BouncingScrollPhysics(parent: EasyPageScrollPhysics()),
+                          physics: const BouncingScrollPhysics(
+                            parent: EasyPageScrollPhysics(),
+                          ),
                           pageSnapping: true,
                           itemCount: 604,
                           onPageChanged: (value) {
                             if (value != _currentIndex) {
                               _currentIndex = value;
                               context.read<QuranCubit>().onQuranPageChanged(
-                                    value,
-                                  );
+                                value,
+                              );
                             }
                           },
                           itemBuilder: (context, index) {
@@ -336,11 +339,15 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
                       onPlay: () {
                         context.read<QuranCubit>().setAutoScrollPaused(false);
                         _startHideMenuTimer();
-                        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+                        SystemChrome.setEnabledSystemUIMode(
+                          SystemUiMode.immersiveSticky,
+                        );
                       },
                       onStop: () {
                         context.read<QuranCubit>().stopAutoScroll();
-                        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+                        SystemChrome.setEnabledSystemUIMode(
+                          SystemUiMode.edgeToEdge,
+                        );
                       },
                     ),
                   ),
@@ -358,11 +365,7 @@ class _TapListener extends StatefulWidget {
   final VoidCallback? onSingleTap;
   final VoidCallback? onDoubleTap;
 
-  const _TapListener({
-    required this.child,
-    this.onSingleTap,
-    this.onDoubleTap,
-  });
+  const _TapListener({required this.child, this.onSingleTap, this.onDoubleTap});
 
   @override
   State<_TapListener> createState() => _TapListenerState();

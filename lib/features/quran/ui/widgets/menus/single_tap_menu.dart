@@ -12,6 +12,7 @@ import '../../../bloc/verse_player/verse_player_cubit.dart';
 import '../bookmark_widget/bookmarks_dialog.dart';
 
 import 'package:ibad_al_rahmann/core/helpers/share_helper.dart';
+import 'package:ibad_al_rahmann/core/app_constants.dart';
 
 // To access scaffoldMessengerKey
 
@@ -37,7 +38,7 @@ class PageActionBar extends StatefulWidget {
     final quranCubit = context.read<QuranCubit>();
     final isWirdMode = quranCubit.state.isWirdMode;
     final isKahfMode = quranCubit.state.isKahfMode;
-    
+
     // Safely look up QuranThemeCubit, if not found try casting ThemeCubit
     QuranThemeCubit themeCubit;
     try {
@@ -45,7 +46,7 @@ class PageActionBar extends StatefulWidget {
     } catch (_) {
       themeCubit = context.read<ThemeCubit>() as QuranThemeCubit;
     }
-    
+
     final currentTheme = Theme.of(context);
 
     showGeneralDialog(
@@ -65,13 +66,18 @@ class PageActionBar extends StatefulWidget {
             child: StatefulBuilder(
               builder: (context, setStateLocal) {
                 final isDark = Theme.of(context).brightness == Brightness.dark;
-                
+
                 // Get the effective currentColor, applying fallbacks if null
                 final currentColor = isKahfMode
-                    ? (quranCubit.state.kahfPaperColor ?? const Color(0xFFF0F9ED))
+                    ? (quranCubit.state.kahfPaperColor ??
+                          const Color(0xFFF0F9ED))
                     : (isWirdMode
-                        ? (quranCubit.state.wirdPaperColor ?? const Color(0xFFFFF9E5))
-                        : (quranCubit.state.quranPaperColor ?? (isDark ? Colors.black : const Color(0xFFFFF9E5))));
+                          ? (quranCubit.state.wirdPaperColor ??
+                                const Color(0xFFFFF9E5))
+                          : (quranCubit.state.quranPaperColor ??
+                                (isDark
+                                    ? Colors.black
+                                    : const Color(0xFFFFF9E5))));
 
                 void updateColorLocal(Color? color) {
                   if (isKahfMode) {
@@ -84,15 +90,19 @@ class PageActionBar extends StatefulWidget {
                   setStateLocal(() {});
                 }
 
-                final headerColor = ThemeData.estimateBrightnessForColor(
-                  currentTheme.primaryColor,
-                ) == Brightness.dark
+                final headerColor =
+                    ThemeData.estimateBrightnessForColor(
+                          currentTheme.primaryColor,
+                        ) ==
+                        Brightness.dark
                     ? Colors.white
                     : Colors.black87;
 
-                final headerColorSubtle = ThemeData.estimateBrightnessForColor(
-                  currentTheme.primaryColor,
-                ) == Brightness.dark
+                final headerColorSubtle =
+                    ThemeData.estimateBrightnessForColor(
+                          currentTheme.primaryColor,
+                        ) ==
+                        Brightness.dark
                     ? Colors.white70
                     : Colors.black87;
 
@@ -132,8 +142,8 @@ class PageActionBar extends StatefulWidget {
                                   isKahfMode
                                       ? 'لون خلفية الكهف'
                                       : (isWirdMode
-                                          ? 'لون خلفية الورد'
-                                          : 'لون خلفية المصحف'),
+                                            ? 'لون خلفية الورد'
+                                            : 'لون خلفية المصحف'),
                                   style: TextStyle(
                                     fontFamily: 'cairo',
                                     fontSize: 12,
@@ -152,7 +162,8 @@ class PageActionBar extends StatefulWidget {
                                     _ColorCircle(
                                       color: Colors.white,
                                       label: 'أبيض',
-                                      isSelected: currentColor.toARGB32() ==
+                                      isSelected:
+                                          currentColor.toARGB32() ==
                                           Colors.white.toARGB32(),
                                       onTap: () =>
                                           updateColorLocal(Colors.white),
@@ -162,7 +173,8 @@ class PageActionBar extends StatefulWidget {
                                     _ColorCircle(
                                       color: const Color(0xFFFFF9E5),
                                       label: 'كريمي',
-                                      isSelected: currentColor.toARGB32() ==
+                                      isSelected:
+                                          currentColor.toARGB32() ==
                                           const Color(0xFFFFF9E5).toARGB32(),
                                       onTap: () => updateColorLocal(
                                         const Color(0xFFFFF9E5),
@@ -173,7 +185,8 @@ class PageActionBar extends StatefulWidget {
                                     _ColorCircle(
                                       color: const Color(0xFFF5F5DC),
                                       label: 'قديم',
-                                      isSelected: currentColor.toARGB32() ==
+                                      isSelected:
+                                          currentColor.toARGB32() ==
                                           const Color(0xFFF5F5DC).toARGB32(),
                                       onTap: () => updateColorLocal(
                                         const Color(0xFFF5F5DC),
@@ -190,7 +203,8 @@ class PageActionBar extends StatefulWidget {
                                     _ColorCircle(
                                       color: Colors.black,
                                       label: 'أسود',
-                                      isSelected: currentColor.toARGB32() ==
+                                      isSelected:
+                                          currentColor.toARGB32() ==
                                           Colors.black.toARGB32(),
                                       onTap: () =>
                                           updateColorLocal(Colors.black),
@@ -200,7 +214,8 @@ class PageActionBar extends StatefulWidget {
                                     _ColorCircle(
                                       color: const Color(0xFF1E1E1E),
                                       label: 'داكن',
-                                      isSelected: currentColor.toARGB32() ==
+                                      isSelected:
+                                          currentColor.toARGB32() ==
                                           const Color(0xFF1E1E1E).toARGB32(),
                                       onTap: () => updateColorLocal(
                                         const Color(0xFF1E1E1E),
@@ -211,7 +226,8 @@ class PageActionBar extends StatefulWidget {
                                     _ColorCircle(
                                       color: const Color(0xFF001F3F),
                                       label: 'كحلي',
-                                      isSelected: currentColor.toARGB32() ==
+                                      isSelected:
+                                          currentColor.toARGB32() ==
                                           const Color(0xFF001F3F).toARGB32(),
                                       onTap: () => updateColorLocal(
                                         const Color(0xFF001F3F),
@@ -340,76 +356,225 @@ class _PageActionBarState extends State<PageActionBar>
 
   Future<void> _showQualityPicker(Function(double) onSelected) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gold = Theme.of(context).primaryColor;
-    double quality = 5.0;
+    const gold = Color(0xFFD0A871);
+    double selectedQuality = 3.0;
+
+    final qualities = [
+      {
+        'title': 'فائقة (4K Ultra HD)',
+        'subtitle': 'أعلى وضوح ونقاء فائق لصفحة المصحف (أعلى جودة)',
+        'value': 5.0,
+        'badge': 'أفضل نقاء 🌟',
+      },
+      {
+        'title': 'عالية (QHD)',
+        'subtitle': 'دقة ممتازة وسريعة في الحفظ والمشاركة',
+        'value': 3.0,
+        'badge': 'سريعة ومتوازنة ⚡',
+      },
+      {
+        'title': 'قياسية (Full HD)',
+        'subtitle': 'حجم صغير ومناسب للمشاركة السريعة',
+        'value': 1.5,
+        'badge': 'خفيفة وسريعة 📱',
+      },
+    ];
 
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          backgroundColor: isDark ? const Color(0xFF000000) : Colors.white,
-          title: Text(
-            'اختر جودة الصورة',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontFamily: 'cairo', fontWeight: FontWeight.bold, color: gold),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+          backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+          title: Row(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildQualityOption('عالية', 5.0, quality == 5.0, (v) => setDlgState(() => quality = v)),
-                  const SizedBox(width: 8),
-                  _buildQualityOption('متوسطة', 3.0, quality == 3.0, (v) => setDlgState(() => quality = v)),
-                  const SizedBox(width: 8),
-                  _buildQualityOption('منخفضة', 1.0, quality == 1.0, (v) => setDlgState(() => quality = v)),
-                ],
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: gold.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.photo_filter_rounded,
+                  color: gold,
+                  size: 22,
+                ),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: gold,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'اختر دقة صورة المصحف',
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: gold,
                   ),
-                  onPressed: () {
-                    onSelected(quality);
-                    Navigator.pop(ctx);
-                  },
-                  child: const Text('تأكيد', style: TextStyle(fontFamily: 'cairo', fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQualityOption(String label, double value, bool isSelected, Function(double) onTap) {
-    final gold = Theme.of(context).primaryColor;
-    return InkWell(
-      onTap: () => onTap(value),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? gold : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: gold),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'cairo',
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: isSelected ? Colors.white : gold,
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: qualities.map((q) {
+                final double val = q['value'] as double;
+                final bool isSelected = selectedQuality == val;
+                return InkWell(
+                  onTap: () => setDlgState(() => selectedQuality = val),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 5),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? gold.withValues(alpha: 0.12)
+                          : (isDark
+                              ? Colors.white.withValues(alpha: 0.04)
+                              : Colors.black.withValues(alpha: 0.03)),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected ? gold : Colors.transparent,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelected
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.radio_button_off_rounded,
+                          color: isSelected ? gold : Colors.grey,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      q['title'] as String,
+                                      style: TextStyle(
+                                        fontFamily: 'Cairo',
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: isSelected
+                                            ? gold
+                                            : (isDark
+                                                ? Colors.white
+                                                : Colors.black87),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? gold.withValues(alpha: 0.2)
+                                          : Colors.grey.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      q['badge'] as String,
+                                      style: TextStyle(
+                                        fontFamily: 'Cairo',
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: isSelected ? gold : Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                q['subtitle'] as String,
+                                style: TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontSize: 11,
+                                  color: isDark
+                                      ? Colors.grey[400]
+                                      : Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
           ),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      side: BorderSide(
+                        color: Colors.grey.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text(
+                      'إلغاء',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: gold,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      onSelected(selectedQuality);
+                      Navigator.pop(ctx);
+                    },
+                    child: Text(
+                      'متابعة',
+                      style: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -417,7 +582,7 @@ class _PageActionBarState extends State<PageActionBar>
 
   Future<void> _onSaveImage() async {
     if (_isBusy) return;
-    
+
     await _showQualityPicker((selectedQuality) async {
       setState(() => _isBusy = true);
       final quranCubit = context.read<QuranCubit>();
@@ -472,10 +637,10 @@ class _PageActionBarState extends State<PageActionBar>
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).primaryColor;
-    
+
     // The bar background is now always the theme's primary color
     final barBg = primaryColor;
-    
+
     // Since primary color is usually strong, we use white/white70 for contrast
     const onBar = Colors.white;
     const onBarSubtle = Colors.white70;
@@ -515,7 +680,6 @@ class _PageActionBarState extends State<PageActionBar>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-
                       _ActionButton(
                         icon: FontAwesomeIcons.headphones,
                         label: 'المصحف الصوتي',
@@ -525,7 +689,6 @@ class _PageActionBarState extends State<PageActionBar>
                         },
                         isEnabled: !_isBusy,
                         color: onBar,
-                        
                       ),
                       _divider(onBarSubtle),
                       _ActionButton(

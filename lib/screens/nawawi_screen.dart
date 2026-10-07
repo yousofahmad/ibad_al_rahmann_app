@@ -15,23 +15,7 @@ class NawawiScreen extends StatefulWidget {
 }
 
 class _NawawiScreenState extends State<NawawiScreen> {
-  String _getSnippet(String text, String query) {
-    if (query.isEmpty) return text.length > 50 ? text.substring(0, 50) + '...' : text;
-    final qLower = query.toLowerCase();
-    final tLower = text.toLowerCase();
-    final idx = tLower.indexOf(qLower);
-    if (idx == -1) return text.length > 50 ? text.substring(0, 50) + '...' : text;
-    
-    int start = (idx - 30) < 0 ? 0 : idx - 30;
-    int end = (idx + query.length + 30) > text.length ? text.length : idx + query.length + 30;
-    
-    String snippet = text.substring(start, end);
-    if (start > 0) snippet = '...' + snippet;
-    if (end < text.length) snippet = snippet + '...';
-    
-    return snippet;
-  }
-
+  final TextEditingController _searchController = TextEditingController();
   List<String> _favoriteHadiths = [];
   bool _showFavoritesOnly = false;
   List<Map<String, dynamic>> _allHadiths = [];
@@ -42,6 +26,12 @@ class _NawawiScreenState extends State<NawawiScreen> {
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -89,63 +79,11 @@ class _NawawiScreenState extends State<NawawiScreen> {
     await prefs.setStringList('nawawi_favorites', _favoriteHadiths);
   }
 
-  /// Builds a RichText where every occurrence of [query] in [text] is
-  /// highlighted with a gold background — identical to WhatsApp search style.
-  Widget _buildHighlightedText(
-    String text,
-    String query, {
-    TextStyle? baseStyle,
-  }) {
-    if (query.isEmpty) return Text(text, style: baseStyle);
-    final lower = text.toLowerCase();
-    final lowerQ = query.toLowerCase();
-    final spans = <TextSpan>[];
-    int start = 0;
-    int idx = lower.indexOf(lowerQ);
-    while (idx != -1) {
-      if (idx > start) {
-        spans.add(TextSpan(text: text.substring(start, idx), style: baseStyle));
-      }
-      spans.add(TextSpan(
-        text: text.substring(idx, idx + query.length),
-        style: (baseStyle ?? const TextStyle()).copyWith(
-          backgroundColor: const Color(0xFFFFE082),
-          color: Colors.black,
-          fontWeight: FontWeight.bold,
-        ),
-      ));
-      start = idx + query.length;
-      idx = lower.indexOf(lowerQ, start);
-    }
-    if (start < text.length) {
-      spans.add(TextSpan(text: text.substring(start), style: baseStyle));
-    }
-    return RichText(
-      textDirection: TextDirection.rtl,
-      text: TextSpan(children: spans),
-    );
-  }
-
-  /// Returns a ~120-char snippet of [hadith] centred around the first match
-  /// of [query], with "..." on either side when truncated.
-  String _hadithSnippet(String hadith, String query) {
-    final lower = hadith.toLowerCase();
-    final idx = lower.indexOf(query.toLowerCase());
-    if (idx == -1) return hadith.length > 120 ? '${hadith.substring(0, 120)}...' : hadith;
-    const half = 60;
-    final from = (idx - half).clamp(0, hadith.length);
-    final to = (idx + query.length + half).clamp(0, hadith.length);
-    final prefix = from > 0 ? '...' : '';
-    final suffix = to < hadith.length ? '...' : '';
-    return '$prefix${hadith.substring(from, to)}$suffix';
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark ? const Color(0xFF000000) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
-    final snippetColor = isDark ? Colors.grey.shade400 : Colors.grey.shade700;
 
     final baseHadiths = _showFavoritesOnly
         ? _allHadiths
@@ -158,8 +96,16 @@ class _NawawiScreenState extends State<NawawiScreen> {
         : baseHadiths
               .where(
                 (h) =>
-                    ArabicSearchHelper.normalizeArabic(h['title'] as String? ?? '').contains(ArabicSearchHelper.normalizeArabic(_searchQuery)) ||
-                    ArabicSearchHelper.normalizeArabic(h['hadith'] as String? ?? '').contains(ArabicSearchHelper.normalizeArabic(_searchQuery)),
+                    ArabicSearchHelper.normalizeArabic(
+                      h['title'] as String? ?? '',
+                    ).contains(
+                      ArabicSearchHelper.normalizeArabic(_searchQuery),
+                    ) ||
+                    ArabicSearchHelper.normalizeArabic(
+                      h['hadith'] as String? ?? '',
+                    ).contains(
+                      ArabicSearchHelper.normalizeArabic(_searchQuery),
+                    ),
               )
               .toList();
 
@@ -215,137 +161,252 @@ class _NawawiScreenState extends State<NawawiScreen> {
                 Padding(
                   padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 4.h),
                   child: TextField(
+                    controller: _searchController,
                     textDirection: TextDirection.rtl,
-                    onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                    onChanged: (val) =>
+                        setState(() => _searchQuery = val.trim()),
                     decoration: InputDecoration(
                       hintText: 'ابحث في الأحاديث...',
-                      hintStyle: TextStyle(fontFamily: AppConsts.expoArabic, fontSize: 13.sp),
+                      hintStyle: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontSize: 13.sp,
+                      ),
                       hintTextDirection: TextDirection.rtl,
-                      prefixIcon: const Icon(Icons.search, color: Color(0xFFD0A871)),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: Color(0xFFD0A871),
+                      ),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.close, size: 18),
-                              onPressed: () => setState(() => _searchQuery = ''),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
                             )
                           : null,
-                      contentPadding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 16.w),
+                      contentPadding: EdgeInsets.symmetric(
+                        vertical: 8.h,
+                        horizontal: 16.w,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25.r),
                         borderSide: const BorderSide(color: Color(0xFFD0A871)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25.r),
-                        borderSide: const BorderSide(color: Color(0xFFD0A871), width: 1.5),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFD0A871),
+                          width: 1.5,
+                        ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25.r),
-                        borderSide: BorderSide(color: const Color(0xFFD0A871).withValues(alpha: 0.4)),
+                        borderSide: BorderSide(
+                          color: const Color(0xFFD0A871).withValues(alpha: 0.4),
+                        ),
                       ),
                     ),
                   ),
                 ),
                 Expanded(
                   child: displayedHadiths.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.bookmark_remove_outlined,
-                    size: 60.w,
-                    color: Colors.grey.withValues(alpha: 0.5),
-                  ),
-                  SizedBox(height: 10.h),
-                  Text(
-                    _showFavoritesOnly
-                        ? "لا توجد أحاديث مفضلة"
-                        : "لا توجد بيانات",
-                    style: TextStyle(
-                      fontFamily: AppConsts.expoArabic,
-                      color: textColor,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: EdgeInsets.fromLTRB(10.w, 20.h, 10.w, 10.h),
-              itemCount: displayedHadiths.length,
-              itemBuilder: (context, index) {
-                final hadith = displayedHadiths[index];
-                final isFav = _favoriteHadiths.contains(hadith['title']);
-
-                return Card(
-                  elevation: 2,
-                  color: cardColor,
-                  margin: EdgeInsets.symmetric(vertical: 6.h),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15.r),
-                    side: BorderSide(
-                      color: const Color(0xFFD0A871).withValues(alpha: 0.3),
-                      width: 1.w,
-                    ),
-                  ),
-                  child: ListTile(                    subtitle: _searchQuery.isNotEmpty
-                        ? Text(
-                            _getSnippet(hadith['hadith'] ?? '', _searchQuery),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: AppConsts.cairo,
-                              fontSize: 13.sp,
-                              color: textColor.withValues(alpha: 0.7),
-                            ),
-                          )
-                        : null,
-                    title: Text(
-                      hadith['title'],
-                      style: TextStyle(
-                        fontFamily: AppConsts.expoArabic,
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.bold,
-                        color: textColor,
-                      ),
-                    ),
-                    leading: CircleAvatar(
-                      backgroundColor: const Color(
-                        0xFFD0A871,
-                      ).withValues(alpha: 0.1),
-                      child: Text(
-                        '${_allHadiths.indexOf(hadith) + 1}',
-                        style: const TextStyle(
-                          color: Color(0xFFD0A871),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    trailing: IconButton(
-                      icon: Icon(
-                        isFav ? Icons.favorite : Icons.favorite_border,
-                        color: isFav ? Colors.red : Colors.grey.shade400,
-                      ),
-                      onPressed: () => _toggleFavorite(hadith['title']),
-                    ),
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => NawawiDetailScreen(
-                            title: hadith['title'],
-                            hadithText: hadith['hadith'],
-                            description: hadith['description'],
-                            isFavorite: isFav,
-                            onFavoriteToggle: () =>
-                                _toggleFavorite(hadith['title']),
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.bookmark_remove_outlined,
+                                size: 60.w,
+                                color: Colors.grey.withValues(alpha: 0.5),
+                              ),
+                              SizedBox(height: 10.h),
+                              Text(
+                                _showFavoritesOnly
+                                    ? "لا توجد أحاديث مفضلة"
+                                    : "لا توجد بيانات",
+                                style: TextStyle(
+                                  fontFamily: AppConsts.expoArabic,
+                                  color: textColor,
+                                ),
+                              ),
+                            ],
                           ),
+                        )
+                      : ListView.builder(
+                          padding: EdgeInsets.fromLTRB(10.w, 20.h, 10.w, 10.h),
+                          itemCount: displayedHadiths.length,
+                          itemBuilder: (context, index) {
+                            final hadith = displayedHadiths[index];
+                            final isFav = _favoriteHadiths.contains(
+                              hadith['title'],
+                            );
+
+                            return Card(
+                              elevation: 2,
+                              color: cardColor,
+                              margin: EdgeInsets.symmetric(vertical: 6.h),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15.r),
+                                side: BorderSide(
+                                  color: const Color(
+                                    0xFFD0A871,
+                                  ).withValues(alpha: 0.3),
+                                  width: 1.w,
+                                ),
+                              ),
+                              child: ListTile(
+                                title: _searchQuery.isNotEmpty
+                                    ? Text.rich(
+                                        TextSpan(
+                                          children:
+                                              ArabicSearchHelper.highlightMatch(
+                                                hadith['title'],
+                                                _searchQuery,
+                                                TextStyle(
+                                                  backgroundColor: isDark
+                                                      ? const Color(
+                                                          0xFFB88A4A,
+                                                        ).withValues(
+                                                          alpha: 0.45,
+                                                        )
+                                                      : const Color(
+                                                          0xFFFFE082,
+                                                        ).withValues(
+                                                          alpha: 0.8,
+                                                        ),
+                                                  color: isDark
+                                                      ? const Color(0xFFFFF8E1)
+                                                      : const Color(0xFF4E342E),
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                baseStyle: TextStyle(
+                                                  fontFamily:
+                                                      AppConsts.expoArabic,
+                                                  fontSize: 16.sp,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: textColor,
+                                                ),
+                                              ),
+                                        ),
+                                      )
+                                    : Text(
+                                        hadith['title'],
+                                        style: TextStyle(
+                                          fontFamily: AppConsts.expoArabic,
+                                          fontSize: 16.sp,
+                                          fontWeight: FontWeight.bold,
+                                          color: textColor,
+                                        ),
+                                      ),
+                                subtitle: _searchQuery.isNotEmpty
+                                    ? Builder(
+                                        builder: (context) {
+                                          final String fullHadith =
+                                              hadith['hadith'] as String? ?? '';
+                                          if (fullHadith.isEmpty)
+                                            return const SizedBox.shrink();
+                                          final snippet =
+                                              ArabicSearchHelper.getSnippet(
+                                                fullHadith,
+                                                _searchQuery,
+                                                contextChars: 110,
+                                              );
+                                          return Padding(
+                                            padding: EdgeInsets.only(top: 4.h),
+                                            child: Text.rich(
+                                              TextSpan(
+                                                children:
+                                                    ArabicSearchHelper.highlightMatch(
+                                                      snippet,
+                                                      _searchQuery,
+                                                      TextStyle(
+                                                        backgroundColor: isDark
+                                                            ? const Color(
+                                                                0xFFB88A4A,
+                                                              ).withValues(
+                                                                alpha: 0.45,
+                                                              )
+                                                            : const Color(
+                                                                0xFFFFE082,
+                                                              ).withValues(
+                                                                alpha: 0.8,
+                                                              ),
+                                                        color: isDark
+                                                            ? const Color(
+                                                                0xFFFFF8E1,
+                                                              )
+                                                            : const Color(
+                                                                0xFF4E342E,
+                                                              ),
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                      baseStyle: TextStyle(
+                                                        fontFamily:
+                                                            AppConsts.cairo,
+                                                        fontSize: 12.5.sp,
+                                                        height: 1.4,
+                                                        color: textColor
+                                                            .withValues(
+                                                              alpha: 0.75,
+                                                            ),
+                                                      ),
+                                                    ),
+                                              ),
+                                              maxLines: 3,
+                                              overflow: TextOverflow.ellipsis,
+                                              textDirection: TextDirection.rtl,
+                                            ),
+                                          );
+                                        },
+                                      )
+                                    : null,
+                                leading: CircleAvatar(
+                                  backgroundColor: const Color(
+                                    0xFFD0A871,
+                                  ).withValues(alpha: 0.1),
+                                  child: Text(
+                                    '${_allHadiths.indexOf(hadith) + 1}',
+                                    style: const TextStyle(
+                                      color: Color(0xFFD0A871),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                trailing: IconButton(
+                                  icon: Icon(
+                                    isFav
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    color: isFav
+                                        ? Colors.red
+                                        : Colors.grey.shade400,
+                                  ),
+                                  onPressed: () =>
+                                      _toggleFavorite(hadith['title']),
+                                ),
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => NawawiDetailScreen(
+                                        title: hadith['title'],
+                                        hadithText: hadith['hadith'],
+                                        description: hadith['description'],
+                                        isFavorite: isFav,
+                                        searchQuery: _searchQuery,
+                                        onFavoriteToggle: () =>
+                                            _toggleFavorite(hadith['title']),
+                                      ),
+                                    ),
+                                  );
+                                  setState(() {});
+                                },
+                              ),
+                            );
+                          },
                         ),
-                      );
-                      setState(() {});
-                    },
-                  ),
-                );
-              },
-            ),
                 ), // Expanded
               ],
             ), // Column
@@ -447,7 +508,10 @@ class _NawawiDetailScreenState extends State<NawawiDetailScreen> {
               decoration: BoxDecoration(
                 color: cardColor,
                 borderRadius: BorderRadius.circular(20.r),
-                border: Border.all(color: const Color(0xFFD0A871), width: 1.5.w),
+                border: Border.all(
+                  color: const Color(0xFFD0A871),
+                  width: 1.5.w,
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.05),
@@ -458,52 +522,18 @@ class _NawawiDetailScreenState extends State<NawawiDetailScreen> {
               ),
               child: Column(
                 children: [
-                  Builder(builder: (context) {
-                    final String textStr = widget.hadithText;
-                    if (widget.searchQuery != null && widget.searchQuery!.isNotEmpty && textStr.contains(widget.searchQuery!)) {
-                      final query = widget.searchQuery!;
-                      final parts = textStr.split(query);
-                      final spans = <TextSpan>[];
-                      for (int i = 0; i < parts.length; i++) {
-                        spans.add(TextSpan(text: parts[i]));
-                        if (i != parts.length - 1) {
-                          spans.add(TextSpan(
-                            text: query,
-                            style: TextStyle(
-                              backgroundColor: Colors.yellow.withOpacity(0.4),
-                              color: Colors.red,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ));
-                        }
-                      }
-                      return RichText(
-                        textAlign: TextAlign.center,
-                        textDirection: TextDirection.rtl,
-                        text: TextSpan(
-                          style: TextStyle(
-                            fontFamily: AppConsts.amiri,
-                            fontSize: 20.sp,
-                            height: 1.8,
-                            color: textColor,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          children: spans,
-                        ),
-                      );
-                    }
-                    return Text(
-                      textStr,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: AppConsts.amiri,
-                        fontSize: 20.sp,
-                        height: 1.8,
-                        color: textColor,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    );
-                  }),
+                  Text(
+                    widget.hadithText,
+                    textAlign: TextAlign.center,
+                    textDirection: TextDirection.rtl,
+                    style: TextStyle(
+                      fontFamily: AppConsts.amiri,
+                      fontSize: 20.sp,
+                      height: 1.8,
+                      color: textColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                   SizedBox(height: 15.h),
                   // Copy Button
                   InkWell(
@@ -543,7 +573,11 @@ class _NawawiDetailScreenState extends State<NawawiDetailScreen> {
                             ),
                           ),
                           SizedBox(width: 5.w),
-                          Icon(Icons.copy, size: 16.w, color: const Color(0xFFD0A871)),
+                          Icon(
+                            Icons.copy,
+                            size: 16.w,
+                            color: const Color(0xFFD0A871),
+                          ),
                         ],
                       ),
                     ),
@@ -581,6 +615,7 @@ class _NawawiDetailScreenState extends State<NawawiDetailScreen> {
                     Text(
                       widget.description,
                       textAlign: TextAlign.justify,
+                      textDirection: TextDirection.rtl,
                       style: TextStyle(
                         fontFamily: AppConsts.expoArabic,
                         fontSize: 14.sp,

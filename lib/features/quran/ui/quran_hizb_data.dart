@@ -28,7 +28,9 @@ abstract final class QuranHizbData {
     for (int p = pageNumber; p >= 1; p--) {
       if (_map.containsKey(p)) {
         final raw = _map[p]!;
-        return raw.startsWith('حزب ') ? raw.replaceFirst('حزب ', 'الحزب ') : raw;
+        return raw.startsWith('حزب ')
+            ? raw.replaceFirst('حزب ', 'الحزب ')
+            : raw;
       }
     }
     return 'الحزب ١';

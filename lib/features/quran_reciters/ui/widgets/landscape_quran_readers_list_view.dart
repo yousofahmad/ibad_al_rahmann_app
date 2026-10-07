@@ -16,9 +16,7 @@ class LandscapeReadersBody extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 40.w, vertical: 8.h),
           child: const RecitersSearchBar(),
         ),
-        Expanded(
-          child: ReadersListView(reciters: reciters),
-        ),
+        Expanded(child: ReadersListView(reciters: reciters)),
       ],
     );
   }

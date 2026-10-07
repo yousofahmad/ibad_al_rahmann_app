@@ -14,17 +14,21 @@ class AppMigrationHelper {
       final lastVersion = prefs.getInt(keyAppVersionCode) ?? 0;
 
       if (lastVersion < currentVersionCode) {
-        debugPrint('🚀 AppMigrationHelper: Running migration from v$lastVersion to v$currentVersionCode...');
-        
+        debugPrint(
+          '🚀 AppMigrationHelper: Running migration from v$lastVersion to v$currentVersionCode...',
+        );
+
         // 1. Clear obsolete prayer caches & old cached hijri epochs
         await PrayerTimesCache.clearStaleEntries();
         await prefs.remove('prayer_times_30d');
         await prefs.remove('hijri_cache_start_epoch');
-        
+
         // 2. Remove obsolete / buggy legacy preference keys
         final allKeys = prefs.getKeys();
         for (final k in allKeys) {
-          if (k.startsWith('temp_prayer_') || k.startsWith('old_alarm_') || k.startsWith('legacy_')) {
+          if (k.startsWith('temp_prayer_') ||
+              k.startsWith('old_alarm_') ||
+              k.startsWith('legacy_')) {
             await prefs.remove(k);
           }
         }
@@ -43,7 +47,9 @@ class AppMigrationHelper {
 
         // 5. Mark migration as done
         await prefs.setInt(keyAppVersionCode, currentVersionCode);
-        debugPrint('✅ AppMigrationHelper: Migration to v$currentVersionCode complete!');
+        debugPrint(
+          '✅ AppMigrationHelper: Migration to v$currentVersionCode complete!',
+        );
       }
     } catch (e) {
       debugPrint('⚠️ AppMigrationHelper error: $e');

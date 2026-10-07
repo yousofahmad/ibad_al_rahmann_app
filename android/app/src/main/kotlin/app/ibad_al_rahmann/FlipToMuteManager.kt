@@ -32,7 +32,8 @@ class FlipToMuteManager(private val context: Context) : SensorEventListener {
         sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
-        // Always start as false so an already-inverted phone doesn't silently auto-mute
+        // Phone might already be face-down. We no longer require a transition from face-up.
+        // It stays silent as long as it's flipped.
         wasFaceUp = false
         lastMuteTime = 0L
 
@@ -68,12 +69,12 @@ class FlipToMuteManager(private val context: Context) : SensorEventListener {
         // Phone must be TRULY flat face-down (not in a pocket or tilted vertically/horizontally):
         // 1. z must be strongly negative (pointing straight down into surface): z < -8.0f
         // 2. x and y tilt must be small: Math.abs(x) < 3.5f && Math.abs(y) < 3.5f (prevents pocket/vertical/slanted false triggers)
-        // 3. wasFaceUp must be true (user explicitly picked it up / turned it face-up first)
+        // 3. wasFaceUp is NO LONGER required! If the phone is face-down, it stays silent.
         // 4. Cooldown passed
         val isFlatFaceDown = z < -8.0f && Math.abs(x) < 3.5f && Math.abs(y) < 3.5f
         val now = System.currentTimeMillis()
 
-        if (isFlatFaceDown && wasFaceUp && (now - lastMuteTime) > MUTE_COOLDOWN_MS) {
+        if (isFlatFaceDown && (now - lastMuteTime) > MUTE_COOLDOWN_MS) {
             lastMuteTime = now
             wasFaceUp = false // Disarm so it doesn't re-trigger
             try {
@@ -82,7 +83,7 @@ class FlipToMuteManager(private val context: Context) : SensorEventListener {
                     action = "STOP_SOUND"
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(stopAdhanIntent)
+                    try { context.startForegroundService(stopAdhanIntent) } catch (e: Exception) { e.printStackTrace(); try { context.startService(stopAdhanIntent) } catch (e2: Exception) {} }
                 } else {
                     context.startService(stopAdhanIntent)
                 }

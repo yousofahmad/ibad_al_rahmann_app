@@ -912,33 +912,38 @@ object PrayerFocusOverlay {
         prefs.edit().putString("flutter.temp_prayers_data", map2.toString()).apply()
     }
 
-    private fun resolveIslamicDay(prefs: android.content.SharedPreferences): String {
+    private fun resolvePrayerDate(prefs: android.content.SharedPreferences, prayerName: String): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val now = System.currentTimeMillis()
         val cal = Calendar.getInstance()
         val todayStr = sdf.format(Date(now))
 
-        val fajrKey = "flutter.fajr_epoch_today"
-        val fajrEpoch = try {
-            val raw = prefs.all[fajrKey]
-            (raw as? Number)?.toLong() ?: raw?.toString()?.toLongOrNull() ?: -1L
-        } catch (_: Exception) { -1L }
+        if (prayerName == "العشاء") {
+            val fajrKey = "flutter.fajr_epoch_today"
+            val fajrEpoch = try {
+                val raw = prefs.all[fajrKey]
+                (raw as? Number)?.toLong() ?: raw?.toString()?.toLongOrNull() ?: -1L
+            } catch (_: Exception) { -1L }
 
-        // Only consider it yesterday if it is strictly before Fajr by a clear margin (more than 15 minutes before Fajr)
-        // Within 15 minutes of Fajr or after Fajr, it belongs to today's civil date!
-        if (fajrEpoch > 0 && now < (fajrEpoch - 15 * 60 * 1000L)) {
-            cal.timeInMillis = now
-            cal.add(Calendar.DAY_OF_YEAR, -1)
-            return sdf.format(cal.time)
+            if (fajrEpoch > 0 && now < fajrEpoch) {
+                cal.timeInMillis = now
+                cal.add(Calendar.DAY_OF_YEAR, -1)
+                return sdf.format(cal.time)
+            }
         }
         return todayStr
     }
 
+    private fun resolveIslamicDay(prefs: android.content.SharedPreferences): String {
+        return resolvePrayerDate(prefs, "العشاء")
+    }
+
     private fun savePrayerLog(context: Context, prayerName: String, status: String) {
         val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        val dayStr = resolveIslamicDay(prefs)
+        val dayStr = resolvePrayerDate(prefs, prayerName)
         val key = "flutter.prayer_focus_log_${dayStr}"
-        val existingJson = prefs.getString(key, null)
+        val rawKey = "prayer_focus_log_${dayStr}"
+        val existingJson = prefs.getString(key, null) ?: prefs.getString(rawKey, null)
         val map = try {
             if (existingJson != null) JSONObject(existingJson) else JSONObject()
         } catch (_: Exception) { JSONObject() }
@@ -947,19 +952,51 @@ object PrayerFocusOverlay {
             put("ts", System.currentTimeMillis())
         }
         map.put(prayerName, entry)
-        prefs.edit().putString(key, map.toString()).apply()
+        prefs.edit()
+            .putString(key, map.toString())
+            .putString(rawKey, map.toString())
+            .apply()
 
-        // Also automatically update flutter.temp_prayers and current_day_date for Hasib Nafsak
+        // Also automatically update flutter.temp_prayers, current_day_date, and stats for Hasib Nafsak
         try {
             val tempKey = "flutter.temp_prayers"
-            val tempJson = prefs.getString(tempKey, null)
+            val tempJson = prefs.getString(tempKey, null) ?: prefs.getString("temp_prayers", null)
             val tempMap = if (tempJson != null) JSONObject(tempJson) else JSONObject()
             var pKey = prayerName
             if (pKey == "الجمعة") pKey = "الظهر"
             tempMap.put(pKey, true)
+
+            // Calculate prayer score (8 default prayers: Fajr, Dhuhr, Asr, Maghrib, Isha, Duha, Qiyam, Sunan)
+            val defaultPrayers = listOf("الفجر", "الظهر", "العصر", "المغرب", "العشاء", "الضحى", "القيام", "السنن")
+            var checkedCount = 0
+            for (p in defaultPrayers) {
+                if (tempMap.optBoolean(p, false)) checkedCount++
+            }
+            val prayerScore = (checkedCount.toDouble() / defaultPrayers.size.toDouble()) * 100.0
+
+            val statsKey = "flutter.stats_$dayStr"
+            val rawStatsKey = "stats_$dayStr"
+            val existingStatsJson = prefs.getString(statsKey, null) ?: prefs.getString(rawStatsKey, null)
+            val statsObj = if (existingStatsJson != null) JSONObject(existingStatsJson) else JSONObject()
+            val quranScore = statsObj.optDouble("quran", 0.0)
+            val azkarScore = statsObj.optDouble("azkar", 0.0)
+            val deedsScore = statsObj.optDouble("deeds", 0.0)
+            val totalScore = (prayerScore + quranScore + azkarScore + deedsScore) / 4.0
+
+            statsObj.put("date", dayStr)
+            statsObj.put("prayer", prayerScore)
+            statsObj.put("quran", quranScore)
+            statsObj.put("azkar", azkarScore)
+            statsObj.put("deeds", deedsScore)
+            statsObj.put("total", totalScore)
+
             prefs.edit()
                 .putString(tempKey, tempMap.toString())
+                .putString("temp_prayers", tempMap.toString())
                 .putString("flutter.current_day_date", dayStr)
+                .putString("current_day_date", dayStr)
+                .putString(statsKey, statsObj.toString())
+                .putString(rawStatsKey, statsObj.toString())
                 .apply()
         } catch (_: Exception) {}
     }

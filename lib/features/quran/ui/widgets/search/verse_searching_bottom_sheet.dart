@@ -21,8 +21,9 @@ class VerseSearchingBottomSheet extends StatelessWidget {
     final paperColor = quranState.isWirdMode
         ? quranState.wirdPaperColor
         : quranState.quranPaperColor;
-    
-    final bool isPaperDark = (paperColor ?? Colors.white).computeLuminance() < 0.5;
+
+    final bool isPaperDark =
+        (paperColor ?? Colors.white).computeLuminance() < 0.5;
     final dialogBg = isPaperDark ? const Color(0xFF000000) : Colors.white;
     final onSurface = isPaperDark ? Colors.white : Colors.black87;
 
@@ -44,7 +45,9 @@ class VerseSearchingBottomSheet extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: context.primaryColor,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
                   ),
                   child: Text(
                     'النتائج: ${state.verses.length.toArabicNums}',

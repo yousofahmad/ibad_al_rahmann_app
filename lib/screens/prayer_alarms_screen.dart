@@ -21,7 +21,12 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
   static const Color _gold = Color(0xFFD0A871);
 
   final Map<String, bool> _fardEnabled = {
-    'Fajr': false, 'Dhuhr': false, 'Jumuah': false, 'Asr': false, 'Maghrib': false, 'Isha': false,
+    'Fajr': false,
+    'Dhuhr': false,
+    'Jumuah': false,
+    'Asr': false,
+    'Maghrib': false,
+    'Isha': false,
   };
   final Map<String, int> _fardMinutes = {};
   final Map<String, int> _iqamaMinutes = {};
@@ -51,12 +56,19 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
     setState(() {
       for (var key in _fardEnabled.keys) {
         final lower = key.toLowerCase();
-        _adhanMode[key] = _prefs.getString('adhan_mode_$key') ??
-            ((_prefs.getBool('notif_prayer_$lower') ?? true) ? 'sound' : 'none');
-        _preMode[key] = _prefs.getString('pre_mode_$key') ??
+        _adhanMode[key] =
+            _prefs.getString('adhan_mode_$key') ??
+            ((_prefs.getBool('notif_prayer_$lower') ?? true)
+                ? 'sound'
+                : 'none');
+        _preMode[key] =
+            _prefs.getString('pre_mode_$key') ??
             ((_prefs.getBool('notif_pre_$key') ?? false) ? 'sound' : 'none');
-        _iqamaMode[key] = _prefs.getString('iqama_mode_$key') ??
-            ((_prefs.getBool('iqama_enabled_$key') ?? false) ? 'sound' : 'none');
+        _iqamaMode[key] =
+            _prefs.getString('iqama_mode_$key') ??
+            ((_prefs.getBool('iqama_enabled_$key') ?? false)
+                ? 'sound'
+                : 'none');
         _fardEnabled[key] = _prefs.getBool('notif_pre_$key') ?? false;
         _fardMinutes[key] = _prefs.getInt('time_pre_$key') ?? 15;
         _iqamaMinutes[key] = _prefs.getInt('iqama_minutes_$key') ?? 15;
@@ -74,24 +86,45 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(context).cardColor,
-        title: const Text("تفعيل الإشعارات", style: TextStyle(fontFamily: AppConsts.expoArabic, color: _gold), textDirection: TextDirection.rtl),
-        content: const Text("لن تصلك هذه التنبيهات بدون إذن الإشعارات.\nهل تريد تفعيله الآن؟", style: TextStyle(fontFamily: AppConsts.expoArabic), textDirection: TextDirection.rtl),
+        title: const Text(
+          "تفعيل الإشعارات",
+          style: TextStyle(fontFamily: AppConsts.expoArabic, color: _gold),
+          textDirection: TextDirection.rtl,
+        ),
+        content: const Text(
+          "لن تصلك هذه التنبيهات بدون إذن الإشعارات.\nهل تريد تفعيله الآن؟",
+          style: TextStyle(fontFamily: AppConsts.expoArabic),
+          textDirection: TextDirection.rtl,
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("لا، شكراً", style: TextStyle(color: Colors.grey))),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              "لا، شكراً",
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
               final result = await Permission.notification.request();
               if (result.isPermanentlyDenied) await openAppSettings();
             },
-            child: const Text("تفعيل", style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
+            child: const Text(
+              "تفعيل",
+              style: TextStyle(color: _gold, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _savePrayerMode(String modeKey, String legacyBoolKey, String value) async {
+  Future<void> _savePrayerMode(
+    String modeKey,
+    String legacyBoolKey,
+    String value,
+  ) async {
     _hasChanges = true;
     await _prefs.setString(modeKey, value);
     await _prefs.setBool(legacyBoolKey, value != 'none');
@@ -104,10 +137,8 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => MuezzinSelectionScreen(
-          prefsKey: prefsKey,
-          title: title,
-        ),
+        builder: (context) =>
+            MuezzinSelectionScreen(prefsKey: prefsKey, title: title),
       ),
     );
     setState(() {}); // Refresh to show new sound name
@@ -231,7 +262,14 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("إشعارات الصلوات", style: TextStyle(fontFamily: AppConsts.expoArabic, color: _gold, fontWeight: FontWeight.bold)),
+        title: const Text(
+          "إشعارات الصلوات",
+          style: TextStyle(
+            fontFamily: AppConsts.expoArabic,
+            color: _gold,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -250,7 +288,11 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.check_circle_outline, color: _gold, size: 14.sp),
+                      Icon(
+                        Icons.check_circle_outline,
+                        color: _gold,
+                        size: 14.sp,
+                      ),
                       SizedBox(width: 4.w),
                       Text(
                         'محفوظ',
@@ -278,7 +320,11 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
               children: [
                 _modeLegend(Icons.volume_up, 'صوت', _gold),
                 SizedBox(width: 14.w),
-                _modeLegend(Icons.notifications_outlined, 'صامت', Colors.blueGrey),
+                _modeLegend(
+                  Icons.notifications_outlined,
+                  'صامت',
+                  Colors.blueGrey,
+                ),
                 SizedBox(width: 14.w),
                 _modeLegend(Icons.block_outlined, 'إيقاف', Colors.red.shade300),
               ],
@@ -300,7 +346,9 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
       ('Maghrib', 'المغرب', Icons.nights_stay_outlined),
       ('Isha', 'العشاء', Icons.dark_mode_outlined),
     ];
-    return prayers.map((p) => _buildSinglePrayerCard(p.$1, p.$2, p.$3)).toList();
+    return prayers
+        .map((p) => _buildSinglePrayerCard(p.$1, p.$2, p.$3))
+        .toList();
   }
 
   Widget _buildSinglePrayerCard(String key, String name, IconData icon) {
@@ -362,7 +410,8 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
             icon: Icons.alarm_outlined,
             mode: _preMode[key]!,
             soundName: _prefs.getString('pre_sound_$key') ?? 'pre_adhan',
-            onSoundTap: () => _openSoundPicker('pre_sound_$key', 'صوت تنبيه قبل الأذان'),
+            onSoundTap: () =>
+                _openSoundPicker('pre_sound_$key', 'صوت تنبيه قبل الأذان'),
             textColor: textColor,
             onModeChanged: (v) {
               setState(() {
@@ -396,8 +445,11 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
             label: 'الأذان',
             icon: Icons.surround_sound_outlined,
             mode: _adhanMode[key]!,
-            soundName: _prefs.getString('adhan_sound_$key') ?? (_prefs.getString('adhan_muezzin_id') ?? 'nafis'),
-            onSoundTap: () => _openSoundPicker('adhan_sound_$key', 'صوت الأذان'),
+            soundName:
+                _prefs.getString('adhan_sound_$key') ??
+                (_prefs.getString('adhan_muezzin_id') ?? 'nafis'),
+            onSoundTap: () =>
+                _openSoundPicker('adhan_sound_$key', 'صوت الأذان'),
             textColor: textColor,
             onModeChanged: (v) {
               setState(() => _adhanMode[key] = v);
@@ -433,7 +485,8 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
             icon: Icons.timer_outlined,
             mode: _iqamaMode[key]!,
             soundName: _prefs.getString('iqama_sound_$key') ?? 'iqama',
-            onSoundTap: () => _openSoundPicker('iqama_sound_$key', 'صوت الإقامة'),
+            onSoundTap: () =>
+                _openSoundPicker('iqama_sound_$key', 'صوت الإقامة'),
             textColor: textColor,
             onModeChanged: (v) {
               setState(() => _iqamaMode[key] = v);
@@ -566,7 +619,9 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
       child: Container(
         padding: EdgeInsets.all(6.w),
         decoration: BoxDecoration(
-          color: isActive ? activeColor.withValues(alpha: 0.2) : Colors.transparent,
+          color: isActive
+              ? activeColor.withValues(alpha: 0.2)
+              : Colors.transparent,
           shape: BoxShape.circle,
         ),
         child: Icon(
@@ -618,10 +673,12 @@ class CompactMinutesPickerWidget extends StatefulWidget {
   });
 
   @override
-  State<CompactMinutesPickerWidget> createState() => _CompactMinutesPickerWidgetState();
+  State<CompactMinutesPickerWidget> createState() =>
+      _CompactMinutesPickerWidgetState();
 }
 
-class _CompactMinutesPickerWidgetState extends State<CompactMinutesPickerWidget> {
+class _CompactMinutesPickerWidgetState
+    extends State<CompactMinutesPickerWidget> {
   late int _val;
 
   @override
@@ -668,7 +725,11 @@ class _CompactMinutesPickerWidgetState extends State<CompactMinutesPickerWidget>
                 widget.onChanged(_val);
               }
             },
-            child: Icon(Icons.remove_circle_outline, color: widget.goldColor, size: 20.sp),
+            child: Icon(
+              Icons.remove_circle_outline,
+              color: widget.goldColor,
+              size: 20.sp,
+            ),
           ),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 8.w),
@@ -688,7 +749,11 @@ class _CompactMinutesPickerWidgetState extends State<CompactMinutesPickerWidget>
                 widget.onChanged(_val);
               }
             },
-            child: Icon(Icons.add_circle_outline, color: widget.goldColor, size: 20.sp),
+            child: Icon(
+              Icons.add_circle_outline,
+              color: widget.goldColor,
+              size: 20.sp,
+            ),
           ),
         ],
       ),

@@ -47,10 +47,7 @@ class _QuranSurahListState extends State<QuranSurahList> {
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            SurahTitleBox(
-              surahIndex: index,
-              selected: index == _currentPage,
-            ),
+            SurahTitleBox(surahIndex: index, selected: index == _currentPage),
           ],
         );
       },

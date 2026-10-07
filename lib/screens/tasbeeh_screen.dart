@@ -109,11 +109,7 @@ class _TasbeehScreenState extends State<TasbeehScreen> {
           toolbarHeight: 55.h,
           elevation: 0,
           leading: IconButton(
-            icon: Icon(
-              Icons.arrow_back_ios,
-              color: borderColor,
-              size: 18.sp,
-            ),
+            icon: Icon(Icons.arrow_back_ios, color: borderColor, size: 18.sp),
             onPressed: () => Navigator.pop(context),
           ),
           title: Text(
@@ -187,10 +183,7 @@ class _TasbeehScreenState extends State<TasbeehScreen> {
 
               // حاوية العداد
               Container(
-                padding: EdgeInsets.symmetric(
-                  vertical: 30.h,
-                  horizontal: 20.w,
-                ),
+                padding: EdgeInsets.symmetric(vertical: 30.h, horizontal: 20.w),
                 margin: EdgeInsets.symmetric(horizontal: 30.w),
                 decoration: BoxDecoration(
                   color: containerColor,
@@ -311,10 +304,7 @@ class _TasbeehScreenState extends State<TasbeehScreen> {
 
               // أدوات التحكم السفلية
               Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: 20.w,
-                  vertical: 20.h,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
                 decoration: BoxDecoration(
                   color: isDark
                       ? const Color(0xFF000000).withValues(alpha: 0.95)

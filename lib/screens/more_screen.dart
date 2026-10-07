@@ -6,7 +6,8 @@ import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/screens/alarms_screen.dart'; // As Alarms
 import 'package:ibad_al_rahmann/screens/settings_screen.dart';
 import 'occasions_screen.dart';
-import 'fasting_days_screen.dart';
+import 'package:ibad_al_rahmann/screens/fasting_days_screen.dart';
+import 'package:ibad_al_rahmann/screens/app_features_guide_screen.dart';
 import 'package:ibad_al_rahmann/features/share_cards/ui/share_cards_screen.dart';
 import 'time_for_allah_screen.dart';
 import 'package:ibad_al_rahmann/services/notification_service.dart';
@@ -64,6 +65,15 @@ class _MoreScreenState extends State<MoreScreen> {
       body: ListView(
         padding: EdgeInsets.all(16.w),
         children: [
+          _buildMenuButton(
+            context: context,
+            title: "دليل مميزات التطبيق 🌟",
+            icon: Icons.explore_rounded,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AppFeaturesGuideScreen()),
+            ),
+          ),
           _buildMenuButton(
             context: context,
             title: "أيام الصيام",
@@ -215,11 +225,7 @@ class _MoreScreenState extends State<MoreScreen> {
                   ),
                 ),
                 const Spacer(),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  color: Colors.grey,
-                  size: 20.w,
-                ),
+                Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 20.w),
               ],
             ),
           ),
@@ -245,7 +251,7 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
   String? _customSoundPath;
   String? _customSoundName;
   String _periodicSound = 'saly_3ala_mo7amad';
-  
+
   final AudioPlayer _audioPlayer = AudioPlayer();
   String? _playingSound;
 
@@ -284,13 +290,17 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
     final prefs = CacheHelper.prefs;
     final enabled = prefs.getBool('salawat_reminder_enabled') ?? false;
     final unlockMode = prefs.getString('salah_unlock_mode') ?? 'none';
-    final useCustomVolume = prefs.getBool('salah_unlock_use_custom_volume') ?? false;
+    final useCustomVolume =
+        prefs.getBool('salah_unlock_use_custom_volume') ?? false;
     final unlockVolume = prefs.getDouble('salah_unlock_volume') ?? 1.0;
     final customPath = prefs.getString('salah_unlock_custom_path');
     final customName = prefs.getString('salah_unlock_custom_name');
-    final periodicSound = prefs.getString('salawat_periodic_sound') ?? 'saly_3ala_mo7amad';
+    final periodicSound =
+        prefs.getString('salawat_periodic_sound') ?? 'saly_3ala_mo7amad';
     final minutes = prefs.getInt('salawat_reminder_minutes') ?? 60;
-    final daysList = prefs.getStringList('salawat_reminder_days') ?? [DateTime.friday.toString()];
+    final daysList =
+        prefs.getStringList('salawat_reminder_days') ??
+        [DateTime.friday.toString()];
 
     final qhStartHour = prefs.getInt('quiet_hours_start_hour') ?? 23;
     final qhStartMin = prefs.getInt('quiet_hours_start_minute') ?? 0;
@@ -321,7 +331,10 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
 
     await prefs.setBool('salawat_reminder_enabled', _isEnabled);
     await prefs.setInt('salawat_reminder_minutes', minutes);
-    await prefs.setString('salah_unlock_mode', _unlockEnabled ? _unlockMode : 'none');
+    await prefs.setString(
+      'salah_unlock_mode',
+      _unlockEnabled ? _unlockMode : 'none',
+    );
     await prefs.setBool('salah_unlock_use_custom_volume', _useCustomVolume);
     await prefs.setDouble('salah_unlock_volume', _unlockVolume);
     if (_customSoundPath != null) {
@@ -331,7 +344,10 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
       await prefs.setString('salah_unlock_custom_name', _customSoundName!);
     }
     await prefs.setString('salawat_periodic_sound', _periodicSound);
-    await prefs.setStringList('salawat_reminder_days', _selectedDays.map((e) => e.toString()).toList());
+    await prefs.setStringList(
+      'salawat_reminder_days',
+      _selectedDays.map((e) => e.toString()).toList(),
+    );
     await prefs.setInt('quiet_hours_start_hour', _quietHoursStart.hour);
     await prefs.setInt('quiet_hours_start_minute', _quietHoursStart.minute);
     await prefs.setInt('quiet_hours_end_hour', _quietHoursEnd.hour);
@@ -342,7 +358,7 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
     try {
       if (_unlockEnabled && _unlockMode != 'none') {
         await platform.invokeMethod('startScreenUnlockService', {
-          'mode':   _unlockMode,
+          'mode': _unlockMode,
           'volume': _unlockVolume,
         });
       } else {
@@ -356,9 +372,14 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
       Navigator.pop(context);
       scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(
-          content: const Text('تم حفظ الإعدادات بنجاح', style: TextStyle(fontFamily: AppConsts.expoArabic)),
+          content: const Text(
+            'تم حفظ الإعدادات بنجاح',
+            style: TextStyle(fontFamily: AppConsts.expoArabic),
+          ),
           backgroundColor: const Color(0xFFD0A871),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10.r),
+          ),
         ),
       );
     }
@@ -425,37 +446,100 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
       'saly_3ala_mo7amad': 'صلي على محمد',
       'salah_2': 'اللهم صلي وسلم على نبينا محمد',
       'both': 'كلاهما (عشوائي)',
-      'custom': _customSoundName != null ? 'صوت مخصص: $_customSoundName' : 'صوت مخصص من الهاتف',
+      'custom': _customSoundName != null
+          ? 'صوت مخصص: $_customSoundName'
+          : 'صوت مخصص من الهاتف',
       'none': 'إيقاف',
     };
     final previewKey = value == 'both' ? 'saly_3ala_mo7amad' : value;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontFamily: AppConsts.expoArabic, fontWeight: FontWeight.bold)),
+        Text(
+          title,
+          style: const TextStyle(
+            fontFamily: AppConsts.expoArabic,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         SizedBox(height: 8.h),
         Container(
           padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
           decoration: BoxDecoration(
             color: isDark ? Colors.grey[900] : Colors.grey[100],
             borderRadius: BorderRadius.circular(12.r),
-            border: Border.all(color: const Color(0xFFD0A871).withValues(alpha: 0.3)),
+            border: Border.all(
+              color: const Color(0xFFD0A871).withValues(alpha: 0.3),
+            ),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
-              value: (showCustom && value == 'custom') || soundLabel.containsKey(value) ? value : 'saly_3ala_mo7amad',
+              value:
+                  (showCustom && value == 'custom') ||
+                      soundLabel.containsKey(value)
+                  ? value
+                  : 'saly_3ala_mo7amad',
               isExpanded: true,
-              icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFFD0A871)),
+              icon: const Icon(
+                Icons.keyboard_arrow_down,
+                color: Color(0xFFD0A871),
+              ),
               dropdownColor: isDark ? Colors.grey[900] : Colors.white,
               items: [
                 if (showNone)
-                  DropdownMenuItem(value: 'none', child: Text(soundLabel['none']!, style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 13.sp))),
-                DropdownMenuItem(value: 'saly_3ala_mo7amad', child: Text(soundLabel['saly_3ala_mo7amad']!, style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 13.sp))),
-                DropdownMenuItem(value: 'salah_2', child: Text(soundLabel['salah_2']!, style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 13.sp))),
+                  DropdownMenuItem(
+                    value: 'none',
+                    child: Text(
+                      soundLabel['none']!,
+                      style: TextStyle(
+                        fontFamily: AppConsts.cairo,
+                        fontSize: 13.sp,
+                      ),
+                    ),
+                  ),
+                DropdownMenuItem(
+                  value: 'saly_3ala_mo7amad',
+                  child: Text(
+                    soundLabel['saly_3ala_mo7amad']!,
+                    style: TextStyle(
+                      fontFamily: AppConsts.cairo,
+                      fontSize: 13.sp,
+                    ),
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: 'salah_2',
+                  child: Text(
+                    soundLabel['salah_2']!,
+                    style: TextStyle(
+                      fontFamily: AppConsts.cairo,
+                      fontSize: 13.sp,
+                    ),
+                  ),
+                ),
                 if (showBoth)
-                  DropdownMenuItem(value: 'both', child: Text(soundLabel['both']!, style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 13.sp))),
+                  DropdownMenuItem(
+                    value: 'both',
+                    child: Text(
+                      soundLabel['both']!,
+                      style: TextStyle(
+                        fontFamily: AppConsts.cairo,
+                        fontSize: 13.sp,
+                      ),
+                    ),
+                  ),
                 if (showCustom)
-                  DropdownMenuItem(value: 'custom', child: Text(soundLabel['custom']!, style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 13.sp, overflow: TextOverflow.ellipsis))),
+                  DropdownMenuItem(
+                    value: 'custom',
+                    child: Text(
+                      soundLabel['custom']!,
+                      style: TextStyle(
+                        fontFamily: AppConsts.cairo,
+                        fontSize: 13.sp,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
               ],
               onChanged: onChanged,
             ),
@@ -468,13 +552,25 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
             child: OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFFD0A871)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
                 padding: EdgeInsets.symmetric(vertical: 8.h),
               ),
-              icon: const Icon(Icons.file_upload_outlined, color: Color(0xFFD0A871), size: 18),
+              icon: const Icon(
+                Icons.file_upload_outlined,
+                color: Color(0xFFD0A871),
+                size: 18,
+              ),
               label: Text(
-                _customSoundName != null ? 'تغيير الملف: $_customSoundName' : 'اختيار ملف صوتي من الجهاز',
-                style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 12.sp, color: const Color(0xFFD0A871)),
+                _customSoundName != null
+                    ? 'تغيير الملف: $_customSoundName'
+                    : 'اختيار ملف صوتي من الجهاز',
+                style: TextStyle(
+                  fontFamily: AppConsts.cairo,
+                  fontSize: 12.sp,
+                  color: const Color(0xFFD0A871),
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
               onPressed: _pickCustomAudio,
@@ -488,19 +584,34 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
               Expanded(
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: _playingSound == previewKey ? Colors.red : const Color(0xFFD0A871),
-                    side: BorderSide(color: _playingSound == previewKey ? Colors.red : const Color(0xFFD0A871)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    foregroundColor: _playingSound == previewKey
+                        ? Colors.red
+                        : const Color(0xFFD0A871),
+                    side: BorderSide(
+                      color: _playingSound == previewKey
+                          ? Colors.red
+                          : const Color(0xFFD0A871),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
                     padding: EdgeInsets.symmetric(vertical: 10.h),
                   ),
-                  icon: Icon(_playingSound == previewKey ? Icons.stop : Icons.play_arrow, size: 20),
+                  icon: Icon(
+                    _playingSound == previewKey ? Icons.stop : Icons.play_arrow,
+                    size: 20,
+                  ),
                   label: Text(
                     _playingSound == previewKey
-                      ? 'إيقاف الصوت'
-                      : (value == 'both' ? 'معاينة (الأول)' : 'معاينة الصوت'),
-                    style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 13.sp),
+                        ? 'إيقاف الصوت'
+                        : (value == 'both' ? 'معاينة (الأول)' : 'معاينة الصوت'),
+                    style: TextStyle(
+                      fontFamily: AppConsts.cairo,
+                      fontSize: 13.sp,
+                    ),
                   ),
-                  onPressed: () => _playSound(previewKey, volume: previewVolume),
+                  onPressed: () =>
+                      _playSound(previewKey, volume: previewVolume),
                 ),
               ),
             ],
@@ -517,7 +628,9 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: const ColorScheme.light(
-            primary: Color(0xFFD0A871), onPrimary: Colors.white, onSurface: Colors.black,
+            primary: Color(0xFFD0A871),
+            onPrimary: Colors.white,
+            onSurface: Colors.black,
           ),
         ),
         child: Directionality(textDirection: TextDirection.rtl, child: child!),
@@ -540,7 +653,13 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
       onTap: onTap,
       child: Column(
         children: [
-          Text(label, style: const TextStyle(fontFamily: AppConsts.cairo, color: Colors.grey)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: AppConsts.cairo,
+              color: Colors.grey,
+            ),
+          ),
           SizedBox(height: 4.h),
           Container(
             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
@@ -550,7 +669,10 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
             ),
             child: Text(
               time.format(context),
-              style: const TextStyle(fontFamily: AppConsts.expoArabic, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontFamily: AppConsts.expoArabic,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -565,7 +687,9 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
       backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
       child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -576,8 +700,14 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
                 borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
               ),
               child: const Center(
-                child: Text("تنبيهات الصلاة على النبي ﷺ", 
-                  style: TextStyle(fontFamily: AppConsts.expoArabic, fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFFD0A871))
+                child: Text(
+                  "تنبيهات الصلاة على النبي ﷺ",
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Color(0xFFD0A871),
+                  ),
                 ),
               ),
             ),
@@ -591,7 +721,14 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text("تنبيهات دورية", style: TextStyle(fontFamily: AppConsts.expoArabic, fontWeight: FontWeight.bold, fontSize: 16)),
+                        const Text(
+                          "تنبيهات دورية",
+                          style: TextStyle(
+                            fontFamily: AppConsts.expoArabic,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
                         Switch(
                           value: _isEnabled,
                           activeThumbColor: const Color(0xFFD0A871),
@@ -604,20 +741,48 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
                       _buildSoundSelector(
                         title: "صوت التذكير الدوري:",
                         value: _periodicSound,
-                        onChanged: (val) { if (val != null) setState(() => _periodicSound = val); },
+                        onChanged: (val) {
+                          if (val != null) setState(() => _periodicSound = val);
+                        },
                       ),
                       SizedBox(height: 16.h),
-                      const Text("الأيام:", style: TextStyle(fontFamily: AppConsts.expoArabic, fontWeight: FontWeight.bold)),
+                      const Text(
+                        "الأيام:",
+                        style: TextStyle(
+                          fontFamily: AppConsts.expoArabic,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       SizedBox(height: 8.h),
                       Wrap(
-                        spacing: 8.w, runSpacing: 8.h,
-                        children: _daysMap.entries.map((e) => FilterChip(
-                          label: Text(e.value, style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 12.sp, color: _selectedDays.contains(e.key) ? Colors.white : (isDark ? Colors.white70 : Colors.black87))),
-                          selected: _selectedDays.contains(e.key),
-                          onSelected: (val) => setState(() { val ? _selectedDays.add(e.key) : _selectedDays.remove(e.key); }),
-                          selectedColor: const Color(0xFFD0A871),
-                          checkmarkColor: Colors.white,
-                        )).toList(),
+                        spacing: 8.w,
+                        runSpacing: 8.h,
+                        children: _daysMap.entries
+                            .map(
+                              (e) => FilterChip(
+                                label: Text(
+                                  e.value,
+                                  style: TextStyle(
+                                    fontFamily: AppConsts.cairo,
+                                    fontSize: 12.sp,
+                                    color: _selectedDays.contains(e.key)
+                                        ? Colors.white
+                                        : (isDark
+                                              ? Colors.white70
+                                              : Colors.black87),
+                                  ),
+                                ),
+                                selected: _selectedDays.contains(e.key),
+                                onSelected: (val) => setState(() {
+                                  val
+                                      ? _selectedDays.add(e.key)
+                                      : _selectedDays.remove(e.key);
+                                }),
+                                selectedColor: const Color(0xFFD0A871),
+                                checkmarkColor: Colors.white,
+                              ),
+                            )
+                            .toList(),
                       ),
                       SizedBox(height: 16.h),
                       TextField(
@@ -625,34 +790,69 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
                           labelText: "تكرار كل (دقيقة)",
-                          labelStyle: const TextStyle(fontFamily: AppConsts.cairo, color: Colors.grey),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
-                          focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Color(0xFFD0A871)), borderRadius: BorderRadius.circular(12.r)),
+                          labelStyle: const TextStyle(
+                            fontFamily: AppConsts.cairo,
+                            color: Colors.grey,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: const BorderSide(
+                              color: Color(0xFFD0A871),
+                            ),
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
                         ),
                       ),
                       SizedBox(height: 16.h),
-                      const Text("ساعات الهدوء (لن يتم التنبيه خلالها):", style: TextStyle(fontFamily: AppConsts.expoArabic, fontWeight: FontWeight.bold)),
+                      const Text(
+                        "ساعات الهدوء (لن يتم التنبيه خلالها):",
+                        style: TextStyle(
+                          fontFamily: AppConsts.expoArabic,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       SizedBox(height: 8.h),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          _quietTimePicker("من", _quietHoursStart, () => _pickTime(true)),
-                          _quietTimePicker("إلى", _quietHoursEnd, () => _pickTime(false)),
+                          _quietTimePicker(
+                            "من",
+                            _quietHoursStart,
+                            () => _pickTime(true),
+                          ),
+                          _quietTimePicker(
+                            "إلى",
+                            _quietHoursEnd,
+                            () => _pickTime(false),
+                          ),
                         ],
                       ),
                     ],
-                    Divider(height: 40.h, color: Colors.grey.withValues(alpha: 0.2)),
+                    Divider(
+                      height: 40.h,
+                      color: Colors.grey.withValues(alpha: 0.2),
+                    ),
                     // Section 2: Lock Screen
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text("عند فتح قفل الشاشة", style: TextStyle(fontFamily: AppConsts.expoArabic, fontWeight: FontWeight.bold, fontSize: 16)),
+                        const Text(
+                          "عند فتح قفل الشاشة",
+                          style: TextStyle(
+                            fontFamily: AppConsts.expoArabic,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
                         Switch(
                           value: _unlockEnabled,
                           activeThumbColor: const Color(0xFFD0A871),
                           onChanged: (val) => setState(() {
                             _unlockEnabled = val;
-                            if (val && _unlockMode == 'none') _unlockMode = 'saly_3ala_mo7amad';
+                            if (val && _unlockMode == 'none')
+                              _unlockMode = 'saly_3ala_mo7amad';
                           }),
                         ),
                       ],
@@ -662,12 +862,16 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
                       SizedBox(height: 4.h),
                       _buildSoundSelector(
                         title: "اختر الصوت:",
-                        value: _unlockMode == 'none' ? 'saly_3ala_mo7amad' : _unlockMode,
+                        value: _unlockMode == 'none'
+                            ? 'saly_3ala_mo7amad'
+                            : _unlockMode,
                         showNone: false,
                         showBoth: true,
                         showCustom: true,
                         previewVolume: _unlockVolume,
-                        onChanged: (val) { if (val != null) setState(() => _unlockMode = val); },
+                        onChanged: (val) {
+                          if (val != null) setState(() => _unlockMode = val);
+                        },
                       ),
                       SizedBox(height: 14.h),
                       Row(
@@ -676,13 +880,18 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
                           Expanded(
                             child: Text(
                               "تخصيص مستوى الصوت (تعلية مؤقتة)",
-                              style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 13.sp, fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                fontFamily: AppConsts.cairo,
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                           Switch(
                             value: _useCustomVolume,
                             activeThumbColor: const Color(0xFFD0A871),
-                            onChanged: (val) => setState(() => _useCustomVolume = val),
+                            onChanged: (val) =>
+                                setState(() => _useCustomVolume = val),
                           ),
                         ],
                       ),
@@ -690,7 +899,11 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
                         SizedBox(height: 8.h),
                         Row(
                           children: [
-                            const Icon(Icons.volume_mute, color: Colors.grey, size: 20),
+                            const Icon(
+                              Icons.volume_mute,
+                              color: Colors.grey,
+                              size: 20,
+                            ),
                             Expanded(
                               child: Slider(
                                 value: _unlockVolume,
@@ -698,18 +911,29 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
                                 max: 1.0,
                                 divisions: 9,
                                 activeColor: const Color(0xFFD0A871),
-                                inactiveColor: const Color(0xFFD0A871).withValues(alpha: 0.2),
-                                onChanged: (val) => setState(() => _unlockVolume = val),
+                                inactiveColor: const Color(
+                                  0xFFD0A871,
+                                ).withValues(alpha: 0.2),
+                                onChanged: (val) =>
+                                    setState(() => _unlockVolume = val),
                               ),
                             ),
-                            const Icon(Icons.volume_up, color: Color(0xFFD0A871), size: 20),
+                            const Icon(
+                              Icons.volume_up,
+                              color: Color(0xFFD0A871),
+                              size: 20,
+                            ),
                             SizedBox(width: 6.w),
                             SizedBox(
                               width: 36.w,
                               child: Text(
                                 '${(_unlockVolume * 100).round()}%',
-                                style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 12.sp,
-                                  color: const Color(0xFFD0A871), fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  fontFamily: AppConsts.cairo,
+                                  fontSize: 12.sp,
+                                  color: const Color(0xFFD0A871),
+                                  fontWeight: FontWeight.bold,
+                                ),
                                 textAlign: TextAlign.right,
                               ),
                             ),
@@ -717,7 +941,11 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
                         ),
                         Text(
                           "يتم تعلية الصوت مؤقتاً أثناء التنبيه ثم استعادة مستوى صوت النظام تلقائياً",
-                          style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 11.sp, color: Colors.grey),
+                          style: TextStyle(
+                            fontFamily: AppConsts.cairo,
+                            fontSize: 11.sp,
+                            color: Colors.grey,
+                          ),
                         ),
                       ],
                     ],
@@ -729,15 +957,29 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
               padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5))],
-                borderRadius: BorderRadius.vertical(bottom: Radius.circular(20.r)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -5),
+                  ),
+                ],
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(20.r),
+                ),
               ),
               child: Row(
                 children: [
                   Expanded(
                     child: TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text("إلغاء", style: TextStyle(fontFamily: AppConsts.expoArabic, color: Colors.grey)),
+                      child: const Text(
+                        "إلغاء",
+                        style: TextStyle(
+                          fontFamily: AppConsts.expoArabic,
+                          color: Colors.grey,
+                        ),
+                      ),
                     ),
                   ),
                   SizedBox(width: 12.w),
@@ -747,11 +989,19 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFD0A871),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
                         padding: EdgeInsets.symmetric(vertical: 12.h),
                       ),
                       onPressed: _saveSettings,
-                      child: const Text("حفظ وتفعيل", style: TextStyle(fontFamily: AppConsts.expoArabic, fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        "حفظ وتفعيل",
+                        style: TextStyle(
+                          fontFamily: AppConsts.expoArabic,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ],

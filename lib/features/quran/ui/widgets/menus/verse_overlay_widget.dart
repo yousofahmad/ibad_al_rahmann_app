@@ -11,6 +11,7 @@ import 'package:quran/quran.dart' as quran;
 import '../../../../../screens/share_setup_screen.dart';
 
 import './verse_details_bottom_sheet.dart';
+import '../audio/reciter_dropdown.dart';
 
 class VerseBottomSheet extends StatefulWidget {
   final bool? isDarkOverride;
@@ -139,9 +140,16 @@ class _VerseBottomSheetState extends State<VerseBottomSheet> {
                 : () {
                     final currentVerse = cubit.currnetVerse;
                     if (currentVerse == null) return;
-                    final text = quran.getVerse(currentVerse.surahNumber, currentVerse.verseNumber, verseEndSymbol: true);
+                    final text = quran.getVerse(
+                      currentVerse.surahNumber,
+                      currentVerse.verseNumber,
+                      verseEndSymbol: true,
+                    );
                     Clipboard.setData(ClipboardData(text: text));
-                    AlertHelper.showSuccessAlert(context, message: 'تم نسخ الآية');
+                    AlertHelper.showSuccessAlert(
+                      context,
+                      message: 'تم نسخ الآية',
+                    );
                   },
             icon: const Icon(Icons.copy_rounded, color: Colors.white),
           ),
@@ -170,10 +178,24 @@ class _VerseBottomSheetState extends State<VerseBottomSheet> {
           ),
           IconButton(
             iconSize: 34.w,
+            tooltip: 'اختيار القارئ والتظليل',
             onPressed: _isOpeningShare
                 ? null
                 : () {
-                    context.pop();
+                    ReciterDropdown.showReciterSelectionModal(context, cubit);
+                  },
+            icon: const Icon(
+              Icons.record_voice_over_rounded,
+              color: Colors.white,
+            ),
+          ),
+          IconButton(
+            iconSize: 34.w,
+            tooltip: 'تشغيل الصوت',
+            onPressed: _isOpeningShare
+                ? null
+                : () {
+                    Navigator.of(context).pop();
                     cubit.show();
                     cubit.initVerse(autoPlay: true);
                   },

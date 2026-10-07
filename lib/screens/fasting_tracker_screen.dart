@@ -129,7 +129,8 @@ class _FastingTrackerScreenState extends State<FastingTrackerScreen> {
                 crossAxisCount: 7,
               ),
               itemCount: 35,
-              itemBuilder: (_, __) => AppSkeleton(width: 40.w, height: 40.w, borderRadius: 20),
+              itemBuilder: (_, __) =>
+                  AppSkeleton(width: 40.w, height: 40.w, borderRadius: 20),
             )
           : Column(
               children: [
@@ -212,12 +213,11 @@ class _FastingTrackerScreenState extends State<FastingTrackerScreen> {
                 Expanded(
                   child: GridView.builder(
                     padding: EdgeInsets.all(16.w),
-                    gridDelegate:
-                        SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 7,
-                          mainAxisSpacing: 8.h,
-                          crossAxisSpacing: 8.w,
-                        ),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 7,
+                      mainAxisSpacing: 8.h,
+                      crossAxisSpacing: 8.w,
+                    ),
                     itemCount: daysInMonth + weekdayOffset,
                     itemBuilder: (context, index) {
                       if (index < weekdayOffset) return const SizedBox();

@@ -27,7 +27,9 @@ class _FiqhScreenState extends State<FiqhScreen> {
 
   Future<void> _loadQuestions() async {
     try {
-      final String response = await rootBundle.loadString('assets/data/fiqh_questions.json');
+      final String response = await rootBundle.loadString(
+        'assets/data/fiqh_questions.json',
+      );
       final data = await json.decode(response);
       setState(() {
         _questions = data;
@@ -44,9 +46,15 @@ class _FiqhScreenState extends State<FiqhScreen> {
   void _filterQuestions(String query) {
     setState(() {
       _filteredQuestions = _questions
-          .where((q) =>
-              q['question'].toString().toLowerCase().contains(query.toLowerCase()) ||
-              q['answer'].toString().toLowerCase().contains(query.toLowerCase()))
+          .where(
+            (q) =>
+                q['question'].toString().toLowerCase().contains(
+                  query.toLowerCase(),
+                ) ||
+                q['answer'].toString().toLowerCase().contains(
+                  query.toLowerCase(),
+                ),
+          )
           .toList();
     });
   }
@@ -87,63 +95,68 @@ class _FiqhScreenState extends State<FiqhScreen> {
                   borderRadius: BorderRadius.circular(15.r),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 16.w,
+                  vertical: 12.h,
+                ),
               ),
             ),
           ),
         ),
         SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final q = _filteredQuestions[index];
-              return Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                child: Card(
-                  elevation: 0,
-                  color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15.r),
-                    side: BorderSide(color: isDark ? Colors.white10 : Colors.black12),
-                  ),
-                  child: ExpansionTile(
-                    leading: CircleAvatar(
-                      backgroundColor: goldColor.withAlpha(30),
-                      child: Text(
-                        q['id'].toString(),
-                        style: const TextStyle(color: goldColor, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    title: Text(
-                      q['question'],
-                      textAlign: TextAlign.right,
-                      style: TextStyle(
-                        fontFamily: AppConsts.expoArabic,
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
-                    ),
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.all(16.w),
-                        child: Text(
-                          q['answer'],
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontFamily: AppConsts.expoArabic,
-                            fontSize: 13.sp,
-                            color: isDark ? Colors.white70 : Colors.black87,
-                            height: 1.5,
-                          ),
-                        ),
-                      ),
-                    ],
+          delegate: SliverChildBuilderDelegate((context, index) {
+            final q = _filteredQuestions[index];
+            return Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+              child: Card(
+                elevation: 0,
+                color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15.r),
+                  side: BorderSide(
+                    color: isDark ? Colors.white10 : Colors.black12,
                   ),
                 ),
-              );
-            },
-            childCount: _filteredQuestions.length,
-          ),
+                child: ExpansionTile(
+                  leading: CircleAvatar(
+                    backgroundColor: goldColor.withAlpha(30),
+                    child: Text(
+                      q['id'].toString(),
+                      style: const TextStyle(
+                        color: goldColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  title: Text(
+                    q['question'],
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontFamily: AppConsts.expoArabic,
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.all(16.w),
+                      child: Text(
+                        q['answer'],
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          fontFamily: AppConsts.expoArabic,
+                          fontSize: 13.sp,
+                          color: isDark ? Colors.white70 : Colors.black87,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }, childCount: _filteredQuestions.length),
         ),
         SliverToBoxAdapter(
           child: Padding(
@@ -162,7 +175,11 @@ class _FiqhScreenState extends State<FiqhScreen> {
                 ),
                 SizedBox(height: 12.h),
                 InkWell(
-                  onTap: () => launchUrl(Uri.parse('https://youtube.com/playlist?list=PL1i_D1Vw3d5P5Q6IHHW22JHrnLCwm60Bn')),
+                  onTap: () => launchUrl(
+                    Uri.parse(
+                      'https://youtube.com/playlist?list=PL1i_D1Vw3d5P5Q6IHHW22JHrnLCwm60Bn',
+                    ),
+                  ),
                   child: Container(
                     width: double.infinity,
                     padding: EdgeInsets.all(20.w),
@@ -182,7 +199,11 @@ class _FiqhScreenState extends State<FiqhScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Icon(Icons.play_circle_fill, color: Colors.white, size: 40),
+                        const Icon(
+                          Icons.play_circle_fill,
+                          color: Colors.white,
+                          size: 40,
+                        ),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.end,

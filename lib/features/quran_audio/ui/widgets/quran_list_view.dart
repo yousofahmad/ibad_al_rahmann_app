@@ -15,19 +15,18 @@ class QuranListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cubit = context.read<QuranAudioCubit>();
-    return FutureBuilder(
-      future: cubit.getQuran(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
+    return BlocBuilder<QuranAudioCubit, QuranState>(
+      builder: (context, quranState) {
+        final cubit = context.read<QuranAudioCubit>();
+        if (quranState is QuranFailure) {
           return Center(
             child: Text(
-              snapshot.error.toString(),
+              quranState.errMessage,
               style: AppStyles.style20.copyWith(color: Colors.redAccent),
               textAlign: TextAlign.center,
             ),
           );
-        } else if (snapshot.hasData) {
+        } else if (cubit.quran.isNotEmpty || quranState is QuranSuccess) {
           return ListView.separated(
             padding: const EdgeInsets.only(top: 12, bottom: 120),
             itemCount: cubit.quran.length,
@@ -61,4 +60,3 @@ class QuranListView extends StatelessWidget {
     return cubit.selectedSurah == surahNumber && cubit.player.playing;
   }
 }
-

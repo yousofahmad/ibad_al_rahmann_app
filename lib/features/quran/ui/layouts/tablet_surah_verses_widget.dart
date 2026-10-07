@@ -73,9 +73,13 @@ class _TabletSurahVersesWidgetState extends State<TabletSurahVersesWidget> {
     }
 
     final playingVerse = cubit.state.currentVerse;
+    final activeWordIndex = cubit.state.activeWordIndex;
     if (playingVerse != null &&
         playingVerse.surahNumber == word.suraNumber &&
         playingVerse.verseNumber == word.ayahNumber) {
+      if (cubit.isHighlightWordByWord && activeWordIndex != null) {
+        return word.position == activeWordIndex;
+      }
       return true;
     }
 
@@ -189,7 +193,8 @@ class _TabletSurahVersesWidgetState extends State<TabletSurahVersesWidget> {
                     final isHighlighted = _isHighlighted(word);
                     return GestureDetector(
                       onLongPress: () {
-                        if (word.suraNumber == null || word.ayahNumber == null) {
+                        if (word.suraNumber == null ||
+                            word.ayahNumber == null) {
                           return;
                         }
                         _highlightSetByLongPress = true;

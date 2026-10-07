@@ -14,15 +14,21 @@ class QuranWbwDbHelper {
   QuranWbwDbHelper._init();
 
   bool _isPreloading = false;
-  final int _maxCachePages = 15;
+  final int _maxCachePages = 100;
 
-  final LinkedHashMap<int, List<PageLine>> _pageLinesCache = LinkedHashMap<int, List<PageLine>>();
-  final LinkedHashMap<int, List<QuranWord>> _pageWordsCache = LinkedHashMap<int, List<QuranWord>>();
-  final Map<String, String> _verseGlyphsCache = {}; // key: 'surah_ayah', value: joined glyphs
+  final LinkedHashMap<int, List<PageLine>> _pageLinesCache =
+      LinkedHashMap<int, List<PageLine>>();
+  final LinkedHashMap<int, List<QuranWord>> _pageWordsCache =
+      LinkedHashMap<int, List<QuranWord>>();
+  final Map<String, String> _verseGlyphsCache =
+      {}; // key: 'surah_ayah', value: joined glyphs
 
   void _updateLru<K, V>(LinkedHashMap<K, V> cache, K key, V value, int max) {
-    if (cache.containsKey(key)) { cache.remove(key); }
-    else if (cache.length >= max) { cache.remove(cache.keys.first); }
+    if (cache.containsKey(key)) {
+      cache.remove(key);
+    } else if (cache.length >= max) {
+      cache.remove(cache.keys.first);
+    }
     cache[key] = value;
   }
 

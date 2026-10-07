@@ -5,6 +5,7 @@ import 'package:adhan/adhan.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:ibad_al_rahmann/features/wird/data/khatma_model.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
@@ -862,9 +863,19 @@ class NotificationService {
       }
     }
 
+    AppLogger.log(
+      "NotificationService",
+      "rescheduleWird() -> found ${khatmas.length} active khatmas to schedule",
+    );
+
     for (final khatma in khatmas) {
       if (khatma.enableNotifications) {
         await _scheduleKhatmaNotifications(khatma, prefs);
+      } else {
+        AppLogger.log(
+          "NotificationService",
+          "Khatma '${khatma.name}' notifications are disabled, skipping.",
+        );
       }
     }
 
@@ -993,6 +1004,10 @@ class NotificationService {
             payload: payload,
             customSoundName: "ibad_al_rahmann_tone",
           );
+          AppLogger.log(
+            "NotificationService",
+            "Scheduled wird alarm $scheduledId for '${khatma.name}' at ${t.toIso8601String()} (daily)",
+          );
         }
       }
     } else if (khatma.notificationType == 'prayer') {
@@ -1032,6 +1047,10 @@ class NotificationService {
               day: t.day,
               payload: payload,
               customSoundName: "ibad_al_rahmann_tone",
+            );
+            AppLogger.log(
+              "NotificationService",
+              "Scheduled wird alarm $scheduledId for '${khatma.name}' after $name at ${t.toIso8601String()}",
             );
           }
           prayerIdx++;

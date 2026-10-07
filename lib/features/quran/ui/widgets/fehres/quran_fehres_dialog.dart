@@ -120,10 +120,11 @@ class _QuranFehresDialogState extends State<QuranFehresDialog> {
     final paperColor = quranState.isWirdMode
         ? quranState.wirdPaperColor
         : quranState.quranPaperColor;
-    
+
     // The dialog body background follows the Mushaf paper's brightness
-    final bool isPaperDark = (paperColor ?? Colors.white).computeLuminance() < 0.5;
-    
+    final bool isPaperDark =
+        (paperColor ?? Colors.white).computeLuminance() < 0.5;
+
     // Use true black for dark mode in index
     final Color dialogBg = isPaperDark ? const Color(0xFF000000) : Colors.white;
     final Color primary = Theme.of(context).primaryColor;
@@ -364,9 +365,10 @@ class _MetadataListTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).primaryColor;
-    final bool isPrimaryDark = ThemeData.estimateBrightnessForColor(primary) == Brightness.dark;
+    final bool isPrimaryDark =
+        ThemeData.estimateBrightnessForColor(primary) == Brightness.dark;
     final Color activeTextColor = isPrimaryDark ? Colors.white : Colors.black87;
-    
+
     return ListView.separated(
       itemCount: items.length,
       separatorBuilder: (_, __) =>
@@ -611,7 +613,8 @@ class _RubCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).primaryColor;
-    final bool isPrimaryDark = ThemeData.estimateBrightnessForColor(primary) == Brightness.dark;
+    final bool isPrimaryDark =
+        ThemeData.estimateBrightnessForColor(primary) == Brightness.dark;
     final Color activeTextColor = isPrimaryDark ? Colors.white : Colors.black87;
 
     final bool isActive = (entry.rubIndex + 1) == activeRub;
@@ -619,7 +622,9 @@ class _RubCard extends StatelessWidget {
         ? primary
         : (isLightBg ? Colors.white : const Color(0xFF000000));
     final txtColor = isActive ? activeTextColor : onSurface;
-    final subTxtColor = isActive ? activeTextColor.withValues(alpha: 0.8) : onSurface.withAlpha(150);
+    final subTxtColor = isActive
+        ? activeTextColor.withValues(alpha: 0.8)
+        : onSurface.withAlpha(150);
 
     // Quarter number within the Hizb (0, 1, 2, 3)
     final quarterInHizb = entry.rubIndex % 4;
@@ -860,11 +865,11 @@ class _RubMarker extends StatelessWidget {
     final double fill = entry.isHizbStart
         ? 1.0
         : switch (quarterLabel) {
-          'الربع' => 0.25,
-          'النصف' => 0.5,
-          'الثلاثة أرباع' => 0.75,
-          _ => 1.0,
-        };
+            'الربع' => 0.25,
+            'النصف' => 0.5,
+            'الثلاثة أرباع' => 0.75,
+            _ => 1.0,
+          };
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -1050,7 +1055,8 @@ class _HizbCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).primaryColor;
-    final bool isPrimaryDark = ThemeData.estimateBrightnessForColor(primary) == Brightness.dark;
+    final bool isPrimaryDark =
+        ThemeData.estimateBrightnessForColor(primary) == Brightness.dark;
     final Color activeTextColor = isPrimaryDark ? Colors.white : Colors.black87;
 
     final bool isActive = (entry.hizbIndex + 1) == activeHizb;
@@ -1058,7 +1064,9 @@ class _HizbCard extends StatelessWidget {
         ? primary
         : (isLightBg ? Colors.white : const Color(0xFF000000));
     final txtColor = isActive ? activeTextColor : onSurface;
-    final subTxtColor = isActive ? activeTextColor.withValues(alpha: 0.8) : onSurface.withAlpha(150);
+    final subTxtColor = isActive
+        ? activeTextColor.withValues(alpha: 0.8)
+        : onSurface.withAlpha(150);
     final hizbInJuz = (entry.hizbIndex % 2) + 1;
     final hizbLabel = hizbInJuz == 1 ? 'الحزب الأول' : 'الحزب الثاني';
 
@@ -1072,12 +1080,12 @@ class _HizbCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           boxShadow: isLightBg && !isActive
               ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ]
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
               : null,
         ),
         child: Padding(

@@ -78,17 +78,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       SystemUiMode.manual,
       overlays: SystemUiOverlay.values,
     );
-    
+
     // Add listener to prayer service to handle cases where it initializes late
     _prayerService.addListener(_loadPrayerTimes);
-    
+
     _loadPrayerTimes();
     _startTimer();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Small delay to ensure UI is stable
       await Future.delayed(const Duration(seconds: 2));
-      if (mounted && WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      if (mounted &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
         // Request essential permissions on startup
         try {
           await Permission.notification.request();
@@ -429,27 +430,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             else
               Icon(icon, size: 40.w, color: const Color(0xFFD0A871)),
             if (!hideTitle) ...[
-              SizedBox(height: 10.h),
+              SizedBox(height: 12.h),
               Transform.translate(
                 offset: Offset(0, textOffset.h),
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: 6.h),
-                  child: ShaderMask(
-                    blendMode: BlendMode.srcIn,
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [Color(0xFFF2D69D), Color(0xFFD0A871), Color(0xFFB88A4A)],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height + 10.h)),
-                    child: Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: const Color(0xFFD0A871),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16.sp,
-                        fontFamily: 'Cairo',
+                child: ShaderMask(
+                  blendMode: BlendMode.srcIn,
+                  shaderCallback: (bounds) =>
+                      const LinearGradient(
+                        colors: [
+                          Color(0xFFF2D69D),
+                          Color(0xFFD0A871),
+                          Color(0xFFB88A4A),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ).createShader(
+                        Rect.fromLTWH(0, 0, bounds.width, bounds.height + 10.h),
                       ),
+                  child: Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: const Color(0xFFD0A871),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16.sp,
+                      fontFamily: 'Cairo',
                     ),
                   ),
                 ),
@@ -540,7 +545,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               if (target != null && !target.isCompleted) {
                 inProgressWirdCards.add(
                   _buildReminderCard(
-                    delayedWirds < 0 
+                    delayedWirds < 0
                         ? "أنت متقدم في ${khatma.name} بمقدار ${-delayedWirds} ورد"
                         : "أكمل قراءة الورد الحالي: ${khatma.name}",
                     () {
@@ -640,7 +645,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
               if (showMorningInProgress)
                 _buildReminderCard(
-                  _isMorningAzkarStarted ? "أكمل أذكار الصباح" : "اقرأ أذكار الصباح",
+                  _isMorningAzkarStarted
+                      ? "أكمل أذكار الصباح"
+                      : "اقرأ أذكار الصباح",
                   () {
                     Navigator.push(
                       context,
@@ -658,7 +665,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
               if (showEveningInProgress)
                 _buildReminderCard(
-                  _isEveningAzkarStarted ? "أكمل أذكار المساء" : "اقرأ أذكار المساء",
+                  _isEveningAzkarStarted
+                      ? "أكمل أذكار المساء"
+                      : "اقرأ أذكار المساء",
                   () {
                     Navigator.push(
                       context,
@@ -772,20 +781,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               SliverToBoxAdapter(
                 child: Container(
                   margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12.w,
+                    vertical: 8.h,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+                    border: Border.all(
+                      color: Colors.redAccent.withValues(alpha: 0.5),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.redAccent,
+                      ),
                       SizedBox(width: 10.w),
                       Expanded(
                         child: Text(
                           "يرجى تأكيد التاريخ الهجري لليوم الجديد",
-                          style: TextStyle(fontFamily: AppConsts.cairo, color: Colors.redAccent, fontSize: 13.sp),
+                          style: TextStyle(
+                            fontFamily: AppConsts.cairo,
+                            color: Colors.redAccent,
+                            fontSize: 13.sp,
+                          ),
                         ),
                       ),
                       ElevatedButton(
@@ -797,8 +818,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         onPressed: () {
                           Navigator.pushNamed(context, '/hijri_confirmation');
                         },
-                        child: const Text("تأكيد", style: TextStyle(color: Colors.white)),
-                      )
+                        child: const Text(
+                          "تأكيد",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -823,8 +847,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     imagePath: Theme.of(context).brightness == Brightness.dark
                         ? AppImages.sectionsQuranDark
                         : AppImages.sectionsQuranLight,
-                    customIconSize: 60.w,
-                    textOffset: 0.0,
+                    customIconSize: 75.w,
+                    textOffset: -10.0,
                   ),
                   _buildGridItem(
                     "الأذكار",
@@ -844,7 +868,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     "السبحة",
                     Icons.radio_button_checked_rounded,
                     const TasbeehScreen(),
-                    imagePath: "assets/images/pngtree-luxury-islamic-prayer-beads-macro-png-image_18712828.webp",
+                    imagePath:
+                        "assets/images/pngtree-luxury-islamic-prayer-beads-macro-png-image_18712828.webp",
                   ),
                   _buildGridItem(
                     "القضاء",

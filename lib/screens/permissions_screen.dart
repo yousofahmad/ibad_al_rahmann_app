@@ -14,7 +14,8 @@ class PermissionsScreen extends StatefulWidget {
 
 class _PermissionsScreenState extends State<PermissionsScreen> {
   bool isNotificationGranted = false;
-  bool isExactAlarmGranted   = true; // assume granted; corrected in _checkPermissions
+  bool isExactAlarmGranted =
+      true; // assume granted; corrected in _checkPermissions
 
   @override
   void initState() {
@@ -29,7 +30,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
     if (!mounted) return;
     setState(() {
       isNotificationGranted = notifStatus.isGranted;
-      isExactAlarmGranted   = exactStatus.isGranted;
+      isExactAlarmGranted = exactStatus.isGranted;
     });
 
     // Auto-proceed when both are granted
@@ -52,7 +53,9 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
           backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.r)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15.r),
+          ),
           title: Text(
             'تنويه هام',
             style: TextStyle(
@@ -97,7 +100,9 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
       await showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.r)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15.r),
+          ),
           title: Text(
             'الإذن مطلوب',
             style: TextStyle(
@@ -222,7 +227,8 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                 icon: Icons.alarm_on_rounded,
                 iconColor: const Color(0xFFD0A871),
                 title: 'دقة مواعيد الأذان',
-                subtitle: 'يضمن وصول الأذان في وقته الدقيق حتى في وضع توفير الطاقة',
+                subtitle:
+                    'يضمن وصول الأذان في وقته الدقيق حتى في وضع توفير الطاقة',
                 isGranted: isExactAlarmGranted,
                 buttonLabel: 'سماح بالتنبيه الدقيق',
                 onTap: isExactAlarmGranted ? null : _requestExactAlarm,
@@ -236,12 +242,14 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                 child: ElevatedButton(
                   onPressed: isNotificationGranted
                       ? () async {
-                          final nav   = Navigator.of(context);
+                          final nav = Navigator.of(context);
                           final prefs = CacheHelper.prefs;
                           await prefs.setBool('notif_permission_decided', true);
                           if (!mounted) return;
                           nav.pushReplacement(
-                            MaterialPageRoute(builder: (_) => const SplashScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => const SplashScreen(),
+                            ),
                           );
                         }
                       : null,
@@ -253,7 +261,9 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                     ),
                   ),
                   child: Text(
-                    isNotificationGranted ? 'متابعة' : 'يرجى السماح بالإشعارات أولاً',
+                    isNotificationGranted
+                        ? 'متابعة'
+                        : 'يرجى السماح بالإشعارات أولاً',
                     style: TextStyle(
                       fontFamily: AppConsts.expoArabic,
                       color: isNotificationGranted ? Colors.white : Colors.grey,
@@ -267,7 +277,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
               // ── Skip link ──
               TextButton(
                 onPressed: () async {
-                  final nav   = Navigator.of(context);
+                  final nav = Navigator.of(context);
                   final prefs = CacheHelper.prefs;
                   await prefs.setBool('notif_permission_decided', true);
                   if (!mounted) return;
@@ -296,11 +306,11 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
 // ── Reusable Permission Card Widget ──────────────────────────────────────────
 class _PermissionCard extends StatelessWidget {
   final IconData icon;
-  final Color    iconColor;
-  final String   title;
-  final String   subtitle;
-  final bool     isGranted;
-  final String   buttonLabel;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final bool isGranted;
+  final String buttonLabel;
   final VoidCallback? onTap;
 
   const _PermissionCard({

@@ -19,6 +19,7 @@ import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:ibad_al_rahmann/services/background_service.dart';
 import 'package:ibad_al_rahmann/widgets/app_loading_dialog.dart';
+import 'package:ibad_al_rahmann/screens/app_features_guide_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -27,10 +28,9 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObserver {
+class _SettingsScreenState extends State<SettingsScreen>
+    with WidgetsBindingObserver {
   final PrayerService _prayerService = PrayerService();
-
-
 
   @override
   void dispose() {
@@ -68,7 +68,12 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 if (!context.mounted) return;
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('تم نسخ السجل كله', textDirection: TextDirection.rtl)),
+                  const SnackBar(
+                    content: Text(
+                      'تم نسخ السجل كله',
+                      textDirection: TextDirection.rtl,
+                    ),
+                  ),
                 );
               },
               child: const Text("نسخ السجل كله"),
@@ -82,7 +87,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("خطأ: $e")));
     }
   }
 
@@ -145,7 +152,8 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
       int h12 = dt.hour % 12;
       if (h12 == 0) h12 = 12;
       String amPm = dt.hour >= 12 ? 'م' : 'ص';
-      String formattedTime = "$h12:${dt.minute.toString().padLeft(2, '0')} $amPm";
+      String formattedTime =
+          "$h12:${dt.minute.toString().padLeft(2, '0')} $amPm";
 
       if (diff.inMinutes < 1) return "الآن";
       if (diff.inHours < 1) return "منذ ${diff.inMinutes} دقيقة";
@@ -175,7 +183,11 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
               backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
               title: Text(
                 "تعديل التاريخ الهجري",
-                style: TextStyle(color: gold, fontFamily: 'Cairo', fontSize: 18.sp),
+                style: TextStyle(
+                  color: gold,
+                  fontFamily: 'Cairo',
+                  fontSize: 18.sp,
+                ),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -367,7 +379,11 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 TextButton(
                   child: Text(
                     "حفظ",
-                    style: TextStyle(color: gold, fontWeight: FontWeight.bold, fontSize: 14.sp),
+                    style: TextStyle(
+                      color: gold,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14.sp,
+                    ),
                   ),
                   onPressed: () async {
                     final navigator = Navigator.of(context);
@@ -406,7 +422,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
         decoration: BoxDecoration(
           color: isSelected
               ? gold.withValues(alpha: 0.12)
-              : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03)),
+              : (isDark
+                    ? Colors.white.withValues(alpha: 0.04)
+                    : Colors.black.withValues(alpha: 0.03)),
           borderRadius: BorderRadius.circular(12.r),
           border: Border.all(
             color: isSelected ? gold : Colors.transparent,
@@ -417,7 +435,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
           children: [
             Icon(
               isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color: isSelected ? gold : (isDark ? Colors.grey[500] : Colors.grey[400]),
+              color: isSelected
+                  ? gold
+                  : (isDark ? Colors.grey[500] : Colors.grey[400]),
               size: 20.sp,
             ),
             SizedBox(width: 12.w),
@@ -484,7 +504,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                     selectedValue: selected,
                     isDark: isDark,
                     gold: gold,
-                    onTap: () => setDialogState(() => selected = PrayerService.systemUmmAlQura),
+                    onTap: () => setDialogState(
+                      () => selected = PrayerService.systemUmmAlQura,
+                    ),
                   ),
                   SizedBox(height: 8.h),
                   _buildHijriSystemOption(
@@ -494,7 +516,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                     selectedValue: selected,
                     isDark: isDark,
                     gold: gold,
-                    onTap: () => setDialogState(() => selected = PrayerService.systemEgyptian),
+                    onTap: () => setDialogState(
+                      () => selected = PrayerService.systemEgyptian,
+                    ),
                   ),
                 ],
               ),
@@ -502,14 +526,23 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 TextButton(
                   child: Text(
                     "إلغاء",
-                    style: TextStyle(color: Colors.grey, fontSize: 14.sp, fontFamily: AppConsts.cairo),
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 14.sp,
+                      fontFamily: AppConsts.cairo,
+                    ),
                   ),
                   onPressed: () => Navigator.pop(context),
                 ),
                 TextButton(
                   child: Text(
                     "حفظ",
-                    style: TextStyle(color: gold, fontWeight: FontWeight.bold, fontSize: 14.sp, fontFamily: AppConsts.cairo),
+                    style: TextStyle(
+                      color: gold,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14.sp,
+                      fontFamily: AppConsts.cairo,
+                    ),
                   ),
                   onPressed: () async {
                     final navigator = Navigator.of(context);
@@ -556,6 +589,17 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
           // 1. General
           _buildSectionHeader("عام"),
           _buildListTile(
+            "دليل مميزات التطبيق 🌟",
+            "استكشف جميع المميزات وطرق الوصول إليها وشرح كل ميزة",
+            Icons.explore_rounded,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AppFeaturesGuideScreen(),
+              ),
+            ),
+          ),
+          _buildListTile(
             "نظام التاريخ الهجري",
             _hijriSystem == PrayerService.systemEgyptian
                 ? "المصري (نظام طبقي تلقائي)"
@@ -577,7 +621,8 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             builder: (context, state) {
               // Fix: Check the actual brightness of the theme currently applied.
               // This covers ThemeMode.system when it resolves to dark.
-              final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+              final isDarkMode =
+                  Theme.of(context).brightness == Brightness.dark;
               return _buildListTile(
                 "الوضع الليلي",
                 "تفعيل الوضع الداكن للتطبيق",
@@ -588,25 +633,30 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                   onChanged: (val) {
                     // Fix: Explicitly set the mode based on the new switch value.
                     context.read<ThemeCubit>().forceThemeMode(
-                          val ? ThemeMode.dark : ThemeMode.light,
-                        );
+                      val ? ThemeMode.dark : ThemeMode.light,
+                    );
                   },
                 ),
               );
             },
           ),
 
-                    // 2.5 Quran
+          // 2.5 Quran
           _buildSectionHeader("القرآن الكريم"),
           _buildListTile(
             "نوع تظليل الآيات",
             "تظليل كلمة بكلمة أو تظليل الآية كاملة",
             Icons.highlight_alt_rounded,
             trailing: Switch(
-              value: CacheHelper.prefs.getBool('verse_player_highlight_wbw') ?? true,
+              value:
+                  CacheHelper.prefs.getBool('verse_player_highlight_wbw') ??
+                  true,
               activeTrackColor: const Color(0xFFD0A871),
               onChanged: (value) async {
-                await CacheHelper.prefs.setBool('verse_player_highlight_wbw', value);
+                await CacheHelper.prefs.setBool(
+                  'verse_player_highlight_wbw',
+                  value,
+                );
                 setState(() {});
               },
             ),
@@ -646,37 +696,46 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             ),
           ),
           _buildListTile(
-              "الإشعار الثابت",
-              "عرض أوقات الصلاة دائمًا في شريط الإشعارات",
-              FontAwesomeIcons.mobileScreen,
-              trailing: _isPersistentSwitchLoading
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFD0A871)),
-                    )
-                  : Switch(
-                      value: _persistentNotification,
-                      activeThumbColor: const Color(0xFFD0A871),
-                      onChanged: (val) async {
-                        setState(() => _isPersistentSwitchLoading = true);
-                        
-                        // Yield to let the UI draw the loading indicator
-                        await Future.delayed(const Duration(milliseconds: 50));
-                        
-                        final prefs = CacheHelper.prefs;
-                        await prefs.setBool('persistent_notification_enabled', val);
-                        await prefs.setBool('flutter.persistent_notification_enabled', val);
-                        setState(() => _persistentNotification = val);
-                        
-                        await _prayerService.scheduleNotifications();
-                        
-                        if (mounted) {
-                          setState(() => _isPersistentSwitchLoading = false);
-                        }
-                      },
+            "الإشعار الثابت",
+            "عرض أوقات الصلاة دائمًا في شريط الإشعارات",
+            FontAwesomeIcons.mobileScreen,
+            trailing: _isPersistentSwitchLoading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFFD0A871),
                     ),
-            ),
+                  )
+                : Switch(
+                    value: _persistentNotification,
+                    activeThumbColor: const Color(0xFFD0A871),
+                    onChanged: (val) async {
+                      setState(() => _isPersistentSwitchLoading = true);
+
+                      // Yield to let the UI draw the loading indicator
+                      await Future.delayed(const Duration(milliseconds: 50));
+
+                      final prefs = CacheHelper.prefs;
+                      await prefs.setBool(
+                        'persistent_notification_enabled',
+                        val,
+                      );
+                      await prefs.setBool(
+                        'flutter.persistent_notification_enabled',
+                        val,
+                      );
+                      setState(() => _persistentNotification = val);
+
+                      await _prayerService.scheduleNotifications();
+
+                      if (mounted) {
+                        setState(() => _isPersistentSwitchLoading = false);
+                      }
+                    },
+                  ),
+          ),
           _buildListTile(
             "صوت الأذان",
             "اختر المؤذن المفضل لديك",
@@ -741,60 +800,90 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                       label: "$_customVolume%",
                       onChanged: (val) async {
                         final prefs = CacheHelper.prefs;
-                        await prefs.setInt('custom_notif_volume_level', val.toInt());
+                        await prefs.setInt(
+                          'custom_notif_volume_level',
+                          val.toInt(),
+                        );
                         setState(() => _customVolume = val.toInt());
                       },
                     ),
                   ),
-                  Icon(Icons.volume_up, color: const Color(0xFFD0A871), size: 20.sp),
-                ],
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "قناة تشغيل الأذان الأساسية",
-                    style: TextStyle(
-                      fontFamily: AppConsts.cairo,
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    "اختر القناة التي سيعمل عليها الأذان. (ملاحظة: اختيار قناة الإشعارات سيجعل الأذان يعمل خارج السماعات أيضاً).",
-                    style: TextStyle(
-                      fontFamily: AppConsts.cairo,
-                      fontSize: 12.sp,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-                  DropdownButtonFormField<String>(
-                    initialValue: _audioStream,
-                    decoration: InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'alarm', child: Text("قناة المنبه (الافتراضي)", style: TextStyle(fontFamily: AppConsts.cairo))),
-                      DropdownMenuItem(value: 'media', child: Text("قناة الوسائط (الميديا)", style: TextStyle(fontFamily: AppConsts.cairo))),
-                      DropdownMenuItem(value: 'ringtone', child: Text("قناة الرنين / الإشعارات", style: TextStyle(fontFamily: AppConsts.cairo))),
-                    ],
-                    onChanged: (val) async {
-                      if (val != null) {
-                        setState(() => _audioStream = val);
-                        final prefs = CacheHelper.prefs;
-                        await prefs.setString('audio_stream_channel', val);
-                      }
-                    },
+                  Icon(
+                    Icons.volume_up,
+                    color: const Color(0xFFD0A871),
+                    size: 20.sp,
                   ),
                 ],
               ),
             ),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "قناة تشغيل الأذان الأساسية",
+                  style: TextStyle(
+                    fontFamily: AppConsts.cairo,
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 4.h),
+                Text(
+                  "اختر القناة التي سيعمل عليها الأذان. (ملاحظة: اختيار قناة الإشعارات سيجعل الأذان يعمل خارج السماعات أيضاً).",
+                  style: TextStyle(
+                    fontFamily: AppConsts.cairo,
+                    fontSize: 12.sp,
+                    color: Colors.grey,
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                DropdownButtonFormField<String>(
+                  initialValue: _audioStream,
+                  decoration: InputDecoration(
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12.w,
+                      vertical: 8.h,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'alarm',
+                      child: Text(
+                        "قناة المنبه (الافتراضي)",
+                        style: TextStyle(fontFamily: AppConsts.cairo),
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'media',
+                      child: Text(
+                        "قناة الوسائط (الميديا)",
+                        style: TextStyle(fontFamily: AppConsts.cairo),
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'ringtone',
+                      child: Text(
+                        "قناة الرنين / الإشعارات",
+                        style: TextStyle(fontFamily: AppConsts.cairo),
+                      ),
+                    ),
+                  ],
+                  onChanged: (val) async {
+                    if (val != null) {
+                      setState(() => _audioStream = val);
+                      final prefs = CacheHelper.prefs;
+                      await prefs.setString('audio_stream_channel', val);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
 
           // 5. Backup & Data
           _buildSectionHeader("النسخ الاحتياطي والبيانات"),
@@ -805,9 +894,13 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             onTap: () async {
               showModalBottomSheet(
                 context: context,
-                backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
+                backgroundColor: isDark
+                    ? const Color(0xFF121212)
+                    : Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(20.r),
+                  ),
                 ),
                 isScrollControlled: true,
                 builder: (context) {
@@ -821,7 +914,10 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             "استعادة الإعدادات من ملف نسخة احتياطية",
             Icons.file_download_rounded,
             onTap: () async {
-              AppLoadingDialog.show(context, message: 'جاري استعادة النسخة الاحتياطية...');
+              AppLoadingDialog.show(
+                context,
+                message: 'جاري استعادة النسخة الاحتياطية...',
+              );
 
               final success = await BackupService.importBackup();
 
@@ -830,7 +926,11 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
 
               if (success) {
                 scaffoldMessengerKey.currentState?.showSnackBar(
-                  const SnackBar(content: Text('تم استيراد البيانات بنجاح، يرجى إعادة تشغيل التطبيق')),
+                  const SnackBar(
+                    content: Text(
+                      'تم استيراد البيانات بنجاح، يرجى إعادة تشغيل التطبيق',
+                    ),
+                  ),
                 );
                 setState(() {
                   _is24Hour = _prayerService.is24Hour;
@@ -841,22 +941,30 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 _showRestartDialog();
               } else {
                 scaffoldMessengerKey.currentState?.showSnackBar(
-                  const SnackBar(content: Text('فشل استيراد البيانات أو تم إلغاء العملية')),
+                  const SnackBar(
+                    content: Text('فشل استيراد البيانات أو تم إلغاء العملية'),
+                  ),
                 );
               }
             },
           ),
           _buildListTile(
-            "مزامنة جوجل درايف",
+            "نسخ احتياطي إلى جوجل درايف",
             _isSyncingToDrive
                 ? "جاري المزامنة مع سحابة جوجل..."
-                : _googleEmail != null 
-                    ? "مرتبط بـ: $_googleEmail\nآخر مزامنة: ${_formatSyncTime(_lastSyncTime)}" 
-                    : "حفظ واستعادة الإعدادات تلقائياً من سحابة جوجل",
+                : _googleEmail != null
+                ? "مرتبط بـ: $_googleEmail\nآخر مزامنة: ${_formatSyncTime(_lastSyncTime)}"
+                : "حفظ الإعدادات والبيانات الحالية في سحابة جوجل",
             FontAwesomeIcons.googleDrive,
             onTap: _isSyncingToDrive
                 ? null
                 : () async {
+                    if (BackupService.isSyncing) {
+                      scaffoldMessengerKey.currentState?.showSnackBar(
+                        const SnackBar(content: Text('يرجى الانتظار، هناك عملية مزامنة قيد التنفيذ.')),
+                      );
+                      return;
+                    }
                     setState(() => _isSyncingToDrive = true);
                     try {
                       final success = await BackupService.syncToDrive();
@@ -871,11 +979,15 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
 
                       if (success) {
                         scaffoldMessengerKey.currentState?.showSnackBar(
-                          const SnackBar(content: Text('تمت المزامنة مع جوجل درايف بنجاح')),
+                          const SnackBar(
+                            content: Text('تمت المزامنة مع جوجل درايف بنجاح'),
+                          ),
                         );
                       } else {
                         scaffoldMessengerKey.currentState?.showSnackBar(
-                          const SnackBar(content: Text('فشلت المزامنة أو تم إلغاء العملية')),
+                          const SnackBar(
+                            content: Text('فشلت المزامنة أو تم إلغاء العملية'),
+                          ),
                         );
                       }
                     } finally {
@@ -894,12 +1006,21 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 showDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text("تسجيل الخروج", style: TextStyle(fontFamily: AppConsts.cairo)),
-                    content: const Text("هل تريد تسجيل الخروج من حساب جوجل درايف الحالي؟", style: TextStyle(fontFamily: AppConsts.cairo)),
+                    title: const Text(
+                      "تسجيل الخروج",
+                      style: TextStyle(fontFamily: AppConsts.cairo),
+                    ),
+                    content: const Text(
+                      "هل تريد تسجيل الخروج من حساب جوجل درايف الحالي؟",
+                      style: TextStyle(fontFamily: AppConsts.cairo),
+                    ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx),
-                        child: const Text("إلغاء", style: TextStyle(fontFamily: AppConsts.cairo)),
+                        child: const Text(
+                          "إلغاء",
+                          style: TextStyle(fontFamily: AppConsts.cairo),
+                        ),
                       ),
                       TextButton(
                         onPressed: () async {
@@ -910,10 +1031,18 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                             _lastSyncTime = null;
                           });
                           scaffoldMessengerKey.currentState?.showSnackBar(
-                            const SnackBar(content: Text('تم تسجيل الخروج من حساب المزامنة')),
+                            const SnackBar(
+                              content: Text('تم تسجيل الخروج من حساب المزامنة'),
+                            ),
                           );
                         },
-                        child: const Text("تسجيل الخروج", style: TextStyle(fontFamily: AppConsts.cairo, color: Colors.red)),
+                        child: const Text(
+                          "تسجيل الخروج",
+                          style: TextStyle(
+                            fontFamily: AppConsts.cairo,
+                            color: Colors.red,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -925,9 +1054,22 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             "تحميل آخر نسخة محفوظة من السحابة",
             Icons.cloud_download_rounded,
             onTap: () async {
-              AppLoadingDialog.show(context, message: 'جاري استعادة النسخة الاحتياطية من السحاب...');
+              if (BackupService.isSyncing || _isSyncingToDrive) {
+                scaffoldMessengerKey.currentState?.showSnackBar(
+                  const SnackBar(
+                    content: Text('يرجى الانتظار، هناك عملية مزامنة قيد التنفيذ.'),
+                  ),
+                );
+                return;
+              }
+              AppLoadingDialog.show(
+                context,
+                message: 'جاري استعادة النسخة الاحتياطية من السحاب...',
+              );
               final success = await BackupService.syncFromDrive();
-              final email = await BackupService.getSignedInEmail(forceCheck: true);
+              final email = await BackupService.getSignedInEmail(
+                forceCheck: true,
+              );
               final syncTime = await BackupService.getLastSyncTime();
               if (mounted) {
                 // ignore: use_build_context_synchronously
@@ -941,7 +1083,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
 
               if (success) {
                 scaffoldMessengerKey.currentState?.showSnackBar(
-                  const SnackBar(content: Text('تمت استعادة البيانات من جوجل درايف بنجاح')),
+                  const SnackBar(
+                    content: Text('تمت استعادة البيانات من جوجل درايف بنجاح'),
+                  ),
                 );
                 setState(() {
                   _is24Hour = _prayerService.is24Hour;
@@ -952,7 +1096,11 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 _showRestartDialog();
               } else {
                 scaffoldMessengerKey.currentState?.showSnackBar(
-                  const SnackBar(content: Text('فشلت الاستعادة. قد لا يوجد ملف نسخة احتياطية أو تم رفض الوصول.')),
+                  const SnackBar(
+                    content: Text(
+                      'لم يتم العثور على نسخة احتياطية سابقة على هذا الحساب، أو حدث خطأ في الاتصال.',
+                    ),
+                  ),
                 );
               }
             },
@@ -970,12 +1118,22 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 await BackupService.toggleAutoSync(val);
                 setState(() => _autoSyncDrive = val);
                 if (val && mounted) {
-                  final times = await PrayerService.getPrayerTimesForDateStatic(DateTime.now());
-                  DateTime sTime = times != null ? times.isha.add(const Duration(hours: 1)) : DateTime.now().add(const Duration(hours: 1));
-                  if (sTime.isBefore(DateTime.now())) sTime = sTime.add(const Duration(days: 1));
-                  final timeStr = "${sTime.hour > 12 ? sTime.hour - 12 : sTime.hour}:${sTime.minute.toString().padLeft(2, '0')} ${sTime.hour >= 12 ? 'م' : 'ص'}";
+                  final times = await PrayerService.getPrayerTimesForDateStatic(
+                    DateTime.now(),
+                  );
+                  DateTime sTime = times != null
+                      ? times.isha.add(const Duration(hours: 1))
+                      : DateTime.now().add(const Duration(hours: 1));
+                  if (sTime.isBefore(DateTime.now()))
+                    sTime = sTime.add(const Duration(days: 1));
+                  final timeStr =
+                      "${sTime.hour > 12 ? sTime.hour - 12 : sTime.hour}:${sTime.minute.toString().padLeft(2, '0')} ${sTime.hour >= 12 ? 'م' : 'ص'}";
                   scaffoldMessengerKey.currentState?.showSnackBar(
-                    SnackBar(content: Text('تم تفعيل المزامنة التلقائية. ستعمل القادمة يوم ${sTime.day}/${sTime.month} الساعة $timeStr')),
+                    SnackBar(
+                      content: Text(
+                        'تم تفعيل المزامنة التلقائية. ستعمل القادمة يوم ${sTime.day}/${sTime.month} الساعة $timeStr',
+                      ),
+                    ),
                   );
                 }
               },
@@ -1025,19 +1183,27 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             "إرسال تقرير مفصل مع ملف السجل للتشخيص والمساعدة عبر الواتساب أو البريد",
             Icons.support_agent_rounded,
             onTap: () async {
-              AppLoadingDialog.show(context, message: 'جاري تجهيز تقرير السجل...');
+              AppLoadingDialog.show(
+                context,
+                message: 'جاري تجهيز تقرير السجل...',
+              );
               try {
-                final nativeLog = await BackgroundService.getNativeLog(lines: 500);
+                final nativeLog = await BackgroundService.getNativeLog(
+                  lines: 500,
+                );
                 if (context.mounted) AppLoadingDialog.hide(context);
                 if (context.mounted) {
-                  await AppLogger.reportIssue(context, nativeLogContent: nativeLog);
+                  await AppLogger.reportIssue(
+                    context,
+                    nativeLogContent: nativeLog,
+                  );
                 }
               } catch (e) {
                 if (context.mounted) AppLoadingDialog.hide(context);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('خطأ: $e')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
                 }
               }
             },
@@ -1050,15 +1216,17 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             onTap: () async {
               AppLoadingDialog.show(context, message: 'جاري تجميع اللوج...');
               try {
-                final nativeLog = await BackgroundService.getNativeLog(lines: 500);
+                final nativeLog = await BackgroundService.getNativeLog(
+                  lines: 500,
+                );
                 if (context.mounted) AppLoadingDialog.hide(context);
                 await AppLogger.shareLog(nativeLogContent: nativeLog);
               } catch (e) {
                 if (context.mounted) AppLoadingDialog.hide(context);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('خطأ: $e')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
                 }
               }
             },
@@ -1078,7 +1246,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 final removed = result['removed'] ?? 0;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('تم التنظيف: حُذف $removed سطر روتيني، تبقى $kept سطر مهم ✓'),
+                    content: Text(
+                      'تم التنظيف: حُذف $removed سطر روتيني، تبقى $kept سطر مهم ✓',
+                    ),
                     duration: const Duration(seconds: 4),
                   ),
                 );
@@ -1093,13 +1263,13 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
           ),
           _buildListTile(
             "عن التطبيق",
-            "الإصدار 1.2.0",
+            "الإصدار 1.3.0",
             Icons.info_outline,
             onTap: () {
               showAboutDialog(
                 context: context,
                 applicationName: "عباد الرحمن",
-                applicationVersion: "1.2.0",
+                applicationVersion: "1.3.0",
                 applicationIcon: Image.asset(
                   "assets/images/logo.png",
                   width: 50.w,
@@ -1318,13 +1488,21 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark 
-            ? const Color(0xFF1A1A1A) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF1A1A1A)
+            : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+        ),
         title: Text(
           "اكتملت الاستعادة",
           textAlign: TextAlign.center,
-          style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, fontSize: 18.sp, color: const Color(0xFFD0A871)),
+          style: TextStyle(
+            fontFamily: 'Cairo',
+            fontWeight: FontWeight.bold,
+            fontSize: 18.sp,
+            color: const Color(0xFFD0A871),
+          ),
         ),
         content: Text(
           "تم استعادة البيانات والختمة والإعدادات بنجاح. يجب إغلاق التطبيق وإعادة فتحه ليتم تطبيق التغييرات وإعادة جدولة المنبهات.",
@@ -1338,10 +1516,19 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFD0A871),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
               ),
               onPressed: () => exit(0),
-              child: Text("إغلاق التطبيق الآن", style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, fontSize: 14.sp)),
+              child: Text(
+                "إغلاق التطبيق الآن",
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14.sp,
+                ),
+              ),
             ),
           ),
         ],
@@ -1378,7 +1565,10 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF000000) : Colors.white,
         borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: isDark ? Colors.white10 : Colors.black12, width: 1.0.w),
+        border: Border.all(
+          color: isDark ? Colors.white10 : Colors.black12,
+          width: 1.0.w,
+        ),
         boxShadow: isDark
             ? null
             : [
@@ -1423,8 +1613,10 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     final prefs = CacheHelper.prefs;
 
     // Gather current settings
-    final lat = prefs.getDouble('latitude') ?? prefs.getDouble('last_lat') ?? 0.0;
-    final lng = prefs.getDouble('longitude') ?? prefs.getDouble('last_lng') ?? 0.0;
+    final lat =
+        prefs.getDouble('latitude') ?? prefs.getDouble('last_lat') ?? 0.0;
+    final lng =
+        prefs.getDouble('longitude') ?? prefs.getDouble('last_lng') ?? 0.0;
     final method = prefs.getString('calculation_method') ?? 'EGYPTIAN';
     final madhab = prefs.getString('madhab') ?? 'SHAFI';
     final lastGpsMs = prefs.getInt('last_gps_update_ms') ?? 0;
@@ -1432,7 +1624,8 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
         ? 'لم يتم بعد'
         : () {
             final dt = DateTime.fromMillisecondsSinceEpoch(lastGpsMs);
-            final d = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+            final d =
+                '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
             final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
             final m = dt.minute.toString().padLeft(2, '0');
             final s = dt.second.toString().padLeft(2, '0');
@@ -1453,12 +1646,12 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     }
 
     final rows = [
-      ['الفجر',   fmt(times?.fajr),    offsets['Fajr'] ?? 0],
-      ['الشروق',  fmt(times?.sunrise),  offsets['Sunrise'] ?? 0],
-      ['الظهر',   fmt(times?.dhuhr),    offsets['Dhuhr'] ?? 0],
-      ['العصر',   fmt(times?.asr),      offsets['Asr'] ?? 0],
-      ['المغرب',  fmt(times?.maghrib),  offsets['Maghrib'] ?? 0],
-      ['العشاء',  fmt(times?.isha),     offsets['Isha'] ?? 0],
+      ['الفجر', fmt(times?.fajr), offsets['Fajr'] ?? 0],
+      ['الشروق', fmt(times?.sunrise), offsets['Sunrise'] ?? 0],
+      ['الظهر', fmt(times?.dhuhr), offsets['Dhuhr'] ?? 0],
+      ['العصر', fmt(times?.asr), offsets['Asr'] ?? 0],
+      ['المغرب', fmt(times?.maghrib), offsets['Maghrib'] ?? 0],
+      ['العشاء', fmt(times?.isha), offsets['Isha'] ?? 0],
     ];
 
     if (!context.mounted) return;
@@ -1470,8 +1663,14 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
           children: [
             const Icon(Icons.gps_fixed, color: gold),
             SizedBox(width: 8.w),
-            Text('دقة أوقات الصلاة',
-              style: TextStyle(fontFamily: 'Cairo', fontSize: 16.sp, color: gold)),
+            Text(
+              'دقة أوقات الصلاة',
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontSize: 16.sp,
+                color: gold,
+              ),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -1479,39 +1678,71 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Coordinates
-              _diagCard(isDark, 'الإحداثيات المستخدمة',
+              _diagCard(
+                isDark,
+                'الإحداثيات المستخدمة',
                 '${lat.toStringAsFixed(6)}° ،  ${lng.toStringAsFixed(6)}°\n'
-                'آخر تحديث GPS: $lastGpsDate'),
+                    'آخر تحديث GPS: $lastGpsDate',
+              ),
               SizedBox(height: 8.h),
               // Method
-              _diagCard(isDark, 'طريقة الحساب والمذهب',
+              _diagCard(
+                isDark,
+                'طريقة الحساب والمذهب',
                 '${_getMethodName(method.toLowerCase())}\n'
-                'المذهب: ${madhab == 'HANAFI' ? 'الحنفي' : 'الشافعي (الجمهور)'}'),
+                    'المذهب: ${madhab == 'HANAFI' ? 'الحنفي' : 'الشافعي (الجمهور)'}',
+              ),
               SizedBox(height: 8.h),
               // Times table
               Container(
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade50,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(10.r),
                   border: Border.all(color: gold.withValues(alpha: 0.3)),
                 ),
                 padding: EdgeInsets.all(10.w),
                 child: Column(
-                  children: rows.map<Widget>((r) => Padding(
-                    padding: EdgeInsets.symmetric(vertical: 3.h),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(r[0] as String, style: TextStyle(fontFamily: 'Cairo', fontSize: 13.sp,
-                          color: isDark ? Colors.white : Colors.black87)),
-                        Text(r[1] as String, style: TextStyle(fontFamily: 'Cairo', fontSize: 13.sp,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black87)),
-                        Text((r[2] as int) == 0 ? '—' : '${(r[2] as int) > 0 ? '+' : ''}${r[2]} د',
-                          style: TextStyle(fontFamily: 'Cairo', fontSize: 11.sp, color: Colors.grey)),
-                      ],
-                    ),
-                  )).toList(),
+                  children: rows
+                      .map<Widget>(
+                        (r) => Padding(
+                          padding: EdgeInsets.symmetric(vertical: 3.h),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                r[0] as String,
+                                style: TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontSize: 13.sp,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                              Text(
+                                r[1] as String,
+                                style: TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                              Text(
+                                (r[2] as int) == 0
+                                    ? '—'
+                                    : '${(r[2] as int) > 0 ? '+' : ''}${r[2]} د',
+                                style: TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontSize: 11.sp,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
                 ),
               ),
               SizedBox(height: 8.h),
@@ -1520,7 +1751,11 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 '• تطابق الإحداثيات\n'
                 '• تطابق طريقة الحساب\n'
                 '• التعديلات اليدوية (العمود الأيسر)',
-                style: TextStyle(fontFamily: 'Cairo', fontSize: 11.sp, color: Colors.grey),
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 11.sp,
+                  color: Colors.grey,
+                ),
                 textDirection: TextDirection.rtl,
               ),
             ],
@@ -1529,7 +1764,10 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('إغلاق', style: TextStyle(color: gold, fontFamily: 'Cairo')),
+            child: const Text(
+              'إغلاق',
+              style: TextStyle(color: gold, fontFamily: 'Cairo'),
+            ),
           ),
         ],
       ),
@@ -1541,18 +1779,35 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
       width: double.infinity,
       padding: EdgeInsets.all(10.w),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade50,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(10.r),
-        border: Border.all(color: const Color(0xFFD0A871).withValues(alpha: 0.3)),
+        border: Border.all(
+          color: const Color(0xFFD0A871).withValues(alpha: 0.3),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(fontFamily: 'Cairo', fontSize: 12.sp,
-            color: const Color(0xFFD0A871), fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 12.sp,
+              color: const Color(0xFFD0A871),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           SizedBox(height: 4.h),
-          Text(body, style: TextStyle(fontFamily: 'Cairo', fontSize: 12.sp,
-            color: isDark ? Colors.white70 : Colors.black87)),
+          Text(
+            body,
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 12.sp,
+              color: isDark ? Colors.white70 : Colors.black87,
+            ),
+          ),
         ],
       ),
     );
@@ -1620,10 +1875,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
   Future<void> _showMadhabDialog() async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final madhabs = {
-      'shafi': 'الشافعي (الجمهور)',
-      'hanafi': 'الحنفي',
-    };
+    final madhabs = {'shafi': 'الشافعي (الجمهور)', 'hanafi': 'الحنفي'};
 
     await showModalBottomSheet(
       context: context,
@@ -1664,10 +1916,12 @@ class _ExportSelectionBottomSheet extends StatefulWidget {
   const _ExportSelectionBottomSheet({required this.isDark});
 
   @override
-  State<_ExportSelectionBottomSheet> createState() => _ExportSelectionBottomSheetState();
+  State<_ExportSelectionBottomSheet> createState() =>
+      _ExportSelectionBottomSheetState();
 }
 
-class _ExportSelectionBottomSheetState extends State<_ExportSelectionBottomSheet> {
+class _ExportSelectionBottomSheetState
+    extends State<_ExportSelectionBottomSheet> {
   final Set<BackupCategory> _selected = {
     BackupCategory.bookmarks,
     BackupCategory.khatmas,
@@ -1693,11 +1947,31 @@ class _ExportSelectionBottomSheetState extends State<_ExportSelectionBottomSheet
     final allSelected = _selected.length == BackupCategory.values.length;
 
     final categories = [
-      (BackupCategory.bookmarks, 'علامات القرآن المرجعية', Icons.bookmark_added_rounded),
-      (BackupCategory.khatmas, 'الختمات والورد القرآني', Icons.menu_book_rounded),
-      (BackupCategory.prayers, 'مواقيت الصلاة والأذان والتنبيهات', Icons.mosque_rounded),
-      (BackupCategory.tracker, 'سجل المحاسبة والصلوات والعبادات', Icons.checklist_rounded),
-      (BackupCategory.settings, 'إعدادات التطبيق العامة والمظهر', Icons.settings_suggest_rounded),
+      (
+        BackupCategory.bookmarks,
+        'علامات القرآن المرجعية',
+        Icons.bookmark_added_rounded,
+      ),
+      (
+        BackupCategory.khatmas,
+        'الختمات والورد القرآني',
+        Icons.menu_book_rounded,
+      ),
+      (
+        BackupCategory.prayers,
+        'مواقيت الصلاة والأذان والتنبيهات',
+        Icons.mosque_rounded,
+      ),
+      (
+        BackupCategory.tracker,
+        'سجل المحاسبة والصلوات والعبادات',
+        Icons.checklist_rounded,
+      ),
+      (
+        BackupCategory.settings,
+        'إعدادات التطبيق العامة والمظهر',
+        Icons.settings_suggest_rounded,
+      ),
     ];
 
     return Padding(
@@ -1766,7 +2040,11 @@ class _ExportSelectionBottomSheetState extends State<_ExportSelectionBottomSheet
                 padding: EdgeInsets.symmetric(vertical: 6.h, horizontal: 4.w),
                 child: Row(
                   children: [
-                    Icon(icon, color: isChecked ? goldColor : Colors.grey, size: 20.sp),
+                    Icon(
+                      icon,
+                      color: isChecked ? goldColor : Colors.grey,
+                      size: 20.sp,
+                    ),
                     SizedBox(width: 12.w),
                     Expanded(
                       child: Text(
@@ -1807,23 +2085,40 @@ class _ExportSelectionBottomSheetState extends State<_ExportSelectionBottomSheet
                     backgroundColor: goldColor,
                     foregroundColor: Colors.black87,
                     padding: EdgeInsets.symmetric(vertical: 12.h),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
                   ),
                   icon: const Icon(Icons.share_rounded, size: 18),
-                  label: Text('مشاركة الملف', style: TextStyle(fontFamily: 'Cairo', fontSize: 13.sp, fontWeight: FontWeight.bold)),
+                  label: Text(
+                    'مشاركة الملف',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   onPressed: _selected.isEmpty
                       ? null
                       : () async {
                           Navigator.pop(context);
-                          final categoriesToExport = Set<BackupCategory>.from(_selected);
-                          final success = await BackupService.exportBackup(categories: categoriesToExport);
+                          final categoriesToExport = Set<BackupCategory>.from(
+                            _selected,
+                          );
+                          final success = await BackupService.exportBackup(
+                            categories: categoriesToExport,
+                          );
                           if (success) {
                             scaffoldMessengerKey.currentState?.showSnackBar(
-                              const SnackBar(content: Text('تم فتح نافذة المشاركة')),
+                              const SnackBar(
+                                content: Text('تم فتح نافذة المشاركة'),
+                              ),
                             );
                           } else {
                             scaffoldMessengerKey.currentState?.showSnackBar(
-                              const SnackBar(content: Text('فشل تصدير البيانات')),
+                              const SnackBar(
+                                content: Text('فشل تصدير البيانات'),
+                              ),
                             );
                           }
                         },
@@ -1836,19 +2131,35 @@ class _ExportSelectionBottomSheetState extends State<_ExportSelectionBottomSheet
                     foregroundColor: goldColor,
                     side: const BorderSide(color: goldColor),
                     padding: EdgeInsets.symmetric(vertical: 12.h),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
                   ),
                   icon: const Icon(Icons.save_alt_rounded, size: 18),
-                  label: Text('حفظ بالجهاز', style: TextStyle(fontFamily: 'Cairo', fontSize: 13.sp, fontWeight: FontWeight.bold)),
+                  label: Text(
+                    'حفظ بالجهاز',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   onPressed: _selected.isEmpty
                       ? null
                       : () async {
                           Navigator.pop(context);
-                          final categoriesToExport = Set<BackupCategory>.from(_selected);
-                          final success = await BackupService.saveBackupToDevice(categories: categoriesToExport);
+                          final categoriesToExport = Set<BackupCategory>.from(
+                            _selected,
+                          );
+                          final success =
+                              await BackupService.saveBackupToDevice(
+                                categories: categoriesToExport,
+                              );
                           if (success) {
                             scaffoldMessengerKey.currentState?.showSnackBar(
-                              const SnackBar(content: Text('تم حفظ البيانات بنجاح')),
+                              const SnackBar(
+                                content: Text('تم حفظ البيانات بنجاح'),
+                              ),
                             );
                           }
                         },

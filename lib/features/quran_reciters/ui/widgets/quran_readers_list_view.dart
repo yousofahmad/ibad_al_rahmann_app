@@ -18,9 +18,7 @@ class ReadersBody extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
           child: const RecitersSearchBar(),
         ),
-        Expanded(
-          child: ReadersListView(reciters: reciters),
-        ),
+        Expanded(child: ReadersListView(reciters: reciters)),
       ],
     );
   }
@@ -55,19 +53,19 @@ class ReadersListView extends StatelessWidget {
       physics: const ClampingScrollPhysics(),
       slivers: [
         SliverList(
-          delegate: SliverChildBuilderDelegate(
-            childCount: items.length,
-            (context, index) {
-              final item = items[index];
-              if (item is String) {
-                return _CategoryHeader(label: item);
-              }
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: ReciterWidget(reciter: item as ReciterAudioModel),
-              );
-            },
-          ),
+          delegate: SliverChildBuilderDelegate(childCount: items.length, (
+            context,
+            index,
+          ) {
+            final item = items[index];
+            if (item is String) {
+              return _CategoryHeader(label: item);
+            }
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: ReciterWidget(reciter: item as ReciterAudioModel),
+            );
+          }),
         ),
       ],
     );

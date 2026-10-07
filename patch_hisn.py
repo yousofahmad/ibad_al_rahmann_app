@@ -1,93 +1,43 @@
-﻿import re
-with open("lib/screens/hisn_muslim_screen.dart", "r", encoding="utf-8") as f:
+﻿with open("lib/screens/hisn_muslim_screen.dart", "r", encoding="utf-8") as f:
     content = f.read()
 
-if "arabic_search_helper.dart" not in content:
-    content = "import 'package:ibad_al_rahmann/core/helpers/arabic_search_helper.dart';\n" + content
+import re
 
-# Patch the filtering
-content = re.sub(r"\(c\['title'\] as String\? \?\? ''\)\.contains\(_searchQuery\)",
-                 r"ArabicSearchHelper.normalizeArabic(c['title'] as String? ?? '').contains(ArabicSearchHelper.normalizeArabic(_searchQuery))", content)
+target1 = r'''        temp\.add\(\{
+          "title": key,
+          "text": List<String>\.from\(value\['text'\]\),
+          "footnote": List<String>\.from\(value\['footnote'\] \?\? \[\]\),
+        \}\);'''
 
-content = re.sub(r"\(c\['text'\] as List<String>\)\.any\(\(t\) => t\.contains\(_searchQuery\)\)",
-                 r"(c['text'] as List<String>).any((t) => ArabicSearchHelper.normalizeArabic(t).contains(ArabicSearchHelper.normalizeArabic(_searchQuery)))", content)
+replacement1 = r'''        temp.add({
+          "title": key,
+          "text": List<String>.from(value['text']),
+          "footnote": List<String>.from(value['footnote'] ?? []),
+          "normalizedTitle": ArabicSearchHelper.normalizeArabic(key),
+          "normalizedText": List<String>.from(value['text']).map((t) => ArabicSearchHelper.normalizeArabic(t)).toList(),
+        });'''
 
+content = re.sub(target1, replacement1, content)
 
-# Patch the Builder highlight in HisnDetailScreen
-highlight_target = r'''                    Builder\(builder: \(context\) \{
-                      final String textStr = widget.texts\[index\];
-                      if \(widget.searchQuery != null && widget.searchQuery!\.isNotEmpty && textStr.contains\(widget.searchQuery!\)\) \{
-                        final query = widget.searchQuery!;
-                        final parts = textStr.split\(query\);
-                        final spans = <TextSpan>\[\];
-                        for \(int i = 0; i < parts.length; i\+\+\) \{
-                          spans.add\(TextSpan\(text: parts\[i\]\)\);
-                          if \(i != parts.length - 1\) \{
-                            spans.add\(TextSpan\(
-                              text: query,
-                              style: TextStyle\(
-                                backgroundColor: Colors.yellow.withOpacity\(0.4\),
-                                color: Colors.red,
-                                fontWeight: FontWeight.bold,
-                              \),
-                            \)\);
-                          \}
-                        \}
-                        return RichText\(
-                          text: TextSpan\(
-                            style: AppStyles.style24harmattan.copyWith\(
-                              color: isDark \? Colors.white : Colors.black87,
-                              height: 1.8,
-                            \),
-                            children: spans,
-                          \),
-                          textAlign: TextAlign.center,
-                        \);
-                      \} else \{
-                        return Text\(
-                          textStr,
-                          style: AppStyles.style24harmattan.copyWith\(
-                            color: isDark \? Colors.white : Colors.black87,
-                            height: 1.8,
-                          \),
-                          textAlign: TextAlign.center,
-                        \);
-                      \}
-                    \}\),'''
+target2 = r'''      final displayedChapters = _searchQuery\.isEmpty
+          \? baseChapters
+          : baseChapters
+              \.where\(
+                \(c\) => ArabicSearchHelper\.normalizeArabic\(c\['title'\] as String\? \?\? ''\)\.contains\(ArabicSearchHelper\.normalizeArabic\(_searchQuery\)\) \|\| \(c\['text'\] as List<String>\)\.any\(\(t\) => ArabicSearchHelper\.normalizeArabic\(t\)\.contains\(ArabicSearchHelper\.normalizeArabic\(_searchQuery\)\)\),
+              \)
+              \.toList\(\);'''
 
-highlight_replacement = r'''                    Builder(builder: (context) {
-                      final String textStr = widget.texts[index];
-                      final baseStyle = AppStyles.style24harmattan.copyWith(
-                        color: isDark ? Colors.white : Colors.black87,
-                        height: 1.8,
-                      );
-                      
-                      if (widget.searchQuery != null && widget.searchQuery!.isNotEmpty) {
-                        return RichText(
-                          text: TextSpan(
-                            style: baseStyle,
-                            children: ArabicSearchHelper.highlightMatch(
-                              textStr,
-                              widget.searchQuery!,
-                              TextStyle(
-                                backgroundColor: Colors.yellow.withOpacity(0.4),
-                                color: Colors.red,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          textAlign: TextAlign.center,
-                        );
-                      } else {
-                        return Text(
-                          textStr,
-                          style: baseStyle,
-                          textAlign: TextAlign.center,
-                        );
-                      }
-                    }),'''
+replacement2 = r'''      final normalizedQuery = ArabicSearchHelper.normalizeArabic(_searchQuery);
+      final displayedChapters = _searchQuery.isEmpty
+          ? baseChapters
+          : baseChapters
+              .where(
+                (c) => (c['normalizedTitle'] as String).contains(normalizedQuery) || 
+                       (c['normalizedText'] as List<String>).any((t) => t.contains(normalizedQuery)),
+              )
+              .toList();'''
 
-content = re.sub(highlight_target, highlight_replacement, content)
+content = re.sub(target2, replacement2, content)
 
 with open("lib/screens/hisn_muslim_screen.dart", "w", encoding="utf-8") as f:
     f.write(content)

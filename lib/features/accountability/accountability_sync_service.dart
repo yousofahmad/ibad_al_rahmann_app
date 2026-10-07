@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/services/daily_tracker_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/islamic_day.dart';
+import 'package:ibad_al_rahmann/core/helpers/prayer_day_helper.dart';
 
 class AccountabilitySyncService {
   static final List<String> _defaultPrayers = [
@@ -35,7 +36,10 @@ class AccountabilitySyncService {
     'طلب علم',
   ];
 
-  static Map<String, bool> _loadOrCreateMap(String key, List<String> defaultList) {
+  static Map<String, bool> _loadOrCreateMap(
+    String key,
+    List<String> defaultList,
+  ) {
     final prefs = CacheHelper.prefs;
     final custom = prefs.getStringList('custom_items_$key') ?? [];
     final deleted = (prefs.getStringList('deleted_items_$key') ?? []).toSet();
@@ -70,6 +74,7 @@ class AccountabilitySyncService {
   static Future<void> syncAndSaveTodayStats() async {
     final prefs = CacheHelper.prefs;
     final todayKey = await IslamicDay.todayKey();
+    final activeKey = PrayerDayHelper.getActivePrayerCycleDate();
 
     // 1. Load temp maps
     final prayersMap = _loadOrCreateMap('temp_prayers', _defaultPrayers);
@@ -78,7 +83,9 @@ class AccountabilitySyncService {
     final deedsMap = _loadOrCreateMap('temp_deeds', _defaultGoodDeeds);
 
     // 2. Sync Prayer Focus
-    final focusLogRaw = prefs.getString('prayer_focus_log_$todayKey');
+    final focusLogRaw =
+        prefs.getString('prayer_focus_log_$activeKey') ??
+        prefs.getString('prayer_focus_log_$todayKey');
     if (focusLogRaw != null) {
       try {
         final Map<String, dynamic> focusMap = json.decode(focusLogRaw);
@@ -119,20 +126,45 @@ class AccountabilitySyncService {
     await prefs.setString('temp_deeds', json.encode(deedsMap));
 
     // 5. Calculate and save stats
-    double prayerScore = _calcPercent(prayersMap);
-    double quranScore = _calcPercent(quranMap);
-    double azkarScore = _calcPercent(azkarMap);
-    double deedsScore = _calcPercent(deedsMap);
-    double totalScore = (prayerScore + quranScore + azkarScore + deedsScore) / 4;
+    int totalPrayers = prayersMap.length;
+    int checkedPrayers = prayersMap.values.where((e) => e).length;
+    double prayerScore =
+        totalPrayers == 0 ? 0.0 : (checkedPrayers / totalPrayers) * 100.0;
+
+    int totalQuran = quranMap.length;
+    int checkedQuran = quranMap.values.where((e) => e).length;
+    double quranScore =
+        totalQuran == 0 ? 0.0 : (checkedQuran / totalQuran) * 100.0;
+
+    int totalAzkar = azkarMap.length;
+    int checkedAzkar = azkarMap.values.where((e) => e).length;
+    double azkarScore =
+        totalAzkar == 0 ? 0.0 : (checkedAzkar / totalAzkar) * 100.0;
+
+    int totalDeeds = deedsMap.length;
+    int checkedDeeds = deedsMap.values.where((e) => e).length;
+    double deedsScore =
+        totalDeeds == 0 ? 0.0 : (checkedDeeds / totalDeeds) * 100.0;
+
+    int totalAll = totalPrayers + totalQuran + totalAzkar + totalDeeds;
+    int totalChecked =
+        checkedPrayers + checkedQuran + checkedAzkar + checkedDeeds;
+    double totalScore =
+        totalAll == 0 ? 0.0 : (totalChecked / totalAll) * 100.0;
 
     Map<String, dynamic> dailyData = {
-      'date': todayKey,
+      'date': activeKey,
       'prayer': prayerScore,
       'quran': quranScore,
       'azkar': azkarScore,
       'deeds': deedsScore,
       'total': totalScore,
     };
-    await prefs.setString('stats_$todayKey', json.encode(dailyData));
+    await prefs.setString('stats_$activeKey', json.encode(dailyData));
+    if (activeKey != todayKey) {
+      final todayData = Map<String, dynamic>.from(dailyData)
+        ..['date'] = todayKey;
+      await prefs.setString('stats_$todayKey', json.encode(todayData));
+    }
   }
 }

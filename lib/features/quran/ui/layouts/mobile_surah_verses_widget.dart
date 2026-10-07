@@ -78,9 +78,13 @@ class _MobileSurahVersesWidgetState extends State<MobileSurahVersesWidget> {
     // If the word represents the verse being played or highlighted, return true.
     // In the new word-based logic, we check surah/ayah match.
     final playingVerse = cubit.state.currentVerse;
+    final activeWordIndex = cubit.state.activeWordIndex;
     if (playingVerse != null &&
         playingVerse.surahNumber == word.suraNumber &&
         playingVerse.verseNumber == word.ayahNumber) {
+      if (cubit.isHighlightWordByWord && activeWordIndex != null) {
+        return word.position == activeWordIndex;
+      }
       return true;
     }
 

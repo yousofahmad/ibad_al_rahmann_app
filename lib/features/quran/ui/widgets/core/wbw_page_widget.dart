@@ -39,6 +39,7 @@ class WbwPageWidget extends StatefulWidget {
   /// are fully collapsed to zero height, showing only the portion of the page
   /// that belongs to the current Rub' (quarter).
   final bool collapseOutOfRange;
+  final VoidCallback? onPageLoaded;
 
   const WbwPageWidget({
     super.key,
@@ -55,6 +56,7 @@ class WbwPageWidget extends StatefulWidget {
     this.isSeamlessScroll = false,
     this.collapseOutOfRange = false,
     this.isLandscape = false,
+    this.onPageLoaded,
   });
 
   final bool isLandscape;
@@ -137,6 +139,9 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
       }
       _lineWordsMap = lineMap;
       _isLoading = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onPageLoaded?.call();
+      });
       return;
     }
 
@@ -161,6 +166,9 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
       if (mounted) {
         setState(() {
           _isLoading = false;
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) widget.onPageLoaded?.call();
         });
         // Preload a bit further in the background
         _preloadNeighbor(widget.pageNumber + 2);
@@ -208,8 +216,6 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
       _lineWordsMap = lineMap;
     }
   }
-
-
 
   Future<void> _onWordLongPressed(
     BuildContext context,
@@ -268,7 +274,9 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
     );
 
     if (mounted) {
-      playerCubit.hide();
+      if (!playerCubit.state.showed && !playerCubit.player.playing) {
+        playerCubit.hide();
+      }
       setState(() {
         _selectedWord = null;
       });
@@ -303,6 +311,9 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
     );
     final playingVerse = playerState.currentVerse;
     final activeWordIndex = playerState.activeWordIndex;
+    final isWbwMode = context.select<VersePlayerCubit, bool>(
+      (cubit) => cubit.isHighlightWordByWord,
+    );
     // Read the navigation-highlight coordinates set by Fehres / bookmarks.
     final navHighlightSurah = context.select<QuranCubit, int?>(
       (cubit) => cubit.state.highlightedSurah,
@@ -343,8 +354,9 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
     }
 
     int surahNum = detectedSurahs.isNotEmpty ? detectedSurahs.first : 1;
-    final List<int> pageSurahs =
-        detectedSurahs.isNotEmpty ? detectedSurahs : [1];
+    final List<int> pageSurahs = detectedSurahs.isNotEmpty
+        ? detectedSurahs
+        : [1];
     int verseNum = 1;
 
     // Determine verseNum for the first available ayah line to help with Juz calculation
@@ -430,34 +442,36 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                               height: 1.0,
                             ),
                           ),
-                        if (hizbText.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 6),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFD0A871).withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                hizbText,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: AppConsts.cairo,
-                                  color: const Color(0xFFD0A871),
-                                  fontSize: isTablet ? 12 : 9.5,
-                                  height: 1.1,
+                          if (hizbText.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFFD0A871,
+                                  ).withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  hizbText,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: AppConsts.cairo,
+                                    color: const Color(0xFFD0A871),
+                                    fontSize: isTablet ? 12 : 9.5,
+                                    height: 1.1,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -475,7 +489,9 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: pageSurahs.map((sNum) {
                                 return Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 2,
+                                  ),
                                   child: Text(
                                     'surah${sNum.toString().padLeft(3, '0')}',
                                     style: TextStyle(
@@ -511,340 +527,386 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
 
     final bool isMinimized = !widget.showHeader && !isPage1or2;
 
-    final versesColumn = LayoutBuilder(builder: (context, constraints) {
-      final bool hasBoundedHeightInner = constraints.hasBoundedHeight;
-      
-      return Column(
-        mainAxisAlignment: isPage1or2
-            ? MainAxisAlignment.center
-            : MainAxisAlignment.spaceBetween,
-        mainAxisSize: MainAxisSize.max,
-        crossAxisAlignment: isPage1or2
-            ? CrossAxisAlignment.center
-            : CrossAxisAlignment.stretch,
-        children: List.generate(15, (i) {
-          final lineNumber = i + 1;
-          final PageLine? lineRule = _pageLines!
-              .where((l) => l.lineNumber == lineNumber)
-              .firstOrNull;
+    final versesColumn = LayoutBuilder(
+      builder: (context, constraints) {
+        final bool hasBoundedHeightInner = constraints.hasBoundedHeight;
 
-          if (lineRule == null) {
-            return (isPage1or2 || widget.isLandscape || !hasBoundedHeightInner)
-                ? const SizedBox.shrink()
-                : const Expanded(child: SizedBox.shrink());
-          }
-
-          if (isPage1or2 && lineRule.lineType == 'ayah') {
-            final lineWords = _lineWordsMap[lineNumber] ?? [];
-            if (lineWords.isEmpty) return const SizedBox.shrink();
-          }
-
-          Widget lineContent;
-
-          if (lineRule.lineType == 'surah_name') {
-            int hSura = lineRule.surahNumber ?? 1;
-            bool isVisible;
-            if (widget.startSuraNumber == null || widget.endSuraNumber == null) {
-              isVisible = true;
-            } else {
-              isVisible =
-                  hSura >= widget.startSuraNumber! &&
-                  hSura <= widget.endSuraNumber!;
-            }
-            Widget header = FullHeaderWidget(
-              surahNumber: hSura,
-              color: headerTextColor,
-            );
-            if (!isVisible) {
-              if (widget.isSeamlessScroll) return const SizedBox.shrink();
-              header = Opacity(opacity: 0.0, child: header);
-            }
-
-            header = FittedBox(fit: BoxFit.scaleDown, child: header);
-
-            final double headerH = isPage1or2 
-                ? (isMinimized ? 60.h : 85.h) 
-                : (isMinimized ? 65.h : 90.h);
-
-            lineContent = (widget.isLandscape || isPage1or2 || !hasBoundedHeightInner)
-                ? SizedBox(
-                    height: headerH,
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        bottom: isPage1or2 ? 0.0 : 4.0,
-                        top: isPage1or2 ? 2.0 : 4.0,
-                      ),
-                      child: header,
-                    ),
-                  )
-                : header;
-          } else if (lineRule.lineType == 'basmallah') {
-            int bSura = lineRule.surahNumber ?? surahNum;
-            bool isVisible;
-            if (widget.startSuraNumber == null || widget.endSuraNumber == null) {
-              isVisible = true;
-            } else {
-              // Fix: If we are in a specific range (Wird/Kahf), and this page is within 
-              // that range, we should generally show the basmallah if it's there.
-              isVisible = bSura >= widget.startSuraNumber! && bSura <= widget.endSuraNumber!;
-              
-              // Special case: if the page is inside the range, don't hide the basmallah
-              // that introduces the surah.
-              if (widget.pageNumber >= 1 && widget.pageNumber <= 604) {
-                 isVisible = true; // Trust the database if the page is being rendered
-              }
-            }
-            Widget basmallah = Basmallah(
-              isFull: true,
-              color: headerTextColor,
-              widthMultiplier: isPage1or2
-                  ? 0.70
-                  : null, 
-            );
-            if (!isVisible) {
-              if (widget.isSeamlessScroll) return const SizedBox.shrink();
-              basmallah = Opacity(opacity: 0.0, child: basmallah);
-            }
-
-            final double basmallahH = isPage1or2 
-                ? (isMinimized ? 30.h : 50.h) 
-                : (isMinimized ? 42.h : 60.h);
-
-            lineContent = (widget.isLandscape || isPage1or2 || !hasBoundedHeightInner)
-                ? SizedBox(
-                    height: basmallahH,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: isPage1or2 ? 0.0 : 4.0,
-                      ),
-                      child: FittedBox(fit: BoxFit.contain, child: basmallah),
-                    ),
-                  )
-                : FittedBox(fit: BoxFit.contain, child: basmallah);
-          } else {
-            final lineWords = _lineWordsMap[lineNumber] ?? [];
-            if (widget.isSeamlessScroll) {
-              bool hasVisibleWord = false;
-              for (var w in lineWords) {
-                int currentWSura = w.suraNumber ?? surahNum;
-                int currentWAyah = w.ayahNumber ?? 0;
-                if (isWordInRange(currentWSura, currentWAyah)) {
-                  hasVisibleWord = true;
-                  break;
-                }
-              }
-              if (!hasVisibleWord) {
-                return (isPage1or2 || !hasBoundedHeightInner) ? const SizedBox.shrink() : const Expanded(child: SizedBox.shrink());
-              }
-            }
-            final PageLine? nextLineRule = _pageLines!
-                .where((l) => l.lineNumber == lineNumber + 1)
+        return Column(
+          mainAxisAlignment: isPage1or2
+              ? MainAxisAlignment.center
+              : MainAxisAlignment.spaceBetween,
+          mainAxisSize: MainAxisSize.max,
+          crossAxisAlignment: isPage1or2
+              ? CrossAxisAlignment.center
+              : CrossAxisAlignment.stretch,
+          children: List.generate(15, (i) {
+            final lineNumber = i + 1;
+            final PageLine? lineRule = _pageLines!
+                .where((l) => l.lineNumber == lineNumber)
                 .firstOrNull;
 
-            final bool isLastLineOfSurah =
-                nextLineRule != null &&
-                (nextLineRule.lineType == 'surah_name' ||
-                    (nextLineRule.surahNumber != null &&
-                        lineRule.surahNumber != null &&
-                        nextLineRule.surahNumber! > lineRule.surahNumber!));
+            if (lineRule == null) {
+              return (isPage1or2 ||
+                      widget.isLandscape ||
+                      !hasBoundedHeightInner)
+                  ? const SizedBox.shrink()
+                  : const Expanded(child: SizedBox.shrink());
+            }
 
-          final bool shouldCenter =
-              isPage1or2 || lineRule.isCentered || isLastLineOfSurah;
+            if (isPage1or2 && lineRule.lineType == 'ayah') {
+              final lineWords = _lineWordsMap[lineNumber] ?? [];
+              if (lineWords.isEmpty) return const SizedBox.shrink();
+            }
 
-          final double canvasFontSize = isPage1or2
-              ? (context.isTablet ? 90.0 : 42.0)
-              : 125.0;
+            Widget lineContent;
 
-          Widget row = Directionality(
-              textDirection: TextDirection.rtl,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                child: Row(
-                  mainAxisSize: shouldCenter
-                      ? MainAxisSize.min
-                      : MainAxisSize.max,
-                  mainAxisAlignment: shouldCenter
-                      ? MainAxisAlignment.center
-                      : MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: () {
-                    final List<Widget> rowChildren = [];
-                    for (int wIdx = 0; wIdx < lineWords.length; wIdx++) {
-                      final word = lineWords[wIdx];
+            if (lineRule.lineType == 'surah_name') {
+              int hSura = lineRule.surahNumber ?? 1;
+              bool isVisible;
+              if (widget.startSuraNumber == null ||
+                  widget.endSuraNumber == null) {
+                isVisible = true;
+              } else {
+                isVisible =
+                    hSura >= widget.startSuraNumber! &&
+                    hSura <= widget.endSuraNumber!;
+              }
+              Widget header = FullHeaderWidget(
+                surahNumber: hSura,
+                color: headerTextColor,
+              );
+              if (!isVisible) {
+                if (widget.isSeamlessScroll) return const SizedBox.shrink();
+                header = Opacity(opacity: 0.0, child: header);
+              }
 
-                      final int currentWSura = word.suraNumber ?? surahNum;
-                      final int currentWAyah = word.ayahNumber ?? 0;
-                      final bool isVisible = isWordInRange(currentWSura, currentWAyah);
+              header = FittedBox(fit: BoxFit.scaleDown, child: header);
 
-                      final bool isHighlighted =
-                          (playingVerse != null &&
-                              playingVerse.surahNumber == currentWSura &&
-                              playingVerse.verseNumber == currentWAyah) ||
-                          (_selectedWord != null &&
-                              (_selectedWord!.suraNumber ?? surahNum) == currentWSura &&
-                              (_selectedWord!.ayahNumber ?? 0) == currentWAyah) ||
-                          (navHighlightSurah != null &&
-                              navHighlightAyah != null &&
-                              currentWSura == navHighlightSurah &&
-                              currentWAyah == navHighlightAyah);
+              final double headerH = isPage1or2
+                  ? (isMinimized ? 60.h : 85.h)
+                  : (isMinimized ? 65.h : 90.h);
 
-                      Color textColor =
-                          widget.textColorOverride ??
-                          (isDarkPaper ? Colors.white : Colors.black);
+              lineContent =
+                  (widget.isLandscape || isPage1or2 || !hasBoundedHeightInner)
+                  ? SizedBox(
+                      height: headerH,
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          bottom: isPage1or2 ? 0.0 : 4.0,
+                          top: isPage1or2 ? 2.0 : 4.0,
+                        ),
+                        child: header,
+                      ),
+                    )
+                  : header;
+            } else if (lineRule.lineType == 'basmallah') {
+              int bSura = lineRule.surahNumber ?? surahNum;
+              bool isVisible;
+              if (widget.startSuraNumber == null ||
+                  widget.endSuraNumber == null) {
+                isVisible = true;
+              } else {
+                // Fix: If we are in a specific range (Wird/Kahf), and this page is within
+                // that range, we should generally show the basmallah if it's there.
+                isVisible =
+                    bSura >= widget.startSuraNumber! &&
+                    bSura <= widget.endSuraNumber!;
 
-                      if (!isVisible) textColor = Colors.transparent;
+                // Special case: if the page is inside the range, don't hide the basmallah
+                // that introduces the surah.
+                if (widget.pageNumber >= 1 && widget.pageNumber <= 604) {
+                  isVisible =
+                      true; // Trust the database if the page is being rendered
+                }
+              }
+              Widget basmallah = Basmallah(
+                isFull: true,
+                color: headerTextColor,
+                widthMultiplier: isPage1or2 ? 0.70 : null,
+              );
+              if (!isVisible) {
+                if (widget.isSeamlessScroll) return const SizedBox.shrink();
+                basmallah = Opacity(opacity: 0.0, child: basmallah);
+              }
 
-                      bool isLastWordOfAyah = false;
-                      if (currentWAyah != 0) {
-                        if (wIdx < lineWords.length - 1) {
-                          if (lineWords[wIdx + 1].ayahNumber != currentWAyah) {
-                            isLastWordOfAyah = true;
-                          }
-                        } else {
-                          final nextLineWords = _lineWordsMap[lineNumber + 1];
-                          if (nextLineWords != null && nextLineWords.isNotEmpty) {
-                            if (nextLineWords.first.ayahNumber != currentWAyah) {
+              final double basmallahH = isPage1or2
+                  ? (isMinimized ? 30.h : 50.h)
+                  : (isMinimized ? 42.h : 60.h);
+
+              lineContent =
+                  (widget.isLandscape || isPage1or2 || !hasBoundedHeightInner)
+                  ? SizedBox(
+                      height: basmallahH,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          vertical: isPage1or2 ? 0.0 : 4.0,
+                        ),
+                        child: FittedBox(fit: BoxFit.contain, child: basmallah),
+                      ),
+                    )
+                  : FittedBox(fit: BoxFit.contain, child: basmallah);
+            } else {
+              final lineWords = _lineWordsMap[lineNumber] ?? [];
+              if (widget.isSeamlessScroll) {
+                bool hasVisibleWord = false;
+                for (var w in lineWords) {
+                  int currentWSura = w.suraNumber ?? surahNum;
+                  int currentWAyah = w.ayahNumber ?? 0;
+                  if (isWordInRange(currentWSura, currentWAyah)) {
+                    hasVisibleWord = true;
+                    break;
+                  }
+                }
+                if (!hasVisibleWord) {
+                  return (isPage1or2 || !hasBoundedHeightInner)
+                      ? const SizedBox.shrink()
+                      : const Expanded(child: SizedBox.shrink());
+                }
+              }
+              final PageLine? nextLineRule = _pageLines!
+                  .where((l) => l.lineNumber == lineNumber + 1)
+                  .firstOrNull;
+
+              final bool isLastLineOfSurah =
+                  nextLineRule != null &&
+                  (nextLineRule.lineType == 'surah_name' ||
+                      (nextLineRule.surahNumber != null &&
+                          lineRule.surahNumber != null &&
+                          nextLineRule.surahNumber! > lineRule.surahNumber!));
+
+              final bool shouldCenter =
+                  isPage1or2 || lineRule.isCentered || isLastLineOfSurah;
+
+              final double canvasFontSize = isPage1or2
+                  ? (context.isTablet ? 90.0 : 42.0)
+                  : 125.0;
+
+              Widget row = Directionality(
+                textDirection: TextDirection.rtl,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: Row(
+                    mainAxisSize: shouldCenter
+                        ? MainAxisSize.min
+                        : MainAxisSize.max,
+                    mainAxisAlignment: shouldCenter
+                        ? MainAxisAlignment.center
+                        : MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: () {
+                      final List<Widget> rowChildren = [];
+                      for (int wIdx = 0; wIdx < lineWords.length; wIdx++) {
+                        final word = lineWords[wIdx];
+
+                        final int currentWSura = word.suraNumber ?? surahNum;
+                        final int currentWAyah = word.ayahNumber ?? 0;
+                        final bool isVisible = isWordInRange(
+                          currentWSura,
+                          currentWAyah,
+                        );
+
+                        final bool isPlayingThisAyah = (playingVerse != null &&
+                            playingVerse.surahNumber == currentWSura &&
+                            playingVerse.verseNumber == currentWAyah);
+
+                        final bool isSelectedOrNav =
+                            (_selectedWord != null &&
+                                (_selectedWord!.suraNumber ?? surahNum) ==
+                                    currentWSura &&
+                                (_selectedWord!.ayahNumber ?? 0) ==
+                                    currentWAyah) ||
+                            (navHighlightSurah != null &&
+                                navHighlightAyah != null &&
+                                currentWSura == navHighlightSurah &&
+                                currentWAyah == navHighlightAyah);
+
+                        // Is this individual word currently playing in Word-by-Word mode?
+                        final bool isWordActive = isPlayingThisAyah &&
+                            isWbwMode &&
+                            activeWordIndex != null &&
+                            word.position == activeWordIndex;
+
+                        // When in Word-by-Word mode with valid word timing, do NOT highlight whole verse
+                        final bool isVerseHighlighted = isPlayingThisAyah &&
+                            (!isWbwMode || activeWordIndex == null);
+
+                        final bool isMarkerHighlighted =
+                            (isVerseHighlighted || isSelectedOrNav);
+
+                        Color textColor =
+                            widget.textColorOverride ??
+                            (isDarkPaper ? Colors.white : Colors.black);
+
+                        if (!isVisible) textColor = Colors.transparent;
+
+                        bool isLastWordOfAyah = false;
+                        if (currentWAyah != 0) {
+                          if (wIdx < lineWords.length - 1) {
+                            if (lineWords[wIdx + 1].ayahNumber !=
+                                currentWAyah) {
                               isLastWordOfAyah = true;
                             }
                           } else {
-                            isLastWordOfAyah = true;
+                            final nextLineWords = _lineWordsMap[lineNumber + 1];
+                            if (nextLineWords != null &&
+                                nextLineWords.isNotEmpty) {
+                              if (nextLineWords.first.ayahNumber !=
+                                  currentWAyah) {
+                                isLastWordOfAyah = true;
+                              }
+                            } else {
+                              isLastWordOfAyah = true;
+                            }
+                          }
+                        }
+
+                        if (isLastWordOfAyah) {
+                          final double sizeMultiplier = isPage1or2 ? 1.20 : 2.0;
+                          final double fontMultiplier = isPage1or2
+                              ? 0.40
+                              : 0.45;
+
+                          final double markerSize =
+                              canvasFontSize * sizeMultiplier;
+                          final double markerFontSize =
+                              canvasFontSize * fontMultiplier;
+
+                          Widget marker = Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4.0,
+                            ),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: isMarkerHighlighted && isVisible
+                                    ? const Color(0xFFE5A93C).withValues(
+                                        alpha: isDarkPaper ? 0.55 : 0.45,
+                                      )
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(markerSize),
+                              ),
+                              child: AyahMarkerWidget(
+                                ayahNumber: currentWAyah,
+                                size: markerSize,
+                                fontSize: markerFontSize,
+                                numberColor: isDarkPaper
+                                    ? const Color(0xFFFFF8E1)
+                                    : const Color(0xFF3E2723),
+                              ),
+                            ),
+                          );
+                          if (!isVisible) {
+                            marker = Opacity(opacity: 0.0, child: marker);
+                          }
+                          rowChildren.add(marker);
+                        } else {
+                          if (word.text.trim().isNotEmpty) {
+                            rowChildren.add(
+                              GestureDetector(
+                                behavior: HitTestBehavior.translucent,
+                                onLongPress: () {
+                                  if (isVisible) {
+                                    _onWordLongPressed(
+                                      context,
+                                      context.read<VersePlayerCubit>(),
+                                      word,
+                                    );
+                                  }
+                                },
+                                child: () {
+                                  final bool showHighlight =
+                                      (isWordActive ||
+                                       isVerseHighlighted ||
+                                       isSelectedOrNav) &&
+                                      isVisible;
+
+                                  final Color highlightColor = isWordActive
+                                      ? const Color(0xFFE5A93C).withValues(
+                                          alpha: isDarkPaper ? 0.85 : 0.70,
+                                        )
+                                      : const Color(0xFFE5A93C).withValues(
+                                          alpha: isDarkPaper ? 0.55 : 0.45,
+                                        );
+
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      color: showHighlight
+                                          ? highlightColor
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      word.text,
+                                      style: const TextStyle(height: 1.0)
+                                          .copyWith(
+                                            fontFamily: _fontFamily,
+                                            fontSize: canvasFontSize,
+                                            color: textColor,
+                                            fontWeight: isWordActive
+                                                ? FontWeight.bold
+                                                : FontWeight.normal,
+                                          ),
+                                    ),
+                                  );
+                                }(),
+                              ),
+                            );
                           }
                         }
                       }
-
-                      if (isLastWordOfAyah) {
-                        final double sizeMultiplier = isPage1or2 ? 1.20 : 2.0;
-                        final double fontMultiplier = isPage1or2 ? 0.40 : 0.45;
-
-                        final double markerSize = canvasFontSize * sizeMultiplier;
-                        final double markerFontSize =
-                            canvasFontSize * fontMultiplier;
-
-                        Widget marker = Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: isHighlighted && isVisible
-                                  ? const Color(0xFFE5A93C).withValues(
-                                      alpha: isDarkPaper ? 0.55 : 0.45,
-                                    )
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(markerSize),
-                            ),
-                            child: AyahMarkerWidget(
-                              ayahNumber: currentWAyah,
-                              size: markerSize,
-                              fontSize: markerFontSize,
-                              numberColor: isDarkPaper
-                                  ? const Color(0xFFFFF8E1)
-                                  : const Color(0xFF3E2723),
-                            ),
-                          ),
-                        );
-                        if (!isVisible) {
-                          marker = Opacity(opacity: 0.0, child: marker);
-                        }
-                        rowChildren.add(marker);
-                      } else {
-                        if (word.text.trim().isNotEmpty) {
-                          rowChildren.add(
-                            GestureDetector(
-                              behavior: HitTestBehavior.translucent,
-                              onLongPress: () {
-                                if (isVisible) {
-                                  _onWordLongPressed(
-                                    context,
-                                    context.read<VersePlayerCubit>(),
-                                    word,
-                                  );
-                                }
-                              },
-                              child: () {
-                                final bool isWordActive = (playingVerse != null &&
-                                    playingVerse.surahNumber == currentWSura &&
-                                    playingVerse.verseNumber == currentWAyah &&
-                                    activeWordIndex != null &&
-                                    word.position == activeWordIndex);
-
-                                final bool showHighlight = (isHighlighted || isWordActive) && isVisible;
-                                final Color highlightColor = isWordActive
-                                    ? const Color(0xFFE5A93C).withValues(
-                                        alpha: isDarkPaper ? 0.85 : 0.70,
-                                      )
-                                    : const Color(0xFFE5A93C).withValues(
-                                        alpha: isDarkPaper ? 0.55 : 0.45,
-                                      );
-
-                                return Container(
-                                  decoration: BoxDecoration(
-                                    color: showHighlight ? highlightColor : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    word.text,
-                                    style: const TextStyle(height: 1.0).copyWith(
-                                      fontFamily: _fontFamily,
-                                      fontSize: canvasFontSize,
-                                      color: textColor,
-                                      fontWeight: isWordActive ? FontWeight.bold : FontWeight.normal,
-                                    ),
-                                  ),
-                                );
-                              }(),
-                            ),
-                          );
-                        }
-                      }
-                    }
-                    return rowChildren;
-                  }(),
-                ),
-              ),
-            );
-
-            if (isPage1or2) {
-              lineContent = Padding(
-                padding: EdgeInsets.symmetric(
-                  vertical: widget.pageNumber == 2 ? 8.0 : 8.0,
-                ),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  child: row,
+                      return rowChildren;
+                    }(),
+                  ),
                 ),
               );
-            } else {
-              lineContent = LayoutBuilder(
-                builder: (ctx, lc) {
-                  final double w = lc.maxWidth.isFinite ? lc.maxWidth : 1000.0;
-                  return FittedBox(
-                    fit: shouldCenter ? BoxFit.scaleDown : BoxFit.fitWidth,
+
+              if (isPage1or2) {
+                lineContent = Padding(
+                  padding: EdgeInsets.symmetric(
+                    vertical: widget.pageNumber == 2 ? 8.0 : 8.0,
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
                     alignment: Alignment.center,
                     clipBehavior: Clip.none,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minWidth: w),
-                      child: row,
-                    ),
-                  );
-                },
-              );
+                    child: row,
+                  ),
+                );
+              } else {
+                lineContent = LayoutBuilder(
+                  builder: (ctx, lc) {
+                    final double w = lc.maxWidth.isFinite
+                        ? lc.maxWidth
+                        : 1000.0;
+                    return FittedBox(
+                      fit: shouldCenter ? BoxFit.scaleDown : BoxFit.fitWidth,
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minWidth: w),
+                        child: row,
+                      ),
+                    );
+                  },
+                );
+              }
             }
-          }
 
-          Widget result = lineContent;
-          if (!isPage1or2 && hasBoundedHeightInner) {
-            result = Expanded(child: result);
-          }
-          return result;
-        }),
-      );
-    });
+            Widget result = lineContent;
+            if (!isPage1or2 && hasBoundedHeightInner) {
+              result = Expanded(child: result);
+            }
+            return result;
+          }),
+        );
+      },
+    );
 
     final pageContent = LayoutBuilder(
       builder: (context, constraints) {
-        final double screenWidth  = constraints.maxWidth;
-        final double screenHeight = constraints.maxHeight > 0 ? constraints.maxHeight : MediaQuery.of(context).size.height;
+        final double screenWidth = constraints.maxWidth;
+        final double screenHeight = constraints.maxHeight > 0
+            ? constraints.maxHeight
+            : MediaQuery.of(context).size.height;
         final bool hasBoundedHeight = constraints.hasBoundedHeight;
         final bool isTablet = context.isTablet;
 
@@ -852,14 +914,18 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
         final double maxWidthAllowed = isTablet
             ? screenWidth
             : (widget.isLandscape ? screenWidth : 650.0);
-        final double baseWidth = screenWidth > maxWidthAllowed ? maxWidthAllowed : screenWidth;
+        final double baseWidth = screenWidth > maxWidthAllowed
+            ? maxWidthAllowed
+            : screenWidth;
 
         // On tablet, the margin slider is the ONLY padding — no extra sidePadding
         final double sidePadding = screenWidth > maxWidthAllowed
             ? ((screenWidth - maxWidthAllowed) / 2)
             : (widget.isLandscape ? 0.0 : (isTablet ? 0.0 : 2.0));
 
-        final double margin = context.select<QuranCubit, double>((c) => c.state.quranPageMargin);
+        final double margin = context.select<QuranCubit, double>(
+          (c) => c.state.quranPageMargin,
+        );
 
         Widget textColumnWithMargin = Padding(
           padding: EdgeInsets.symmetric(horizontal: margin),
@@ -870,7 +936,9 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
         // shrink the text trying to fit an arbitrary 1.95 multiplier that was
         // designed for phone portrait dimensions.
         final double pageAspectHeight = isTablet
-            ? (hasBoundedHeight && screenHeight > 0 ? screenHeight : baseWidth * 1.42)
+            ? (hasBoundedHeight && screenHeight > 0
+                  ? screenHeight
+                  : baseWidth * 1.42)
             : baseWidth * 1.95;
 
         Widget innerContentWithoutMargin = Container(
@@ -904,8 +972,13 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
       },
     );
 
-    final String prefix = widget.isSeamlessScroll ? 'vertical' : (widget.showHeader ? 'mushaf' : 'min');
-    final repaintKey = context.read<QuranCubit>().getPageKey(widget.pageNumber, contextPrefix: prefix);
+    final String prefix = widget.isSeamlessScroll
+        ? 'vertical'
+        : (widget.showHeader ? 'mushaf' : 'min');
+    final repaintKey = context.read<QuranCubit>().getPageKey(
+      widget.pageNumber,
+      contextPrefix: prefix,
+    );
 
     return RepaintBoundary(
       key: repaintKey,
@@ -919,7 +992,8 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
               builder: (context, middleConstraints) {
                 Widget topBarWidget = widget.showHeader
                     ? SafeArea(
-                        top: true, // Restored to prevent camera overlap in fullscreen mode
+                        top:
+                            true, // Restored to prevent camera overlap in fullscreen mode
                         bottom: false,
                         child: !isPage1or2
                             ? headerBar
@@ -938,7 +1012,11 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                       children: [
                         if (widget.showHeader) topBarWidget,
                         SizedBox(
-                          height: screenWidth * (isPage1or2 ? 1.95 : 1.95), // Fixed height for page 1 & 2
+                          height:
+                              screenWidth *
+                              (isPage1or2
+                                  ? 1.95
+                                  : 1.95), // Fixed height for page 1 & 2
                           child: pageContent,
                         ),
                         if (widget.showPageNumber)
@@ -960,7 +1038,9 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                                     alignment: Alignment.center,
                                     decoration: const BoxDecoration(
                                       image: DecorationImage(
-                                        image: AssetImage('assets/images/page_numpers.png'),
+                                        image: AssetImage(
+                                          'assets/images/page_numpers.png',
+                                        ),
                                         fit: BoxFit.fill,
                                       ),
                                     ),
@@ -984,15 +1064,17 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                 } else {
                   fullContent = Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisAlignment: isPage1or2 ? MainAxisAlignment.center : MainAxisAlignment.start,
+                    mainAxisAlignment: isPage1or2
+                        ? MainAxisAlignment.center
+                        : MainAxisAlignment.start,
                     mainAxisSize: MainAxisSize.max,
                     children: [
                       if (widget.showHeader) topBarWidget,
                       Expanded(
-                        child: isPage1or2 
-                          ? Center(child: pageContent)
-                          : pageContent,
-                      ), 
+                        child: isPage1or2
+                            ? Center(child: pageContent)
+                            : pageContent,
+                      ),
                       if (widget.showPageNumber)
                         SafeArea(
                           top: false,
@@ -1012,7 +1094,9 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                                   alignment: Alignment.center,
                                   decoration: const BoxDecoration(
                                     image: DecorationImage(
-                                      image: AssetImage('assets/images/page_numpers.png'),
+                                      image: AssetImage(
+                                        'assets/images/page_numpers.png',
+                                      ),
                                       fit: BoxFit.fill,
                                     ),
                                   ),

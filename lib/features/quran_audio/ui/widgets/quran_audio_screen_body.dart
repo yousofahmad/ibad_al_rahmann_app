@@ -45,18 +45,13 @@ class QuranAudioScreenBody extends StatelessWidget {
           elevation: 0,
           scrolledUnderElevation: 0,
           leading: IconButton(
-            icon: Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: primaryColor,
-            ),
+            icon: Icon(Icons.arrow_back_ios_new_rounded, color: primaryColor),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ),
         body: Stack(
           children: [
-            Positioned.fill(
-              child: QuranListView(qaree: reciter),
-            ),
+            Positioned.fill(child: QuranListView(qaree: reciter)),
             Positioned.fill(
               bottom: 16.h,
               child: Align(

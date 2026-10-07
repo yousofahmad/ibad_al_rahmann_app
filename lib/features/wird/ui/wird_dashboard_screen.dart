@@ -12,6 +12,7 @@ import '../data/khatma_model.dart';
 import 'new_khatma_screen.dart';
 import 'khatma_details_view.dart';
 import 'khatma_details_screen.dart';
+import 'khatma_stats_screen.dart';
 
 class WirdDashboardScreen extends StatefulWidget {
   const WirdDashboardScreen({super.key});
@@ -21,20 +22,35 @@ class WirdDashboardScreen extends StatefulWidget {
 }
 
 class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
-
-  Future<void> _showPrayerOffsetsDialog(BuildContext context, KhatmaCubit cubit, KhatmaModel khatma) async {
-    final map = khatma.notificationOffsetMinutesMap ?? {
-      'الفجر': khatma.notificationOffsetMinutes,
-      'الظهر': khatma.notificationOffsetMinutes,
-      'العصر': khatma.notificationOffsetMinutes,
-      'المغرب': khatma.notificationOffsetMinutes,
-      'العشاء': khatma.notificationOffsetMinutes,
-    };
-    final fajrCtrl = TextEditingController(text: (map['الفجر'] ?? 30).toString());
-    final dhuhrCtrl = TextEditingController(text: (map['الظهر'] ?? 30).toString());
-    final asrCtrl = TextEditingController(text: (map['العصر'] ?? 30).toString());
-    final maghribCtrl = TextEditingController(text: (map['المغرب'] ?? 30).toString());
-    final ishaCtrl = TextEditingController(text: (map['العشاء'] ?? 30).toString());
+  Future<void> _showPrayerOffsetsDialog(
+    BuildContext context,
+    KhatmaCubit cubit,
+    KhatmaModel khatma,
+  ) async {
+    final map =
+        khatma.notificationOffsetMinutesMap ??
+        {
+          'الفجر': khatma.notificationOffsetMinutes,
+          'الظهر': khatma.notificationOffsetMinutes,
+          'العصر': khatma.notificationOffsetMinutes,
+          'المغرب': khatma.notificationOffsetMinutes,
+          'العشاء': khatma.notificationOffsetMinutes,
+        };
+    final fajrCtrl = TextEditingController(
+      text: (map['الفجر'] ?? 30).toString(),
+    );
+    final dhuhrCtrl = TextEditingController(
+      text: (map['الظهر'] ?? 30).toString(),
+    );
+    final asrCtrl = TextEditingController(
+      text: (map['العصر'] ?? 30).toString(),
+    );
+    final maghribCtrl = TextEditingController(
+      text: (map['المغرب'] ?? 30).toString(),
+    );
+    final ishaCtrl = TextEditingController(
+      text: (map['العشاء'] ?? 30).toString(),
+    );
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -46,7 +62,10 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
           backgroundColor: isDark ? Colors.grey[900] : Colors.white,
           title: Text(
             'تعديل دقائق التأخير',
-            style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           content: SingleChildScrollView(
             child: Column(
@@ -72,11 +91,31 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(ctx, {
-                  'الفجر': int.tryParse(AppFormatters.toEnglishDigits(fajrCtrl.text)) ?? 30,
-                  'الظهر': int.tryParse(AppFormatters.toEnglishDigits(dhuhrCtrl.text)) ?? 30,
-                  'العصر': int.tryParse(AppFormatters.toEnglishDigits(asrCtrl.text)) ?? 30,
-                  'المغرب': int.tryParse(AppFormatters.toEnglishDigits(maghribCtrl.text)) ?? 30,
-                  'العشاء': int.tryParse(AppFormatters.toEnglishDigits(ishaCtrl.text)) ?? 30,
+                  'الفجر':
+                      int.tryParse(
+                        AppFormatters.toEnglishDigits(fajrCtrl.text),
+                      ) ??
+                      30,
+                  'الظهر':
+                      int.tryParse(
+                        AppFormatters.toEnglishDigits(dhuhrCtrl.text),
+                      ) ??
+                      30,
+                  'العصر':
+                      int.tryParse(
+                        AppFormatters.toEnglishDigits(asrCtrl.text),
+                      ) ??
+                      30,
+                  'المغرب':
+                      int.tryParse(
+                        AppFormatters.toEnglishDigits(maghribCtrl.text),
+                      ) ??
+                      30,
+                  'العشاء':
+                      int.tryParse(
+                        AppFormatters.toEnglishDigits(ishaCtrl.text),
+                      ) ??
+                      30,
                 });
               },
               style: ElevatedButton.styleFrom(
@@ -95,10 +134,23 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
     }
   }
 
-  Widget _buildOffsetField(String label, TextEditingController ctrl, bool isDark) {
+  Widget _buildOffsetField(
+    String label,
+    TextEditingController ctrl,
+    bool isDark,
+  ) {
     return Row(
       children: [
-        SizedBox(width: 80, child: Text(label, style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold))),
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
         Expanded(
           child: TextField(
             controller: ctrl,
@@ -108,7 +160,9 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
               suffixText: 'دقيقة',
               suffixStyle: const TextStyle(color: Colors.grey, fontSize: 12),
               isDense: true,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
         ),
@@ -116,7 +170,12 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
     );
   }
 
-  Future<void> _showTimePickerDialog(BuildContext context, KhatmaCubit cubit, String? currentTime, String khatmaId) async {
+  Future<void> _showTimePickerDialog(
+    BuildContext context,
+    KhatmaCubit cubit,
+    String? currentTime,
+    String khatmaId,
+  ) async {
     final parts = (currentTime ?? '20:00').split(':');
     final initialTime = TimeOfDay(
       hour: int.tryParse(parts[0]) ?? 20,
@@ -126,10 +185,12 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
       context: context,
       initialTime: initialTime,
       helpText: 'وقت التنبيه اليومي',
-      builder: (ctx, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
+      builder: (ctx, child) =>
+          Directionality(textDirection: TextDirection.rtl, child: child!),
     );
     if (picked != null) {
-      final newTime = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+      final newTime =
+          '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
       await cubit.updateDailyTime(khatmaId, newTime);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -171,18 +232,45 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
           centerTitle: true,
           scrolledUnderElevation: 0,
           actions: [
+            IconButton(
+              tooltip: 'إحصائيات وسجل الختمات',
+              icon: const Icon(
+                FontAwesomeIcons.chartPie,
+                color: Color(0xFFD0A871),
+                size: 18,
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const KhatmaStatsScreen()),
+                );
+              },
+            ),
             BlocBuilder<KhatmaCubit, KhatmaState>(
               builder: (context, state) {
                 if (state is KhatmaLoaded && state.khatmas.length == 1) {
                   final khatma = state.khatmas.first;
                   return IconButton(
                     tooltip: 'تعديل وقت التنبيه',
-                    icon: const Icon(FontAwesomeIcons.clock, color: Color(0xFFD0A871)),
+                    icon: const Icon(
+                      FontAwesomeIcons.clock,
+                      color: Color(0xFFD0A871),
+                      size: 18,
+                    ),
                     onPressed: () {
                       if (khatma.notificationType == 'prayer') {
-                        _showPrayerOffsetsDialog(context, context.read<KhatmaCubit>(), khatma);
+                        _showPrayerOffsetsDialog(
+                          context,
+                          context.read<KhatmaCubit>(),
+                          khatma,
+                        );
                       } else {
-                        _showTimePickerDialog(context, context.read<KhatmaCubit>(), khatma.dailyTime, khatma.id);
+                        _showTimePickerDialog(
+                          context,
+                          context.read<KhatmaCubit>(),
+                          khatma.dailyTime,
+                          khatma.id,
+                        );
                       }
                     },
                   );
@@ -204,28 +292,28 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
             return BlocBuilder<KhatmaCubit, KhatmaState>(
               builder: (context, state) {
                 if (state is KhatmaLoading) {
-              return Padding(
-                padding: EdgeInsets.only(top: 20.h),
-                child: AppSkeleton.card(height: 200.h),
-              );
-            } else if (state is KhatmaEmpty) {
-              return _buildEmptyState(context);
-            } else if (state is KhatmaLoaded) {
-              if (state.khatmas.isEmpty) return _buildEmptyState(context);
-              if (state.khatmas.length == 1) {
-                return KhatmaDetailsView(khatma: state.khatmas.first);
-              } else {
-                return _buildKhatmaList(context, state.khatmas, isDark);
-              }
-            } else if (state is KhatmaError) {
-              return Center(
-                child: Text(
-                  state.message,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              );
-            }
-            return const SizedBox.shrink();
+                  return Padding(
+                    padding: EdgeInsets.only(top: 20.h),
+                    child: AppSkeleton.card(height: 200.h),
+                  );
+                } else if (state is KhatmaEmpty) {
+                  return _buildEmptyState(context);
+                } else if (state is KhatmaLoaded) {
+                  if (state.khatmas.isEmpty) return _buildEmptyState(context);
+                  if (state.khatmas.length == 1) {
+                    return KhatmaDetailsView(khatma: state.khatmas.first);
+                  } else {
+                    return _buildKhatmaList(context, state.khatmas, isDark);
+                  }
+                } else if (state is KhatmaError) {
+                  return Center(
+                    child: Text(
+                      state.message,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
               },
             );
           },
@@ -352,6 +440,50 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
                 color: Colors.black,
               ),
             ),
+          ),
+          Builder(
+            builder: (ctx) {
+              final completedCount = ctx
+                  .watch<KhatmaCubit>()
+                  .totalCompletedCount;
+              if (completedCount <= 0) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFD0A871)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  icon: const Icon(
+                    FontAwesomeIcons.trophy,
+                    size: 15,
+                    color: Color(0xFFD0A871),
+                  ),
+                  label: Text(
+                    "عرض إحصائيات وسجل الختمات ($completedCount)",
+                    style: const TextStyle(
+                      fontFamily: AppConsts.cairo,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFD0A871),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      ctx,
+                      MaterialPageRoute(
+                        builder: (_) => const KhatmaStatsScreen(),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -512,9 +644,13 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFD0A871).withValues(alpha: 0.2),
+                                    color: const Color(
+                                      0xFFD0A871,
+                                    ).withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFD0A871)),
+                                    border: Border.all(
+                                      color: const Color(0xFFD0A871),
+                                    ),
                                   ),
                                   child: const Text(
                                     "منتظم (عادي)",

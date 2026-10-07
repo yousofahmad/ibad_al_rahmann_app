@@ -12,8 +12,6 @@ import '../bloc/quran/quran_cubit.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import '../../../widgets/app_skeleton.dart';
 
-
-
 class MushafScreen extends StatefulWidget {
   const MushafScreen({super.key});
 
@@ -60,10 +58,13 @@ class _MushafScreenState extends State<MushafScreen>
     final clampedDelta = delta > 0.1 ? 0.016 : delta;
 
     final pixelsPerSec = _scrollSpeed * 33.3;
-    final newOffset = _autoScrollController.offset + (pixelsPerSec * clampedDelta);
+    final newOffset =
+        _autoScrollController.offset + (pixelsPerSec * clampedDelta);
     if (newOffset <= _autoScrollController.position.maxScrollExtent) {
       _autoScrollController.jumpTo(newOffset);
-      final pageHeight = _cachedScreenHeight > 0 ? _cachedScreenHeight : MediaQuery.of(context).size.height;
+      final pageHeight = _cachedScreenHeight > 0
+          ? _cachedScreenHeight
+          : MediaQuery.of(context).size.height;
       if (pageHeight > 0) {
         final newIndex = (newOffset / pageHeight).round() + 1;
         if (newIndex != _currentIndex && newIndex > 0 && newIndex <= 604) {
@@ -129,10 +130,7 @@ class _MushafScreenState extends State<MushafScreen>
             children: [
               Column(
                 children: [
-                  SizedBox(
-                    height: 100.h,
-                    child: const MobileQuranTopBar(),
-                  ),
+                  SizedBox(height: 100.h, child: const MobileQuranTopBar()),
                   Expanded(
                     child: Listener(
                       behavior: HitTestBehavior.translucent,
@@ -165,7 +163,9 @@ class _MushafScreenState extends State<MushafScreen>
                               controller: _pageController,
                               itemCount: 604,
                               reverse: true,
-                              physics: const BouncingScrollPhysics(parent: EasyPageScrollPhysics()),
+                              physics: const BouncingScrollPhysics(
+                                parent: EasyPageScrollPhysics(),
+                              ),
                               onPageChanged: (idx) {
                                 _currentIndex = idx + 1;
                                 context.read<QuranCubit>().onQuranPageChanged(
@@ -296,11 +296,9 @@ class _MushafScreenState extends State<MushafScreen>
                   alignment: Alignment.center,
                   child: Padding(
                     padding: EdgeInsets.symmetric(
-                      horizontal: (context.isTablet ? 24.0 : 0.0) +
-                          context
-                              .watch<QuranCubit>()
-                              .state
-                              .quranPageMargin,
+                      horizontal:
+                          (context.isTablet ? 24.0 : 0.0) +
+                          context.watch<QuranCubit>().state.quranPageMargin,
                     ),
                     child: SizedBox(
                       width: 1000,

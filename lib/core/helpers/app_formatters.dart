@@ -7,8 +7,30 @@ class AppFormatters {
   static const String ltr = '\u200E';
   static const String rtl = '\u200F';
 
-  static const List<String> _englishDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-  static const List<String> _arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+  static const List<String> _englishDigits = [
+    '0',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+  ];
+  static const List<String> _arabicDigits = [
+    '٠',
+    '١',
+    '٢',
+    '٣',
+    '٤',
+    '٥',
+    '٦',
+    '٧',
+    '٨',
+    '٩',
+  ];
 
   /// Converts any string or number containing English digits (0-9) to Eastern Arabic digits (٠-٩).
   static String toEnglishDigits(dynamic input) {
@@ -40,8 +62,14 @@ class AppFormatters {
   static String twoDigits(int n) => n.toString().padLeft(2, '0');
 
   /// Formats time in Arabic (either 12-hour with localized ص/م or 24-hour).
-  static String formatTime(DateTime time, {bool is24Hour = false, bool convertToArabicDigits = false}) {
-    String formatted = is24Hour ? DateFormat('HH:mm').format(time) : DateFormat.jm('ar').format(time);
+  static String formatTime(
+    DateTime time, {
+    bool is24Hour = false,
+    bool convertToArabicDigits = false,
+  }) {
+    String formatted = is24Hour
+        ? DateFormat('HH:mm').format(time)
+        : DateFormat.jm('ar').format(time);
     return convertToArabicDigits ? toArabicDigits(formatted) : formatted;
   }
 

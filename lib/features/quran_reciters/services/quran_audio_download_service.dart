@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -7,21 +7,24 @@ import 'package:ibad_al_rahmann/core/data/quran_audio_index.dart';
 enum AudioDownloadState { notDownloaded, downloading, downloaded }
 
 class QuranAudioDownloadService extends ChangeNotifier {
-  static final QuranAudioDownloadService _instance = QuranAudioDownloadService._internal();
+  static final QuranAudioDownloadService _instance =
+      QuranAudioDownloadService._internal();
   factory QuranAudioDownloadService() => _instance;
   QuranAudioDownloadService._internal();
 
   final Dio _dio = Dio();
-  
+
   // Track download states
   final Map<String, AudioDownloadState> _states = {};
   // Track download progress (0.0 to 1.0)
   final Map<String, double> _progress = {};
 
-  String _getKey(String reciterId, int surahNumber) => "${reciterId}_$surahNumber";
+  String _getKey(String reciterId, int surahNumber) =>
+      "${reciterId}_$surahNumber";
 
   AudioDownloadState getState(String reciterId, int surahNumber) {
-    return _states[_getKey(reciterId, surahNumber)] ?? AudioDownloadState.notDownloaded;
+    return _states[_getKey(reciterId, surahNumber)] ??
+        AudioDownloadState.notDownloaded;
   }
 
   double getProgress(String reciterId, int surahNumber) {
@@ -52,7 +55,9 @@ class QuranAudioDownloadService extends ChangeNotifier {
 
   Future<void> downloadSurah(String reciterId, int surahNumber) async {
     final key = _getKey(reciterId, surahNumber);
-    if (_states[key] == AudioDownloadState.downloading || _states[key] == AudioDownloadState.downloaded) return;
+    if (_states[key] == AudioDownloadState.downloading ||
+        _states[key] == AudioDownloadState.downloaded)
+      return;
 
     // Resolve URL from index
     String? audioUrl;
@@ -62,9 +67,10 @@ class QuranAudioDownloadService extends ChangeNotifier {
         audioUrl = data[surahNumber.toString()]!['audio_url'];
       }
     }
-    
+
     if (audioUrl == null) {
-      audioUrl = "https://audio-cdn.tarteel.ai/quran/surah/$reciterId/murattal/mp3/${surahNumber.toString().padLeft(3, '0')}.mp3";
+      audioUrl =
+          "https://audio-cdn.tarteel.ai/quran/surah/$reciterId/murattal/mp3/${surahNumber.toString().padLeft(3, '0')}.mp3";
     }
 
     _states[key] = AudioDownloadState.downloading;

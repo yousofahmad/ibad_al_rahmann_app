@@ -10,11 +10,7 @@ import 'package:quran/quran.dart';
 import 'package:ibad_al_rahmann/widgets/app_skeleton.dart';
 
 class FehresItemsListView extends StatelessWidget {
-  const FehresItemsListView({
-    super.key,
-    required this.surahs,
-    this.onSurface,
-  });
+  const FehresItemsListView({super.key, required this.surahs, this.onSurface});
   final List<SearchingSurahModel> surahs;
   final Color? onSurface;
 
@@ -28,14 +24,13 @@ class FehresItemsListView extends StatelessWidget {
     }
     final cubit = context.read<QuranCubit>();
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final defaultOnSurface = onSurface ?? (isDarkMode ? Colors.white : Colors.black87);
+    final defaultOnSurface =
+        onSurface ?? (isDarkMode ? Colors.white : Colors.black87);
 
     return ListView.separated(
       itemCount: surahs.length,
-      separatorBuilder: (context, index) => Divider(
-        color: defaultOnSurface.withValues(alpha: 0.12),
-        height: 1,
-      ),
+      separatorBuilder: (context, index) =>
+          Divider(color: defaultOnSurface.withValues(alpha: 0.12), height: 1),
       itemBuilder: (context, index) {
         final bool isActive =
             surahs.length == 114 && cubit.currentSurahIndex == index;
@@ -43,8 +38,11 @@ class FehresItemsListView extends StatelessWidget {
         final Color bgColor = isActive ? primary : Colors.transparent;
 
         // Force high contrast for active items based on primary color brightness
-        final bool isPrimaryDark = ThemeData.estimateBrightnessForColor(primary) == Brightness.dark;
-        final Color activeTextColor = isPrimaryDark ? Colors.white : Colors.black87;
+        final bool isPrimaryDark =
+            ThemeData.estimateBrightnessForColor(primary) == Brightness.dark;
+        final Color activeTextColor = isPrimaryDark
+            ? Colors.white
+            : Colors.black87;
 
         final Color textColor = isActive ? activeTextColor : defaultOnSurface;
         final Color subTextColor = isActive

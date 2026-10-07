@@ -6,8 +6,6 @@ import 'package:ibad_al_rahmann/core/theme/custom_theme_model.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
 
 class QuranThemeCubit extends ThemeCubit {
-  
-
   QuranThemeCubit() : super() {
     _init();
   }
@@ -19,7 +17,9 @@ class QuranThemeCubit extends ThemeCubit {
 
   Future<void> _init() async {
     // Load saved theme using Quran-specific keys (Isolated from main app)
-    final savedThemeKey = CacheHelper.prefs.getString(CacheKeys.quranSelectedTheme);
+    final savedThemeKey = CacheHelper.prefs.getString(
+      CacheKeys.quranSelectedTheme,
+    );
     final themeMode = CacheHelper.prefs.getString(CacheKeys.quranThemeMode);
 
     if (savedThemeKey != null && savedThemeKey.startsWith('custom_')) {
@@ -58,10 +58,16 @@ class QuranThemeCubit extends ThemeCubit {
   @override
   void switchTheme() {
     if (state.mode == ThemeMode.light) {
-      CacheHelper.prefs.setString(CacheKeys.quranThemeMode, CacheKeys.darkTheme);
+      CacheHelper.prefs.setString(
+        CacheKeys.quranThemeMode,
+        CacheKeys.darkTheme,
+      );
       emit(ThemeChanged(theme: state.theme, mode: ThemeMode.dark));
     } else {
-      CacheHelper.prefs.setString(CacheKeys.quranThemeMode, CacheKeys.lightTheme);
+      CacheHelper.prefs.setString(
+        CacheKeys.quranThemeMode,
+        CacheKeys.lightTheme,
+      );
       emit(ThemeChanged(theme: state.theme, mode: ThemeMode.light));
     }
   }

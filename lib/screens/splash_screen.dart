@@ -25,17 +25,22 @@ class _SplashScreenState extends State<SplashScreen> {
     super.didChangeDependencies();
     if (!_initialized) {
       _initialized = true;
-      
+
       // Precache the heavy background image first
-      precacheImage(const AssetImage('assets/images/mosque_bottom.webp'), context).then((_) {
-        // Remove native splash only after the image is fully decoded and ready
-        FlutterNativeSplash.remove();
-        _checkUser();
-      }).catchError((e) {
-        debugPrint("Splash image precache error: $e");
-        FlutterNativeSplash.remove();
-        _checkUser();
-      });
+      precacheImage(
+            const AssetImage('assets/images/mosque_bottom.webp'),
+            context,
+          )
+          .then((_) {
+            // Remove native splash only after the image is fully decoded and ready
+            FlutterNativeSplash.remove();
+            _checkUser();
+          })
+          .catchError((e) {
+            debugPrint("Splash image precache error: $e");
+            FlutterNativeSplash.remove();
+            _checkUser();
+          });
     }
   }
 
@@ -62,20 +67,29 @@ class _SplashScreenState extends State<SplashScreen> {
     final String? startPayload = results[1] as String?;
     final PermissionStatus notificationStatus = results[2] as PermissionStatus;
 
-    NotificationService.nativeLog('SplashScreen._checkUser: startPayload=$startPayload');
+    NotificationService.nativeLog(
+      'SplashScreen._checkUser: startPayload=$startPayload',
+    );
 
     final prefs = CacheHelper.prefs;
 
     if (!mounted) {
-      NotificationService.nativeLog('SplashScreen._checkUser: not mounted, abort');
+      NotificationService.nativeLog(
+        'SplashScreen._checkUser: not mounted, abort',
+      );
       return;
     }
 
     // A. Handle Payload (Click from notification) — FAST PATH (instant navigation)
     if (startPayload != null) {
       final payload = startPayload;
-      NotificationService.nativeLog('SplashScreen: fast-path navigation for payload=$payload');
-      AppLogger.log('SplashScreen', 'fast-path navigation for payload=$payload');
+      NotificationService.nativeLog(
+        'SplashScreen: fast-path navigation for payload=$payload',
+      );
+      AppLogger.log(
+        'SplashScreen',
+        'fast-path navigation for payload=$payload',
+      );
       // Push HomeScreen underneath
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomeScreen()),

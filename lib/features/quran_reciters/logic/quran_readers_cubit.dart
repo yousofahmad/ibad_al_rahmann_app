@@ -13,10 +13,12 @@ class QuranReadersCubit extends Cubit<QuranReadersState> {
   void onSearch(String? value) {
     if (value != null && value.trim().isNotEmpty) {
       List<ReciterAudioModel> searchReciters = reciters
-          .where((e) =>
-              e.name.contains(value) ||
-              e.style.contains(value) ||
-              e.category.contains(value))
+          .where(
+            (e) =>
+                e.name.contains(value) ||
+                e.style.contains(value) ||
+                e.category.contains(value),
+          )
           .toList();
       emit(QuranReadersSuccess(reciters: searchReciters));
     } else {

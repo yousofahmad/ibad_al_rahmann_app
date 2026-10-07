@@ -13,7 +13,6 @@ class ThemeCubit extends Cubit<ThemeState> {
     : super(ThemeInitial(theme: _themes['gold']!, mode: ThemeMode.light)) {
     _init();
   }
-  
 
   Future<void> reload() async {
     await _init();
@@ -45,10 +44,16 @@ class ThemeCubit extends Cubit<ThemeState> {
 
   void switchTheme() async {
     if (state.mode == ThemeMode.light) {
-      await CacheHelper.prefs.setString(CacheKeys.themeMode, CacheKeys.darkTheme);
+      await CacheHelper.prefs.setString(
+        CacheKeys.themeMode,
+        CacheKeys.darkTheme,
+      );
       emit(ThemeChanged(theme: state.theme, mode: ThemeMode.dark));
     } else {
-      await CacheHelper.prefs.setString(CacheKeys.themeMode, CacheKeys.lightTheme);
+      await CacheHelper.prefs.setString(
+        CacheKeys.themeMode,
+        CacheKeys.lightTheme,
+      );
       emit(ThemeChanged(theme: state.theme, mode: ThemeMode.light));
     }
   }

@@ -5,34 +5,67 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:gal/gal.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 
 class ImageGenerationService {
-  static Future<Uint8List> captureAsPng(GlobalKey boundaryKey, {double? pixelRatio}) async {
-    // Very short delay to ensure the framework has rendered the RepaintBoundary
-    await Future.delayed(const Duration(milliseconds: 20));
+  static Future<Uint8List> captureAsPng(
+    GlobalKey boundaryKey, {
+    double? pixelRatio,
+  }) async {
+    final double targetRatio = (pixelRatio != null && pixelRatio > 3.0)
+        ? 3.0
+        : (pixelRatio ?? 2.5);
 
-    final currentContext = boundaryKey.currentContext;
-    if (currentContext == null || !currentContext.mounted) {
-      throw StateError(
-        'عذراً، لم يتم العثور على منطقة الرسم (Context is null). تأكد من اكتمال تحميل البيانات.',
-      );
+    for (int attempt = 0; attempt < 8; attempt++) {
+      try {
+        final currentContext = boundaryKey.currentContext;
+        if (currentContext == null || !currentContext.mounted) {
+          await Future.delayed(const Duration(milliseconds: 60));
+          await WidgetsBinding.instance.endOfFrame;
+          continue;
+        }
+
+        final renderObject = currentContext.findRenderObject();
+        if (renderObject is! RenderRepaintBoundary ||
+            !renderObject.hasSize ||
+            renderObject.size.width <= 0 ||
+            renderObject.size.height <= 0) {
+          await Future.delayed(const Duration(milliseconds: 60));
+          await WidgetsBinding.instance.endOfFrame;
+          continue;
+        }
+
+        final double effectiveRatio = attempt == 0
+            ? targetRatio
+            : (attempt == 1 ? 2.0 : 1.5);
+
+        AppLogger.log(
+          "ImageGenerationService",
+          "Capturing boundary at ratio $effectiveRatio (attempt $attempt, size: ${renderObject.size})",
+        );
+
+        final ui.Image image = await renderObject.toImage(
+          pixelRatio: effectiveRatio,
+        );
+        final ByteData? byteData = await image.toByteData(
+          format: ui.ImageByteFormat.png,
+        );
+
+        if (byteData == null) {
+          throw StateError('Failed to convert image to byte data.');
+        }
+
+        return byteData.buffer.asUint8List();
+      } catch (e) {
+        AppLogger.log(
+          "ImageGenerationService",
+          "Capture attempt $attempt failed: $e",
+        );
+        await Future.delayed(const Duration(milliseconds: 80));
+      }
     }
 
-    final renderObject = currentContext.findRenderObject();
-    if (renderObject is! RenderRepaintBoundary) {
-      throw StateError('RepaintBoundary not found for the given key.');
-    }
-
-    final ui.Image image = await renderObject.toImage(pixelRatio: pixelRatio ?? 6.0);
-    final ByteData? byteData = await image.toByteData(
-      format: ui.ImageByteFormat.png,
-    );
-
-    if (byteData == null) {
-      throw StateError('Failed to convert image to byte data.');
-    }
-
-    return byteData.buffer.asUint8List();
+    throw StateError('تعذر التقاط الصورة بعد محاولات متعددة.');
   }
 
   static Future<String> saveTempAndGetPath(

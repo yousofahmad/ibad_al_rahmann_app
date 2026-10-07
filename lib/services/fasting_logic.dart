@@ -12,28 +12,27 @@ class FastingLogic {
     // we start from a safe Gregorian date and loop forward for ~35 days.
     // ─────────────────────────────────────────────────────────────────────────
 
-    // Estimate starting Gregorian date for Hijri month 1.
-    // Hijri 1445-01-01 is roughly 2023-07-19.
-    // We'll create a HijriCalendar for the target month/day 1 and convert it
-    // to Gregorian as our "center point", then search around it.
+    // Estimate middle of the Hijri month to get a safe Gregorian center
+    HijriCalendar targetH = HijriCalendar()
+      ..hYear = hYear
+      ..hMonth = hMonth
+      ..hDay = 15;
 
-    HijriCalendar targetH = HijriCalendar();
-    targetH.hYear = hYear;
-    targetH.hMonth = hMonth;
-    targetH.hDay = 1;
+    DateTime centerGreg = targetH.hijriToGregorian(hYear, hMonth, 15);
+    // Start searching 20 days before center to comfortably cover all possible days
+    DateTime startGreg = centerGreg.subtract(const Duration(days: 20));
 
-    DateTime baseGreg = targetH.hijriToGregorian(hYear, hMonth, 1);
-    // Start searching 5 days before just in case of offsets/month boundaries
-    DateTime currentGreg = baseGreg.subtract(const Duration(days: 5));
+    // Loop for 45 days to cover the entire Hijri month under any offset
+    for (int i = 0; i < 45; i++) {
+      DateTime date = DateTime(
+        startGreg.year,
+        startGreg.month,
+        startGreg.day,
+      ).add(Duration(days: i));
+      // Use PrayerService.getHijriWithOffset to guarantee 100% synchronization with the app's Hijri calendar system (including Egyptian system & manual offsets)
+      HijriCalendar hDate = PrayerService.getHijriWithOffset(offset, date);
 
-    // Loop for 40 days to cover any Hijri month (max 30 days) plus buffer
-    for (int i = 0; i < 40; i++) {
-      DateTime date = currentGreg.add(Duration(days: i));
-      // Convert Gregorian + Offset back to Hijri to get the "Actual" Hijri date shown in app
-      DateTime shiftedDate = date.add(Duration(days: offset));
-      HijriCalendar hDate = HijriCalendar.fromDate(shiftedDate);
-
-      // Only process days belonging to the target Hijri month
+      // Only process days belonging to the target Hijri month and year
       if (hDate.hMonth == hMonth && hDate.hYear == hYear) {
         // --- Forbidden Fasting Days Filter ---
         // 1. Eid al-Fitr (1 Shawwal)

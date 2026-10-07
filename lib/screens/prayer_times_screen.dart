@@ -6,7 +6,6 @@ import 'package:ibad_al_rahmann/core/helpers/app_formatters.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/services/notification_service.dart';
 import 'package:intl/intl.dart';
-import 'package:hijri/hijri_calendar.dart';
 import '../services/prayer_service.dart';
 import 'widgets/prayer_detail_modal.dart';
 import 'widgets/prayer_ring_widget.dart';
@@ -88,9 +87,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
       bool def = (p.prayer != null || id == 'sunrise');
       final notifKey = p.prayer != null
           ? 'notif_prayer_$id'
-          : (id == 'last_third' || id == 'qiyam'
-              ? 'notif_qiyam'
-              : 'notif_$id');
+          : (id == 'last_third' || id == 'qiyam' ? 'notif_qiyam' : 'notif_$id');
       final legacyBool = prefs.getBool(notifKey) ?? def;
       final mode =
           prefs.getString('adhan_mode_$capKey') ??
@@ -291,7 +288,10 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   }
 
   Future<void> _forceRefreshLocation() async {
-    AppLoadingDialog.show(context, message: 'يرجى الانتظار لحين تحديث الموقع وجدولة جميع الإشعارات...');
+    AppLoadingDialog.show(
+      context,
+      message: 'يرجى الانتظار لحين تحديث الموقع وجدولة جميع الإشعارات...',
+    );
 
     try {
       await PrayerService().updateLocation();
@@ -308,7 +308,10 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   @override
   Widget build(BuildContext context) {
     final hijriOffset = PrayerService().hijriOffset;
-    final selectedHijri = PrayerService.getHijriWithOffset(hijriOffset, _selectedDate);
+    final selectedHijri = PrayerService.getHijriWithOffset(
+      hijriOffset,
+      _selectedDate,
+    );
     final hijriStrRaw =
         "${selectedHijri.hDay} ${selectedHijri.longMonthName} ${selectedHijri.hYear}";
     final hijriStr = AppFormatters.toArabicDigits(hijriStrRaw);
@@ -399,11 +402,15 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                                   ),
                                 ),
                                 Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 24.w),
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 24.w,
+                                  ),
                                   child: FittedBox(
                                     fit: BoxFit.scaleDown,
                                     child: Text(
-                                      AppFormatters.toArabicDigits(_formatDuration(_timeToNext)),
+                                      AppFormatters.toArabicDigits(
+                                        _formatDuration(_timeToNext),
+                                      ),
                                       style: TextStyle(
                                         fontFamily: AppConsts.expoArabic,
                                         color: Theme.of(
@@ -463,12 +470,14 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                           final tomorrowDate = DateTime.now().add(
                             const Duration(days: 1),
                           );
-                          final tomorrowH = HijriCalendar.fromDate(
-                            tomorrowDate.add(Duration(days: hijriOffset)),
+                          final tomorrowH = PrayerService.getHijriWithOffset(
+                            hijriOffset,
+                            tomorrowDate,
                           );
-                          return _buildDateHeader(
-                            "${tomorrowH.hDay} ${tomorrowH.longMonthName} ${tomorrowH.hYear}",
+                          final dateStr = AppFormatters.toArabicDigits(
+                            "${tomorrowH.hDay} ${tomorrowH.longMonthName} ${tomorrowH.hYear} هـ",
                           );
+                          return _buildDateHeader(dateStr);
                         }
                         final p = _tomorrowPrayers[index - _prayers.length - 2];
                         final isNext = p == _nextPrayer;
@@ -624,7 +633,9 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                   SizedBox(width: 10.w),
                 ],
                 Text(
-                  AppFormatters.toArabicDigits(PrayerService().formatTime(p.time)),
+                  AppFormatters.toArabicDigits(
+                    PrayerService().formatTime(p.time),
+                  ),
                   style: TextStyle(
                     fontFamily: AppConsts.expoArabic,
                     color: timeColor,

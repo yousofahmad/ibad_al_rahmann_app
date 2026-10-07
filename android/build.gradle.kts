@@ -3,6 +3,14 @@ allprojects {
         google()
         mavenCentral()
     }
+    configurations.all {
+        resolutionStrategy {
+            force("androidx.work:work-runtime:2.10.0")
+            force("androidx.work:work-runtime-ktx:2.10.0")
+            force("androidx.glance:glance-appwidget:1.1.1")
+            force("androidx.glance:glance:1.1.1")
+        }
+    }
 }
 
 // FIX: Point to the correct Flutter build directory (one level up from android/)

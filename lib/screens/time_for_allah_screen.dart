@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:ibad_al_rahmann/core/helpers/app_formatters.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/widgets/app_skeleton.dart';
@@ -157,16 +156,20 @@ class _TimeForAllahScreenState extends State<TimeForAllahScreen> {
                   SizedBox(
                     width: 200.w,
                     height: 200.w,
-                    child: _isActive 
-                      ? CircularProgressIndicator(
-                        value: _secondsRemaining / (_selectedMinutes * 60),
-                        strokeWidth: 8.w,
-                        backgroundColor: Colors.grey.withValues(alpha: 0.1),
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          primaryColor,
-                        ),
-                      )
-                      : AppSkeleton(width: 200.w, height: 200.w, borderRadius: 100.r),
+                    child: _isActive
+                        ? CircularProgressIndicator(
+                            value: _secondsRemaining / (_selectedMinutes * 60),
+                            strokeWidth: 8.w,
+                            backgroundColor: Colors.grey.withValues(alpha: 0.1),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              primaryColor,
+                            ),
+                          )
+                        : AppSkeleton(
+                            width: 200.w,
+                            height: 200.w,
+                            borderRadius: 100.r,
+                          ),
                   ),
                   Text(
                     _isActive

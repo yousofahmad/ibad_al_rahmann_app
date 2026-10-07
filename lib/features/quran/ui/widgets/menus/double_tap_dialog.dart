@@ -14,12 +14,14 @@ class DoubleTapDialog extends StatelessWidget {
     return AlertDialog(
       backgroundColor: primaryColor,
       contentPadding: EdgeInsets.fromLTRB(20.w, 15.h, 20.w, 10.h),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Column(
         children: [
-          Icon(Icons.tips_and_updates_outlined, color: Colors.white.withValues(alpha: 0.9), size: 30),
+          Icon(
+            Icons.tips_and_updates_outlined,
+            color: Colors.white.withValues(alpha: 0.9),
+            size: 30,
+          ),
           SizedBox(height: 10.h),
           const Text(
             'تلميحات التصفح',
@@ -86,7 +88,9 @@ class DoubleTapDialog extends StatelessWidget {
             style: TextButton.styleFrom(
               backgroundColor: Colors.white.withValues(alpha: 0.15),
               padding: EdgeInsets.symmetric(horizontal: 40.w, vertical: 8.h),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
             ),
             onPressed: () => Navigator.of(context).pop(),
             child: const Text(

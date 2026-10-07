@@ -15,6 +15,7 @@ import '../services/image_generation_service.dart';
 import '../core/helpers/fonts_helper.dart';
 import '../core/theme/theme_manager/theme_cubit.dart';
 import '../core/helpers/share_helper.dart';
+import '../core/app_constants.dart';
 
 import '../features/quran/ui/widgets/components/db_mushaf_text.dart';
 import '../features/quran/ui/widgets/components/ayah_marker_widget.dart';
@@ -119,7 +120,8 @@ class _ShareSheetBodyState extends State<_ShareSheetBody>
 
   void _cyclePaperColor() {
     setState(() {
-      if (_customPaperColor == null || _customPaperColor == Theme.of(context).scaffoldBackgroundColor) {
+      if (_customPaperColor == null ||
+          _customPaperColor == Theme.of(context).scaffoldBackgroundColor) {
         _customPaperColor = Colors.white;
       } else if (_customPaperColor == Colors.white) {
         _customPaperColor = const Color(0xFFF4ECD8);
@@ -143,7 +145,11 @@ class _ShareSheetBodyState extends State<_ShareSheetBody>
   void initState() {
     super.initState();
     final initialMode = context.read<ShareProvider>().shareMode;
-    _tabController = TabController(length: 2, vsync: this, initialIndex: initialMode == ShareMode.text ? 1 : 0);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: initialMode == ShareMode.text ? 1 : 0,
+    );
     _tabController.addListener(() {
       final provider = context.read<ShareProvider>();
       final mode = _tabController.index == 0 ? ShareMode.image : ShareMode.text;
@@ -167,75 +173,222 @@ class _ShareSheetBodyState extends State<_ShareSheetBody>
   Future<void> _showQualityPicker(Function(double) onSelected) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     const gold = Color(0xFFD0A871);
-    double quality = 5.0;
+    double selectedQuality = 3.0;
+
+    final qualities = [
+      {
+        'title': 'فائقة (4K Ultra HD)',
+        'subtitle': 'أعلى وضوح ونقاء فائق لبطاقة الآية القرآنية',
+        'value': 5.0,
+        'badge': 'أفضل نقاء 🌟',
+      },
+      {
+        'title': 'عالية (QHD)',
+        'subtitle': 'دقة ممتازة وسريعة في الحفظ والمشاركة',
+        'value': 3.0,
+        'badge': 'سريعة ومتوازنة ⚡',
+      },
+      {
+        'title': 'قياسية (Full HD)',
+        'subtitle': 'حجم مناسب ومثالي لحالات الواتساب وإنستغرام',
+        'value': 1.5,
+        'badge': 'خفيفة وسريعة 📱',
+      },
+    ];
 
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-          title: const Text(
-            'اختر جودة الصورة',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontFamily: 'cairo', fontWeight: FontWeight.bold, color: gold),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24.r),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+          backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          titlePadding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 10.h),
+          contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
+          actionsPadding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 16.h),
+          title: Row(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildQualityOption('عالية', 5.0, quality == 5.0, (v) => setDlgState(() => quality = v)),
-                  const SizedBox(width: 8),
-                  _buildQualityOption('متوسطة', 3.0, quality == 3.0, (v) => setDlgState(() => quality = v)),
-                  const SizedBox(width: 8),
-                  _buildQualityOption('منخفضة', 1.0, quality == 1.0, (v) => setDlgState(() => quality = v)),
-                ],
+              Container(
+                padding: EdgeInsets.all(8.w),
+                decoration: BoxDecoration(
+                  color: gold.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.photo_filter_rounded,
+                  color: gold,
+                  size: 22.sp,
+                ),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: gold,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: Text(
+                  'اختر دقة صورة الآية',
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16.sp,
+                    color: gold,
                   ),
-                  onPressed: () {
-                    onSelected(quality);
-                    Navigator.pop(ctx);
-                  },
-                  child: const Text('تأكيد', style: TextStyle(fontFamily: 'cairo', fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQualityOption(String label, double value, bool isSelected, Function(double) onTap) {
-    const gold = Color(0xFFD0A871);
-    return InkWell(
-      onTap: () => onTap(value),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? gold : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: gold),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'cairo',
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: isSelected ? Colors.white : gold,
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: qualities.map((q) {
+                final double val = q['value'] as double;
+                final bool isSelected = selectedQuality == val;
+                return InkWell(
+                  onTap: () => setDlgState(() => selectedQuality = val),
+                  borderRadius: BorderRadius.circular(16.r),
+                  child: Container(
+                    margin: EdgeInsets.symmetric(vertical: 5.h),
+                    padding: EdgeInsets.all(12.w),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? gold.withValues(alpha: 0.12)
+                          : (isDark
+                              ? Colors.white.withValues(alpha: 0.04)
+                              : Colors.black.withValues(alpha: 0.03)),
+                      borderRadius: BorderRadius.circular(16.r),
+                      border: Border.all(
+                        color: isSelected ? gold : Colors.transparent,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelected
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.radio_button_off_rounded,
+                          color: isSelected ? gold : Colors.grey,
+                          size: 20.sp,
+                        ),
+                        SizedBox(width: 10.w),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    q['title'] as String,
+                                    style: TextStyle(
+                                      fontFamily: 'Cairo',
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13.sp,
+                                      color: isSelected
+                                          ? gold
+                                          : (isDark
+                                              ? Colors.white
+                                              : Colors.black87),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 6.w,
+                                      vertical: 2.h,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? gold.withValues(alpha: 0.2)
+                                          : Colors.grey.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6.r),
+                                    ),
+                                    child: Text(
+                                      q['badge'] as String,
+                                      style: TextStyle(
+                                        fontFamily: 'Cairo',
+                                        fontSize: 10.sp,
+                                        fontWeight: FontWeight.bold,
+                                        color: isSelected ? gold : Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 2.h),
+                              Text(
+                                q['subtitle'] as String,
+                                style: TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontSize: 11.sp,
+                                  color: isDark
+                                      ? Colors.grey[400]
+                                      : Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
           ),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 12.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      side: BorderSide(
+                        color: Colors.grey.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(
+                      'إلغاء',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.sp,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 10.w),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: gold,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 12.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      onSelected(selectedQuality);
+                      Navigator.pop(ctx);
+                    },
+                    child: Text(
+                      'متابعة',
+                      style: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.sp,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -263,7 +416,11 @@ class _ShareSheetBodyState extends State<_ShareSheetBody>
         );
       } catch (e) {
         if (mounted) {
-          ShareHelper.showTopNotification(context, 'حدث خطأ أثناء توليد الصورة: ${e.toString()}', isError: true);
+          ShareHelper.showTopNotification(
+            context,
+            'حدث خطأ أثناء توليد الصورة: ${e.toString()}',
+            isError: true,
+          );
         }
       } finally {
         if (mounted) setState(() => _isCapturing = false);
@@ -279,13 +436,21 @@ class _ShareSheetBodyState extends State<_ShareSheetBody>
       final access = await Gal.requestAccess(toAlbum: true);
       if (!access) {
         if (mounted) {
-          ShareHelper.showTopNotification(context, 'تم رفض صلاحية الوصول للمعرض. يرجى تفعيلها من الإعدادات.', isError: true);
+          ShareHelper.showTopNotification(
+            context,
+            'تم رفض صلاحية الوصول للمعرض. يرجى تفعيلها من الإعدادات.',
+            isError: true,
+          );
         }
         return;
       }
     } catch (e) {
       if (mounted) {
-        ShareHelper.showTopNotification(context, 'فشل طلب الصلاحيات: ${e.toString()}', isError: true);
+        ShareHelper.showTopNotification(
+          context,
+          'فشل طلب الصلاحيات: ${e.toString()}',
+          isError: true,
+        );
       }
       return;
     }
@@ -307,7 +472,11 @@ class _ShareSheetBodyState extends State<_ShareSheetBody>
         }
       } catch (e) {
         if (mounted) {
-          ShareHelper.showTopNotification(context, 'فشل الحفظ: ${e.toString()}', isError: true);
+          ShareHelper.showTopNotification(
+            context,
+            'فشل الحفظ: ${e.toString()}',
+            isError: true,
+          );
         }
       } finally {
         if (mounted) setState(() => _isCapturing = false);
@@ -391,13 +560,17 @@ class _ShareSheetBodyState extends State<_ShareSheetBody>
                       icon: provider.isMushafFormat
                           ? Icons.segment_rounded
                           : Icons.notes_rounded,
-                      tooltip: provider.isMushafFormat ? 'تنسيق مفرود' : 'تنسيق المصحف',
+                      tooltip: provider.isMushafFormat
+                          ? 'تنسيق مفرود'
+                          : 'تنسيق المصحف',
                     ),
                     // Logo toggle
                     _HeaderIconButton(
                       onTap: provider.toggleLogo,
                       isActive: provider.showLogo,
-                      tooltip: provider.showLogo ? 'إخفاء الشعار' : 'إظهار الشعار',
+                      tooltip: provider.showLogo
+                          ? 'إخفاء الشعار'
+                          : 'إظهار الشعار',
                       child: ClipOval(
                         child: Opacity(
                           opacity: provider.showLogo ? 1.0 : 0.3,
@@ -492,13 +665,22 @@ class _ShareSheetBodyState extends State<_ShareSheetBody>
                 onShare: provider.shareMode == ShareMode.image
                     ? _shareImage
                     : () => _shareText(provider),
-                onSave: provider.shareMode == ShareMode.image ? _saveImage : null,
-                onToggleColor: provider.shareMode == ShareMode.image ? _cyclePaperColor : null,
+                onSave: provider.shareMode == ShareMode.image
+                    ? _saveImage
+                    : null,
+                onToggleColor: provider.shareMode == ShareMode.image
+                    ? _cyclePaperColor
+                    : null,
                 onCopy: provider.shareMode == ShareMode.text
                     ? () {
-                        final text = provider.buildShareText(withLogo: provider.showLogo);
+                        final text = provider.buildShareText(
+                          withLogo: provider.showLogo,
+                        );
                         Clipboard.setData(ClipboardData(text: text));
-                        ShareHelper.showTopNotification(context, 'تم نسخ النص ✓');
+                        ShareHelper.showTopNotification(
+                          context,
+                          'تم نسخ النص ✓',
+                        );
                       }
                     : null,
               ),
@@ -546,12 +728,7 @@ class _HeaderIconButton extends StatelessWidget {
             ),
           ),
           child: Center(
-            child: child ??
-                Icon(
-                  icon,
-                  color: Colors.white,
-                  size: 18.w,
-                ),
+            child: child ?? Icon(icon, color: Colors.white, size: 18.w),
           ),
         ),
       ),
@@ -584,10 +761,14 @@ class _ImagePreviewTab extends StatelessWidget {
     final Widget captureContent = RepaintBoundary(
       key: boundaryKey,
       child: Container(
-        width: 1080.0, 
+        width: 1080.0,
         // Allow height to be dynamic
         color: paperColor,
-        child: _ShareableImageCard(provider: provider, isLightBg: isLightBg, paperColor: paperColor),
+        child: _ShareableImageCard(
+          provider: provider,
+          isLightBg: isLightBg,
+          paperColor: paperColor,
+        ),
       ),
     );
 
@@ -609,7 +790,11 @@ class _ShareableImageCard extends StatelessWidget {
   final bool isLightBg;
   final Color paperColor;
 
-  const _ShareableImageCard({required this.provider, required this.isLightBg, required this.paperColor});
+  const _ShareableImageCard({
+    required this.provider,
+    required this.isLightBg,
+    required this.paperColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -618,7 +803,9 @@ class _ShareableImageCard extends StatelessWidget {
     final surahNameCode = 'surah${surahNum.toString().padLeft(3, '0')}';
 
     final bgColor = paperColor;
-    final textColor = paperColor.computeLuminance() > 0.5 ? Colors.black87 : const Color(0xFFF0F0F0);
+    final textColor = paperColor.computeLuminance() > 0.5
+        ? Colors.black87
+        : const Color(0xFFF0F0F0);
     final primary = Theme.of(context).primaryColor;
 
     return Container(
@@ -659,7 +846,11 @@ class _ShareableImageCard extends StatelessWidget {
       height: 24.0,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [gold.withValues(alpha: 0.0), gold.withValues(alpha: 0.6), gold.withValues(alpha: 0.0)],
+          colors: [
+            gold.withValues(alpha: 0.0),
+            gold.withValues(alpha: 0.6),
+            gold.withValues(alpha: 0.0),
+          ],
         ),
       ),
     );
@@ -671,7 +862,11 @@ class _ShareableImageCard extends StatelessWidget {
       height: 24.0,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [gold.withValues(alpha: 0.0), gold.withValues(alpha: 0.6), gold.withValues(alpha: 0.0)],
+          colors: [
+            gold.withValues(alpha: 0.0),
+            gold.withValues(alpha: 0.6),
+            gold.withValues(alpha: 0.0),
+          ],
         ),
       ),
     );
@@ -693,7 +888,7 @@ class _SurahNameFrame extends StatelessWidget {
   Widget build(BuildContext context) {
     const goldenColor = Color(0xFFD0A871);
     const double frameH = 120.0;
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 50.0),
       child: SizedBox(
@@ -710,23 +905,23 @@ class _SurahNameFrame extends StatelessWidget {
                 colorBlendMode: BlendMode.srcIn,
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 80.0),
-            child: FittedBox(
-              fit: BoxFit.contain,
-              child: Text(
-                surahNameCode,
-                style: const TextStyle(
-                  fontFamily: 'SurahNames',
-                  fontSize: 70.0, 
-                  color: goldenColor,
-                  height: 1.0,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 80.0),
+              child: FittedBox(
+                fit: BoxFit.contain,
+                child: Text(
+                  surahNameCode,
+                  style: const TextStyle(
+                    fontFamily: 'SurahNames',
+                    fontSize: 70.0,
+                    color: goldenColor,
+                    height: 1.0,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -824,11 +1019,13 @@ class _VersesSection extends StatelessWidget {
     if (provider.isMushafFormat && provider.mushafLines != null) {
       const double baseFontSize = 75.0; // Optimized for 980px width
       final visibleLines = provider.mushafLines!.where((line) {
-        return line.any((w) =>
-            w.lineType == 'surah_name' ||
-            w.lineType == 'basmallah' ||
-            (w.suraNumber == provider.surahNumber &&
-                provider.isInRange(w.ayahNumber ?? 0)));
+        return line.any(
+          (w) =>
+              w.lineType == 'surah_name' ||
+              w.lineType == 'basmallah' ||
+              (w.suraNumber == provider.surahNumber &&
+                  provider.isInRange(w.ayahNumber ?? 0)),
+        );
       }).toList();
 
       return Column(
@@ -845,7 +1042,8 @@ class _VersesSection extends StatelessWidget {
               line.first.suraNumber == provider.surahNumber &&
               line.last.suraNumber == provider.surahNumber;
 
-          final bool shouldJustify = !isCentered && isFullLine && line.length > 1;
+          final bool shouldJustify =
+              !isCentered && isFullLine && line.length > 1;
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 24.0),
@@ -892,7 +1090,7 @@ class _VersesSection extends StatelessWidget {
     // Normal / Linear Format
     final List<InlineSpan> spans = [];
     final allWords = provider.allWords!;
-    const double normalFontSize = 65.0; 
+    const double normalFontSize = 65.0;
     final firstFontFamily = allWords.isNotEmpty
         ? FontsHelper.getFontFamily(allWords.first.pageNumber ?? 1)
         : 'uthmanic';
@@ -904,45 +1102,58 @@ class _VersesSection extends StatelessWidget {
 
       if (word.lineType == 'surah_name' || word.lineType == 'basmallah') {
         if (spans.isNotEmpty) spans.add(const TextSpan(text: '\n'));
-        spans.add(WidgetSpan(
-          child: Container(
-            width: contentWidth,
-            alignment: Alignment.center,
-            child: _buildWordWidget(word, false, normalFontSize * 1.5, fontFamily), 
+        spans.add(
+          WidgetSpan(
+            child: Container(
+              width: contentWidth,
+              alignment: Alignment.center,
+              child: _buildWordWidget(
+                word,
+                false,
+                normalFontSize * 1.5,
+                fontFamily,
+              ),
+            ),
           ),
-        ));
+        );
         spans.add(const TextSpan(text: '\n'));
         continue;
       }
 
       if (isMarker) {
-        spans.add(WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          baseline: TextBaseline.alphabetic,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-            child: AyahMarkerWidget(
-              ayahNumber: word.ayahNumber ?? 0,
-              size: normalFontSize * 1.05,
-              fontSize: normalFontSize * 0.36,
-              numberColor: textColor.computeLuminance() > 0.5
-                  ? const Color(0xFFFFF8E1)
-                  : const Color(0xFF3E2723),
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            baseline: TextBaseline.alphabetic,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: AyahMarkerWidget(
+                ayahNumber: word.ayahNumber ?? 0,
+                size: normalFontSize * 1.05,
+                fontSize: normalFontSize * 0.36,
+                numberColor: textColor.computeLuminance() > 0.5
+                    ? const Color(0xFFFFF8E1)
+                    : const Color(0xFF3E2723),
+              ),
             ),
           ),
-        ));
+        );
         spans.add(const TextSpan(text: ' '));
       } else {
-        spans.add(TextSpan(
-          text: word.text,
-          style: TextStyle(
-            fontFamily: fontFamily,
-            fontSize: normalFontSize,
-            color: textColor,
-            height: 1.95, 
+        spans.add(
+          TextSpan(
+            text: word.text,
+            style: TextStyle(
+              fontFamily: fontFamily,
+              fontSize: normalFontSize,
+              color: textColor,
+              height: 1.95,
+            ),
           ),
-        ));
-        if (i < allWords.length - 1 && allWords[i+1].lineType != 'surah_name' && !_isMarker(allWords[i+1])) {
+        );
+        if (i < allWords.length - 1 &&
+            allWords[i + 1].lineType != 'surah_name' &&
+            !_isMarker(allWords[i + 1])) {
           spans.add(const TextSpan(text: ' '));
         }
       }
@@ -1181,7 +1392,10 @@ class _ToolbarButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: primary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12.r),
-              border: Border.all(color: primary.withValues(alpha: 0.4), width: 1.0.w),
+              border: Border.all(
+                color: primary.withValues(alpha: 0.4),
+                width: 1.0.w,
+              ),
             ),
             child: Icon(icon, color: primary, size: 22.sp),
           ),
@@ -1189,7 +1403,11 @@ class _ToolbarButton extends StatelessWidget {
         SizedBox(height: 2.h),
         Text(
           label,
-          style: TextStyle(fontFamily: 'Cairo', fontSize: 10.sp, color: primary),
+          style: TextStyle(
+            fontFamily: 'Cairo',
+            fontSize: 10.sp,
+            color: primary,
+          ),
         ),
       ],
     );
@@ -1311,7 +1529,11 @@ class _VerseDropdown extends StatelessWidget {
               value: value,
               isExpanded: true,
               dropdownColor: bgColor,
-              icon: Icon(Icons.expand_more_rounded, color: primary, size: 18.sp),
+              icon: Icon(
+                Icons.expand_more_rounded,
+                color: primary,
+                size: 18.sp,
+              ),
               style: TextStyle(
                 fontFamily: 'Cairo',
                 fontSize: 12.sp,

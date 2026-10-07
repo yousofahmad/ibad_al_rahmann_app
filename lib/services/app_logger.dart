@@ -42,7 +42,8 @@ class AppLogger {
   /// يكتب رسالة في الملف
   static void log(String tag, String message) {
     final now = DateTime.now();
-    final ts = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
+    final ts =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:'
         '${now.second.toString().padLeft(2, '0')}.${now.millisecond.toString().padLeft(3, '0')}';
     final line = '[$ts] [$tag] $message\n';
@@ -118,7 +119,8 @@ class AppLogger {
   static Future<Map<String, int>> smartClean() async {
     await _flushBuffer();
     final file = _logFile;
-    if (file == null || !await file.exists()) return {'total': 0, 'kept': 0, 'removed': 0};
+    if (file == null || !await file.exists())
+      return {'total': 0, 'kept': 0, 'removed': 0};
 
     final lines = await file.readAsLines();
     final total = lines.length;
@@ -126,9 +128,18 @@ class AppLogger {
 
     // الكلمات الدالة على مشكلة — نحتفظ بهذه دائماً
     const errorKeywords = [
-      'error', 'exception', 'fail', 'crash', 'timeout',
-      'null', 'fatal', 'IOException', 'ANR',
-      'خطأ', 'فشل', 'تعذر',
+      'error',
+      'exception',
+      'fail',
+      'crash',
+      'timeout',
+      'null',
+      'fatal',
+      'IOException',
+      'ANR',
+      'خطأ',
+      'فشل',
+      'تعذر',
     ];
 
     // السطور الروتينية الصرفة التي نحذفها إذا لم يكن هناك تأخير أو خطأ
@@ -147,7 +158,9 @@ class AppLogger {
 
       // استخرج الوقت من السطر: [MM-DD HH:mm:ss.mmm]
       DateTime? lineTime;
-      final timeMatch = RegExp(r'\[(\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})\]').firstMatch(line);
+      final timeMatch = RegExp(
+        r'\[(\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})\]',
+      ).firstMatch(line);
       if (timeMatch != null) {
         try {
           final parts = timeMatch.group(1)!.split(RegExp(r'[ :.]'));
@@ -166,7 +179,9 @@ class AppLogger {
 
       // 1. هل السطر يحتوي على كلمة مهمة؟
       final lower = line.toLowerCase();
-      final isImportant = errorKeywords.any((kw) => lower.contains(kw.toLowerCase()));
+      final isImportant = errorKeywords.any(
+        (kw) => lower.contains(kw.toLowerCase()),
+      );
 
       // 2. هل هناك تأخير كبير منذ السطر السابق؟ (> 2 ثانية = تهنيج محتمل)
       bool isSlowStep = false;
@@ -182,11 +197,16 @@ class AppLogger {
       final isFirstOrLast = (i == 0 || i == lines.length - 1);
 
       // 4. هل هو روتيني صرف؟
-      final isRoutine = !isImportant && !isSlowStep && !isFirstOrLast &&
+      final isRoutine =
+          !isImportant &&
+          !isSlowStep &&
+          !isFirstOrLast &&
           routinePatterns.any((p) => p.hasMatch(line));
 
       // 5. هل مكرر (نفس المحتوى بدون الطابع الزمني)؟
-      final msgKey = line.replaceAll(RegExp(r'\[\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\]'), '').trim();
+      final msgKey = line
+          .replaceAll(RegExp(r'\[\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\]'), '')
+          .trim();
       final isDuplicate = !isImportant && seen.contains(msgKey);
 
       if (!isRoutine && !isDuplicate) {
@@ -199,7 +219,10 @@ class AppLogger {
 
     await file.writeAsString('${kept.join('\n')}\n');
     final removed = total - kept.length;
-    log('AppLogger', 'smartClean done: total=$total kept=${kept.length} removed=$removed');
+    log(
+      'AppLogger',
+      'smartClean done: total=$total kept=${kept.length} removed=$removed',
+    );
     return {'total': total, 'kept': kept.length, 'removed': removed};
   }
 
@@ -212,7 +235,6 @@ class AppLogger {
       debugPrint('AppLogger.clear error: $e');
     }
   }
-
 
   /// يشارك ملف اللوغ (Flutter + Native مدمجَين)
   static Future<void> shareLog({String? nativeLogContent}) async {
@@ -249,7 +271,8 @@ class AppLogger {
 
       await Share.shareXFiles(
         [XFile(tempFile.path)],
-        subject: 'سجل عباد الرحمن — ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}',
+        subject:
+            'سجل عباد الرحمن — ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}',
         text: 'سجل التطبيق لتشخيص المشاكل (الإصدار 1.2.0)',
       );
     } catch (e) {
@@ -258,17 +281,22 @@ class AppLogger {
   }
 
   /// الإبلاغ عن مشكلة وتجهيز ملف السجل وإرساله
-  static Future<void> reportIssue(BuildContext context, {String? nativeLogContent}) async {
+  static Future<void> reportIssue(
+    BuildContext context, {
+    String? nativeLogContent,
+  }) async {
     try {
       final timeStr = DateFormat('yyyy_MM_dd_HHmmss').format(DateTime.now());
       final path = await getLogPath();
       final flutterFile = path != null ? File(path) : null;
-      
+
       String combined = '';
       combined += '═══════════ تقرير تشخيص مشكلة — عباد الرحمن ═══════════\n';
-      combined += 'تاريخ التقرير: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())}\n';
+      combined +=
+          'تاريخ التقرير: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())}\n';
       combined += 'إصدار التطبيق: 1.2.0\n';
-      combined += 'نظام التشغيل: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}\n\n';
+      combined +=
+          'نظام التشغيل: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}\n\n';
 
       combined += '────── Flutter/Dart Logs ──────\n';
       if (flutterFile != null && await flutterFile.exists()) {
@@ -286,7 +314,8 @@ class AppLogger {
       final tempFile = File('${dir.path}/ibad_issue_report_$timeStr.txt');
       await tempFile.writeAsString(combined);
 
-      const messageText = 'السلام عليكم ورحمة الله وبركاته،\n'
+      const messageText =
+          'السلام عليكم ورحمة الله وبركاته،\n'
           'أود الإبلاغ عن مشكلة في تطبيق عباد الرحمن (الإصدار 1.2.0):\n\n'
           '[يرجى كتابة تفاصيل المشكلة هنا]\n\n'
           '(مرفق ملف سجل التطبيق للتشخيص)';

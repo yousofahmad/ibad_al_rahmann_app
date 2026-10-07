@@ -38,7 +38,8 @@ class QuranApp extends StatelessWidget {
                   ? const SplashScreen()
                   : const HomeScreen(),
               routes: {
-                '/hijri_confirmation': (context) => const HijriConfirmationScreen(),
+                '/hijri_confirmation': (context) =>
+                    const HijriConfirmationScreen(),
               },
             );
           },

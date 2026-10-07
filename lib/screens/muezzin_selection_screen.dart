@@ -574,10 +574,11 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
                                           ? SizedBox(
                                               width: 20.w,
                                               height: 20.h,
-                                              child: const CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: primaryColor,
-                                              ),
+                                              child:
+                                                  const CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    color: primaryColor,
+                                                  ),
                                             )
                                           : Icon(
                                               isPlaying

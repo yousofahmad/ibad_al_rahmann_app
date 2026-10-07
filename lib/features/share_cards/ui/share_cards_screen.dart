@@ -62,9 +62,9 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
       await Share.shareXFiles([XFile(path)], text: 'من تطبيق عباد الرحمن');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('فشل في مشاركة الصورة')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('فشل في مشاركة الصورة')));
       }
     } finally {
       if (mounted) setState(() => _downloadingUrls.remove(url));
@@ -92,9 +92,9 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('فشل في حفظ الصورة')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('فشل في حفظ الصورة')));
       }
     } finally {
       if (mounted) setState(() => _downloadingUrls.remove(url));
@@ -114,7 +114,8 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
               child: CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.contain,
-                placeholder: (context, url) => const CircularProgressIndicator(color: Color(0xFFD0A871)),
+                placeholder: (context, url) =>
+                    const CircularProgressIndicator(color: Color(0xFFD0A871)),
               ),
             ),
             Positioned(
@@ -137,7 +138,9 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
     const gold = Color(0xFFD0A871);
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF000000) : const Color(0xFFF5F5F5),
+      backgroundColor: isDark
+          ? const Color(0xFF000000)
+          : const Color(0xFFF5F5F5),
       appBar: AppBar(
         title: const Text(
           "بطاقات المشاركة",
@@ -148,20 +151,22 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
           ),
         ),
         centerTitle: true,
-        backgroundColor: isDark ? const Color(0xFF000000) : const Color(0xFFF5F5F5),
+        backgroundColor: isDark
+            ? const Color(0xFF000000)
+            : const Color(0xFFF5F5F5),
         elevation: 0,
         iconTheme: const IconThemeData(color: gold),
       ),
       body: _isLoading
           ? _buildLoadingState()
           : _categories.isEmpty
-              ? _buildEmptyState()
-              : Column(
-                  children: [
-                    _buildCategoryTabs(),
-                    Expanded(child: _buildCardsGrid()),
-                  ],
-                ),
+          ? _buildEmptyState()
+          : Column(
+              children: [
+                _buildCategoryTabs(),
+                Expanded(child: _buildCardsGrid()),
+              ],
+            ),
     );
   }
 
@@ -181,7 +186,9 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
               margin: EdgeInsets.symmetric(horizontal: 8.w),
               padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
               decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFFD0A871) : Colors.transparent,
+                color: isSelected
+                    ? const Color(0xFFD0A871)
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(20.r),
                 border: Border.all(color: const Color(0xFFD0A871), width: 1.w),
               ),
@@ -223,7 +230,7 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
   Widget _buildCardItem(ShareCardItem item, String url) {
     const gold = Color(0xFFD0A871);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     final isDownloading = _downloadingUrls.contains(url);
     return Container(
       decoration: BoxDecoration(
@@ -264,22 +271,44 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                isDownloading 
-                  ? SizedBox(width: 20.w, height: 20.w, child: const CircularProgressIndicator(color: gold, strokeWidth: 2))
-                  : IconButton(
-                      icon: const Icon(Icons.share_outlined, color: gold, size: 20),
-                      onPressed: () => _downloadAndShare(url),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                isDownloading 
-                  ? SizedBox(width: 20.w, height: 20.w, child: const CircularProgressIndicator(color: gold, strokeWidth: 2))
-                  : IconButton(
-                      icon: const Icon(Icons.save_alt_rounded, color: gold, size: 20),
-                      onPressed: () => _saveToGallery(url),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
+                isDownloading
+                    ? SizedBox(
+                        width: 20.w,
+                        height: 20.w,
+                        child: const CircularProgressIndicator(
+                          color: gold,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : IconButton(
+                        icon: const Icon(
+                          Icons.share_outlined,
+                          color: gold,
+                          size: 20,
+                        ),
+                        onPressed: () => _downloadAndShare(url),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                isDownloading
+                    ? SizedBox(
+                        width: 20.w,
+                        height: 20.w,
+                        child: const CircularProgressIndicator(
+                          color: gold,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : IconButton(
+                        icon: const Icon(
+                          Icons.save_alt_rounded,
+                          color: gold,
+                          size: 20,
+                        ),
+                        onPressed: () => _saveToGallery(url),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
               ],
             ),
           ),
@@ -302,7 +331,11 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.image_not_supported_outlined, size: 64.sp, color: Colors.grey),
+          Icon(
+            Icons.image_not_supported_outlined,
+            size: 64.sp,
+            color: Colors.grey,
+          ),
           SizedBox(height: 16.h),
           const Text(
             "لا توجد بطاقات متاحة حالياً",

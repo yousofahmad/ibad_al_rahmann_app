@@ -70,8 +70,8 @@ class _MinQuranTabletState extends State<MinQuranTablet> {
                 child: _TapListener(
                   onDoubleTap: () => context.read<QuranCubit>().changeLayout(),
                   child: PageView.builder(
-      physics: const EasyPageScrollPhysics(),
-      allowImplicitScrolling: true,
+                    physics: const EasyPageScrollPhysics(),
+                    allowImplicitScrolling: true,
                     controller: context.read<QuranCubit>().minQuranController,
                     itemCount: 604,
                     onPageChanged: (value) =>

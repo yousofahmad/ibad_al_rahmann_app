@@ -40,9 +40,11 @@ class SurahOverlayPlayer extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             Text(
-              reciter.hasSegments
-                  ? '${cubit.currentReciterName!} • أصوات متقسمة آيات'
-                  : '${cubit.currentReciterName!} • سورة كاملة فقط (تظليل الآيات: لا يوجد)',
+              reciter.highlightSupport == ReciterHighlightSupport.wordByWord
+                  ? '${cubit.currentReciterName!} • أصوات مقسمة كلمات وآيات'
+                  : (reciter.hasSegments
+                      ? '${cubit.currentReciterName!} • أصوات مقسمة آيات'
+                      : '${cubit.currentReciterName!} • سورة كاملة'),
               style: AppStyles.style20harmattan.copyWith(
                 color: Colors.grey.shade200,
                 fontSize: 14,

@@ -240,7 +240,7 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
                         }
 
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            try { context.startForegroundService(intent) } catch (e: Exception) { e.printStackTrace() }
+                            try { try { context.startForegroundService(intent) } catch (e: Exception) { e.printStackTrace(); try { context.startService(intent) } catch (e2: Exception) {} } } catch (e: Exception) { e.printStackTrace() }
                         } else {
                             try { androidx.core.content.ContextCompat.startForegroundService(context, intent) } catch (e: Exception) { e.printStackTrace() }
                         }

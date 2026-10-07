@@ -699,7 +699,10 @@ class _AzkarPageState extends State<AzkarPage> {
                             decoration: BoxDecoration(
                               color: _goldColor,
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 3.w),
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 3.w,
+                              ),
                             ),
                             child: Center(
                               child: Text(
@@ -926,7 +929,11 @@ class _AzkarPageState extends State<AzkarPage> {
               width: 1.5.w,
             ),
             boxShadow: [
-              BoxShadow(color: Colors.black26, blurRadius: 10.r, spreadRadius: 2.r),
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 10.r,
+                spreadRadius: 2.r,
+              ),
             ],
           ),
           child: Column(
@@ -980,7 +987,11 @@ class _AzkarPageState extends State<AzkarPage> {
                     Row(
                       children: [
                         IconButton(
-                          icon: Icon(Icons.copy, color: _goldColor, size: 26.sp),
+                          icon: Icon(
+                            Icons.copy,
+                            color: _goldColor,
+                            size: 26.sp,
+                          ),
                           onPressed: () {
                             Clipboard.setData(ClipboardData(text: data.text));
                             ScaffoldMessenger.of(context).showSnackBar(

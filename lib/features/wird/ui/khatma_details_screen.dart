@@ -51,20 +51,35 @@ class KhatmaDetailsScreen extends StatelessWidget {
     );
   }
 
-
-  Future<void> _showPrayerOffsetsDialog(BuildContext context, KhatmaCubit cubit, KhatmaModel khatma) async {
-    final map = khatma.notificationOffsetMinutesMap ?? {
-      'الفجر': khatma.notificationOffsetMinutes,
-      'الظهر': khatma.notificationOffsetMinutes,
-      'العصر': khatma.notificationOffsetMinutes,
-      'المغرب': khatma.notificationOffsetMinutes,
-      'العشاء': khatma.notificationOffsetMinutes,
-    };
-    final fajrCtrl = TextEditingController(text: (map['الفجر'] ?? 30).toString());
-    final dhuhrCtrl = TextEditingController(text: (map['الظهر'] ?? 30).toString());
-    final asrCtrl = TextEditingController(text: (map['العصر'] ?? 30).toString());
-    final maghribCtrl = TextEditingController(text: (map['المغرب'] ?? 30).toString());
-    final ishaCtrl = TextEditingController(text: (map['العشاء'] ?? 30).toString());
+  Future<void> _showPrayerOffsetsDialog(
+    BuildContext context,
+    KhatmaCubit cubit,
+    KhatmaModel khatma,
+  ) async {
+    final map =
+        khatma.notificationOffsetMinutesMap ??
+        {
+          'الفجر': khatma.notificationOffsetMinutes,
+          'الظهر': khatma.notificationOffsetMinutes,
+          'العصر': khatma.notificationOffsetMinutes,
+          'المغرب': khatma.notificationOffsetMinutes,
+          'العشاء': khatma.notificationOffsetMinutes,
+        };
+    final fajrCtrl = TextEditingController(
+      text: (map['الفجر'] ?? 30).toString(),
+    );
+    final dhuhrCtrl = TextEditingController(
+      text: (map['الظهر'] ?? 30).toString(),
+    );
+    final asrCtrl = TextEditingController(
+      text: (map['العصر'] ?? 30).toString(),
+    );
+    final maghribCtrl = TextEditingController(
+      text: (map['المغرب'] ?? 30).toString(),
+    );
+    final ishaCtrl = TextEditingController(
+      text: (map['العشاء'] ?? 30).toString(),
+    );
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -76,7 +91,10 @@ class KhatmaDetailsScreen extends StatelessWidget {
           backgroundColor: isDark ? Colors.grey[900] : Colors.white,
           title: Text(
             'تعديل دقائق التأخير',
-            style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           content: SingleChildScrollView(
             child: Column(
@@ -102,11 +120,31 @@ class KhatmaDetailsScreen extends StatelessWidget {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(ctx, {
-                  'الفجر': int.tryParse(AppFormatters.toEnglishDigits(fajrCtrl.text)) ?? 30,
-                  'الظهر': int.tryParse(AppFormatters.toEnglishDigits(dhuhrCtrl.text)) ?? 30,
-                  'العصر': int.tryParse(AppFormatters.toEnglishDigits(asrCtrl.text)) ?? 30,
-                  'المغرب': int.tryParse(AppFormatters.toEnglishDigits(maghribCtrl.text)) ?? 30,
-                  'العشاء': int.tryParse(AppFormatters.toEnglishDigits(ishaCtrl.text)) ?? 30,
+                  'الفجر':
+                      int.tryParse(
+                        AppFormatters.toEnglishDigits(fajrCtrl.text),
+                      ) ??
+                      30,
+                  'الظهر':
+                      int.tryParse(
+                        AppFormatters.toEnglishDigits(dhuhrCtrl.text),
+                      ) ??
+                      30,
+                  'العصر':
+                      int.tryParse(
+                        AppFormatters.toEnglishDigits(asrCtrl.text),
+                      ) ??
+                      30,
+                  'المغرب':
+                      int.tryParse(
+                        AppFormatters.toEnglishDigits(maghribCtrl.text),
+                      ) ??
+                      30,
+                  'العشاء':
+                      int.tryParse(
+                        AppFormatters.toEnglishDigits(ishaCtrl.text),
+                      ) ??
+                      30,
                 });
               },
               style: ElevatedButton.styleFrom(
@@ -125,10 +163,23 @@ class KhatmaDetailsScreen extends StatelessWidget {
     }
   }
 
-  Widget _buildOffsetField(String label, TextEditingController ctrl, bool isDark) {
+  Widget _buildOffsetField(
+    String label,
+    TextEditingController ctrl,
+    bool isDark,
+  ) {
     return Row(
       children: [
-        SizedBox(width: 80, child: Text(label, style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold))),
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
         Expanded(
           child: TextField(
             controller: ctrl,
@@ -138,7 +189,9 @@ class KhatmaDetailsScreen extends StatelessWidget {
               suffixText: 'دقيقة',
               suffixStyle: const TextStyle(color: Colors.grey, fontSize: 12),
               isDense: true,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
         ),
@@ -146,7 +199,11 @@ class KhatmaDetailsScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _showTimePickerDialog(BuildContext context, KhatmaCubit cubit, String? currentTime) async {
+  Future<void> _showTimePickerDialog(
+    BuildContext context,
+    KhatmaCubit cubit,
+    String? currentTime,
+  ) async {
     final parts = (currentTime ?? '20:00').split(':');
     final initialTime = TimeOfDay(
       hour: int.tryParse(parts[0]) ?? 20,
@@ -156,10 +213,12 @@ class KhatmaDetailsScreen extends StatelessWidget {
       context: context,
       initialTime: initialTime,
       helpText: 'وقت التنبيه اليومي',
-      builder: (ctx, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
+      builder: (ctx, child) =>
+          Directionality(textDirection: TextDirection.rtl, child: child!),
     );
     if (picked != null) {
-      final newTime = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+      final newTime =
+          '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
       await cubit.updateDailyTime(khatmaId, newTime);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -168,6 +227,47 @@ class KhatmaDetailsScreen extends StatelessWidget {
               'تم ضبط وقت التنبيه اليومي على الساعة $newTime بنجاح',
               style: const TextStyle(fontFamily: AppConsts.cairo),
             ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showStartDatePickerDialog(
+    BuildContext context,
+    KhatmaCubit cubit,
+    DateTime currentStartDate,
+  ) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: currentStartDate,
+      firstDate: DateTime(now.year - 2, 1, 1),
+      lastDate: DateTime(now.year + 2, 12, 31),
+      helpText: 'تعديل تاريخ بدء الختمة',
+      builder: (ctx, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(context).colorScheme.copyWith(
+                primary: const Color(0xFFD0A871),
+                onPrimary: Colors.black,
+              ),
+        ),
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: child!,
+        ),
+      ),
+    );
+    if (picked != null) {
+      await cubit.updateKhatmaStartDate(khatmaId, picked);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تم تعديل تاريخ بدء الختمة وتحديث جدول التأخير بنجاح',
+              style: TextStyle(fontFamily: AppConsts.cairo),
+            ),
+            backgroundColor: Colors.green,
           ),
         );
       }
@@ -200,21 +300,41 @@ class KhatmaDetailsScreen extends StatelessWidget {
             builder: (context, state) {
               if (state is KhatmaLoaded) {
                 try {
-                  final khatma = state.khatmas.firstWhere((k) => k.id == khatmaId);
-return IconButton(
-                    tooltip: 'تعديل وقت التنبيه',
-                    icon: const Icon(FontAwesomeIcons.clock),
-                    onPressed: () {
-                      if (khatma.notificationType == 'prayer') {
-                        _showPrayerOffsetsDialog(context, context.read<KhatmaCubit>(), khatma);
-                      } else {
-                        _showTimePickerDialog(
+                  final khatma = state.khatmas.firstWhere(
+                    (k) => k.id == khatmaId,
+                  );
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'تعديل تاريخ بدء الختمة',
+                        icon: const Icon(FontAwesomeIcons.calendarDay, size: 18),
+                        onPressed: () => _showStartDatePickerDialog(
                           context,
                           context.read<KhatmaCubit>(),
-                          khatma.dailyTime,
-                        );
-                      }
-                    },
+                          khatma.startDate,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'تعديل وقت التنبيه',
+                        icon: const Icon(FontAwesomeIcons.clock, size: 18),
+                        onPressed: () {
+                          if (khatma.notificationType == 'prayer') {
+                            _showPrayerOffsetsDialog(
+                              context,
+                              context.read<KhatmaCubit>(),
+                              khatma,
+                            );
+                          } else {
+                            _showTimePickerDialog(
+                              context,
+                              context.read<KhatmaCubit>(),
+                              khatma.dailyTime,
+                            );
+                          }
+                        },
+                      ),
+                    ],
                   );
                 } catch (_) {}
               }
@@ -234,24 +354,33 @@ return IconButton(
       body: ValueListenableBuilder(
         valueListenable: Hive.box('appDataBox').listenable(),
         builder: (context, box, _) {
-          return BlocBuilder<KhatmaCubit, KhatmaState>(
-        builder: (context, state) {
-          if (state is KhatmaLoaded) {
-            try {
-              final khatma = state.khatmas.firstWhere((k) => k.id == khatmaId);
-              return KhatmaDetailsView(khatma: khatma);
-            } catch (_) {
-              return const Center(
-                child: Text(
-                  "هذه الختمة لم تعد موجودة",
-                  style: TextStyle(color: Colors.red),
-                ),
-              );
-            }
-          }
-          return const SizedBox.shrink();
-        },
-      );
+          return BlocConsumer<KhatmaCubit, KhatmaState>(
+            listener: (context, state) {
+              if (state is KhatmaEmpty) {
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+              } else if (state is KhatmaLoaded) {
+                final exists = state.khatmas.any((k) => k.id == khatmaId);
+                if (!exists && Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+              }
+            },
+            builder: (context, state) {
+              if (state is KhatmaLoaded) {
+                try {
+                  final khatma = state.khatmas.firstWhere(
+                    (k) => k.id == khatmaId,
+                  );
+                  return KhatmaDetailsView(khatma: khatma);
+                } catch (_) {
+                  return const SizedBox.shrink();
+                }
+              }
+              return const SizedBox.shrink();
+            },
+          );
         },
       ),
     );

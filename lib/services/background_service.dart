@@ -42,7 +42,9 @@ class BackgroundService {
   /// يُعيد آخر [lines] سطراً من ملف اللوغ النيتيف
   static Future<String> getNativeLog({int lines = 300}) async {
     try {
-      final result = await _channel.invokeMethod<String>('getNativeLog', {'lines': lines});
+      final result = await _channel.invokeMethod<String>('getNativeLog', {
+        'lines': lines,
+      });
       return result ?? '(فارغ)';
     } catch (e) {
       return '❌ خطأ في قراءة اللوغ: $e';

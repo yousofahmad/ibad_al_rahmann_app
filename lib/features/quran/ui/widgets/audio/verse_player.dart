@@ -66,9 +66,7 @@ class PortraitVersePlayer extends StatelessWidget {
           // Top Row: Reciter Selector + Mode Pill + Speed + Loop + Close
           Row(
             children: [
-              Flexible(
-                child: ReciterDropdown(cubit: cubit),
-              ),
+              Flexible(child: ReciterDropdown(cubit: cubit)),
               SizedBox(width: 6.w),
               // Single Verse vs Continuous toggle pill
               InkWell(
@@ -92,9 +90,13 @@ class PortraitVersePlayer extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        cubit.autoPlayNext ? Icons.repeat_rounded : Icons.looks_one_rounded,
+                        cubit.autoPlayNext
+                            ? Icons.repeat_rounded
+                            : Icons.looks_one_rounded,
                         size: 13.sp,
-                        color: cubit.autoPlayNext ? const Color(0xFFFFD54F) : Colors.white,
+                        color: cubit.autoPlayNext
+                            ? const Color(0xFFFFD54F)
+                            : Colors.white,
                       ),
                       SizedBox(width: 3.w),
                       Text(
@@ -103,7 +105,56 @@ class PortraitVersePlayer extends StatelessWidget {
                           fontFamily: AppConsts.expoArabic,
                           fontSize: 10.5.sp,
                           fontWeight: FontWeight.bold,
-                          color: cubit.autoPlayNext ? const Color(0xFFFFD54F) : Colors.white,
+                          color: cubit.autoPlayNext
+                              ? const Color(0xFFFFD54F)
+                              : Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(width: 5.w),
+              // Highlight Mode (Word by Word vs Verse) toggle pill
+              InkWell(
+                onTap: () => cubit.toggleHighlightMode(),
+                borderRadius: BorderRadius.circular(16.r),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: cubit.isHighlightWordByWord
+                        ? const Color(0xFFFFD54F).withValues(alpha: 0.25)
+                        : Colors.white.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(16.r),
+                    border: Border.all(
+                      color: cubit.isHighlightWordByWord
+                          ? const Color(0xFFFFD54F)
+                          : Colors.white.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        cubit.isHighlightWordByWord
+                            ? Icons.spellcheck_rounded
+                            : Icons.auto_stories_rounded,
+                        size: 13.sp,
+                        color: cubit.isHighlightWordByWord
+                            ? const Color(0xFFFFD54F)
+                            : Colors.white,
+                      ),
+                      SizedBox(width: 3.w),
+                      Text(
+                        cubit.isHighlightWordByWord ? 'كلمات' : 'آية',
+                        style: TextStyle(
+                          fontFamily: AppConsts.expoArabic,
+                          fontSize: 10.5.sp,
+                          fontWeight: FontWeight.bold,
+                          color: cubit.isHighlightWordByWord
+                              ? const Color(0xFFFFD54F)
+                              : Colors.white,
                         ),
                       ),
                     ],
@@ -144,11 +195,17 @@ class PortraitVersePlayer extends StatelessWidget {
                 constraints: BoxConstraints.tight(Size(28.w, 28.w)),
                 onPressed: () => cubit.toggleLoop(),
                 icon: Icon(
-                  cubit.isLooping ? Icons.repeat_one_rounded : Icons.repeat_rounded,
+                  cubit.isLooping
+                      ? Icons.repeat_one_rounded
+                      : Icons.repeat_rounded,
                   size: 18.sp,
-                  color: cubit.isLooping ? const Color(0xFFFFD54F) : Colors.white.withValues(alpha: 0.7),
+                  color: cubit.isLooping
+                      ? const Color(0xFFFFD54F)
+                      : Colors.white.withValues(alpha: 0.7),
                 ),
-                tooltip: cubit.isLooping ? 'تكرار الآية مفعل' : 'تكرار الآية معطل',
+                tooltip: cubit.isLooping
+                    ? 'تكرار الآية مفعل'
+                    : 'تكرار الآية معطل',
               ),
               SizedBox(width: 2.w),
               // Close button
@@ -156,7 +213,11 @@ class PortraitVersePlayer extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 constraints: BoxConstraints.tight(Size(28.w, 28.w)),
                 onPressed: () => cubit.hide(),
-                icon: Icon(Icons.close_rounded, size: 18.sp, color: Colors.white),
+                icon: Icon(
+                  Icons.close_rounded,
+                  size: 18.sp,
+                  color: Colors.white,
+                ),
               ),
             ],
           ),
@@ -191,7 +252,9 @@ class PortraitVersePlayer extends StatelessWidget {
                         ),
                       )
                     : Icon(
-                        isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded,
+                        isPlaying
+                            ? Icons.pause_circle_filled_rounded
+                            : Icons.play_circle_filled_rounded,
                         color: Colors.white,
                       ),
               ),
@@ -261,9 +324,13 @@ class LandscapeVersePlayer extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    cubit.autoPlayNext ? Icons.repeat_rounded : Icons.looks_one_rounded,
+                    cubit.autoPlayNext
+                        ? Icons.repeat_rounded
+                        : Icons.looks_one_rounded,
                     size: 13.sp,
-                    color: cubit.autoPlayNext ? const Color(0xFFFFD54F) : Colors.white,
+                    color: cubit.autoPlayNext
+                        ? const Color(0xFFFFD54F)
+                        : Colors.white,
                   ),
                   SizedBox(width: 3.w),
                   Text(
@@ -272,7 +339,55 @@ class LandscapeVersePlayer extends StatelessWidget {
                       fontFamily: AppConsts.expoArabic,
                       fontSize: 10.5.sp,
                       fontWeight: FontWeight.bold,
-                      color: cubit.autoPlayNext ? const Color(0xFFFFD54F) : Colors.white,
+                      color: cubit.autoPlayNext
+                          ? const Color(0xFFFFD54F)
+                          : Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(width: 6.w),
+          // Highlight Mode toggle pill
+          InkWell(
+            onTap: () => cubit.toggleHighlightMode(),
+            borderRadius: BorderRadius.circular(16.r),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 4.h),
+              decoration: BoxDecoration(
+                color: cubit.isHighlightWordByWord
+                    ? const Color(0xFFFFD54F).withValues(alpha: 0.25)
+                    : Colors.white.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(16.r),
+                border: Border.all(
+                  color: cubit.isHighlightWordByWord
+                      ? const Color(0xFFFFD54F)
+                      : Colors.white.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    cubit.isHighlightWordByWord
+                        ? Icons.spellcheck_rounded
+                        : Icons.auto_stories_rounded,
+                    size: 13.sp,
+                    color: cubit.isHighlightWordByWord
+                        ? const Color(0xFFFFD54F)
+                        : Colors.white,
+                  ),
+                  SizedBox(width: 3.w),
+                  Text(
+                    cubit.isHighlightWordByWord ? 'كلمات' : 'آية',
+                    style: TextStyle(
+                      fontFamily: AppConsts.expoArabic,
+                      fontSize: 10.5.sp,
+                      fontWeight: FontWeight.bold,
+                      color: cubit.isHighlightWordByWord
+                          ? const Color(0xFFFFD54F)
+                          : Colors.white,
                     ),
                   ),
                 ],
@@ -282,7 +397,11 @@ class LandscapeVersePlayer extends StatelessWidget {
           SizedBox(width: 8.w),
           IconButton(
             onPressed: () => cubit.playPreviousVerse(),
-            icon: Icon(Icons.skip_next_rounded, color: Colors.white, size: 26.sp),
+            icon: Icon(
+              Icons.skip_next_rounded,
+              color: Colors.white,
+              size: 26.sp,
+            ),
           ),
           IconButton(
             padding: EdgeInsets.zero,
@@ -292,16 +411,25 @@ class LandscapeVersePlayer extends StatelessWidget {
                 ? const SizedBox(
                     width: 24,
                     height: 24,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
                   )
                 : Icon(
-                    isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded,
+                    isPlaying
+                        ? Icons.pause_circle_filled_rounded
+                        : Icons.play_circle_filled_rounded,
                     color: Colors.white,
                   ),
           ),
           IconButton(
             onPressed: () => cubit.playNextVerse(),
-            icon: Icon(Icons.skip_previous_rounded, color: Colors.white, size: 26.sp),
+            icon: Icon(
+              Icons.skip_previous_rounded,
+              color: Colors.white,
+              size: 26.sp,
+            ),
           ),
           SizedBox(width: 8.w),
           IconButton(

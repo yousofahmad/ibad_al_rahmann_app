@@ -77,7 +77,9 @@ class _RamadanScreenState extends State<RamadanScreen> {
       final path = "${tempDir.path}/ramadan_share.jpg";
       await Dio().download(url, path);
       // ignore: deprecated_member_use
-      await Share.shareXFiles([XFile(path)], text: 'رمضان كريم من تطبيق عباد الرحمن');
+      await Share.shareXFiles([
+        XFile(path),
+      ], text: 'رمضان كريم من تطبيق عباد الرحمن');
     } catch (_) {}
   }
 
@@ -164,7 +166,9 @@ class _RamadanScreenState extends State<RamadanScreen> {
                 padding: EdgeInsets.only(bottom: 20.h),
                 child: Shimmer.fromColors(
                   baseColor: isDark ? Colors.grey[900]! : Colors.grey[300]!,
-                  highlightColor: isDark ? Colors.grey[800]! : Colors.grey[100]!,
+                  highlightColor: isDark
+                      ? Colors.grey[800]!
+                      : Colors.grey[100]!,
                   child: Container(
                     height: 140.h,
                     decoration: BoxDecoration(
@@ -193,7 +197,9 @@ class _RamadanScreenState extends State<RamadanScreen> {
                           margin: EdgeInsets.only(left: 12.w),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(15.r),
-                            border: Border.all(color: _gold.withValues(alpha: 0.3)),
+                            border: Border.all(
+                              color: _gold.withValues(alpha: 0.3),
+                            ),
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(15.r),
@@ -203,8 +209,13 @@ class _RamadanScreenState extends State<RamadanScreen> {
                                 CachedNetworkImage(
                                   imageUrl: fullUrl,
                                   fit: BoxFit.cover,
-                                  placeholder: (context, url) => Container(color: isDark ? Colors.black26 : Colors.grey[100]),
-                                  errorWidget: (context, url, error) => const Icon(Icons.error),
+                                  placeholder: (context, url) => Container(
+                                    color: isDark
+                                        ? Colors.black26
+                                        : Colors.grey[100],
+                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      const Icon(Icons.error),
                                 ),
                                 Positioned(
                                   bottom: 0,
@@ -215,18 +226,30 @@ class _RamadanScreenState extends State<RamadanScreen> {
                                       gradient: LinearGradient(
                                         begin: Alignment.bottomCenter,
                                         end: Alignment.topCenter,
-                                        colors: [Colors.black54, Colors.transparent],
+                                        colors: [
+                                          Colors.black54,
+                                          Colors.transparent,
+                                        ],
                                       ),
                                     ),
                                     padding: EdgeInsets.all(6.w),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
-                                        Icon(Icons.share, color: Colors.white, size: 14.sp),
+                                        Icon(
+                                          Icons.share,
+                                          color: Colors.white,
+                                          size: 14.sp,
+                                        ),
                                         SizedBox(width: 4.w),
                                         Text(
                                           "مشاركة",
-                                          style: TextStyle(color: Colors.white, fontSize: 10.sp, fontFamily: 'Cairo'),
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10.sp,
+                                            fontFamily: 'Cairo',
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -488,7 +511,10 @@ class _RamadanScreenState extends State<RamadanScreen> {
         children: [
           RadioListTile<int>(
             activeColor: _gold,
-            contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 16.w,
+              vertical: 4.h,
+            ),
             title: Text(
               'الوقت الأصلي',
               style: TextStyle(
@@ -520,7 +546,10 @@ class _RamadanScreenState extends State<RamadanScreen> {
           Divider(color: Colors.grey.withAlpha(30), height: 1.h),
           RadioListTile<int>(
             activeColor: _gold,
-            contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 16.w,
+              vertical: 4.h,
+            ),
             title: Text(
               'بعد المغرب بـ 90 دقيقة',
               style: TextStyle(
@@ -552,7 +581,10 @@ class _RamadanScreenState extends State<RamadanScreen> {
           Divider(color: Colors.grey.withAlpha(30), height: 1.h),
           RadioListTile<int>(
             activeColor: _gold,
-            contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 16.w,
+              vertical: 4.h,
+            ),
             title: Text(
               'بعد المغرب بـ 120 دقيقة',
               style: TextStyle(
@@ -798,7 +830,11 @@ class _RamadanScreenState extends State<RamadanScreen> {
         Row(
           children: [
             IconButton(
-              icon: Icon(Icons.remove_circle_outline, color: _gold, size: 24.sp),
+              icon: Icon(
+                Icons.remove_circle_outline,
+                color: _gold,
+                size: 24.sp,
+              ),
               onPressed: value > min
                   ? () => onChanged((value - step).clamp(min, max))
                   : null,
@@ -927,10 +963,7 @@ class _RamadanScreenState extends State<RamadanScreen> {
               onTap: () => onChanged(options[i]),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding: EdgeInsets.symmetric(
-                  horizontal: 14.w,
-                  vertical: 8.h,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
                 decoration: BoxDecoration(
                   color: selected ? _gold : Colors.transparent,
                   borderRadius: BorderRadius.circular(20.r),

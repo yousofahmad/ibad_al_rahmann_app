@@ -296,7 +296,7 @@ class AlarmReceiver : BroadcastReceiver() {
             // ── Quiet Hours Gate for Salawat and Takbeerat ──
             var skipNotif = isNotificationExplicitlyDisabled(context, alarmId, soundName)
             if (!skipNotif) {
-                if (alarmId in 8000..8999) {
+                if (alarmId == 950 || alarmId in 8000..8999) {
                     // Salawat range (8000+) uses general quiet_hours
                     if (isInQuietHours(context, "quiet_hours")) {
                         skipNotif = true

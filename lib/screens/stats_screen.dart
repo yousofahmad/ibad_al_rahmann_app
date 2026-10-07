@@ -143,11 +143,7 @@ class _StatsScreenState extends State<StatsScreen> {
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: goldColor,
-                          size: 20.w,
-                        ),
+                        Icon(Icons.info_outline, color: goldColor, size: 20.w),
                         SizedBox(width: 10.w),
                         Expanded(
                           child: Text(

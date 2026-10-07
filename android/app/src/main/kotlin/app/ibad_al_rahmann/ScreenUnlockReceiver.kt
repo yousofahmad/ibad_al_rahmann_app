@@ -23,6 +23,8 @@ class ScreenUnlockReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "ScreenUnlockReceiver"
+        private var activeStreamId: Int = 0
+        private val handler = Handler(Looper.getMainLooper())
         private var soundPool: SoundPool? = null
         private val soundMap = HashMap<String, Int>()
         private var isSoundPoolReady = false
@@ -64,15 +66,8 @@ class ScreenUnlockReceiver : BroadcastReceiver() {
         val action = intent.action ?: return
         if (action != Intent.ACTION_USER_PRESENT && action != Intent.ACTION_SCREEN_ON) return
 
-        // For ACTION_SCREEN_ON, only trigger if device has NO screen lock (not keyguard-locked)
-        if (action == Intent.ACTION_SCREEN_ON) {
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
-            val isLocked = keyguardManager?.isKeyguardLocked ?: false
-            if (isLocked) {
-                // Device has a lock screen / PIN / password; wait for ACTION_USER_PRESENT
-                return
-            }
-        }
+        // For ACTION_SCREEN_ON or ACTION_USER_PRESENT, proceed to play.
+        // The 10-second debounce will prevent duplicate plays if both actions fire.
 
         // 10-second debounce
         val now = System.currentTimeMillis()
@@ -207,12 +202,17 @@ class ScreenUnlockReceiver : BroadcastReceiver() {
         // Try instant SoundPool playback for built-in audio (0ms latency!)
         val soundId = soundMap[mode]
         if (soundId != null && soundPool != null) {
+            if (activeStreamId != 0) {
+                soundPool!!.stop(activeStreamId)
+                activeStreamId = 0
+            }
             val streamId = soundPool!!.play(soundId, volumeRatio, volumeRatio, 1, 0, 1.0f)
             if (streamId != 0) {
+                activeStreamId = streamId
                 Log.d(TAG, "SoundPool played sound successfully: $mode (stream: $streamId)")
-                Handler(Looper.getMainLooper()).postDelayed({
-                    restoreVolume(context)
-                }, 4500L)
+                
+                handler.removeCallbacksAndMessages(null)
+                handler.postDelayed({ restoreVolume(context) }, 4500L)
                 return
             } else {
                 // SoundPool failed (possibly GC'd) — release and re-init for next time
@@ -268,6 +268,11 @@ class ScreenUnlockReceiver : BroadcastReceiver() {
     }
 
     private fun releasePlayer(context: Context) {
+        handler.removeCallbacksAndMessages(null)
+        if (activeStreamId != 0 && soundPool != null) {
+            soundPool!!.stop(activeStreamId)
+            activeStreamId = 0
+        }
         mediaPlayer?.let {
             try {
                 if (it.isPlaying) it.stop()

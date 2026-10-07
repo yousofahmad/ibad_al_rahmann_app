@@ -165,233 +165,132 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.only(bottom: 24),
           child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[800] : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey[800] : Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  widget.prayer.name,
-                  style: const TextStyle(
-                    fontFamily: AppConsts.expoArabic,
-                    color: Color(0xFFD0A871),
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  PrayerService().formatTime(widget.prayer.time),
-                  style: TextStyle(
-                    fontFamily: AppConsts.expoArabic,
-                    color: textColor,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Religious Text Card
-            if (prayerDescriptions.containsKey(widget.prayer.id))
-              Container(
-                padding: const EdgeInsets.all(16),
-                margin: const EdgeInsets.only(bottom: 24),
-                decoration: BoxDecoration(
-                  color: containerColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFFD0A871).withValues(alpha: 0.2),
-                  ),
-                  boxShadow: isDark
-                      ? null
-                      : [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 5,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                ),
-                child: Text(
-                  prayerDescriptions[widget.prayer.id]!,
-                  style: TextStyle(
-                    fontFamily: AppConsts.expoArabic,
-                    color: textColor,
-                    fontSize: 14,
-                    height: 1.5,
-                  ),
-                  textAlign: TextAlign.justify,
-                  // textDirection: TextDirection.rtl,
-                ),
-              ),
-
-            // Smart Timer Section
-            _buildSmartTimer(isDark),
-            const SizedBox(height: 16),
-
-            if (widget.prayer.prayer != null ||
-                widget.prayer.id == 'duha' ||
-                widget.prayer.id == 'witr' ||
-                widget.prayer.id == 'sunrise' ||
-                widget.prayer.id == 'first_third' ||
-                widget.prayer.id == 'midnight' ||
-                widget.prayer.id == 'last_third') ...[
-              // Manual Adjustment (Only for Fard)
-              if (widget.prayer.prayer != null)
-                _buildAdjustmentRow(
-                  "تعديل الموعد (دقائق)",
-                  _adhanOffset,
-                  _updateOffset,
-                  isDark,
-                ),
-
-              const SizedBox(height: 16),
-
-              // Notification Toggles & Sound
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: containerColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: borderColor),
-                  boxShadow: isDark
-                      ? null
-                      : [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 5,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                ),
-                child: Column(
-                  children: [
-                    // Adhan Mode 3-way
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(
-                        Icons.notifications_active,
-                        color: Color(0xFFD0A871),
-                      ),
-                      title: Text(
-                        "تنبيه الأذان",
-                        style: TextStyle(
-                          fontFamily: AppConsts.expoArabic,
-                          color: textColor,
-                          fontSize: 14,
-                        ),
-                      ),
-                      subtitle: Text(
-                        _adhanMode == 'sound'
-                            ? 'صوت + إشعار'
-                            : _adhanMode == 'silent_notif'
-                            ? 'إشعار بدون صوت'
-                            : 'مُعطَّل',
-                        style: const TextStyle(
-                          fontFamily: AppConsts.cairo,
-                          color: Colors.grey,
-                          fontSize: 12,
-                        ),
-                      ),
-                      trailing: _buildModeSelector(_adhanMode, (v) async {
-                        setState(() => _adhanMode = v);
-                        final prefs = CacheHelper.prefs;
-                        final capKey =
-                            widget.prayer.id[0].toUpperCase() +
-                            widget.prayer.id.substring(1);
-                        await prefs.setString('adhan_mode_$capKey', v);
-                        await prefs.setBool(_getNotifKey(), v != 'none');
-                        if (widget.prayer.id == 'last_third' || widget.prayer.id == 'qiyam') {
-                          await prefs.setString('qiyam_mode_notif', v);
-                          await prefs.setBool('notif_qiyam', v != 'none');
-                        }
-                        PrayerService().scheduleNotificationsDebounced();
-                      }),
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    widget.prayer.name,
+                    style: const TextStyle(
+                      fontFamily: AppConsts.expoArabic,
+                      color: Color(0xFFD0A871),
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
                     ),
-                    Divider(color: borderColor),
-                    // Hide adhan picker for events that use fixed custom voice-overs
-                    if (!_isCustomSoundEvent()) ...[
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          Icons.music_note,
-                          color: Color(0xFFD0A871),
-                        ),
-                        title: Text(
-                          "نغمة التنبيه",
-                          style: TextStyle(
-                            fontFamily: AppConsts.expoArabic,
-                            color: textColor,
-                            fontSize: 14,
-                          ),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              constraints: const BoxConstraints(maxWidth: 100),
-                              child: Text(
-                                _selectedSoundName,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontFamily: AppConsts.expoArabic,
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            const Icon(
-                              Icons.arrow_forward_ios,
-                              color: Colors.grey,
-                              size: 14,
+                  ),
+                  Text(
+                    PrayerService().formatTime(widget.prayer.time),
+                    style: TextStyle(
+                      fontFamily: AppConsts.expoArabic,
+                      color: textColor,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Religious Text Card
+              if (prayerDescriptions.containsKey(widget.prayer.id))
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 24),
+                  decoration: BoxDecoration(
+                    color: containerColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFD0A871).withValues(alpha: 0.2),
+                    ),
+                    boxShadow: isDark
+                        ? null
+                        : [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 5,
+                              offset: const Offset(0, 2),
                             ),
                           ],
-                        ),
-                        onTap: () async {
-                          // Navigate to sound selection
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => MuezzinSelectionScreen(
-                                prefsKey:
-                                    'adhan_sound_${widget.prayer.id.toLowerCase()}',
-                                title: 'أذان ${widget.prayer.name}',
-                              ),
+                  ),
+                  child: Text(
+                    prayerDescriptions[widget.prayer.id]!,
+                    style: TextStyle(
+                      fontFamily: AppConsts.expoArabic,
+                      color: textColor,
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.justify,
+                    // textDirection: TextDirection.rtl,
+                  ),
+                ),
+
+              // Smart Timer Section
+              _buildSmartTimer(isDark),
+              const SizedBox(height: 16),
+
+              if (widget.prayer.prayer != null ||
+                  widget.prayer.id == 'duha' ||
+                  widget.prayer.id == 'witr' ||
+                  widget.prayer.id == 'sunrise' ||
+                  widget.prayer.id == 'first_third' ||
+                  widget.prayer.id == 'midnight' ||
+                  widget.prayer.id == 'last_third') ...[
+                // Manual Adjustment (Only for Fard)
+                if (widget.prayer.prayer != null)
+                  _buildAdjustmentRow(
+                    "تعديل الموعد (دقائق)",
+                    _adhanOffset,
+                    _updateOffset,
+                    isDark,
+                  ),
+
+                const SizedBox(height: 16),
+
+                // Notification Toggles & Sound
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: containerColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: borderColor),
+                    boxShadow: isDark
+                        ? null
+                        : [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 5,
+                              offset: const Offset(0, 2),
                             ),
-                          );
-                          _loadSound(); // Refresh after return
-                          PrayerService().scheduleNotificationsDebounced();
-                        },
-                      ),
-                    ],
-                    if (widget.prayer.prayer != null &&
-                        widget.prayer.id != 'sunrise') ...[
-                      Divider(color: borderColor),
-                      // Iqama Mode 3-way
+                          ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Adhan Mode 3-way
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(
-                          Icons.timer_outlined,
+                          Icons.notifications_active,
                           color: Color(0xFFD0A871),
                         ),
                         title: Text(
-                          "إقامة الصلاة",
+                          "تنبيه الأذان",
                           style: TextStyle(
                             fontFamily: AppConsts.expoArabic,
                             color: textColor,
@@ -399,9 +298,9 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
                           ),
                         ),
                         subtitle: Text(
-                          _iqamaMode == 'sound'
+                          _adhanMode == 'sound'
                               ? 'صوت + إشعار'
-                              : _iqamaMode == 'silent_notif'
+                              : _adhanMode == 'silent_notif'
                               ? 'إشعار بدون صوت'
                               : 'مُعطَّل',
                           style: const TextStyle(
@@ -410,137 +309,246 @@ class _PrayerDetailModalState extends State<PrayerDetailModal> {
                             fontSize: 12,
                           ),
                         ),
-                        trailing: _buildModeSelector(_iqamaMode, (v) async {
-                          setState(() => _iqamaMode = v);
+                        trailing: _buildModeSelector(_adhanMode, (v) async {
+                          setState(() => _adhanMode = v);
+                          final prefs = CacheHelper.prefs;
                           final capKey =
                               widget.prayer.id[0].toUpperCase() +
                               widget.prayer.id.substring(1);
-                          final prefs = CacheHelper.prefs;
-                          await prefs.setString('iqama_mode_$capKey', v);
-                          await prefs.setBool(
-                            'iqama_enabled_$capKey',
-                            v != 'none',
-                          );
+                          await prefs.setString('adhan_mode_$capKey', v);
+                          await prefs.setBool(_getNotifKey(), v != 'none');
+                          if (widget.prayer.id == 'last_third' ||
+                              widget.prayer.id == 'qiyam') {
+                            await prefs.setString('qiyam_mode_notif', v);
+                            await prefs.setBool('notif_qiyam', v != 'none');
+                          }
                           PrayerService().scheduleNotificationsDebounced();
                         }),
                       ),
-                      if (_iqamaMode != 'none') ...[
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
+                      Divider(color: borderColor),
+                      // Hide adhan picker for events that use fixed custom voice-overs
+                      if (!_isCustomSoundEvent()) ...[
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(
+                            Icons.music_note,
+                            color: Color(0xFFD0A871),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          title: Text(
+                            "نغمة التنبيه",
+                            style: TextStyle(
+                              fontFamily: AppConsts.expoArabic,
+                              color: textColor,
+                              fontSize: 14,
+                            ),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                "وقت الإقامة (دقائق)",
-                                style: TextStyle(
-                                  fontFamily: AppConsts.cairo,
-                                  color: textColor.withValues(alpha: 0.7),
-                                  fontSize: 13,
+                              Container(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 100,
+                                ),
+                                child: Text(
+                                  _selectedSoundName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontFamily: AppConsts.expoArabic,
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? const Color(0xFF303030)
-                                      : Colors.grey[200],
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  children: [
-                                    InkWell(
-                                      onTap: () async {
-                                        if (_iqamaDelay > 1) {
-                                          setState(() => _iqamaDelay--);
-                                          String key =
-                                              widget.prayer.id[0]
-                                                  .toUpperCase() +
-                                              widget.prayer.id.substring(1);
-                                          final prefs =
-                                              CacheHelper.prefs;
-                                          await prefs.setInt(
-                                            'iqama_minutes_$key',
-                                            _iqamaDelay,
-                                          );
-                                          PrayerService()
-                                              .scheduleNotificationsDebounced(isUserAction: true);
-                                        }
-                                      },
-                                      child: const Icon(Icons.remove, size: 18),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                      ),
-                                      child: Text(
-                                        "$_iqamaDelay",
-                                        style: const TextStyle(
-                                          fontFamily: AppConsts.expoArabic,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                    InkWell(
-                                      onTap: () async {
-                                        if (_iqamaDelay < 60) {
-                                          setState(() => _iqamaDelay++);
-                                          String key =
-                                              widget.prayer.id[0]
-                                                  .toUpperCase() +
-                                              widget.prayer.id.substring(1);
-                                          final prefs =
-                                              CacheHelper.prefs;
-                                          await prefs.setInt(
-                                            'iqama_minutes_$key',
-                                            _iqamaDelay,
-                                          );
-                                          PrayerService()
-                                              .scheduleNotificationsDebounced(isUserAction: true);
-                                        }
-                                      },
-                                      child: const Icon(Icons.add, size: 18),
-                                    ),
-                                  ],
-                                ),
+                              const Icon(
+                                Icons.arrow_forward_ios,
+                                color: Colors.grey,
+                                size: 14,
                               ),
                             ],
                           ),
+                          onTap: () async {
+                            // Navigate to sound selection
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => MuezzinSelectionScreen(
+                                  prefsKey:
+                                      'adhan_sound_${widget.prayer.id.toLowerCase()}',
+                                  title: 'أذان ${widget.prayer.name}',
+                                ),
+                              ),
+                            );
+                            _loadSound(); // Refresh after return
+                            PrayerService().scheduleNotificationsDebounced();
+                          },
                         ),
                       ],
+                      if (widget.prayer.prayer != null &&
+                          widget.prayer.id != 'sunrise') ...[
+                        Divider(color: borderColor),
+                        // Iqama Mode 3-way
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(
+                            Icons.timer_outlined,
+                            color: Color(0xFFD0A871),
+                          ),
+                          title: Text(
+                            "إقامة الصلاة",
+                            style: TextStyle(
+                              fontFamily: AppConsts.expoArabic,
+                              color: textColor,
+                              fontSize: 14,
+                            ),
+                          ),
+                          subtitle: Text(
+                            _iqamaMode == 'sound'
+                                ? 'صوت + إشعار'
+                                : _iqamaMode == 'silent_notif'
+                                ? 'إشعار بدون صوت'
+                                : 'مُعطَّل',
+                            style: const TextStyle(
+                              fontFamily: AppConsts.cairo,
+                              color: Colors.grey,
+                              fontSize: 12,
+                            ),
+                          ),
+                          trailing: _buildModeSelector(_iqamaMode, (v) async {
+                            setState(() => _iqamaMode = v);
+                            final capKey =
+                                widget.prayer.id[0].toUpperCase() +
+                                widget.prayer.id.substring(1);
+                            final prefs = CacheHelper.prefs;
+                            await prefs.setString('iqama_mode_$capKey', v);
+                            await prefs.setBool(
+                              'iqama_enabled_$capKey',
+                              v != 'none',
+                            );
+                            PrayerService().scheduleNotificationsDebounced();
+                          }),
+                        ),
+                        if (_iqamaMode != 'none') ...[
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  "وقت الإقامة (دقائق)",
+                                  style: TextStyle(
+                                    fontFamily: AppConsts.cairo,
+                                    color: textColor.withValues(alpha: 0.7),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? const Color(0xFF303030)
+                                        : Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      InkWell(
+                                        onTap: () async {
+                                          if (_iqamaDelay > 1) {
+                                            setState(() => _iqamaDelay--);
+                                            String key =
+                                                widget.prayer.id[0]
+                                                    .toUpperCase() +
+                                                widget.prayer.id.substring(1);
+                                            final prefs = CacheHelper.prefs;
+                                            await prefs.setInt(
+                                              'iqama_minutes_$key',
+                                              _iqamaDelay,
+                                            );
+                                            PrayerService()
+                                                .scheduleNotificationsDebounced(
+                                                  isUserAction: true,
+                                                );
+                                          }
+                                        },
+                                        child: const Icon(
+                                          Icons.remove,
+                                          size: 18,
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                        ),
+                                        child: Text(
+                                          "$_iqamaDelay",
+                                          style: const TextStyle(
+                                            fontFamily: AppConsts.expoArabic,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      InkWell(
+                                        onTap: () async {
+                                          if (_iqamaDelay < 60) {
+                                            setState(() => _iqamaDelay++);
+                                            String key =
+                                                widget.prayer.id[0]
+                                                    .toUpperCase() +
+                                                widget.prayer.id.substring(1);
+                                            final prefs = CacheHelper.prefs;
+                                            await prefs.setInt(
+                                              'iqama_minutes_$key',
+                                              _iqamaDelay,
+                                            );
+                                            PrayerService()
+                                                .scheduleNotificationsDebounced(
+                                                  isUserAction: true,
+                                                );
+                                          }
+                                        },
+                                        child: const Icon(Icons.add, size: 18),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ],
-                  ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD0A871),
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text(
+                  "إغلاق",
+                  style: TextStyle(
+                    fontFamily: AppConsts.cairo,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
-
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD0A871),
-                foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: const Text(
-                "إغلاق",
-                style: TextStyle(
-                  fontFamily: AppConsts.cairo,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
-       ),
       ),
     );
   }

@@ -3,11 +3,27 @@ import 'package:flutter/foundation.dart';
 
 class FontsHelper {
   static final Set<String> _loadedFonts = {};
+  static final Map<String, Future<void>> _loadingFutures = {};
 
   static bool isFontLoaded(String family) => _loadedFonts.contains(family);
 
   static Future<void> loadFont(String family, String path) async {
     if (_loadedFonts.contains(family)) return;
+    if (_loadingFutures.containsKey(family)) {
+      await _loadingFutures[family];
+      return;
+    }
+
+    final future = _loadFontInternal(family, path);
+    _loadingFutures[family] = future;
+    try {
+      await future;
+    } finally {
+      _loadingFutures.remove(family);
+    }
+  }
+
+  static Future<void> _loadFontInternal(String family, String path) async {
     try {
       final loader = FontLoader(family)..addFont(rootBundle.load(path));
       await loader.load();

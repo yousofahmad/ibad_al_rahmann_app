@@ -5,7 +5,7 @@ import android.content.Context
 import android.os.Build
 
 object AppMigrationManager {
-    private const val CURRENT_NATIVE_VERSION = 9
+    private const val CURRENT_NATIVE_VERSION = 10
     private const val KEY_MIGRATION = "native_migration_version"
 
     fun checkAndPerformMigration(context: Context) {
@@ -28,6 +28,7 @@ object AppMigrationManager {
                     "persistent_prayer_v19", "persistent_prayer_v20", "persistent_prayer_v21",
                     "persistent_prayer_v22", "prayer_sound_channel_v1", "prayer_sound_channel_v2",
                     "prayer_sound_channel_v10", "prayer_sound_channel_v11", "prayer_sound_channel_v12",
+                    "prayer_sound_channel_v13",
                     "adhan_channel", "azkar_channel", "general_channel"
                 )
                 for (ch in oldChannels) {

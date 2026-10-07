@@ -28,8 +28,7 @@ class _QuranPagesListState extends State<QuranPagesList> {
       buildWhen: (prev, curr) => prev.currentPage != curr.currentPage,
       builder: (context, state) {
         return PageView.builder(
-      physics: const EasyPageScrollPhysics(),
-      allowImplicitScrolling: true,
+          allowImplicitScrolling: true,
           controller: cubit.pagesController,
           scrollDirection: Axis.horizontal,
           clipBehavior: Clip.none,

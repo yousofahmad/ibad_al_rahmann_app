@@ -136,7 +136,9 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
     final isFriday = DateTime.now().weekday == DateTime.friday;
     if (name.contains('فجر')) return 'assets/images/ic_fajr.png';
     if (name.contains('ظهر') || name.contains('جمعة')) {
-      return isFriday ? 'assets/images/ic_jumuah_prayer.png' : 'assets/images/ic_dhuhr.png';
+      return isFriday
+          ? 'assets/images/ic_jumuah_prayer.png'
+          : 'assets/images/ic_dhuhr.png';
     }
     if (name.contains('عصر')) return 'assets/images/ic_asr.png';
     if (name.contains('مغرب')) return 'assets/images/ic_maghrib.png';
@@ -208,29 +210,25 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
             padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h),
             child: Container(
               width: double.infinity,
-            constraints: BoxConstraints(
-              maxWidth: 420.w,
-              minHeight: 460.h,
+              constraints: BoxConstraints(maxWidth: 420.w, minHeight: 460.h),
+              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
+              decoration: const BoxDecoration(color: Colors.transparent),
+              child: _isAchievementStep
+                  ? _buildAchievementStep(goldColor, goldDark, isDark)
+                  : (_isConfirmStep
+                        ? _buildConfirmStep(goldColor, goldDark, isDark)
+                        : _buildMainAlertContent(goldColor, goldDark, isDark)),
             ),
-            padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
-            decoration: const BoxDecoration(
-              color: Colors.transparent,
-            ),
-            child: _isAchievementStep
-                ? _buildAchievementStep(goldColor, goldDark, isDark)
-                : (_isConfirmStep
-                    ? _buildConfirmStep(goldColor, goldDark, isDark)
-                    : _buildMainAlertContent(goldColor, goldDark, isDark)),
           ),
         ),
-      ),
       ),
     );
   }
 
   Widget _buildMainAlertContent(Color goldColor, Color goldDark, bool isDark) {
     final subColor = isDark ? Colors.white70 : const Color(0xFF6E655C);
-    final (remainingTimeText, progressValue) = _calculateRemainingTimeAndProgress();
+    final (remainingTimeText, progressValue) =
+        _calculateRemainingTimeAndProgress();
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -244,17 +242,17 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: goldColor.withValues(alpha: 0.1),
-              border: Border.all(color: goldColor.withValues(alpha: 0.4), width: 2),
+              border: Border.all(
+                color: goldColor.withValues(alpha: 0.4),
+                width: 2,
+              ),
             ),
             padding: EdgeInsets.all(12.w),
             child: Image.asset(
               _getPrayerImage(),
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => Icon(
-                Icons.mosque_rounded,
-                size: 48.sp,
-                color: goldColor,
-              ),
+              errorBuilder: (_, __, ___) =>
+                  Icon(Icons.mosque_rounded, size: 48.sp, color: goldColor),
             ),
           ),
         ),
@@ -289,7 +287,9 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
             decoration: BoxDecoration(
               color: const Color(0xFFFF8C00).withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(16.r),
-              border: Border.all(color: const Color(0xFFFF8C00).withValues(alpha: 0.3)),
+              border: Border.all(
+                color: const Color(0xFFFF8C00).withValues(alpha: 0.3),
+              ),
             ),
             child: Text(
               '🔥 ${widget.streak} صلوات متتالية',
@@ -317,50 +317,48 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
           child: Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-            decoration: const BoxDecoration(
-              color: Colors.transparent,
-            ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'الوقت المتبقي للآتية:',
-                    style: TextStyle(
-                      fontFamily: AppConsts.expoArabic,
-                      fontSize: 12.sp,
-                      color: subColor,
+            decoration: const BoxDecoration(color: Colors.transparent),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'الوقت المتبقي للآتية:',
+                      style: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontSize: 12.sp,
+                        color: subColor,
+                      ),
                     ),
-                  ),
-                  Text(
-                    remainingTimeText,
-                    style: TextStyle(
-                      fontFamily: AppConsts.expoArabic,
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.bold,
-                      color: goldColor,
+                    Text(
+                      remainingTimeText,
+                      style: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.bold,
+                        color: goldColor,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8.h),
-
-              // Thick rounded progress bar
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8.r),
-                child: LinearProgressIndicator(
-                  value: progressValue,
-                  minHeight: 8.h,
-                  backgroundColor: isDark
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : Colors.black.withValues(alpha: 0.08),
-                  valueColor: AlwaysStoppedAnimation<Color>(goldColor),
+                  ],
                 ),
-              ),
-            ],
+                SizedBox(height: 8.h),
+
+                // Thick rounded progress bar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8.r),
+                  child: LinearProgressIndicator(
+                    value: progressValue,
+                    minHeight: 8.h,
+                    backgroundColor: isDark
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : Colors.black.withValues(alpha: 0.08),
+                    valueColor: AlwaysStoppedAnimation<Color>(goldColor),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
         ),
         SizedBox(height: 24.h),
 
@@ -406,15 +404,21 @@ class _PrayerAlertModalState extends State<PrayerAlertModal> {
                 ? () {
                     // CRITICAL: Calculate target time STRICTLY at the exact moment of the tap
                     final now = DateTime.now();
-                    final targetSnoozeTime = now.add(Duration(minutes: widget.snoozeMinutes));
-                    debugPrint('Snoozed at $now, next alert target: $targetSnoozeTime');
+                    final targetSnoozeTime = now.add(
+                      Duration(minutes: widget.snoozeMinutes),
+                    );
+                    debugPrint(
+                      'Snoozed at $now, next alert target: $targetSnoozeTime',
+                    );
                     widget.onSnooze();
                   }
                 : null,
             style: OutlinedButton.styleFrom(
               foregroundColor: goldColor,
               side: BorderSide(
-                color: goldColor.withValues(alpha: _snoozeCountdown == 0 ? 0.6 : 0.2),
+                color: goldColor.withValues(
+                  alpha: _snoozeCountdown == 0 ? 0.6 : 0.2,
+                ),
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20.r),

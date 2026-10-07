@@ -20,9 +20,9 @@
 - Other app notifications use `IMPORTANCE_HIGH` / `PRIORITY_HIGH` so they rank below the persistent notification.
 - When persistent notification is disabled, cancel notification ID 777 immediately and call `stopSelf()`.
 
-## 3. Hijri Dates & Maghrib Day Transition
-- Primary source: ICU Umm al-Qura calculation combined with manual offsets.
-- In Islamic law, the new day starts at Maghrib (sunset). If current time is after today's Maghrib, the date MUST advance to the next Islamic day across all widgets, notifications, and native calculations.
+## 3. Hijri Dates & Civil Day Transition (Midnight 00:00)
+- Primary source: ICU Umm al-Qura calculation combined with Egyptian system (Dar Al-Ifta & Survey Authority) and manual offsets.
+- Hijri calendar dates transition at 00:00 (midnight) across the app to maintain 100% parity with civil dates, Egyptian authority calendars, and daily/prayer-based Wird routines. Eve of 29 crescent confirmation checks occur after Maghrib on day 29.
 
 ## 4. Quran Page Header & Layout Standard
 - **Header Layout**:
@@ -129,4 +129,17 @@
   - Light mode: Pure white (`Colors.white` / `#FFFFFF`).
   - Dark mode: Dark / Black (`Colors.black` / `const Color(0xFF000000)` / `const Color(0xFF1E1E1E)`).
 - Never hardcode fixed static colors (e.g. fixed emerald green texture background) that ignore the user-selected theme.
+
+## 25. Notification Group Summary Auto-Cleanup (تنظيف ملخص مجموعة الإشعارات)
+- When prayer or general notifications are swiped away or tapped, `NotificationDismissReceiver.cleanupEmptyGroupSummaries` and `MainActivity` MUST inspect active notifications on Android 6.0+ (API 23+).
+- If no active child notifications remain in `PRAYER_GROUP`, cancel group summary ID 666 immediately.
+- If no active child notifications remain in `GENERAL_GROUP`, cancel group summary ID 667 immediately.
+- Never leave an empty group header or collapsed empty container in the system notification shade.
+
+## 26. Isha Validity Window & Post-Midnight Date Resolution (دورة صلاة العشاء بعد منتصف الليل وحتى الفجر)
+- The validity window for Isha prayer extends from evening (after Maghrib) throughout the night until Fajr adhan / alert.
+- If a user records, toggles, or confirms Isha between 00:00:00 (midnight) and today's Fajr: the prayer MUST be recorded under the active night's date key (yesterday's date / active prayer cycle), NEVER under the upcoming unarrived Isha of the new civil day.
+- In "صلاتي", "حاسب نفسك", and Native Kotlin overlay (`PrayerFocusOverlay.kt`), date resolution for Isha past midnight must target yesterday's log (`prayer_focus_log_$yesterdayKey`), preserving streak, stats, and today's upcoming Isha.
+- Daily accountability reset in `DailyTrackerService.initStatsForToday()` transitions at Fajr rather than wiping at 00:00 midnight.
+
 

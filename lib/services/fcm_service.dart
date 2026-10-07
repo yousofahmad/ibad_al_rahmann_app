@@ -13,19 +13,22 @@ class FCMService {
   static Future<void> init() async {
     try {
       // Register background handler early
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
 
       // Only request permission if the app is actually in the foreground/active.
       // If the screen is locked, this might fail or show nothing.
-      final settings = await _messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      ).timeout(const Duration(seconds: 5), onTimeout: () {
-         debugPrint('FCM: Permission request timed out.');
-         return _messaging.getNotificationSettings();
-      });
-      
+      final settings = await _messaging
+          .requestPermission(alert: true, badge: true, sound: true)
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              debugPrint('FCM: Permission request timed out.');
+              return _messaging.getNotificationSettings();
+            },
+          );
+
       debugPrint('FCM permission: ${settings.authorizationStatus}');
 
       // Foreground message listener

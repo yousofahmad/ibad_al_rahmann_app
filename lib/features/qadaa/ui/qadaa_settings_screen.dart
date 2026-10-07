@@ -26,12 +26,28 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
   int _fastingReminderDay = 7; // Default Sunday (1=Mon, 7=Sun)
 
   final List<String> hijriMonths = [
-    "محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة",
-    "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
+    "محرم",
+    "صفر",
+    "ربيع الأول",
+    "ربيع الآخر",
+    "جمادى الأولى",
+    "جمادى الآخرة",
+    "رجب",
+    "شعبان",
+    "رمضان",
+    "شوال",
+    "ذو القعدة",
+    "ذو الحجة",
   ];
 
   final List<String> weekDays = [
-    "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"
+    "الإثنين",
+    "الثلاثاء",
+    "الأربعاء",
+    "الخميس",
+    "الجمعة",
+    "السبت",
+    "الأحد",
   ];
 
   @override
@@ -46,14 +62,20 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
       _requiresPrayerQadaa = prefs.getBool('qadaa_requires_prayer') ?? true;
       _hasZakatWealth = prefs.getBool('qadaa_has_zakat') ?? false;
       _zakatDate = prefs.getString('qadaa_zakat_date');
-      _dailyPrayerReminder = prefs.getBool('qadaa_daily_prayer_reminder') ?? false;
+      _dailyPrayerReminder =
+          prefs.getBool('qadaa_daily_prayer_reminder') ?? false;
       final timeStr = prefs.getString('qadaa_daily_prayer_time');
       if (timeStr != null && timeStr.contains(':')) {
         final parts = timeStr.split(':');
-        _prayerReminderTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+        _prayerReminderTime = TimeOfDay(
+          hour: int.parse(parts[0]),
+          minute: int.parse(parts[1]),
+        );
       }
-      _fastingReminderFrequency = prefs.getString('qadaa_fasting_reminder_freq') ?? 'إيقاف';
-      _fastingStartMonth = prefs.getInt('qadaa_fasting_reminder_start_month') ?? 7;
+      _fastingReminderFrequency =
+          prefs.getString('qadaa_fasting_reminder_freq') ?? 'إيقاف';
+      _fastingStartMonth =
+          prefs.getInt('qadaa_fasting_reminder_start_month') ?? 7;
       _fastingReminderDay = prefs.getInt('qadaa_fasting_reminder_day') ?? 7;
     });
   }
@@ -86,7 +108,10 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
     );
     if (picked != null) {
       setState(() => _prayerReminderTime = picked);
-      await _saveString('qadaa_daily_prayer_time', '${picked.hour}:${picked.minute}');
+      await _saveString(
+        'qadaa_daily_prayer_time',
+        '${picked.hour}:${picked.minute}',
+      );
       if (!_dailyPrayerReminder) {
         setState(() => _dailyPrayerReminder = true);
         await _saveBool('qadaa_daily_prayer_reminder', true);
@@ -100,7 +125,9 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
       builder: (ctx) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.r),
+          ),
           backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
           child: Container(
             height: 400.h,
@@ -112,10 +139,15 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                   TabBar(
                     indicatorColor: const Color(0xFFD0A871),
                     labelColor: const Color(0xFFD0A871),
-                    unselectedLabelColor: isDark ? Colors.white38 : Colors.black45,
+                    unselectedLabelColor: isDark
+                        ? Colors.white38
+                        : Colors.black45,
                     indicatorSize: TabBarIndicatorSize.tab,
                     dividerColor: Colors.transparent,
-                    labelStyle: const TextStyle(fontFamily: AppConsts.expoArabic, fontWeight: FontWeight.bold),
+                    labelStyle: const TextStyle(
+                      fontFamily: AppConsts.expoArabic,
+                      fontWeight: FontWeight.bold,
+                    ),
                     tabs: const [
                       Tab(text: "ميلادي"),
                       Tab(text: "هجري"),
@@ -124,10 +156,7 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                   SizedBox(height: 10.h),
                   Expanded(
                     child: TabBarView(
-                      children: [
-                        _buildGregorianTab(ctx),
-                        _buildHijriTab(ctx),
-                      ],
+                      children: [_buildGregorianTab(ctx), _buildHijriTab(ctx)],
                     ),
                   ),
                 ],
@@ -135,7 +164,7 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
             ),
           ),
         );
-      }
+      },
     );
   }
 
@@ -171,7 +200,12 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                         primary: const Color(0xFFD0A871),
                         onPrimary: Colors.white,
                         onSurface: isDark ? Colors.white : Colors.black,
-                      ), dialogTheme: DialogThemeData(backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white),
+                      ),
+                      dialogTheme: DialogThemeData(
+                        backgroundColor: isDark
+                            ? const Color(0xFF1A1A1A)
+                            : Colors.white,
+                      ),
                     ),
                     child: child!,
                   );
@@ -179,7 +213,10 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
               );
               if (picked != null) {
                 final prefs = CacheHelper.prefs;
-                await prefs.setString('qadaa_zakat_date', picked.toIso8601String());
+                await prefs.setString(
+                  'qadaa_zakat_date',
+                  picked.toIso8601String(),
+                );
                 setState(() {
                   _zakatDate = picked.toIso8601String();
                 });
@@ -191,9 +228,17 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFD0A871),
               padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
             ),
-            label: const Text("فتح التقويم", style: TextStyle(color: Colors.white, fontFamily: AppConsts.expoArabic)),
+            label: const Text(
+              "فتح التقويم",
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: AppConsts.expoArabic,
+              ),
+            ),
           ),
         ],
       ),
@@ -224,7 +269,9 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
             Container(
               padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
               decoration: BoxDecoration(
-                color: isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+                color: isDark
+                    ? Colors.white.withAlpha(10)
+                    : Colors.black.withAlpha(5),
                 borderRadius: BorderRadius.circular(15.r),
               ),
               child: Row(
@@ -245,7 +292,10 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                   ),
                   _buildHijriDropdown<int>(
                     value: year,
-                    items: List.generate(10, (i) => HijriCalendar.now().hYear + i - 1),
+                    items: List.generate(
+                      10,
+                      (i) => HijriCalendar.now().hYear + i - 1,
+                    ),
                     onChanged: (v) => setModalState(() => year = v!),
                     isDark: isDark,
                   ),
@@ -259,7 +309,10 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                   final temp = HijriCalendar();
                   final greg = temp.hijriToGregorian(year, month, day);
                   final prefs = CacheHelper.prefs;
-                  await prefs.setString('qadaa_zakat_date', greg.toIso8601String());
+                  await prefs.setString(
+                    'qadaa_zakat_date',
+                    greg.toIso8601String(),
+                  );
                   setState(() {
                     _zakatDate = greg.toIso8601String();
                   });
@@ -272,13 +325,21 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFD0A871),
                 padding: EdgeInsets.symmetric(horizontal: 40.w, vertical: 12.h),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
               ),
-              child: const Text("حفظ التاريخ", style: TextStyle(color: Colors.white, fontFamily: AppConsts.expoArabic)),
-            )
+              child: const Text(
+                "حفظ التاريخ",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: AppConsts.expoArabic,
+                ),
+              ),
+            ),
           ],
         );
-      }
+      },
     );
   }
 
@@ -319,17 +380,29 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
         title: Text(
           "تأكيد التصفير",
           textAlign: TextAlign.right,
-          style: TextStyle(fontFamily: AppConsts.expoArabic, color: isDark ? Colors.white : Colors.black),
+          style: TextStyle(
+            fontFamily: AppConsts.expoArabic,
+            color: isDark ? Colors.white : Colors.black,
+          ),
         ),
         content: Text(
           "هل أنت متأكد من مسح جميع بيانات القضاء والزكاة؟ هذا الإجراء لا يمكن التراجع عنه.",
           textAlign: TextAlign.right,
-          style: TextStyle(fontFamily: AppConsts.expoArabic, color: isDark ? Colors.white70 : Colors.black87),
+          style: TextStyle(
+            fontFamily: AppConsts.expoArabic,
+            color: isDark ? Colors.white70 : Colors.black87,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text("إلغاء", style: TextStyle(color: Colors.grey, fontFamily: AppConsts.expoArabic)),
+            child: const Text(
+              "إلغاء",
+              style: TextStyle(
+                color: Colors.grey,
+                fontFamily: AppConsts.expoArabic,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -347,7 +420,7 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
               await prefs.remove('qadaa_zakat_date');
               // Clear current month fasting misses if applicable
               final year = HijriCalendar.now().hYear;
-              for (int i=1; i<=30; i++) {
+              for (int i = 1; i <= 30; i++) {
                 await prefs.remove('qada_${year}_$i');
               }
               setState(() {
@@ -361,7 +434,13 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
               if (ctx.mounted) Navigator.pop(ctx);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text("مسح البيانات", style: TextStyle(color: Colors.white, fontFamily: AppConsts.expoArabic)),
+            child: const Text(
+              "مسح البيانات",
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: AppConsts.expoArabic,
+              ),
+            ),
           ),
         ],
       ),
@@ -395,7 +474,11 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                   SwitchListTile(
                     title: Text(
                       "هل مذهبك يوجب قضاء الصلاة؟",
-                      style: TextStyle(fontFamily: AppConsts.expoArabic, fontSize: 14.sp, color: isDark ? Colors.white : Colors.black),
+                      style: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontSize: 14.sp,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
                     ),
                     value: _requiresPrayerQadaa,
                     activeThumbColor: goldColor,
@@ -408,7 +491,11 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                   SwitchListTile(
                     title: Text(
                       "هل لك مال تؤدي عنه الزكاة؟",
-                      style: TextStyle(fontFamily: AppConsts.expoArabic, fontSize: 14.sp, color: isDark ? Colors.white : Colors.black),
+                      style: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontSize: 14.sp,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
                     ),
                     subtitle: _hasZakatWealth && zakatFormatted != null
                         ? InkWell(
@@ -417,7 +504,11 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                               padding: EdgeInsets.only(top: 8.h),
                               child: Text(
                                 "موعد الزكاة: $zakatFormatted\n(اضغط للتعديل)",
-                                style: TextStyle(fontFamily: AppConsts.expoArabic, color: goldColor, fontSize: 12.sp),
+                                style: TextStyle(
+                                  fontFamily: AppConsts.expoArabic,
+                                  color: goldColor,
+                                  fontSize: 12.sp,
+                                ),
                               ),
                             ),
                           )
@@ -443,21 +534,32 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                   SwitchListTile(
                     title: Text(
                       "تذكير يومي بإضافة الصلوات المقضية",
-                      style: TextStyle(fontFamily: AppConsts.expoArabic, fontSize: 14.sp, color: isDark ? Colors.white : Colors.black),
+                      style: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontSize: 14.sp,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
                     ),
-                    subtitle: _prayerReminderTime != null && _dailyPrayerReminder
+                    subtitle:
+                        _prayerReminderTime != null && _dailyPrayerReminder
                         ? Padding(
                             padding: EdgeInsets.only(top: 8.h),
                             child: Text(
                               "وقت التذكير: ${_prayerReminderTime!.format(context)}",
-                              style: const TextStyle(fontFamily: AppConsts.expoArabic, color: goldColor),
+                              style: const TextStyle(
+                                fontFamily: AppConsts.expoArabic,
+                                color: goldColor,
+                              ),
                             ),
                           )
                         : null,
                     value: _dailyPrayerReminder,
                     activeThumbColor: goldColor,
                     secondary: IconButton(
-                      icon: Icon(Icons.access_time, color: _dailyPrayerReminder ? goldColor : Colors.grey),
+                      icon: Icon(
+                        Icons.access_time,
+                        color: _dailyPrayerReminder ? goldColor : Colors.grey,
+                      ),
                       onPressed: () => _selectPrayerTime(context),
                     ),
                     onChanged: (val) {
@@ -477,11 +579,17 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
               child: Padding(
                 padding: EdgeInsets.all(16.w),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, // In RTL, start is right
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start, // In RTL, start is right
                   children: [
                     Text(
                       "تكرار تذكير الصيام",
-                      style: TextStyle(fontFamily: AppConsts.expoArabic, fontSize: 14.sp, color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontSize: 14.sp,
+                        color: isDark ? Colors.white : Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     SizedBox(height: 10.h),
                     Wrap(
@@ -493,12 +601,16 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                             label,
                             style: TextStyle(
                               fontFamily: AppConsts.expoArabic,
-                              color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                              color: isSelected
+                                  ? Colors.white
+                                  : (isDark ? Colors.white70 : Colors.black87),
                             ),
                           ),
                           selected: isSelected,
                           selectedColor: goldColor,
-                          backgroundColor: isDark ? Colors.white10 : Colors.grey[200],
+                          backgroundColor: isDark
+                              ? Colors.white10
+                              : Colors.grey[200],
                           showCheckmark: false,
                           onSelected: (val) {
                             if (val) {
@@ -513,7 +625,11 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                       SizedBox(height: 16.h),
                       Text(
                         "تنبيه كل يوم:",
-                        style: TextStyle(fontFamily: AppConsts.expoArabic, fontSize: 13.sp, color: isDark ? Colors.white70 : Colors.black87),
+                        style: TextStyle(
+                          fontFamily: AppConsts.expoArabic,
+                          fontSize: 13.sp,
+                          color: isDark ? Colors.white70 : Colors.black87,
+                        ),
                       ),
                       SizedBox(height: 8.h),
                       SizedBox(
@@ -532,17 +648,28 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                                   style: TextStyle(
                                     fontFamily: AppConsts.expoArabic,
                                     fontSize: 11.sp,
-                                    color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                    color: isSelected
+                                        ? Colors.white
+                                        : (isDark
+                                              ? Colors.white70
+                                              : Colors.black87),
                                   ),
                                 ),
                                 selected: isSelected,
                                 selectedColor: goldColor,
-                                backgroundColor: isDark ? Colors.white10 : Colors.grey[200],
+                                backgroundColor: isDark
+                                    ? Colors.white10
+                                    : Colors.grey[200],
                                 showCheckmark: false,
                                 onSelected: (val) {
                                   if (val) {
-                                    setState(() => _fastingReminderDay = dayNum);
-                                    _saveInt('qadaa_fasting_reminder_day', dayNum);
+                                    setState(
+                                      () => _fastingReminderDay = dayNum,
+                                    );
+                                    _saveInt(
+                                      'qadaa_fasting_reminder_day',
+                                      dayNum,
+                                    );
                                   }
                                 },
                               ),
@@ -590,17 +717,28 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                                   style: TextStyle(
                                     fontFamily: AppConsts.expoArabic,
                                     fontSize: 11.sp,
-                                    color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                    color: isSelected
+                                        ? Colors.white
+                                        : (isDark
+                                              ? Colors.white70
+                                              : Colors.black87),
                                   ),
                                 ),
                                 selected: isSelected,
                                 selectedColor: goldColor,
-                                backgroundColor: isDark ? Colors.white10 : Colors.grey[200],
+                                backgroundColor: isDark
+                                    ? Colors.white10
+                                    : Colors.grey[200],
                                 showCheckmark: false,
                                 onSelected: (val) {
                                   if (val) {
-                                    setState(() => _fastingStartMonth = monthNum);
-                                    _saveInt('qadaa_fasting_reminder_start_month', monthNum);
+                                    setState(
+                                      () => _fastingStartMonth = monthNum,
+                                    );
+                                    _saveInt(
+                                      'qadaa_fasting_reminder_start_month',
+                                      monthNum,
+                                    );
                                   }
                                 },
                               ),

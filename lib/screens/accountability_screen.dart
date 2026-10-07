@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/features/wird/bloc/khatma_cubit.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/core/helpers/islamic_day.dart';
+import 'package:ibad_al_rahmann/core/helpers/prayer_day_helper.dart';
 import 'package:ibad_al_rahmann/widgets/app_skeleton.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
@@ -22,7 +23,7 @@ class AccountabilityScreen extends StatefulWidget {
   State<AccountabilityScreen> createState() => _AccountabilityScreenState();
 }
 
-class _AccountabilityScreenState extends State<AccountabilityScreen> {
+class _AccountabilityScreenState extends State<AccountabilityScreen> with WidgetsBindingObserver {
   final List<String> _defaultPrayers = [
     'الفجر',
     'الظهر',
@@ -77,7 +78,21 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadDailyProgress();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadDailyProgress();
+    }
   }
 
   void _initSectionItems(
@@ -87,7 +102,8 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
     Map<String, bool> targetMap,
   ) {
     final custom = prefs.getStringList('custom_items_$storageKey') ?? [];
-    final deleted = (prefs.getStringList('deleted_items_$storageKey') ?? []).toSet();
+    final deleted = (prefs.getStringList('deleted_items_$storageKey') ?? [])
+        .toSet();
     final items = [
       ...defaultList.where((e) => !deleted.contains(e)),
       ...custom.where((e) => !deleted.contains(e)),
@@ -103,24 +119,16 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
     final prefs = CacheHelper.prefs;
     await prefs.reload();
 
+    // ✅ التأكد من تهيئة بيانات اليوم وعمل Reset لو يوم جديد
+    await DailyTrackerService.initStatsForToday();
+
+    await prefs.reload();
+
     // تهيئة القوائم بالبنود الافتراضية والمخصصة
     _initSectionItems(prefs, 'temp_prayers', _defaultPrayers, _prayers);
     _initSectionItems(prefs, 'temp_quran', _defaultQuran, _quran);
     _initSectionItems(prefs, 'temp_azkar', _defaultAzkar, _azkar);
     _initSectionItems(prefs, 'temp_deeds', _defaultGoodDeeds, _goodDeeds);
-
-    // ✅ احفظ البيانات النيتف المهمة قبل أي reset
-    final nativeTempPrayers = prefs.getString('temp_prayers');
-
-    // ✅ التأكد من تهيئة بيانات اليوم وعمل Reset لو يوم جديد
-    await DailyTrackerService.initStatsForToday();
-
-    // ✅ لو DailyTracker مسح temp_prayers (يوم جديد) ارجع للبيانات النيتف لو موجودة
-    if (nativeTempPrayers != null && prefs.getString('temp_prayers') == null) {
-      await prefs.setString('temp_prayers', nativeTempPrayers);
-    }
-
-    await prefs.reload();
 
     // ✅ استرجاع العلامات التي علمناها لليوم الحالي
     _loadMapFromPrefs(prefs, 'temp_prayers', _prayers);
@@ -128,9 +136,12 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
     _loadMapFromPrefs(prefs, 'temp_azkar', _azkar);
     _loadMapFromPrefs(prefs, 'temp_deeds', _goodDeeds);
 
-    // ✅ دمج الصلوات المسجلة في صلاتي (Prayer Focus) لليوم الحالي
+    // ✅ دمج الصلوات المسجلة في صلاتي (Prayer Focus) لليوم الحالي / الدورة النشطة
     final todayKey = await IslamicDay.todayKey();
-    final focusLogRaw = prefs.getString('prayer_focus_log_$todayKey');
+    final activeKey = PrayerDayHelper.getActivePrayerCycleDate();
+    final focusLogRaw =
+        prefs.getString('prayer_focus_log_$activeKey') ??
+        prefs.getString('prayer_focus_log_$todayKey');
     if (focusLogRaw != null) {
       try {
         final Map<String, dynamic> focusMap = json.decode(focusLogRaw);
@@ -183,27 +194,32 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
       }
       _salawatCount = prefs.getInt('salawat_count_$todayKey') ?? 0;
 
-      _dynamicWirds.clear();
-      final khatmaState = context.read<KhatmaCubit>().state;
-      if (khatmaState is KhatmaLoaded) {
-        for (final k in khatmaState.khatmas) {
-          final label = k.accountabilityLabel.isNotEmpty ? k.accountabilityLabel : 'ورد التلاوة';
-          if (k.notificationType == 'prayer') {
-            for (final p in ['الفجر', 'الظهر', 'العصر', 'المغرب', 'العشاء']) {
-               final key = '$label - $p';
-               _dynamicWirds[key] = await DailyTrackerService.isWirdDone(key);
-            }
-          } else {
-             _dynamicWirds[label] = await DailyTrackerService.isWirdDone(label);
-          }
-        }
-      }
-
+      await _refreshDynamicWirds();
       await _saveStatsSilent();
 
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _refreshDynamicWirds() async {
+    _dynamicWirds.clear();
+    final khatmaState = context.read<KhatmaCubit>().state;
+    if (khatmaState is KhatmaLoaded) {
+      for (final k in khatmaState.khatmas) {
+        final label = k.accountabilityLabel.isNotEmpty
+            ? k.accountabilityLabel
+            : 'ورد التلاوة';
+        if (k.notificationType == 'prayer') {
+          for (final p in ['الفجر', 'الظهر', 'العصر', 'المغرب', 'العشاء']) {
+            final key = '$label - $p';
+            _dynamicWirds[key] = await DailyTrackerService.isWirdDone(key);
+          }
+        } else {
+          _dynamicWirds[label] = await DailyTrackerService.isWirdDone(label);
+        }
+      }
     }
   }
 
@@ -252,6 +268,28 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
     final prefs = CacheHelper.prefs;
     await prefs.setString(key, json.encode(map));
 
+    // Rule 15: If checking/unchecking prayers, write back to prayer_focus_log_$dateKey
+    if (key == 'temp_prayers') {
+      final dateKey = PrayerDayHelper.getPrayerDateKey(itemKey);
+      final logKey = 'prayer_focus_log_$dateKey';
+      final existing = prefs.getString(logKey);
+      Map<String, dynamic> focusMap = {};
+      if (existing != null) {
+        try {
+          focusMap = json.decode(existing) as Map<String, dynamic>;
+        } catch (_) {}
+      }
+      if (value) {
+        focusMap[itemKey] = {
+          'status': 'ontime',
+          'ts': DateTime.now().millisecondsSinceEpoch,
+        };
+      } else {
+        focusMap.remove(itemKey);
+      }
+      await prefs.setString(logKey, json.encode(focusMap));
+    }
+
     // ✅ حفظ فوري للإحصائيات وحساب نسبة الإنجاز فوراً
     await _saveStatsSilent();
 
@@ -271,19 +309,46 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
 
   // دالة حفظ الإحصائيات (بدون رسالة)
   Future<void> _saveStatsSilent() async {
-    double calcPercent(Map<String, bool> map) {
-      int checked = map.values.where((e) => e).length;
-      return map.isEmpty ? 0 : (checked / map.length) * 100;
-    }
+    int totalPrayerItems = _prayers.length;
+    int checkedPrayerItems = _prayers.values.where((e) => e).length;
+    double prayerScore = totalPrayerItems == 0
+        ? 0.0
+        : (checkedPrayerItems / totalPrayerItems) * 100.0;
 
-    double prayerScore = calcPercent(_prayers);
-    double quranScore = calcPercent(_quran);
-    double azkarScore = calcPercent(_azkar);
-    double deedsScore = calcPercent(_goodDeeds);
-    double totalScore =
-        (prayerScore + quranScore + azkarScore + deedsScore) / 4;
+    int totalQuranItems =
+        _quran.length + _dynamicWirds.length + (_isFriday ? 1 : 0);
+    int checkedQuranItems = _quran.values.where((e) => e).length +
+        _dynamicWirds.values.where((e) => e).length +
+        (_isFriday && _isKahfDone ? 1 : 0);
+    double quranScore = totalQuranItems == 0
+        ? 0.0
+        : (checkedQuranItems / totalQuranItems) * 100.0;
 
-    final String dateKey = await IslamicDay.todayKey();
+    int totalAzkarItems = _azkar.length;
+    int checkedAzkarItems = _azkar.values.where((e) => e).length;
+    double azkarScore = totalAzkarItems == 0
+        ? 0.0
+        : (checkedAzkarItems / totalAzkarItems) * 100.0;
+
+    int totalDeedsItems = _goodDeeds.length;
+    int checkedDeedsItems = _goodDeeds.values.where((e) => e).length;
+    double deedsScore = totalDeedsItems == 0
+        ? 0.0
+        : (checkedDeedsItems / totalDeedsItems) * 100.0;
+
+    int totalAllItems =
+        totalPrayerItems + totalQuranItems + totalAzkarItems + totalDeedsItems;
+    int totalAllChecked = checkedPrayerItems +
+        checkedQuranItems +
+        checkedAzkarItems +
+        checkedDeedsItems;
+
+    double totalScore = totalAllItems == 0
+        ? 0.0
+        : (totalAllChecked / totalAllItems) * 100.0;
+
+    final String dateKey = PrayerDayHelper.getActivePrayerCycleDate();
+    final String todayCivilKey = await IslamicDay.todayKey();
     Map<String, dynamic> dailyData = {
       'date': dateKey,
       'prayer': prayerScore,
@@ -295,6 +360,9 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
 
     final prefs = CacheHelper.prefs;
     await prefs.setString('stats_$dateKey', json.encode(dailyData));
+    if (dateKey != todayCivilKey) {
+      await prefs.setString('stats_$todayCivilKey', json.encode(dailyData));
+    }
 
     if (mounted) {
       setState(() {
@@ -363,7 +431,9 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
             builder: (ctx) {
               final textColor = isDark ? Colors.white : Colors.black87;
               return AlertDialog(
-                backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                backgroundColor: isDark
+                    ? const Color(0xFF1E1E1E)
+                    : Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20.r),
                 ),
@@ -380,26 +450,14 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildStatRow(
-                      "الصلاة",
-                      data['prayer'] ?? 0,
-                      textColor,
-                    ),
+                    _buildStatRow("الصلاة", data['prayer'] ?? 0, textColor),
                     _buildStatRow(
                       "القرآن الكريم",
                       data['quran'] ?? 0,
                       textColor,
                     ),
-                    _buildStatRow(
-                      "الأذكار",
-                      data['azkar'] ?? 0,
-                      textColor,
-                    ),
-                    _buildStatRow(
-                      "الطاعات",
-                      data['deeds'] ?? 0,
-                      textColor,
-                    ),
+                    _buildStatRow("الأذكار", data['azkar'] ?? 0, textColor),
+                    _buildStatRow("الطاعات", data['deeds'] ?? 0, textColor),
                     const Divider(color: Color(0xFFD0A871)),
                     _buildStatRow(
                       "المجموع الكلي",
@@ -502,7 +560,9 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
             decoration: BoxDecoration(
               color: cardColor,
               borderRadius: BorderRadius.vertical(top: Radius.circular(25.r)),
-              border: Border.all(color: const Color(0xFFD0A871).withValues(alpha: 0.4)),
+              border: Border.all(
+                color: const Color(0xFFD0A871).withValues(alpha: 0.4),
+              ),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -542,7 +602,10 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                           ),
                           filled: true,
                           fillColor: isDark ? Colors.black26 : Colors.grey[100],
-                          contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 14.w,
+                            vertical: 10.h,
+                          ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12.r),
                             borderSide: BorderSide.none,
@@ -560,27 +623,45 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFD0A871),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-                        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 14.w,
+                          vertical: 12.h,
+                        ),
                       ),
                       onPressed: () async {
                         final text = textController.text.trim();
                         if (text.isEmpty) return;
                         if (dataMap.containsKey(text)) {
                           scaffoldMessengerKey.currentState?.showSnackBar(
-                            const SnackBar(content: Text("هذا البند موجود بالفعل")),
+                            const SnackBar(
+                              content: Text("هذا البند موجود بالفعل"),
+                            ),
                           );
                           return;
                         }
 
                         final prefs = CacheHelper.prefs;
-                        final customList = prefs.getStringList('custom_items_$storageKey') ?? [];
+                        final customList =
+                            prefs.getStringList('custom_items_$storageKey') ??
+                            [];
                         customList.add(text);
-                        await prefs.setStringList('custom_items_$storageKey', customList);
+                        await prefs.setStringList(
+                          'custom_items_$storageKey',
+                          customList,
+                        );
 
-                        final deleted = (prefs.getStringList('deleted_items_$storageKey') ?? []).toSet();
+                        final deleted =
+                            (prefs.getStringList('deleted_items_$storageKey') ??
+                                    [])
+                                .toSet();
                         deleted.remove(text);
-                        await prefs.setStringList('deleted_items_$storageKey', deleted.toList());
+                        await prefs.setStringList(
+                          'deleted_items_$storageKey',
+                          deleted.toList(),
+                        );
 
                         setState(() {
                           dataMap[text] = false;
@@ -604,11 +685,18 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                     children: dataMap.keys.map((item) {
                       return Container(
                         margin: EdgeInsets.symmetric(vertical: 4.h),
-                        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12.w,
+                          vertical: 6.h,
+                        ),
                         decoration: BoxDecoration(
                           color: isDark ? Colors.black12 : Colors.grey[50],
                           borderRadius: BorderRadius.circular(10.r),
-                          border: Border.all(color: const Color(0xFFD0A871).withValues(alpha: 0.2)),
+                          border: Border.all(
+                            color: const Color(
+                              0xFFD0A871,
+                            ).withValues(alpha: 0.2),
+                          ),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -623,22 +711,44 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.redAccent,
+                                size: 20,
+                              ),
                               onPressed: () async {
                                 final prefs = CacheHelper.prefs;
 
-                                final customList = prefs.getStringList('custom_items_$storageKey') ?? [];
+                                final customList =
+                                    prefs.getStringList(
+                                      'custom_items_$storageKey',
+                                    ) ??
+                                    [];
                                 customList.remove(item);
-                                await prefs.setStringList('custom_items_$storageKey', customList);
+                                await prefs.setStringList(
+                                  'custom_items_$storageKey',
+                                  customList,
+                                );
 
-                                final deleted = (prefs.getStringList('deleted_items_$storageKey') ?? []).toSet();
+                                final deleted =
+                                    (prefs.getStringList(
+                                              'deleted_items_$storageKey',
+                                            ) ??
+                                            [])
+                                        .toSet();
                                 deleted.add(item);
-                                await prefs.setStringList('deleted_items_$storageKey', deleted.toList());
+                                await prefs.setStringList(
+                                  'deleted_items_$storageKey',
+                                  deleted.toList(),
+                                );
 
                                 setState(() {
                                   dataMap.remove(item);
                                 });
-                                await prefs.setString(storageKey, json.encode(dataMap));
+                                await prefs.setString(
+                                  storageKey,
+                                  json.encode(dataMap),
+                                );
                                 await _saveStatsSilent();
 
                                 setModalState(() {});
@@ -664,10 +774,16 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
     final bgColor = Theme.of(context).scaffoldBackgroundColor;
     final textColor = isDark ? Colors.white : Colors.black87;
 
-    return Scaffold(
-      backgroundColor: bgColor,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
+    return BlocListener<KhatmaCubit, KhatmaState>(
+      listener: (context, state) async {
+        await _refreshDynamicWirds();
+        await _saveStatsSilent();
+        if (mounted) setState(() {});
+      },
+      child: Scaffold(
+        backgroundColor: bgColor,
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
         title: const Text(
           'حاسب نفسك',
           style: TextStyle(
@@ -719,9 +835,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                                   borderRadius: BorderRadius.circular(15.r),
                                 ),
                                 elevation: 4,
-                                padding: EdgeInsets.symmetric(
-                                  vertical: 12.h,
-                                ),
+                                padding: EdgeInsets.symmetric(vertical: 12.h),
                               ),
                               onPressed: () {
                                 Navigator.push(
@@ -754,9 +868,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                                   borderRadius: BorderRadius.circular(15.r),
                                 ),
                                 elevation: 4,
-                                padding: EdgeInsets.symmetric(
-                                  vertical: 12.h,
-                                ),
+                                padding: EdgeInsets.symmetric(vertical: 12.h),
                               ),
                               onPressed: _reviewOldEntry,
                               icon: Icon(Icons.calendar_month, size: 20.sp),
@@ -821,10 +933,14 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                               horizontal: 16.w,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFD0A871).withValues(alpha: 0.12),
+                              color: const Color(
+                                0xFFD0A871,
+                              ).withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(15.r),
                               border: Border.all(
-                                color: const Color(0xFFD0A871).withValues(alpha: 0.35),
+                                color: const Color(
+                                  0xFFD0A871,
+                                ).withValues(alpha: 0.35),
                               ),
                             ),
                             child: Row(
@@ -855,6 +971,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                   ],
                 ),
               ),
+        ),
       ),
     );
   }
@@ -916,7 +1033,9 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                 decoration: BoxDecoration(
                   color: const Color(0xFFD0A871).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12.r),
-                  border: Border.all(color: const Color(0xFFD0A871).withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: const Color(0xFFD0A871).withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Text(
                   "${progressInt.toArabicNums}%",
@@ -937,7 +1056,9 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
               value: (_todayTotalScore / 100.0).clamp(0.0, 1.0),
               minHeight: 10.h,
               backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFD0A871)),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                Color(0xFFD0A871),
+              ),
             ),
           ),
           SizedBox(height: 10.h),
@@ -1004,37 +1125,44 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
         children: [
           Container(
             width: double.infinity,
-            padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 12.h),
+            padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 14.h),
             decoration: BoxDecoration(
               color: const Color(0xFFD0A871).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(20.r),
-              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
             ),
             child: Row(
               children: [
                 IconButton(
-                  icon: Icon(Icons.edit_outlined, color: const Color(0xFFD0A871), size: 20.sp),
-                  onPressed: () => _showEditSectionDialog("القرآن الكريم", "temp_quran", _defaultQuran, _quran),
+                  icon: Icon(
+                    Icons.edit_outlined,
+                    color: const Color(0xFFD0A871),
+                    size: 20.sp,
+                  ),
+                  onPressed: () => _showEditSectionDialog(
+                    "القرآن الكريم",
+                    "temp_quran",
+                    _defaultQuran,
+                    _quran,
+                  ),
                   tooltip: "تخصيص بنود القرآن الكريم",
                 ),
                 Expanded(
                   child: Column(
                     children: [
                       Padding(
-                        padding: EdgeInsets.only(bottom: 4.h),
+                        padding: EdgeInsets.only(top: 4.h, bottom: 8.h),
                         child: Text(
                           "القرآن الكريم",
                           style: TextStyle(
                             fontFamily: AppConsts.motoNastaliq,
-                            fontSize: 22.sp,
+                            fontSize: 23.sp,
                             fontWeight: FontWeight.normal,
                             color: const Color(0xFFD0A871),
-                            height: 1.6,
+                            height: 2.2,
                           ),
                         ),
                       ),
-                      SizedBox(height: 8.h),
+                      SizedBox(height: 4.h),
                       Text(
                         "القرآن شفيع لأصحابه",
                         style: TextStyle(
@@ -1097,7 +1225,12 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                             ),
                             value: _quran[key] ?? false,
                             onChanged: (val) {
-                              _updateStateAndSave(_quran, "temp_quran", key, val ?? false);
+                              _updateStateAndSave(
+                                _quran,
+                                "temp_quran",
+                                key,
+                                val ?? false,
+                              );
                             },
                           ),
                         ),
@@ -1107,74 +1240,165 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
 
                 // ── الأوراد من الختمات النشطة ──
                 if (_dynamicWirds.isNotEmpty) ...[
-                  SizedBox(height: 10.h),
-                  Divider(color: const Color(0xFFD0A871).withValues(alpha: 0.3)),
+                  SizedBox(height: 12.h),
+                  Divider(
+                    color: const Color(0xFFD0A871).withValues(alpha: 0.3),
+                  ),
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 6.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 4.w,
+                      vertical: 8.h,
+                    ),
                     child: Row(
                       children: [
-                        Icon(Icons.auto_stories_rounded, color: const Color(0xFFD0A871), size: 16.sp),
-                        SizedBox(width: 6.w),
-                        Text(
-                          "أوراد الختمات النشطة",
-                          style: TextStyle(
-                            fontFamily: AppConsts.expoArabic,
-                            fontSize: 13.sp,
-                            fontWeight: FontWeight.bold,
+                        Container(
+                          padding: EdgeInsets.all(6.w),
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFFD0A871,
+                            ).withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.auto_stories_rounded,
                             color: const Color(0xFFD0A871),
+                            size: 18.sp,
+                          ),
+                        ),
+                        SizedBox(width: 8.w),
+                        Padding(
+                          padding: EdgeInsets.only(top: 4.h, bottom: 6.h),
+                          child: Text(
+                            "أوراد الختمات النشطة",
+                            style: TextStyle(
+                              fontFamily: AppConsts.motoNastaliq,
+                              fontSize: 18.sp,
+                              fontWeight: FontWeight.normal,
+                              color: const Color(0xFFD0A871),
+                              height: 2.2,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Wrap(
-                    spacing: 10.w,
-                    runSpacing: 6.h,
-                    children: _dynamicWirds.keys.map((key) {
-                      return SizedBox(
-                        width: MediaQuery.of(context).size.width / 2.5,
-                        child: Theme(
-                          data: ThemeData(
-                            unselectedWidgetColor: const Color(0xFFD0A871),
-                          ),
-                          child: CheckboxListTile(
-                            activeColor: const Color(0xFFD0A871),
-                            checkColor: Colors.white,
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(
+                  ..._dynamicWirds.keys.map((key) {
+                    final isDone = _dynamicWirds[key] ?? false;
+                    return Container(
+                      margin: EdgeInsets.symmetric(
+                        vertical: 4.h,
+                        horizontal: 2.w,
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12.w,
+                        vertical: 10.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF141414)
+                            : const Color(0xFFFBF8F3),
+                        borderRadius: BorderRadius.circular(14.r),
+                        border: Border.all(
+                          color: isDone
+                              ? const Color(0xFFD0A871)
+                              : const Color(0xFFD0A871).withValues(alpha: 0.25),
+                          width: isDone ? 1.5 : 1.0,
+                        ),
+                      ),
+                      child: InkWell(
+                        onTap: () async {
+                          final newStatus = !isDone;
+                          setState(() {
+                            _dynamicWirds[key] = newStatus;
+                          });
+                          final dateStr =
+                              PrayerDayHelper.getActivePrayerCycleDate();
+                          if (newStatus) {
+                            await DailyTrackerService.markWirdDone(
                               key,
-                              style: TextStyle(
-                                fontFamily: AppConsts.expoArabic,
-                                fontSize: 13.sp,
-                                color: textColor,
-                                fontWeight: FontWeight.w600,
+                              dateKey: dateStr,
+                            );
+                          } else {
+                            await CacheHelper.prefs.setBool(
+                              'wird_done_${key}_$dateStr',
+                              false,
+                            );
+                          }
+                          await _saveStatsSilent();
+                        },
+                        borderRadius: BorderRadius.circular(10.r),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 24.w,
+                              height: 24.w,
+                              decoration: BoxDecoration(
+                                color: isDone
+                                    ? const Color(0xFFD0A871)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(6.r),
+                                border: Border.all(
+                                  color: const Color(0xFFD0A871),
+                                  width: 2.0,
+                                ),
+                              ),
+                              child: isDone
+                                  ? const Icon(
+                                      Icons.check,
+                                      size: 18,
+                                      color: Colors.white,
+                                    )
+                                  : null,
+                            ),
+                            SizedBox(width: 12.w),
+                            Expanded(
+                              child: Text(
+                                key,
+                                style: TextStyle(
+                                  fontFamily: AppConsts.expoArabic,
+                                  fontSize: 14.sp,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDone
+                                      ? const Color(0xFFD0A871)
+                                      : textColor,
+                                ),
                               ),
                             ),
-                            value: _dynamicWirds[key] ?? false,
-                            onChanged: (val) async {
-                              final isChecked = val ?? false;
-                              if (isChecked) {
-                                await DailyTrackerService.markWirdDone(key);
-                              } else {
-                                final today = await IslamicDay.todayKey();
-                                await CacheHelper.prefs.setBool('wird_done_${key}_$today', false);
-                              }
-                              setState(() {
-                                _dynamicWirds[key] = isChecked;
-                              });
-                              await _saveStatsSilent();
-                            },
-                          ),
+                            if (isDone)
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 8.w,
+                                  vertical: 3.h,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFFD0A871,
+                                  ).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                                child: Text(
+                                  "مكتمل ✓",
+                                  style: TextStyle(
+                                    fontFamily: AppConsts.expoArabic,
+                                    fontSize: 11.sp,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFFD0A871),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                      );
-                    }).toList(),
-                  ),
+                      ),
+                    );
+                  }),
                 ],
 
                 // ── سورة الكهف (يوم الجمعة) ──
                 if (_isFriday) ...[
                   SizedBox(height: 10.h),
-                  Divider(color: const Color(0xFFD0A871).withValues(alpha: 0.3)),
+                  Divider(
+                    color: const Color(0xFFD0A871).withValues(alpha: 0.3),
+                  ),
                   CheckboxListTile(
                     activeColor: const Color(0xFFD0A871),
                     checkColor: Colors.white,
@@ -1186,18 +1410,25 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                         await DailyTrackerService.markKahfDone();
                       } else {
                         final today = await IslamicDay.todayKey();
-                        await CacheHelper.prefs.setBool('kahf_done_$today', false);
+                        await CacheHelper.prefs.setBool(
+                          'kahf_done_$today',
+                          false,
+                        );
                       }
                       setState(() => _isKahfDone = isChecked);
                       await _saveStatsSilent();
                     },
-                    title: Text(
-                      'قراءة سورة الكهف 📖',
-                      style: TextStyle(
-                        fontFamily: AppConsts.expoArabic,
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w600,
-                        color: textColor,
+                    title: Padding(
+                      padding: EdgeInsets.only(top: 2.h, bottom: 4.h),
+                      child: Text(
+                        'قراءة سورة الكهف 📖',
+                        style: TextStyle(
+                          fontFamily: AppConsts.motoNastaliq,
+                          fontSize: 18.sp,
+                          fontWeight: FontWeight.normal,
+                          color: const Color(0xFFD0A871),
+                          height: 2.2,
+                        ),
                       ),
                     ),
                     subtitle: Text(
@@ -1241,13 +1472,17 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                "الصلاة على النبي ﷺ",
-                style: TextStyle(
-                  fontFamily: AppConsts.expoArabic,
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFFD0A871),
+              Padding(
+                padding: EdgeInsets.only(top: 4.h, bottom: 6.h),
+                child: Text(
+                  "الصلاة على النبي ﷺ",
+                  style: TextStyle(
+                    fontFamily: AppConsts.motoNastaliq,
+                    fontSize: 21.sp,
+                    fontWeight: FontWeight.normal,
+                    color: const Color(0xFFD0A871),
+                    height: 2.2,
+                  ),
                 ),
               ),
               if (_salawatCount > 0)
@@ -1268,7 +1503,9 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFFD0A871).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16.r),
-                border: Border.all(color: const Color(0xFFD0A871).withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: const Color(0xFFD0A871).withValues(alpha: 0.3),
+                ),
               ),
               child: Column(
                 children: [
@@ -1317,7 +1554,9 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFFD0A871).withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: const Color(0xFFD0A871).withValues(alpha: 0.4)),
+          border: Border.all(
+            color: const Color(0xFFD0A871).withValues(alpha: 0.4),
+          ),
         ),
         child: Text(
           label,
@@ -1364,37 +1603,44 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
         children: [
           Container(
             width: double.infinity,
-            padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 12.h),
+            padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 14.h),
             decoration: BoxDecoration(
               color: const Color(0xFFD0A871).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(20.r),
-              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
             ),
             child: Row(
               children: [
                 IconButton(
-                  icon: Icon(Icons.edit_outlined, color: const Color(0xFFD0A871), size: 20.sp),
-                  onPressed: () => _showEditSectionDialog(title, storageKey, defaultList, dataMap),
+                  icon: Icon(
+                    Icons.edit_outlined,
+                    color: const Color(0xFFD0A871),
+                    size: 20.sp,
+                  ),
+                  onPressed: () => _showEditSectionDialog(
+                    title,
+                    storageKey,
+                    defaultList,
+                    dataMap,
+                  ),
                   tooltip: "تخصيص بنود $title",
                 ),
                 Expanded(
                   child: Column(
                     children: [
                       Padding(
-                        padding: EdgeInsets.only(bottom: 4.h),
+                        padding: EdgeInsets.only(top: 4.h, bottom: 8.h),
                         child: Text(
                           title,
                           style: TextStyle(
                             fontFamily: AppConsts.motoNastaliq,
-                            fontSize: 22.sp,
+                            fontSize: 23.sp,
                             fontWeight: FontWeight.normal,
                             color: const Color(0xFFD0A871),
-                            height: 1.6,
+                            height: 2.2,
                           ),
                         ),
                       ),
-                      SizedBox(height: 8.h),
+                      SizedBox(height: 4.h),
                       Text(
                         subtitle,
                         style: TextStyle(
@@ -1407,7 +1653,9 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                     ],
                   ),
                 ),
-                SizedBox(width: 40.w), // Balance spacing opposite to the edit button
+                SizedBox(
+                  width: 40.w,
+                ), // Balance spacing opposite to the edit button
               ],
             ),
           ),
@@ -1451,7 +1699,12 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> {
                             ),
                             value: dataMap[key] ?? false,
                             onChanged: (val) {
-                              _updateStateAndSave(dataMap, storageKey, key, val ?? false);
+                              _updateStateAndSave(
+                                dataMap,
+                                storageKey,
+                                key,
+                                val ?? false,
+                              );
                             },
                           ),
                         ),

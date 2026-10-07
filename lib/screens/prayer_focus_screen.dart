@@ -10,7 +10,7 @@ import '../services/prayer_service.dart';
 import 'package:adhan/adhan.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:intl/intl.dart' hide TextDirection;
-import '../core/helpers/islamic_day.dart';
+import '../core/helpers/prayer_day_helper.dart';
 
 /// شاشة "صلاتي" — التركيز للصلاة
 /// • Streak مستقل لكل صلاة (5 سلاسل)
@@ -23,9 +23,11 @@ class PrayerFocusScreen extends StatefulWidget {
   State<PrayerFocusScreen> createState() => _PrayerFocusScreenState();
 }
 
-class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindingObserver {
-
-  static const _channel = MethodChannel('app.ibad_al_rahmann/native_notifications');
+class _PrayerFocusScreenState extends State<PrayerFocusScreen>
+    with WidgetsBindingObserver {
+  static const _channel = MethodChannel(
+    'app.ibad_al_rahmann/native_notifications',
+  );
 
   // أسماء الصلوات
   static const _prayers = ['الفجر', 'الظهر', 'العصر', 'المغرب', 'العشاء'];
@@ -35,7 +37,9 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
     final isFriday = DateTime.now().weekday == DateTime.friday;
     return [
       'assets/images/ic_fajr.png',
-      isFriday ? 'assets/images/ic_jumuah_prayer.png' : 'assets/images/ic_dhuhr.png',
+      isFriday
+          ? 'assets/images/ic_jumuah_prayer.png'
+          : 'assets/images/ic_dhuhr.png',
       'assets/images/ic_asr.png',
       'assets/images/ic_maghrib.png',
       'assets/images/ic_isha.png',
@@ -54,14 +58,14 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
 
   // سجل 60 يوم: { 'yyyy-MM-dd' → { 'الفجر' → 'ontime'/'late'/null } }
   final Map<String, Map<String, String?>> _monthLog = {};
-  
+
   // للتنقل بين الشهور في التقويم
   int _calendarMonthOffset = 0;
   DateTime _selectedCalendarDate = DateTime.now();
-  
+
   // إعدادات شاشة التركيز
-  int _preAdhanMinutes = 0;   // 0 = معطّل
-  int _snoozeDuration  = 5;   // دقائق التأجيل الافتراضية
+  int _preAdhanMinutes = 0; // 0 = معطّل
+  int _snoozeDuration = 5; // دقائق التأجيل الافتراضية
 
   @override
   void initState() {
@@ -105,10 +109,10 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
     // تشغيل الميزة
     final enabled = prefs.getBool('prayer_focus_enabled') ?? false;
 
-    // صلوات اليوم
-    final today = await IslamicDay.todayKey();
+    // صلوات الدورة النشطة الحالية
+    final activeDate = PrayerDayHelper.getActivePrayerCycleDate();
     final todayStatus = <String, String?>{};
-    final todayLog = _parseLog(prefs, today);
+    final todayLog = _parseLog(prefs, activeDate);
     for (final p in _prayers) {
       todayStatus[p] = todayLog[p];
     }
@@ -120,12 +124,12 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
       final key = DateFormat('yyyy-MM-dd').format(d);
       monthLog[key] = _parseLog(prefs, key);
     }
-    // اليوم الحالي من todayStatus
-    monthLog[today] = Map.from(todayStatus);
+    // اليوم الحالي / الدورة النشطة من todayStatus
+    monthLog[activeDate] = Map.from(todayStatus);
 
     // تحميل إعدادات شاشة التركيز
     final preAdhanMinutes = prefs.getInt('pre_adhan_reminder_minutes') ?? 0;
-    final snoozeDuration  = prefs.getInt('focus_snooze_duration')      ?? 5;
+    final snoozeDuration = prefs.getInt('focus_snooze_duration') ?? 5;
 
     final realStreak = await _recalculateTrueStreak(prefs);
 
@@ -136,14 +140,18 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
     DateTime? earliestDate;
 
     for (final k in prefs.getKeys()) {
-      if (k.startsWith('prayer_focus_log_') || k.startsWith('flutter.prayer_focus_log_')) {
-        final dStr = k.replaceFirst('flutter.prayer_focus_log_', '').replaceFirst('prayer_focus_log_', '');
+      if (k.startsWith('prayer_focus_log_') ||
+          k.startsWith('flutter.prayer_focus_log_')) {
+        final dStr = k
+            .replaceFirst('flutter.prayer_focus_log_', '')
+            .replaceFirst('prayer_focus_log_', '');
         try {
           final d = DateTime.parse(dStr);
           final val = prefs.getString(k);
           if (val != null && val.isNotEmpty && val != '{}') {
             final parsed = json.decode(val);
-            if (parsed is Map && parsed.values.any((v) => v != null && v != false)) {
+            if (parsed is Map &&
+                parsed.values.any((v) => v != null && v != false)) {
               if (earliestDate == null || d.isBefore(earliestDate)) {
                 earliestDate = DateTime(d.year, d.month, d.day);
               }
@@ -158,13 +166,18 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
       try {
         final sd = DateTime.parse(savedStartDateStr);
         final sdNorm = DateTime(sd.year, sd.month, sd.day);
-        trackingStart = (earliestDate != null && earliestDate.isBefore(sdNorm)) ? earliestDate : sdNorm;
+        trackingStart = (earliestDate != null && earliestDate.isBefore(sdNorm))
+            ? earliestDate
+            : sdNorm;
       } catch (_) {
         trackingStart = earliestDate ?? todayNorm;
       }
     } else {
       trackingStart = earliestDate ?? todayNorm;
-      await prefs.setString('prayer_focus_start_date', DateFormat('yyyy-MM-dd').format(trackingStart));
+      await prefs.setString(
+        'prayer_focus_start_date',
+        DateFormat('yyyy-MM-dd').format(trackingStart),
+      );
     }
 
     if (mounted) {
@@ -178,14 +191,15 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
         _unifiedStreak = realStreak;
         _trackingStartDate = trackingStart;
         _preAdhanMinutes = preAdhanMinutes;
-        _snoozeDuration  = snoozeDuration;
+        _snoozeDuration = snoozeDuration;
       });
     }
   }
 
   Map<String, String?> _parseLog(SharedPreferences prefs, String date) {
-    final raw = prefs.getString('prayer_focus_log_$date')
-        ?? prefs.getString('flutter.prayer_focus_log_$date');
+    final raw =
+        prefs.getString('prayer_focus_log_$date') ??
+        prefs.getString('flutter.prayer_focus_log_$date');
     if (raw == null) return {for (var p in _prayers) p: null};
     try {
       final decoded = json.decode(raw) as Map<String, dynamic>;
@@ -201,16 +215,16 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
             }
             if (val == null) return null;
             if (val is Map) {
-                final st = (val['status'] as String?) ?? 'ontime';
-                if (st == 'present' || st == 'on_time') return 'ontime';
-                return st;
-              }
-              if (val is bool) return val ? 'ontime' : null;
-              if (val is String) {
-                if (val == 'present' || val == 'on_time') return 'ontime';
-                return val.isNotEmpty ? val : null;
-              }
-              return 'ontime';
+              final st = (val['status'] as String?) ?? 'ontime';
+              if (st == 'present' || st == 'on_time') return 'ontime';
+              return st;
+            }
+            if (val is bool) return val ? 'ontime' : null;
+            if (val is String) {
+              if (val == 'present' || val == 'on_time') return 'ontime';
+              return val.isNotEmpty ? val : null;
+            }
+            return 'ontime';
           }(),
       };
     } catch (_) {
@@ -218,7 +232,7 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen> with WidgetsBindi
     }
   }
 
-Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
+  Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
     int streak = 0;
     bool shouldContinue = true;
     final now = DateTime.now();
@@ -227,7 +241,7 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
       if (!shouldContinue) break;
       final d = now.subtract(Duration(days: dayOffset));
       final dNext = d.add(const Duration(days: 1));
-      
+
       final logDay = _parseLog(prefs, DateFormat('yyyy-MM-dd').format(d));
       final logNext = _parseLog(prefs, DateFormat('yyyy-MM-dd').format(dNext));
 
@@ -242,7 +256,9 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
 
       if (dayOffset == 0) {
         try {
-          final prayersToday = await PrayerService().getExtendedPrayers(date: d);
+          final prayersToday = await PrayerService().getExtendedPrayers(
+            date: d,
+          );
           final prayerMap = {
             'الفجر': prayersToday.firstWhere((p) => p.id == 'fajr').time,
             if (isFriday)
@@ -257,8 +273,7 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
           for (final p in prayersInReverse) {
             final pTime = prayerMap[p];
             final isPassed = pTime != null && now.isAfter(pTime);
-            final log = (p == 'المغرب' || p == 'العشاء') ? logNext : logDay;
-            final isLogged = log[p] != null;
+            final isLogged = logDay[p] != null || logNext[p] != null;
 
             if (isLogged) {
               streak++;
@@ -271,8 +286,7 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
         } catch (_) {
           bool foundLatest = false;
           for (final p in prayersInReverse) {
-            final log = (p == 'المغرب' || p == 'العشاء') ? logNext : logDay;
-            final isLogged = log[p] != null;
+            final isLogged = logDay[p] != null || logNext[p] != null;
             if (isLogged) {
               foundLatest = true;
               streak++;
@@ -284,8 +298,7 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
         }
       } else {
         for (final p in prayersInReverse) {
-          final log = (p == 'المغرب' || p == 'العشاء') ? logNext : logDay;
-          final isLogged = log[p] != null;
+          final isLogged = logDay[p] != null || logNext[p] != null;
           if (isLogged) {
             streak++;
           } else {
@@ -319,7 +332,8 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
     try {
       await _channel.invokeMethod('requestOverlayPermission');
       await Future.delayed(const Duration(seconds: 2));
-      final hasPerm = await _channel.invokeMethod('checkOverlayPermission') ?? false;
+      final hasPerm =
+          await _channel.invokeMethod('checkOverlayPermission') ?? false;
       setState(() => _hasOverlayPermission = hasPerm);
       if (hasPerm && mounted) _toggleFeature(true);
     } catch (_) {}
@@ -342,28 +356,40 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
     if (result != null) await _savePrayerStatus(prayer, result);
   }
 
-  Future<void> _savePrayerStatusForDate(String prayer, String? status, String dateKey) async {
+  Future<void> _savePrayerStatusForDate(
+    String prayer,
+    String? status,
+    String dateKey,
+  ) async {
     final prefs = await SharedPreferences.getInstance();
 
     final logKey = 'prayer_focus_log_$dateKey';
     final existing = prefs.getString(logKey);
     Map<String, dynamic> logMap = {};
     if (existing != null) {
-      try { logMap = json.decode(existing) as Map<String, dynamic>; } catch (_) {}
+      try {
+        logMap = json.decode(existing) as Map<String, dynamic>;
+      } catch (_) {}
     }
     if (status == null) {
       logMap.remove(prayer);
     } else {
-      logMap[prayer] = {'status': status, 'ts': DateTime.now().millisecondsSinceEpoch};
+      logMap[prayer] = {
+        'status': status,
+        'ts': DateTime.now().millisecondsSinceEpoch,
+      };
     }
     await prefs.setString(logKey, json.encode(logMap));
 
-    final todayKey = await IslamicDay.todayKey();
-    if (dateKey == todayKey) {
+    final activeKey = PrayerDayHelper.getActivePrayerCycleDate();
+    final todayCivil = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    if (dateKey == activeKey || dateKey == todayCivil) {
       final tempRaw = prefs.getString('temp_prayers');
       final tempMap = <String, dynamic>{};
       if (tempRaw != null) {
-        try { tempMap.addAll(json.decode(tempRaw) as Map<String, dynamic>); } catch (_) {}
+        try {
+          tempMap.addAll(json.decode(tempRaw) as Map<String, dynamic>);
+        } catch (_) {}
       }
       String actualKey = prayer;
       if (actualKey == 'الجمعة') actualKey = 'الظهر';
@@ -372,22 +398,29 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
       } else {
         tempMap[actualKey] = true;
       }
-      AppLogger.log("PrayerFocus", "writing prayer_focus_log_$dateKey: ${json.encode(logMap)} AND temp_prayers: ${json.encode(tempMap)}");
+      AppLogger.log(
+        "PrayerFocus",
+        "writing prayer_focus_log_$dateKey: ${json.encode(logMap)} AND temp_prayers: ${json.encode(tempMap)}",
+      );
       await prefs.setString('temp_prayers', json.encode(tempMap));
     } else {
-      AppLogger.log("PrayerFocus", "writing prayer_focus_log_$dateKey: ${json.encode(logMap)} (NOT today)");
+      AppLogger.log(
+        "PrayerFocus",
+        "writing prayer_focus_log_$dateKey: ${json.encode(logMap)} (NOT active day)",
+      );
     }
 
     await AccountabilitySyncService.syncAndSaveTodayStats();
-    
+
     // إعادة حساب الاستريك الفعلي من السجل
     final newStreak = await _recalculateTrueStreak(prefs);
 
-    final updatedLog = Map<String, String?>.from(_monthLog[dateKey] ?? {})..[prayer] = status;
-    
+    final updatedLog = Map<String, String?>.from(_monthLog[dateKey] ?? {})
+      ..[prayer] = status;
+
     if (mounted) {
       setState(() {
-        if (dateKey == todayKey) {
+        if (dateKey == activeKey) {
           _todayStatus[prayer] = status;
         }
         _unifiedStreak = newStreak;
@@ -397,8 +430,8 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
   }
 
   Future<void> _savePrayerStatus(String prayer, String? status) async {
-    final today = await IslamicDay.todayKey();
-    await _savePrayerStatusForDate(prayer, status, today);
+    final dateKey = PrayerDayHelper.getPrayerDateKey(prayer);
+    await _savePrayerStatusForDate(prayer, status, dateKey);
   }
 
   // ─── Build ──────────────────────────────────────────────────────────────────
@@ -436,12 +469,17 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0xFF2A1C14), Color(0xFF120A05)], // خلفية بنية داكنة جداً وفخمة
+                    colors: [
+                      Color(0xFF2A1C14),
+                      Color(0xFF120A05),
+                    ], // خلفية بنية داكنة جداً وفخمة
                   ),
                 ),
                 child: Center(
                   child: Padding(
-                    padding: EdgeInsets.only(bottom: 45.h), // رفع الصورة للأعلى لتجنب التداخل مع النص
+                    padding: EdgeInsets.only(
+                      bottom: 45.h,
+                    ), // رفع الصورة للأعلى لتجنب التداخل مع النص
                     child: Image.asset(
                       'assets/images/header_salati.png',
                       width: 60.w,
@@ -498,13 +536,23 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
 
   // ─── Feature Card ───────────────────────────────────────────────────────────
 
-  Widget _buildFeatureCard(bool isDark, Color cardBg, Color gold, Color textColor) {
+  Widget _buildFeatureCard(
+    bool isDark,
+    Color cardBg,
+    Color gold,
+    Color textColor,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(20.r),
         border: Border.all(color: gold.withValues(alpha: 0.3)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -522,21 +570,31 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('شاشة التركيز للصلاة',
-                          style: TextStyle(
-                              fontFamily: AppConsts.expoArabic,
-                              fontSize: 16.sp,
-                              fontWeight: FontWeight.bold,
-                              color: gold)),
-                      Text('تظهر فوق التطبيقات عند كل أذان',
-                          style: TextStyle(
-                              fontFamily: AppConsts.expoArabic,
-                              fontSize: 12.sp,
-                              color: textColor.withValues(alpha: 0.55))),
+                      Text(
+                        'شاشة التركيز للصلاة',
+                        style: TextStyle(
+                          fontFamily: AppConsts.expoArabic,
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.bold,
+                          color: gold,
+                        ),
+                      ),
+                      Text(
+                        'تظهر فوق التطبيقات عند كل أذان',
+                        style: TextStyle(
+                          fontFamily: AppConsts.expoArabic,
+                          fontSize: 12.sp,
+                          color: textColor.withValues(alpha: 0.55),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                Switch(value: _isEnabled, activeThumbColor: gold, onChanged: _toggleFeature),
+                Switch(
+                  value: _isEnabled,
+                  activeThumbColor: gold,
+                  onChanged: _toggleFeature,
+                ),
               ],
             ),
           ),
@@ -547,22 +605,37 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                 padding: EdgeInsets.all(14.w),
                 decoration: BoxDecoration(
                   color: Colors.amber.withValues(alpha: 0.08),
-                  border: Border(top: BorderSide(color: Colors.amber.withValues(alpha: 0.3))),
-                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(20.r)),
+                  border: Border(
+                    top: BorderSide(color: Colors.amber.withValues(alpha: 0.3)),
+                  ),
+                  borderRadius: BorderRadius.vertical(
+                    bottom: Radius.circular(20.r),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 18.sp),
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.amber,
+                      size: 18.sp,
+                    ),
                     SizedBox(width: 8.w),
                     Expanded(
-                      child: Text('اضغط لمنح صلاحية الظهور فوق التطبيقات',
-                          style: TextStyle(
-                              fontFamily: AppConsts.expoArabic,
-                              fontSize: 13.sp,
-                              color: Colors.amber.shade700,
-                              fontWeight: FontWeight.bold)),
+                      child: Text(
+                        'اضغط لمنح صلاحية الظهور فوق التطبيقات',
+                        style: TextStyle(
+                          fontFamily: AppConsts.expoArabic,
+                          fontSize: 13.sp,
+                          color: Colors.amber.shade700,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                    Icon(Icons.arrow_forward_ios_rounded, color: Colors.amber, size: 13.sp),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: Colors.amber,
+                      size: 13.sp,
+                    ),
                   ],
                 ),
               ),
@@ -572,15 +645,21 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
             _buildSettingRow(
               icon: Icons.notifications_active_outlined,
               label: 'تذكير قبل الأذان',
-              gold: gold, textColor: textColor, isDark: isDark,
+              gold: gold,
+              textColor: textColor,
+              isDark: isDark,
               child: DropdownButton<int>(
                 value: _preAdhanMinutes,
                 underline: const SizedBox(),
                 dropdownColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-                style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 13.sp, color: gold),
+                style: TextStyle(
+                  fontFamily: AppConsts.cairo,
+                  fontSize: 13.sp,
+                  color: gold,
+                ),
                 items: const [
-                  DropdownMenuItem(value: 0,  child: Text('معطّل')),
-                  DropdownMenuItem(value: 5,  child: Text('5 دق')),
+                  DropdownMenuItem(value: 0, child: Text('معطّل')),
+                  DropdownMenuItem(value: 5, child: Text('5 دق')),
                   DropdownMenuItem(value: 10, child: Text('10 دق')),
                   DropdownMenuItem(value: 15, child: Text('15 دق')),
                   DropdownMenuItem(value: 20, child: Text('20 دق')),
@@ -591,7 +670,9 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                   final prefs = await SharedPreferences.getInstance();
                   await prefs.setInt('pre_adhan_reminder_minutes', v);
                   try {
-                    await _channel.invokeMethod('setPreAdhanReminderMinutes', {'minutes': v});
+                    await _channel.invokeMethod('setPreAdhanReminderMinutes', {
+                      'minutes': v,
+                    });
                   } catch (_) {}
                   setState(() => _preAdhanMinutes = v);
                 },
@@ -601,15 +682,21 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
             _buildSettingRow(
               icon: Icons.snooze_rounded,
               label: 'تأجيل التذكير',
-              gold: gold, textColor: textColor, isDark: isDark,
+              gold: gold,
+              textColor: textColor,
+              isDark: isDark,
               child: DropdownButton<int>(
                 value: _snoozeDuration,
                 underline: const SizedBox(),
                 dropdownColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-                style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 13.sp, color: gold),
+                style: TextStyle(
+                  fontFamily: AppConsts.cairo,
+                  fontSize: 13.sp,
+                  color: gold,
+                ),
                 items: const [
-                  DropdownMenuItem(value: 3,  child: Text('3 دق')),
-                  DropdownMenuItem(value: 5,  child: Text('5 دق')),
+                  DropdownMenuItem(value: 3, child: Text('3 دق')),
+                  DropdownMenuItem(value: 5, child: Text('5 دق')),
                   DropdownMenuItem(value: 10, child: Text('10 دق')),
                   DropdownMenuItem(value: 15, child: Text('15 دق')),
                 ],
@@ -637,11 +724,17 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
                 decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: gold.withValues(alpha: 0.12))),
+                  border: Border(
+                    top: BorderSide(color: gold.withValues(alpha: 0.12)),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.remove_red_eye_outlined, size: 16.sp, color: gold),
+                    Icon(
+                      Icons.remove_red_eye_outlined,
+                      size: 16.sp,
+                      color: gold,
+                    ),
                     SizedBox(width: 8.w),
                     Text(
                       'معاينة نافذة التنبيه',
@@ -653,7 +746,11 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                       ),
                     ),
                     const Spacer(),
-                    Icon(Icons.arrow_forward_ios_rounded, size: 12.sp, color: gold),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 12.sp,
+                      color: gold,
+                    ),
                   ],
                 ),
               ),
@@ -681,11 +778,14 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
         children: [
           Icon(icon, size: 16.sp, color: gold),
           SizedBox(width: 8.w),
-          Text(label,
-              style: TextStyle(
-                  fontFamily: AppConsts.expoArabic,
-                  fontSize: 13.sp,
-                  color: textColor.withValues(alpha: 0.8))),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: AppConsts.expoArabic,
+              fontSize: 13.sp,
+              color: textColor.withValues(alpha: 0.8),
+            ),
+          ),
           const Spacer(),
           child,
         ],
@@ -695,14 +795,21 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
 
   // ─── Today Prayers Card ─────────────────────────────────────────────────────
 
-  Widget _buildTodayCard(bool isDark, Color cardBg, Color gold, Color textColor) {
+  Widget _buildTodayCard(
+    bool isDark,
+    Color cardBg,
+    Color gold,
+    Color textColor,
+  ) {
     final doneCount = _todayStatus.values.where((s) => s != null).length;
     return Container(
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(20.r),
         border: Border.all(color: gold.withValues(alpha: 0.2)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8),
+        ],
       ),
       child: Column(
         children: [
@@ -717,19 +824,25 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
               children: [
                 Icon(Icons.check_circle_outline, color: gold, size: 22.sp),
                 SizedBox(width: 10.w),
-                Text('صلوات اليوم',
-                    style: TextStyle(
-                        fontFamily: AppConsts.expoArabic,
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.bold,
-                        color: gold)),
+                Text(
+                  'صلوات اليوم',
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                    color: gold,
+                  ),
+                ),
                 const Spacer(),
-                Text('$doneCount / 5',
-                    style: TextStyle(
-                        fontFamily: AppConsts.expoArabic,
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.bold,
-                        color: gold)),
+                Text(
+                  '$doneCount / 5',
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.bold,
+                    color: gold,
+                  ),
+                ),
               ],
             ),
           ),
@@ -745,9 +858,7 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                 final isDone = status != null;
                 final isOnTime = status == 'ontime';
                 final circleColor = isDone
-                    ? (isOnTime
-                        ? gold
-                        : const Color(0xFFE65100))
+                    ? (isOnTime ? gold : const Color(0xFFE65100))
                     : gold.withValues(alpha: 0.12);
                 final borderColor = isDone
                     ? (isOnTime ? gold : const Color(0xFFE65100))
@@ -767,9 +878,13 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                           color: circleColor,
                           border: Border.all(color: borderColor, width: 2),
                           boxShadow: isDone
-                              ? [BoxShadow(
-                                  color: borderColor.withValues(alpha: 0.35),
-                                  blurRadius: 8, spreadRadius: 1)]
+                              ? [
+                                  BoxShadow(
+                                    color: borderColor.withValues(alpha: 0.35),
+                                    blurRadius: 8,
+                                    spreadRadius: 1,
+                                  ),
+                                ]
                               : [],
                         ),
                         child: Center(
@@ -782,7 +897,11 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                                 width: 30.w,
                                 height: 30.w,
                                 errorBuilder: (context, error, stackTrace) =>
-                                    Icon(Icons.mosque, size: 22.sp, color: isDone ? Colors.white : gold),
+                                    Icon(
+                                      Icons.mosque,
+                                      size: 22.sp,
+                                      color: isDone ? Colors.white : gold,
+                                    ),
                               ),
                               if (isDone)
                                 Positioned(
@@ -791,13 +910,22 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                                   child: Container(
                                     padding: EdgeInsets.all(2.w),
                                     decoration: BoxDecoration(
-                                      color: isOnTime ? gold : const Color(0xFFE65100),
+                                      color: isOnTime
+                                          ? gold
+                                          : const Color(0xFFE65100),
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: circleColor, width: 1.5),
+                                      border: Border.all(
+                                        color: circleColor,
+                                        width: 1.5,
+                                      ),
                                     ),
                                     child: Text(
                                       isOnTime ? '✓' : '⏳',
-                                      style: TextStyle(color: Colors.white, fontSize: 8.sp, fontWeight: FontWeight.bold),
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 8.sp,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -809,12 +937,20 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                     SizedBox(height: 6.h),
                     // اسم الصلاة
                     Text(
-                      (prayer == 'الظهر' && DateTime.now().weekday == DateTime.friday) ? 'الجمعة' : prayer,
+                      (prayer == 'الظهر' &&
+                              DateTime.now().weekday == DateTime.friday)
+                          ? 'الجمعة'
+                          : prayer,
                       style: TextStyle(
-                          fontFamily: AppConsts.expoArabic,
-                          fontSize: 10.sp,
-                          color: isDone ? borderColor : textColor.withValues(alpha: 0.5),
-                          fontWeight: isDone ? FontWeight.bold : FontWeight.normal),
+                        fontFamily: AppConsts.expoArabic,
+                        fontSize: 10.sp,
+                        color: isDone
+                            ? borderColor
+                            : textColor.withValues(alpha: 0.5),
+                        fontWeight: isDone
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
                     ),
                     SizedBox(height: 14.h),
                   ],
@@ -841,9 +977,10 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                 Text(
                   _progressMessage(doneCount),
                   style: TextStyle(
-                      fontFamily: AppConsts.expoArabic,
-                      fontSize: 11.sp,
-                      color: textColor.withValues(alpha: 0.45)),
+                    fontFamily: AppConsts.expoArabic,
+                    fontSize: 11.sp,
+                    color: textColor.withValues(alpha: 0.45),
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -874,19 +1011,49 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
 
   // ─── Calendar Card ──────────────────────────────────────────────────────────
 
-  Widget _buildCalendarCard(bool isDark, Color cardBg, Color gold, Color textColor) {
+  Widget _buildCalendarCard(
+    bool isDark,
+    Color cardBg,
+    Color gold,
+    Color textColor,
+  ) {
     final now = DateTime.now();
-    final displayMonth = DateTime(now.year, now.month + _calendarMonthOffset, 1);
-    final daysInMonth = DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month);
-    final firstWeekday = DateTime(displayMonth.year, displayMonth.month, 1).weekday;
+    final displayMonth = DateTime(
+      now.year,
+      now.month + _calendarMonthOffset,
+      1,
+    );
+    final daysInMonth = DateUtils.getDaysInMonth(
+      displayMonth.year,
+      displayMonth.month,
+    );
+    final firstWeekday = DateTime(
+      displayMonth.year,
+      displayMonth.month,
+      1,
+    ).weekday;
 
     final arabicMonths = [
-      '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+      '',
+      'يناير',
+      'فبراير',
+      'مارس',
+      'أبريل',
+      'مايو',
+      'يونيو',
+      'يوليو',
+      'أغسطس',
+      'سبتمبر',
+      'أكتوبر',
+      'نوفمبر',
+      'ديسمبر',
     ];
     final shortDays = ['إث', 'ثل', 'أر', 'خم', 'جم', 'سب', 'أح'];
 
-    final selectedDayStr = DateFormat('EEEE، d MMMM yyyy', 'ar').format(_selectedCalendarDate);
+    final selectedDayStr = DateFormat(
+      'EEEE، d MMMM yyyy',
+      'ar',
+    ).format(_selectedCalendarDate);
     final selectedHijriStr = _getHijriDateString(_selectedCalendarDate);
     final selectedDoneCount = _getDayDoneCount(_selectedCalendarDate);
 
@@ -895,7 +1062,9 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
         color: cardBg,
         borderRadius: BorderRadius.circular(20.r),
         border: Border.all(color: gold.withValues(alpha: 0.2)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8),
+        ],
       ),
       child: Column(
         children: [
@@ -910,12 +1079,15 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
               children: [
                 Icon(Icons.calendar_month_rounded, color: gold, size: 22.sp),
                 SizedBox(width: 10.w),
-                Text('${arabicMonths[displayMonth.month]} ${displayMonth.year}',
-                    style: TextStyle(
-                        fontFamily: AppConsts.expoArabic,
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.bold,
-                        color: gold)),
+                Text(
+                  '${arabicMonths[displayMonth.month]} ${displayMonth.year}',
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                    color: gold,
+                  ),
+                ),
                 const Spacer(),
                 IconButton(
                   icon: Icon(Icons.chevron_right, color: gold, size: 22.sp),
@@ -924,9 +1096,13 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                   constraints: BoxConstraints(minWidth: 32.w, minHeight: 32.w),
                 ),
                 IconButton(
-                  icon: Icon(Icons.chevron_left,
-                      color: _calendarMonthOffset < 0 ? gold : gold.withValues(alpha: 0.3),
-                      size: 22.sp),
+                  icon: Icon(
+                    Icons.chevron_left,
+                    color: _calendarMonthOffset < 0
+                        ? gold
+                        : gold.withValues(alpha: 0.3),
+                    size: 22.sp,
+                  ),
                   onPressed: _calendarMonthOffset < 0
                       ? () => setState(() => _calendarMonthOffset++)
                       : null,
@@ -978,13 +1154,16 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                   ),
                 ),
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 10.w,
+                    vertical: 6.h,
+                  ),
                   decoration: BoxDecoration(
                     color: selectedDoneCount == 5
                         ? gold.withValues(alpha: 0.2)
                         : (selectedDoneCount > 0
-                            ? gold.withValues(alpha: 0.15)
-                            : Colors.grey.withValues(alpha: 0.15)),
+                              ? gold.withValues(alpha: 0.15)
+                              : Colors.grey.withValues(alpha: 0.15)),
                     borderRadius: BorderRadius.circular(10.r),
                   ),
                   child: Text(
@@ -995,7 +1174,9 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                       fontWeight: FontWeight.bold,
                       color: selectedDoneCount == 5
                           ? gold
-                          : (selectedDoneCount > 0 ? gold : textColor.withValues(alpha: 0.6)),
+                          : (selectedDoneCount > 0
+                                ? gold
+                                : textColor.withValues(alpha: 0.6)),
                     ),
                   ),
                 ),
@@ -1009,16 +1190,23 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
               children: [
                 // أيام الأسبوع
                 Row(
-                  children: shortDays.map((d) => Expanded(
-                    child: Center(
-                      child: Text(d,
-                          style: TextStyle(
-                              fontFamily: AppConsts.expoArabic,
-                              fontSize: 10.sp,
-                              color: textColor.withValues(alpha: 0.4),
-                              fontWeight: FontWeight.bold)),
-                    ),
-                  )).toList(),
+                  children: shortDays
+                      .map(
+                        (d) => Expanded(
+                          child: Center(
+                            child: Text(
+                              d,
+                              style: TextStyle(
+                                fontFamily: AppConsts.expoArabic,
+                                fontSize: 10.sp,
+                                color: textColor.withValues(alpha: 0.4),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
                 ),
                 SizedBox(height: 8.h),
 
@@ -1034,11 +1222,19 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                   itemBuilder: (ctx, index) {
                     if (index < firstWeekday - 1) return const SizedBox();
                     final day = index - (firstWeekday - 1) + 1;
-                    final dayDate = DateTime(displayMonth.year, displayMonth.month, day);
+                    final dayDate = DateTime(
+                      displayMonth.year,
+                      displayMonth.month,
+                      day,
+                    );
                     final key = DateFormat('yyyy-MM-dd').format(dayDate);
                     final log = _monthLog[key];
-                    final isToday = dayDate.year == now.year && dayDate.month == now.month && day == now.day;
-                    final isSelected = dayDate.year == _selectedCalendarDate.year &&
+                    final isToday =
+                        dayDate.year == now.year &&
+                        dayDate.month == now.month &&
+                        day == now.day;
+                    final isSelected =
+                        dayDate.year == _selectedCalendarDate.year &&
                         dayDate.month == _selectedCalendarDate.month &&
                         dayDate.day == _selectedCalendarDate.day;
                     final isFuture = dayDate.isAfter(now);
@@ -1068,7 +1264,15 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                     return InkWell(
                       onTap: () {
                         setState(() => _selectedCalendarDate = dayDate);
-                        _showDayDetails(context, dayDate, log, isDark, cardBg, gold, textColor);
+                        _showDayDetails(
+                          context,
+                          dayDate,
+                          log,
+                          isDark,
+                          cardBg,
+                          gold,
+                          textColor,
+                        );
                       },
                       borderRadius: BorderRadius.circular(20.r),
                       child: Column(
@@ -1081,7 +1285,9 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                               shape: BoxShape.circle,
                               color: isSelected
                                   ? gold
-                                  : (isToday ? gold.withValues(alpha: 0.25) : Colors.transparent),
+                                  : (isToday
+                                        ? gold.withValues(alpha: 0.25)
+                                        : Colors.transparent),
                               border: isToday && !isSelected
                                   ? Border.all(color: gold, width: 1.5)
                                   : null,
@@ -1094,8 +1300,12 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                                   fontSize: 11.sp,
                                   color: isSelected
                                       ? Colors.white
-                                      : (isToday ? gold : textColor.withValues(alpha: 0.7)),
-                                  fontWeight: (isToday || isSelected) ? FontWeight.bold : FontWeight.normal,
+                                      : (isToday
+                                            ? gold
+                                            : textColor.withValues(alpha: 0.7)),
+                                  fontWeight: (isToday || isSelected)
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                 ),
                               ),
                             ),
@@ -1137,11 +1347,23 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
 
   // ─── Weekly Completion Curve Card (Matching Image 2) ────────────────────────
 
-  Widget _buildWeeklyCompletionCard(bool isDark, Color cardBg, Color gold, Color textColor) {
+  Widget _buildWeeklyCompletionCard(
+    bool isDark,
+    Color cardBg,
+    Color gold,
+    Color textColor,
+  ) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final displayMonth = DateTime(now.year, now.month + _calendarMonthOffset, 1);
-    final daysInMonth = DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month);
+    final displayMonth = DateTime(
+      now.year,
+      now.month + _calendarMonthOffset,
+      1,
+    );
+    final daysInMonth = DateUtils.getDaysInMonth(
+      displayMonth.year,
+      displayMonth.month,
+    );
 
     final todayTimes = PrayerService().getPrayerTimes();
     int passedToday = 0;
@@ -1170,7 +1392,10 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
         final date = DateTime(displayMonth.year, displayMonth.month, d);
         if (date.isAfter(today) || date.isBefore(_trackingStartDate)) continue;
 
-        final bool isToday = date.year == today.year && date.month == today.month && date.day == today.day;
+        final bool isToday =
+            date.year == today.year &&
+            date.month == today.month &&
+            date.day == today.day;
         final int dayExpected = isToday ? passedToday : 5;
         if (dayExpected <= 0) continue;
 
@@ -1191,7 +1416,9 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
         color: cardBg,
         borderRadius: BorderRadius.circular(20.r),
         border: Border.all(color: gold.withValues(alpha: 0.2)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1240,11 +1467,23 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
 
   // ─── Weekly Consistency Bar Chart (Matching Image 2 & 3) ───────────────────
 
-  Widget _buildWeeklyConsistencyCard(bool isDark, Color cardBg, Color gold, Color textColor) {
+  Widget _buildWeeklyConsistencyCard(
+    bool isDark,
+    Color cardBg,
+    Color gold,
+    Color textColor,
+  ) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final displayMonth = DateTime(now.year, now.month + _calendarMonthOffset, 1);
-    final daysInMonth = DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month);
+    final displayMonth = DateTime(
+      now.year,
+      now.month + _calendarMonthOffset,
+      1,
+    );
+    final daysInMonth = DateUtils.getDaysInMonth(
+      displayMonth.year,
+      displayMonth.month,
+    );
 
     final todayTimes = PrayerService().getPrayerTimes();
     int passedToday = 0;
@@ -1278,7 +1517,10 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
         final date = DateTime(displayMonth.year, displayMonth.month, d);
         if (date.isAfter(today) || date.isBefore(_trackingStartDate)) continue;
 
-        final bool isToday = date.year == today.year && date.month == today.month && date.day == today.day;
+        final bool isToday =
+            date.year == today.year &&
+            date.month == today.month &&
+            date.day == today.day;
         final int dayExpected = isToday ? passedToday : 5;
         if (dayExpected <= 0) continue;
 
@@ -1304,7 +1546,9 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
         color: cardBg,
         borderRadius: BorderRadius.circular(20.r),
         border: Border.all(color: gold.withValues(alpha: 0.2)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1396,7 +1640,12 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
 
   // ─── Delay Habits Card (Matching Image 3) ───────────────────────────────────
 
-  Widget _buildDelayHabitsCard(bool isDark, Color cardBg, Color gold, Color textColor) {
+  Widget _buildDelayHabitsCard(
+    bool isDark,
+    Color cardBg,
+    Color gold,
+    Color textColor,
+  ) {
     final Map<String, int> prayerDelayCount = {};
     final Map<String, int> prayerOnTimeCount = {};
     for (var p in _prayers) {
@@ -1431,7 +1680,9 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
         color: cardBg,
         borderRadius: BorderRadius.circular(20.r),
         border: Border.all(color: gold.withValues(alpha: 0.2)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1478,7 +1729,9 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                   child: Row(
                     children: [
                       Icon(
-                        hasDelays ? Icons.lightbulb_outline_rounded : Icons.check_circle_outline_rounded,
+                        hasDelays
+                            ? Icons.lightbulb_outline_rounded
+                            : Icons.check_circle_outline_rounded,
                         color: hasDelays ? const Color(0xFFE53935) : gold,
                         size: 20.sp,
                       ),
@@ -1523,13 +1776,17 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                               ),
                             ),
                             Text(
-                              total > 0 ? '${(onTimePct * 100).round()}% في وقتها' : 'لم تُسجل بعد',
+                              total > 0
+                                  ? '${(onTimePct * 100).round()}% في وقتها'
+                                  : 'لم تُسجل بعد',
                               style: TextStyle(
                                 fontFamily: AppConsts.cairo,
                                 fontSize: 11.sp,
                                 color: total == 0
                                     ? textColor.withValues(alpha: 0.4)
-                                    : (onTimePct >= 0.7 ? gold : const Color(0xFFE65100)),
+                                    : (onTimePct >= 0.7
+                                          ? gold
+                                          : const Color(0xFFE65100)),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -1541,7 +1798,11 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                           child: LinearProgressIndicator(
                             value: total > 0 ? onTimePct : 0.0,
                             minHeight: 6.h,
-                            backgroundColor: (total > 0 ? const Color(0xFFE53935) : textColor).withValues(alpha: 0.15),
+                            backgroundColor:
+                                (total > 0
+                                        ? const Color(0xFFE53935)
+                                        : textColor)
+                                    .withValues(alpha: 0.15),
                             valueColor: AlwaysStoppedAnimation(
                               onTimePct >= 0.7 ? gold : const Color(0xFFFBC02D),
                             ),
@@ -1562,13 +1823,13 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
   // ─── Day Details Dialog ─────────────────────────────────────────────────────
 
   void _showDayDetails(
-    BuildContext context, 
-    DateTime date, 
-    Map<String, String?>? initialLog, 
-    bool isDark, 
-    Color cardBg, 
-    Color gold, 
-    Color textColor
+    BuildContext context,
+    DateTime date,
+    Map<String, String?>? initialLog,
+    bool isDark,
+    Color cardBg,
+    Color gold,
+    Color textColor,
   ) {
     final dateKey = DateFormat('yyyy-MM-dd').format(date);
     final dateStr = DateFormat('yyyy-MM-dd', 'ar').format(date);
@@ -1577,7 +1838,9 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
     showModalBottomSheet(
       context: context,
       backgroundColor: cardBg,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20.r))),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+      ),
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
@@ -1602,7 +1865,7 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                     final idx = entry.key;
                     final p = entry.value;
                     final status = currentLog[p];
-                    
+
                     String statusText = "اضغط للتسجيل";
                     Color statusColor = textColor.withValues(alpha: 0.5);
                     IconData iconData = Icons.radio_button_unchecked;
@@ -1627,7 +1890,8 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                         } else {
                           final result = await showDialog<String>(
                             context: context,
-                            builder: (dialogCtx) => _buildConfirmDialog(p, dialogCtx),
+                            builder: (dialogCtx) =>
+                                _buildConfirmDialog(p, dialogCtx),
                           );
                           if (result != null) {
                             await _savePrayerStatusForDate(p, result, dateKey);
@@ -1637,7 +1901,10 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                       },
                       borderRadius: BorderRadius.circular(10.r),
                       child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 8.w),
+                        padding: EdgeInsets.symmetric(
+                          vertical: 12.h,
+                          horizontal: 8.w,
+                        ),
                         child: Row(
                           children: [
                             Image.asset(
@@ -1677,7 +1944,7 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                 ],
               ),
             );
-          }
+          },
         );
       },
     );
@@ -1687,37 +1954,67 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 8.w, height: 8.w,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: color)),
+        Container(
+          width: 8.w,
+          height: 8.w,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+        ),
         SizedBox(width: 4.w),
-        Text(text, style: TextStyle(
-            fontFamily: AppConsts.expoArabic, fontSize: 9.sp,
-            color: const Color(0xFF888888))),
+        Text(
+          text,
+          style: TextStyle(
+            fontFamily: AppConsts.expoArabic,
+            fontSize: 9.sp,
+            color: const Color(0xFF888888),
+          ),
+        ),
       ],
     );
   }
 
   // ─── Stats Card ─────────────────────────────────────────────────────────────
 
-  Widget _buildStatsCard(bool isDark, Color cardBg, Color gold, Color textColor) {
+  Widget _buildStatsCard(
+    bool isDark,
+    Color cardBg,
+    Color gold,
+    Color textColor,
+  ) {
     int totalOnTime = 0, totalLate = 0, totalMissed = 0;
     final now = DateTime.now();
-    final displayMonth = DateTime(now.year, now.month + _calendarMonthOffset, 1);
-    
+    final displayMonth = DateTime(
+      now.year,
+      now.month + _calendarMonthOffset,
+      1,
+    );
+
     int expectedPrayers = 0;
     final monthStart = DateTime(displayMonth.year, displayMonth.month, 1);
-    final monthEnd = DateTime(displayMonth.year, displayMonth.month, DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month));
+    final monthEnd = DateTime(
+      displayMonth.year,
+      displayMonth.month,
+      DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month),
+    );
 
     if (!monthEnd.isBefore(_trackingStartDate)) {
-      final effectiveStart = _trackingStartDate.isAfter(monthStart) ? _trackingStartDate : monthStart;
-      final effectiveEnd = now.isBefore(monthEnd) ? DateTime(now.year, now.month, now.day) : monthEnd;
+      final effectiveStart = _trackingStartDate.isAfter(monthStart)
+          ? _trackingStartDate
+          : monthStart;
+      final effectiveEnd = now.isBefore(monthEnd)
+          ? DateTime(now.year, now.month, now.day)
+          : monthEnd;
 
       if (!effectiveStart.isAfter(effectiveEnd)) {
         if (displayMonth.year == now.year && displayMonth.month == now.month) {
-          final daysBeforeToday = (DateTime(now.year, now.month, now.day).difference(effectiveStart).inDays).clamp(0, 31);
+          final daysBeforeToday = (DateTime(
+            now.year,
+            now.month,
+            now.day,
+          ).difference(effectiveStart).inDays).clamp(0, 31);
           expectedPrayers += daysBeforeToday * 5;
 
-          final cp = PrayerService().getPrayerTimes()?.currentPrayer() ?? Prayer.none;
+          final cp =
+              PrayerService().getPrayerTimes()?.currentPrayer() ?? Prayer.none;
           if (cp == Prayer.fajr) {
             expectedPrayers += 1;
           } else if (cp == Prayer.dhuhr) {
@@ -1730,7 +2027,8 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
             expectedPrayers += 5;
           }
         } else {
-          final totalDays = (effectiveEnd.difference(effectiveStart).inDays + 1).clamp(0, 31);
+          final totalDays = (effectiveEnd.difference(effectiveStart).inDays + 1)
+              .clamp(0, 31);
           expectedPrayers += totalDays * 5;
         }
       }
@@ -1740,7 +2038,9 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
       try {
         final d = DateTime.parse(e.key);
         return d.year == displayMonth.year && d.month == displayMonth.month;
-      } catch (_) { return false; }
+      } catch (_) {
+        return false;
+      }
     }).toList();
 
     for (final entry in monthEntries) {
@@ -1752,11 +2052,18 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
         }
       }
     }
-    totalMissed = (expectedPrayers - (totalOnTime + totalLate)).clamp(0, expectedPrayers);
+    totalMissed = (expectedPrayers - (totalOnTime + totalLate)).clamp(
+      0,
+      expectedPrayers,
+    );
 
     // Number of active tracking days in the current display month
     int trackedDaysInMonth = 0;
-    for (int d = 1; d <= DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month); d++) {
+    for (
+      int d = 1;
+      d <= DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month);
+      d++
+    ) {
       final date = DateTime(displayMonth.year, displayMonth.month, d);
       if (!date.isAfter(now) && !date.isBefore(_trackingStartDate)) {
         trackedDaysInMonth++;
@@ -1768,7 +2075,9 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
         color: cardBg,
         borderRadius: BorderRadius.circular(20.r),
         border: Border.all(color: gold.withValues(alpha: 0.2)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8),
+        ],
       ),
       child: Column(
         children: [
@@ -1782,12 +2091,15 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
               children: [
                 Icon(Icons.bar_chart_rounded, color: gold, size: 22.sp),
                 SizedBox(width: 10.w),
-                Text('إحصائيات الشهر',
-                    style: TextStyle(
-                        fontFamily: AppConsts.expoArabic,
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.bold,
-                        color: gold)),
+                Text(
+                  'إحصائيات الشهر',
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                    color: gold,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1800,9 +2112,19 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                   children: [
                     _statBubble('في وقتها', totalOnTime, gold, textColor),
                     SizedBox(width: 8.w),
-                    _statBubble('متأخراً', totalLate, const Color(0xFFE65100), textColor),
+                    _statBubble(
+                      'متأخراً',
+                      totalLate,
+                      const Color(0xFFE65100),
+                      textColor,
+                    ),
                     SizedBox(width: 8.w),
-                    _statBubble('فائتة', totalMissed, const Color(0xFFE53935), textColor),
+                    _statBubble(
+                      'فائتة',
+                      totalMissed,
+                      const Color(0xFFE53935),
+                      textColor,
+                    ),
                   ],
                 ),
                 SizedBox(height: 20.h),
@@ -1817,7 +2139,9 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                     }
                   }
                   final pDone = pOnTime + pLate;
-                  final pct = trackedDaysInMonth > 0 ? (pDone / trackedDaysInMonth) : (pDone > 0 ? 1.0 : 0.0);
+                  final pct = trackedDaysInMonth > 0
+                      ? (pDone / trackedDaysInMonth)
+                      : (pDone > 0 ? 1.0 : 0.0);
 
                   return Padding(
                     padding: EdgeInsets.only(bottom: 12.h),
@@ -1825,11 +2149,14 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                       children: [
                         SizedBox(
                           width: 46.w,
-                          child: Text(prayer,
-                              style: TextStyle(
-                                  fontFamily: AppConsts.expoArabic,
-                                  fontSize: 11.sp,
-                                  color: textColor.withValues(alpha: 0.65))),
+                          child: Text(
+                            prayer,
+                            style: TextStyle(
+                              fontFamily: AppConsts.expoArabic,
+                              fontSize: 11.sp,
+                              color: textColor.withValues(alpha: 0.65),
+                            ),
+                          ),
                         ),
                         Expanded(
                           child: Stack(
@@ -1837,8 +2164,9 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                               Container(
                                 height: 10.h,
                                 decoration: BoxDecoration(
-                                    color: textColor.withValues(alpha: 0.06),
-                                    borderRadius: BorderRadius.circular(6.r)),
+                                  color: textColor.withValues(alpha: 0.06),
+                                  borderRadius: BorderRadius.circular(6.r),
+                                ),
                               ),
                               FractionallySizedBox(
                                 widthFactor: pct.clamp(0.0, 1.0),
@@ -1848,8 +2176,8 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
                                     color: pct > 0.8
                                         ? gold
                                         : pct > 0.4
-                                            ? const Color(0xFFFBC02D)
-                                            : const Color(0xFFE65100),
+                                        ? const Color(0xFFFBC02D)
+                                        : const Color(0xFFE65100),
                                     borderRadius: BorderRadius.circular(6.r),
                                   ),
                                 ),
@@ -1880,17 +2208,23 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
         ),
         child: Column(
           children: [
-            Text('$count',
-                style: TextStyle(
-                    fontFamily: AppConsts.expoArabic,
-                    fontSize: 22.sp,
-                    fontWeight: FontWeight.bold,
-                    color: color)),
-            Text(label,
-                style: TextStyle(
-                    fontFamily: AppConsts.expoArabic,
-                    fontSize: 10.sp,
-                    color: textColor.withValues(alpha: 0.6))),
+            Text(
+              '$count',
+              style: TextStyle(
+                fontFamily: AppConsts.expoArabic,
+                fontSize: 22.sp,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: AppConsts.expoArabic,
+                fontSize: 10.sp,
+                color: textColor.withValues(alpha: 0.6),
+              ),
+            ),
           ],
         ),
       ),
@@ -1906,10 +2240,11 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
         'صلاة $prayer',
         textAlign: TextAlign.center,
         style: TextStyle(
-            fontFamily: AppConsts.expoArabic,
-            fontSize: 18.sp,
-            fontWeight: FontWeight.bold,
-            color: const Color(0xFFD0A871)),
+          fontFamily: AppConsts.expoArabic,
+          fontSize: 18.sp,
+          fontWeight: FontWeight.bold,
+          color: const Color(0xFFD0A871),
+        ),
       ),
       content: Text(
         'هل صليتَها في وقتها أم متأخراً؟',
@@ -1922,29 +2257,39 @@ Future<int> _recalculateTrueStreak(SharedPreferences prefs) async {
           onPressed: () => Navigator.pop(ctx, 'ontime'),
           style: TextButton.styleFrom(
             backgroundColor: const Color(0xFFD0A871).withValues(alpha: 0.15),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.r),
+            ),
             padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
           ),
-          child: const Text('في وقتها ✓',
-              style: TextStyle(
-                  fontFamily: AppConsts.expoArabic,
-                  fontSize: 14,
-                  color: Color(0xFFD0A871),
-                  fontWeight: FontWeight.bold)),
+          child: const Text(
+            'في وقتها ✓',
+            style: TextStyle(
+              fontFamily: AppConsts.expoArabic,
+              fontSize: 14,
+              color: Color(0xFFD0A871),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
         TextButton(
           onPressed: () => Navigator.pop(ctx, 'late'),
           style: TextButton.styleFrom(
             backgroundColor: const Color(0xFFE65100).withValues(alpha: 0.1),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.r),
+            ),
             padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
           ),
-          child: Text('متأخراً ⏳',
-              style: TextStyle(
-                  fontFamily: AppConsts.expoArabic,
-                  fontSize: 14.sp,
-                  color: const Color(0xFFE65100),
-                  fontWeight: FontWeight.bold)),
+          child: Text(
+            'متأخراً ⏳',
+            style: TextStyle(
+              fontFamily: AppConsts.expoArabic,
+              fontSize: 14.sp,
+              color: const Color(0xFFE65100),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
       ],
     );
@@ -1988,9 +2333,7 @@ class WeeklyCompletionSplinePainter extends CustomPainter {
       ..color = textColor.withValues(alpha: 0.12)
       ..strokeWidth = 1.0;
 
-    final textPainter = TextPainter(
-      textDirection: TextDirection.rtl,
-    );
+    final textPainter = TextPainter(textDirection: TextDirection.rtl);
 
     for (int i = 0; i <= 5; i++) {
       final pct = (100 - i * 20);
@@ -2023,7 +2366,10 @@ class WeeklyCompletionSplinePainter extends CustomPainter {
     final points = <Offset>[];
     for (int i = 0; i < 5; i++) {
       final double x = leftPadding + (i / 4.0) * chartWidth;
-      final double rate = (i < weeklyRates.length ? weeklyRates[i] : 0.0).clamp(0.0, 100.0);
+      final double rate = (i < weeklyRates.length ? weeklyRates[i] : 0.0).clamp(
+        0.0,
+        100.0,
+      );
       final double y = topPadding + (1.0 - (rate / 100.0)) * chartHeight;
       points.add(Offset(x, y));
     }
@@ -2046,14 +2392,17 @@ class WeeklyCompletionSplinePainter extends CustomPainter {
       ..close();
 
     final fillPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          primaryColor.withValues(alpha: 0.35),
-          primaryColor.withValues(alpha: 0.0),
-        ],
-      ).createShader(Rect.fromLTWH(leftPadding, topPadding, chartWidth, chartHeight));
+      ..shader =
+          LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              primaryColor.withValues(alpha: 0.35),
+              primaryColor.withValues(alpha: 0.0),
+            ],
+          ).createShader(
+            Rect.fromLTWH(leftPadding, topPadding, chartWidth, chartHeight),
+          );
 
     canvas.drawPath(fillPath, fillPaint);
 
@@ -2106,12 +2455,16 @@ class WeeklyCompletionSplinePainter extends CustomPainter {
     textPainter.layout();
     textPainter.paint(
       canvas,
-      Offset((leftPadding + (chartWidth / 2)) - (textPainter.width / 2), topPadding + chartHeight + 20.0),
+      Offset(
+        (leftPadding + (chartWidth / 2)) - (textPainter.width / 2),
+        topPadding + chartHeight + 20.0,
+      ),
     );
   }
 
   @override
-  bool shouldRepaint(covariant WeeklyCompletionSplinePainter oldDelegate) => true;
+  bool shouldRepaint(covariant WeeklyCompletionSplinePainter oldDelegate) =>
+      true;
 }
 
 class WeeklyConsistencyBarPainter extends CustomPainter {
@@ -2162,7 +2515,13 @@ class WeeklyConsistencyBarPainter extends CustomPainter {
     maxVal = ((maxVal + 4) ~/ 5) * 5;
     if (maxVal < 10) maxVal = 10;
 
-    final steps = [maxVal, (maxVal * 0.7).round(), (maxVal * 0.5).round(), (maxVal * 0.2).round(), 0];
+    final steps = [
+      maxVal,
+      (maxVal * 0.7).round(),
+      (maxVal * 0.5).round(),
+      (maxVal * 0.2).round(),
+      0,
+    ];
     for (int step in steps) {
       final y = topPadding + (1.0 - (step / maxVal)) * chartHeight;
       canvas.drawLine(
@@ -2181,7 +2540,10 @@ class WeeklyConsistencyBarPainter extends CustomPainter {
       );
       textPainter.text = textSpan;
       textPainter.layout();
-      textPainter.paint(canvas, Offset(leftPadding + chartWidth + 6.0, y - (textPainter.height / 2)));
+      textPainter.paint(
+        canvas,
+        Offset(leftPadding + chartWidth + 6.0, y - (textPainter.height / 2)),
+      );
     }
 
     final barGroupWidth = chartWidth / 5.0;
@@ -2201,20 +2563,44 @@ class WeeklyConsistencyBarPainter extends CustomPainter {
 
       if (ot > 0) {
         final otHeight = (ot / maxVal) * chartHeight;
-        final otRect = Rect.fromLTWH(centerX - singleBarWidth * 1.5 - 2, baseY - otHeight, singleBarWidth, otHeight);
-        canvas.drawRRect(RRect.fromRectAndRadius(otRect, Radius.circular(3.r)), onTimePaint);
+        final otRect = Rect.fromLTWH(
+          centerX - singleBarWidth * 1.5 - 2,
+          baseY - otHeight,
+          singleBarWidth,
+          otHeight,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(otRect, Radius.circular(3.r)),
+          onTimePaint,
+        );
       }
 
       if (lt > 0) {
         final ltHeight = (lt / maxVal) * chartHeight;
-        final ltRect = Rect.fromLTWH(centerX - singleBarWidth * 0.5, baseY - ltHeight, singleBarWidth, ltHeight);
-        canvas.drawRRect(RRect.fromRectAndRadius(ltRect, Radius.circular(3.r)), latePaint);
+        final ltRect = Rect.fromLTWH(
+          centerX - singleBarWidth * 0.5,
+          baseY - ltHeight,
+          singleBarWidth,
+          ltHeight,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(ltRect, Radius.circular(3.r)),
+          latePaint,
+        );
       }
 
       if (ms > 0) {
         final msHeight = (ms / maxVal) * chartHeight;
-        final msRect = Rect.fromLTWH(centerX + singleBarWidth * 0.5 + 2, baseY - msHeight, singleBarWidth, msHeight);
-        canvas.drawRRect(RRect.fromRectAndRadius(msRect, Radius.circular(3.r)), missedPaint);
+        final msRect = Rect.fromLTWH(
+          centerX + singleBarWidth * 0.5 + 2,
+          baseY - msHeight,
+          singleBarWidth,
+          msHeight,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(msRect, Radius.circular(3.r)),
+          missedPaint,
+        );
       }
 
       final textSpan = TextSpan(
@@ -2246,7 +2632,10 @@ class WeeklyConsistencyBarPainter extends CustomPainter {
     textPainter.layout();
     textPainter.paint(
       canvas,
-      Offset((leftPadding + (chartWidth / 2)) - (textPainter.width / 2), topPadding + chartHeight + 20.0),
+      Offset(
+        (leftPadding + (chartWidth / 2)) - (textPainter.width / 2),
+        topPadding + chartHeight + 20.0,
+      ),
     );
   }
 

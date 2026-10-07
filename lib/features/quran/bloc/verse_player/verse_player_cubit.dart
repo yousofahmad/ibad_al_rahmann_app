@@ -28,7 +28,8 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   double playbackSpeed = 1.0;
   bool isLooping = false;
   bool autoPlayNext = true;
-  bool isHighlightWordByWord = CacheHelper.prefs.getBool('verse_player_highlight_wbw') ?? true;
+  bool isHighlightWordByWord =
+      CacheHelper.prefs.getBool('verse_player_highlight_wbw') ?? true;
   ReciterAudioModel? currentReciterModel;
 
   static const Map<String, String> defaultReciters = {
@@ -101,7 +102,11 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
     'ar.abdullahmatroud': 'Abdullah_Matroud_128kbps',
   };
 
-  static String getAyahAudioUrl(int surahNumber, int verseNumber, String reciterId) {
+  static String getAyahAudioUrl(
+    int surahNumber,
+    int verseNumber,
+    String reciterId,
+  ) {
     final folder = reciterFolders[reciterId] ?? 'Alafasy_128kbps';
     final s = surahNumber.toString().padLeft(3, '0');
     final v = verseNumber.toString().padLeft(3, '0');
@@ -111,7 +116,8 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   Map<String, String> get reciters => defaultReciters;
 
   void init() async {
-    reciter = CacheHelper.prefs.getString('reciter') ?? defaultReciters.keys.first;
+    reciter =
+        CacheHelper.prefs.getString('reciter') ?? defaultReciters.keys.first;
     autoPlayNext = CacheHelper.prefs.getBool('verse_player_auto_play') ?? false;
   }
 
@@ -152,10 +158,45 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
     );
   }
 
-    void toggleHighlightMode() {
+  static List<ReciterAudioModel> get allReciters =>
+      ReciterAudioHelper.defaultReciters;
+
+  void selectReciter(ReciterAudioModel model) {
+    reciter = model.id;
+    currentReciterModel = model;
+    CacheHelper.prefs.setString('verse_player_reciter', model.id);
+    if (currnetVerse != null) {
+      initVerse(autoPlay: player.playing);
+    }
+  }
+
+  void setHighlightMode(bool wordByWord) {
+    isHighlightWordByWord = wordByWord;
+    CacheHelper.prefs.setBool('verse_player_highlight_wbw', wordByWord);
+    emit(
+      VersePlayerInitial(
+        showed: state.showed,
+        loading: state.loading,
+        currentVerse: currnetVerse,
+        activeWordIndex: isHighlightWordByWord ? state.activeWordIndex : null,
+      ),
+    );
+  }
+
+  void toggleHighlightMode() {
     isHighlightWordByWord = !isHighlightWordByWord;
-    CacheHelper.prefs.setBool('verse_player_highlight_wbw', isHighlightWordByWord);
-    emit(VersePlayerInitial(showed: state.showed, loading: state.loading, currentVerse: currnetVerse, activeWordIndex: state.activeWordIndex));
+    CacheHelper.prefs.setBool(
+      'verse_player_highlight_wbw',
+      isHighlightWordByWord,
+    );
+    emit(
+      VersePlayerInitial(
+        showed: state.showed,
+        loading: state.loading,
+        currentVerse: currnetVerse,
+        activeWordIndex: state.activeWordIndex,
+      ),
+    );
   }
 
   void toggleAutoPlayNext() {
@@ -194,75 +235,92 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
     );
   }
 
+  bool _isInitializingVerse = false;
+
   Future<void> initVerse({bool autoPlay = false}) async {
-    if (currnetVerse != null) {
-      if (player.playing) {
-        await player.stop();
-      }
-
-      final activeReciter = reciter ?? defaultReciters.keys.first;
-
-      // Compute direct EveryAyah CDN audio URL immediately (0ms delay)
-      final ayahUrl = getAyahAudioUrl(
-        currnetVerse!.surahNumber,
-        currnetVerse!.verseNumber,
-        activeReciter,
-      );
-
-      emit(
-        VersePlayerInitial(
-          showed: true,
-          loading: true,
-          currentVerse: currnetVerse,
-        ),
-      );
-
-      try {
-        await player.setAudioSource(
-          AudioSource.uri(
-            Uri.parse(ayahUrl),
-            tag: MediaItem(
-              id: ayahUrl,
-              title: 'سورة ${surahArabicTashkel[currnetVerse!.surahNumber - 1]}',
-              artist: 'الآية ${currnetVerse!.verseNumber.toArabicNums}',
-              album: defaultReciters[activeReciter] ?? 'القارئ',
-            ),
-          ),
-          preload: true,
-        );
-
-        await player.setSpeed(playbackSpeed);
-        await player.setLoopMode(isLooping ? LoopMode.one : LoopMode.off);
-        verseListener();
-
-        if (autoPlay) {
-          player.play();
+    if (_isInitializingVerse) return;
+    _isInitializingVerse = true;
+    try {
+      if (currnetVerse != null) {
+        if (player.playing) {
+          await player.stop();
         }
 
+        final activeReciter = reciter ?? defaultReciters.keys.first;
+
+        // Compute direct EveryAyah CDN audio URL immediately (0ms delay)
+        final ayahUrl = getAyahAudioUrl(
+          currnetVerse!.surahNumber,
+          currnetVerse!.verseNumber,
+          activeReciter,
+        );
+
         emit(
           VersePlayerInitial(
             showed: true,
-            loading: false,
+            loading: true,
             currentVerse: currnetVerse,
           ),
         );
 
-        // Fetch segments asynchronously in background for word-by-word highlight without delaying audio
-        _loadSegmentsAsync(activeReciter, currnetVerse!.surahNumber, currnetVerse!.verseNumber);
-      } catch (e) {
-        debugPrint('Error setting verse audio source: $e');
-        emit(
-          VersePlayerInitial(
-            showed: true,
-            loading: false,
-            currentVerse: currnetVerse,
-          ),
-        );
+        try {
+          await player.setAudioSource(
+            AudioSource.uri(
+              Uri.parse(ayahUrl),
+              tag: MediaItem(
+                id: ayahUrl,
+                title:
+                    'سورة ${surahArabicTashkel[currnetVerse!.surahNumber - 1]}',
+                artist: 'الآية ${currnetVerse!.verseNumber.toArabicNums}',
+                album: defaultReciters[activeReciter] ?? 'القارئ',
+              ),
+            ),
+            preload: true,
+          );
+
+          await player.setSpeed(playbackSpeed);
+          await player.setLoopMode(isLooping ? LoopMode.one : LoopMode.off);
+          verseListener();
+
+          if (autoPlay) {
+            player.play();
+          }
+
+          emit(
+            VersePlayerInitial(
+              showed: true,
+              loading: false,
+              currentVerse: currnetVerse,
+            ),
+          );
+
+          // Fetch segments asynchronously in background for word-by-word highlight without delaying audio
+          _loadSegmentsAsync(
+            activeReciter,
+            currnetVerse!.surahNumber,
+            currnetVerse!.verseNumber,
+          );
+        } catch (e) {
+          debugPrint('Error setting verse audio source: $e');
+          emit(
+            VersePlayerInitial(
+              showed: true,
+              loading: false,
+              currentVerse: currnetVerse,
+            ),
+          );
+        }
       }
+    } finally {
+      _isInitializingVerse = false;
     }
   }
 
-  void _loadSegmentsAsync(String activeReciter, int surahNum, int verseNum) async {
+  void _loadSegmentsAsync(
+    String activeReciter,
+    int surahNum,
+    int verseNum,
+  ) async {
     try {
       final recitersList = await ReciterAudioHelper.getReciters();
       final Map<String, String> everyAyahToReciterModelId = {
@@ -293,10 +351,15 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
         'ar.salahbukhatir': 'bukhatir',
         'ar.abdullahmatroud': 'matroud',
       };
-      
-      final mappedId = everyAyahToReciterModelId[activeReciter] ?? activeReciter;
 
-      final reciterModel = recitersList.firstWhere((r) => r.id == mappedId, orElse: () => ReciterAudioModel(id: '', name: '', style: '', folderName: ''));
+      final mappedId =
+          everyAyahToReciterModelId[activeReciter] ?? activeReciter;
+
+      final reciterModel = recitersList.firstWhere(
+        (r) => r.id == mappedId,
+        orElse: () =>
+            ReciterAudioModel(id: '', name: '', style: '', folderName: ''),
+      );
       currentReciterModel = reciterModel;
 
       if (reciterModel.id.isNotEmpty || reciterModel.folderName.isNotEmpty) {
@@ -377,55 +440,69 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
     });
   }
 
-  Future<void> playNextVerse() async {
-    if (currnetVerse == null) return;
-    final totalVersesInSurah = getVerseCount(currnetVerse!.surahNumber);
-    int nextSNum = currnetVerse!.surahNumber;
-    int nextVNum = currnetVerse!.verseNumber + 1;
-    if (nextVNum > totalVersesInSurah) {
-      if (nextSNum < 114) {
-        nextSNum += 1;
-        nextVNum = 1;
-      } else {
-        return;
-      }
-    }
-    final nextText = getVerse(nextSNum, nextVNum);
-    final nextPg = getPageNumber(nextSNum, nextVNum);
-    final nextFont = 'page$nextPg';
+  bool _isChangingVerse = false;
 
-    setVerse(
-      surahNumber: nextSNum,
-      verseNumber: nextVNum,
-      fontFamily: nextFont,
-      verse: nextText,
-    );
-    await initVerse(autoPlay: true);
+  Future<void> playNextVerse() async {
+    if (_isChangingVerse) return;
+    if (currnetVerse == null) return;
+    _isChangingVerse = true;
+    try {
+      final totalVersesInSurah = getVerseCount(currnetVerse!.surahNumber);
+      int nextSNum = currnetVerse!.surahNumber;
+      int nextVNum = currnetVerse!.verseNumber + 1;
+      if (nextVNum > totalVersesInSurah) {
+        if (nextSNum < 114) {
+          nextSNum += 1;
+          nextVNum = 1;
+        } else {
+          return;
+        }
+      }
+      final nextText = getVerse(nextSNum, nextVNum);
+      final nextPg = getPageNumber(nextSNum, nextVNum);
+      final nextFont = 'page';
+
+      setVerse(
+        surahNumber: nextSNum,
+        verseNumber: nextVNum,
+        fontFamily: nextFont,
+        verse: nextText,
+      );
+      await initVerse(autoPlay: true);
+    } finally {
+      _isChangingVerse = false;
+    }
   }
 
   Future<void> playPreviousVerse() async {
+    if (_isChangingVerse) return;
     if (currnetVerse == null) return;
-    int prevSNum = currnetVerse!.surahNumber;
-    int prevVNum = currnetVerse!.verseNumber - 1;
-    if (prevVNum < 1) {
-      if (prevSNum > 1) {
-        prevSNum -= 1;
-        prevVNum = getVerseCount(prevSNum);
-      } else {
-        return;
+    _isChangingVerse = true;
+    try {
+      int prevSNum = currnetVerse!.surahNumber;
+      int prevVNum = currnetVerse!.verseNumber - 1;
+      if (prevVNum < 1) {
+        if (prevSNum > 1) {
+          prevSNum -= 1;
+          prevVNum = getVerseCount(prevSNum);
+        } else {
+          return;
+        }
       }
-    }
-    final prevText = getVerse(prevSNum, prevVNum);
-    final prevPg = getPageNumber(prevSNum, prevVNum);
-    final prevFont = 'page$prevPg';
+      final prevText = getVerse(prevSNum, prevVNum);
+      final prevPg = getPageNumber(prevSNum, prevVNum);
+      final prevFont = 'page';
 
-    setVerse(
-      surahNumber: prevSNum,
-      verseNumber: prevVNum,
-      fontFamily: prevFont,
-      verse: prevText,
-    );
-    await initVerse(autoPlay: true);
+      setVerse(
+        surahNumber: prevSNum,
+        verseNumber: prevVNum,
+        fontFamily: prevFont,
+        verse: prevText,
+      );
+      await initVerse(autoPlay: true);
+    } finally {
+      _isChangingVerse = false;
+    }
   }
 
   void handlePlayPause() {

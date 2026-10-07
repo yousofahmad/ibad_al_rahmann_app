@@ -32,10 +32,7 @@ class QuranReadersScreen extends StatelessWidget {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: primaryColor,
-          ),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: primaryColor),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),

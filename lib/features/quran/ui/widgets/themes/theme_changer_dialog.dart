@@ -148,7 +148,7 @@ class _ThemeChangerDialogState extends State<ThemeChangerDialog> {
                           ? ThemeMode.light
                           : ThemeMode.dark;
                       themeCubit.forceThemeMode(mode);
-                      
+
                       if (quranCubit.state.isKahfMode) {
                         quranCubit.setKahfColor(picked);
                       } else if (quranCubit.state.isWirdMode) {
@@ -156,7 +156,7 @@ class _ThemeChangerDialogState extends State<ThemeChangerDialog> {
                       } else {
                         quranCubit.setPaperColor(picked);
                       }
-                      
+
                       Navigator.pop(sheetCtx);
                     },
                     style: ElevatedButton.styleFrom(
@@ -200,8 +200,9 @@ class _ThemeChangerDialogState extends State<ThemeChangerDialog> {
     final Color effectivePaperColor = isKahfMode
         ? (quranCubit.state.kahfPaperColor ?? creamFallback)
         : (isWirdMode
-            ? (quranCubit.state.wirdPaperColor ?? creamFallback)
-            : (quranCubit.state.quranPaperColor ?? (isDark ? Colors.black : creamFallback)));
+              ? (quranCubit.state.wirdPaperColor ?? creamFallback)
+              : (quranCubit.state.quranPaperColor ??
+                    (isDark ? Colors.black : creamFallback)));
 
     // Is the current color a custom (non-preset) one?
     final bool isCustom = !_presets.any(
@@ -422,7 +423,9 @@ class _ThemeChangerDialogState extends State<ThemeChangerDialog> {
             Container(
               padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(50),
+                color: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest.withAlpha(50),
                 borderRadius: BorderRadius.circular(12.r),
               ),
               child: Column(

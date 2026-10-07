@@ -10,7 +10,7 @@ class RemoteConfigService {
       return FirebaseRemoteConfig.instance;
     } catch (e) {
       // If Firebase is not initialized, this will throw.
-      // We should ideally ensure initialization in main.dart, 
+      // We should ideally ensure initialization in main.dart,
       // but a fallback or late initialization check here adds safety.
       rethrow;
     }

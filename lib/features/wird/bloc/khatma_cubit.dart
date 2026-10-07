@@ -6,6 +6,7 @@ import 'package:quran/quran.dart' as quran;
 import 'package:ibad_al_rahmann/services/notification_service.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
 import '../data/khatma_model.dart';
+import '../data/completed_khatma_model.dart';
 import '../data/wird_model.dart';
 import '../utils/wird_calculator.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -49,52 +50,79 @@ class KhatmaCubit extends Cubit<KhatmaState> {
       final box = Hive.box('appDataBox');
       List<KhatmaModel> loadedKhatmas = [];
 
-      // Migrate existing khatma keys from SharedPreferences to Hive
-      final keys = prefs.getKeys();
-      for (String key in keys) {
-        if (key.startsWith('khatma_')) {
-          final data = prefs.getString(key);
-          if (data != null) {
-            await box.put(key, data);
-            await prefs.remove(
-              key,
-            ); // Remove from SharedPreferences after migration
-          }
-        }
-      }
-
-      // Legacy fallback migration
-      final oldData = prefs.getString(_khatmaKey);
-      if (oldData != null) {
-        final k = KhatmaModel.fromJson(jsonDecode(oldData));
-        await box.put('khatma_${k.id}', oldData);
-        await prefs.remove(_khatmaKey);
-      }
-
-      // Load all Khatmas from Hive
+      // Load from Hive first
       int count = 0;
       for (var key in box.keys) {
         if (key.toString().startsWith('khatma_')) {
           final data = box.get(key);
           if (data != null && data is String) {
-            loadedKhatmas.add(KhatmaModel.fromJson(jsonDecode(data)));
+            try {
+              final k = KhatmaModel.fromJson(jsonDecode(data));
+              loadedKhatmas.add(k);
+              // Ensure SharedPreferences is always mirrored for Native Kotlin background alarm scheduler
+              await prefs.setString('khatma_${k.id}', data);
+            } catch (e) {
+              AppLogger.log(
+                "KhatmaCubit",
+                "Error parsing khatma from Hive ($key): $e",
+              );
+            }
           }
         }
 
-        // Yield every 10 keys to keep UI thread responsive
         count++;
         if (count % 10 == 0) {
           await Future.delayed(Duration.zero);
         }
       }
 
+      // If Hive was empty, fall back to SharedPreferences and migrate to Hive (without deleting from prefs!)
+      if (loadedKhatmas.isEmpty) {
+        final keys = prefs.getKeys();
+        for (String key in keys) {
+          if (key.startsWith('khatma_')) {
+            final data = prefs.getString(key);
+            if (data != null) {
+              try {
+                final k = KhatmaModel.fromJson(jsonDecode(data));
+                loadedKhatmas.add(k);
+                await box.put(key, data);
+              } catch (e) {
+                AppLogger.log(
+                  "KhatmaCubit",
+                  "Error parsing khatma from prefs ($key): $e",
+                );
+              }
+            }
+          }
+        }
+
+        // Legacy fallback migration
+        final oldData = prefs.getString(_khatmaKey);
+        if (oldData != null) {
+          try {
+            final k = KhatmaModel.fromJson(jsonDecode(oldData));
+            final jsonData = jsonEncode(k.toJson());
+            await box.put('khatma_${k.id}', jsonData);
+            await prefs.setString('khatma_${k.id}', jsonData);
+            await prefs.remove(_khatmaKey);
+            loadedKhatmas.add(k);
+          } catch (_) {}
+        }
+      }
+
+      AppLogger.log(
+        "KhatmaCubit",
+        "loadKhatma() -> loaded ${loadedKhatmas.length} khatmas (synchronized with SharedPreferences)",
+      );
+
       if (loadedKhatmas.isNotEmpty) {
-        // Sort so the newest or main logic applies
         emit(KhatmaLoaded(loadedKhatmas));
       } else {
         emit(KhatmaEmpty());
       }
     } catch (e) {
+      AppLogger.log("KhatmaCubit", "loadKhatma error: $e");
       emit(KhatmaError("حدث خطأ أثناء تحميل الختمة: $e"));
     }
   }
@@ -111,6 +139,9 @@ class KhatmaCubit extends Cubit<KhatmaState> {
     String? dailyTime,
     int notificationOffsetMinutes = 30,
     String accountabilityLabel = '+ بند جديد بنفس اسم الختمة',
+    bool startFromBeginningOfDay = true,
+    DateTime? startDate,
+    int initialCompletedWirds = 0,
   }) async {
     emit(KhatmaLoading());
     try {
@@ -133,6 +164,9 @@ class KhatmaCubit extends Cubit<KhatmaState> {
         totalSessions = WirdCalculator.getQuarterCount(effectiveStartPage);
       }
 
+      final effectiveStartDate = startDate ?? DateTime.now();
+      final clampedCompleted = initialCompletedWirds.clamp(0, totalSessions);
+
       for (int i = 0; i < totalSessions; i++) {
         WirdSession session = WirdCalculator.getSession(
           sessionIndex: i,
@@ -150,7 +184,7 @@ class KhatmaCubit extends Cubit<KhatmaState> {
             endAyah: session.endAyah,
             startPage: session.startPage,
             endPage: session.endPage,
-            isCompleted: false,
+            isCompleted: i < clampedCompleted,
             isPartial: session.isPartial,
             startSuraNumber: session.startSuraNumber,
             endSuraNumber: session.endSuraNumber,
@@ -158,14 +192,18 @@ class KhatmaCubit extends Cubit<KhatmaState> {
         );
       }
 
+      final int currentWirdIndex = clampedCompleted >= totalSessions
+          ? (totalSessions - 1)
+          : clampedCompleted;
+
       final newKhatma = KhatmaModel(
         id: id,
         name: name,
         wirds: wirds,
-        currentWirdIndex: 0,
+        currentWirdIndex: currentWirdIndex,
         notificationType: notificationType,
         enableNotifications: enableNotifications,
-        startDate: DateTime.now(),
+        startDate: effectiveStartDate,
         days: totalDays,
         pagesPerWird: unit == WirdUnit.page
             ? (604 - effectiveStartPage + 1) ~/ totalSessions
@@ -176,7 +214,8 @@ class KhatmaCubit extends Cubit<KhatmaState> {
             ? name
             : accountabilityLabel,
         // Record which prayer we started on so getDaysLate can offset correctly.
-        startPrayerOffset: notificationType == 'prayer'
+        startPrayerOffset:
+            (notificationType == 'prayer' && !startFromBeginningOfDay)
             ? _getPrayerOffset(
                 PrayerService().getPrayerTimes()?.currentPrayer() ??
                     Prayer.none,
@@ -211,17 +250,23 @@ class KhatmaCubit extends Cubit<KhatmaState> {
 
       await NotificationService.rescheduleWird();
 
+      AppLogger.log(
+        "KhatmaCubit",
+        "startNewKhatma() -> created khatma '$name' ($id), total sessions: ${wirds.length}, type: $notificationType",
+      );
+
       emit(KhatmaLoaded(currentList));
     } catch (e) {
+      AppLogger.log("KhatmaCubit", "startNewKhatma error: $e");
       emit(KhatmaError("حدث خطأ أثناء إنشاء الختمة الجديدة: $e"));
     }
   }
 
-  Future<void> markWirdAsCompleted(String khatmaId, int index) async {
+  Future<bool> markWirdAsCompleted(String khatmaId, int index) async {
     if (state is KhatmaLoaded) {
       final khatmas = List<KhatmaModel>.from((state as KhatmaLoaded).khatmas);
       final kIndex = khatmas.indexWhere((k) => k.id == khatmaId);
-      if (kIndex == -1) return;
+      if (kIndex == -1) return false;
 
       final currentKhatma = khatmas[kIndex];
       final updatedWirds = List<WirdModel>.from(currentKhatma.wirds);
@@ -241,11 +286,23 @@ class KhatmaCubit extends Cubit<KhatmaState> {
 
       khatmas[kIndex] = updatedKhatma;
 
-      // Auto-delete if ALL wirds are now completed
+      // Check if ALL wirds are now completed OR the user finished the last wird -> Archive as Completed Khatma
+      final bool isLastWird = (index >= updatedWirds.length - 1);
       final bool isAllCompleted = updatedWirds.every((w) => w.isCompleted);
-      if (isAllCompleted) {
-        await deleteKhatma(khatmaId);
-        return;
+      if (isLastWird || isAllCompleted) {
+        final allDoneWirds = updatedWirds
+            .map((w) => w.copyWith(isCompleted: true))
+            .toList();
+        final finalKhatma = updatedKhatma.copyWith(
+          wirds: allDoneWirds,
+          currentWirdIndex: updatedWirds.length - 1,
+        );
+        AppLogger.log(
+          "KhatmaCubit",
+          "Khatma $khatmaId completed (last wird / all wirds completed)! Archiving...",
+        );
+        await archiveCompletedKhatma(finalKhatma);
+        return true;
       }
 
       final box = Hive.box('appDataBox');
@@ -258,12 +315,19 @@ class KhatmaCubit extends Cubit<KhatmaState> {
         jsonData,
       ); // Mirror to SharedPreferences
 
+      AppLogger.log(
+        "KhatmaCubit",
+        "markWirdAsCompleted() -> marked wird $index completed for $khatmaId (next wird: $nextIndex)",
+      );
+
       // Cancel only THIS khatma's notifications, then reschedule all
       await NotificationService.cancelKhatmaNotifications(khatmaId);
       await NotificationService.rescheduleAllKhatmaNotifications();
 
       emit(KhatmaLoaded(khatmas));
+      return false;
     }
+    return false;
   }
 
   /// Returns how many sessions the user is behind schedule.
@@ -390,16 +454,20 @@ class KhatmaCubit extends Cubit<KhatmaState> {
     final box = Hive.box('appDataBox');
     final jsonStr = jsonEncode(updatedKhatma.toJson());
     await box.put('khatma_$khatmaId', jsonStr);
-    
+
     final prefs = CacheHelper.prefs;
     await prefs.setString('khatma_$khatmaId', jsonStr);
+
+    AppLogger.log(
+      "KhatmaCubit",
+      "updatePrayerOffsets() for $khatmaId: $newOffsets",
+    );
 
     await NotificationService.cancelKhatmaNotifications(khatmaId);
     await NotificationService.rescheduleAllKhatmaNotifications();
 
     emit(KhatmaLoaded(khatmas));
   }
-
 
   Future<void> updateDailyTime(String khatmaId, String newTime) async {
     if (state is! KhatmaLoaded) return;
@@ -421,6 +489,38 @@ class KhatmaCubit extends Cubit<KhatmaState> {
     final prefs = CacheHelper.prefs;
     await prefs.setString('khatma_$khatmaId', jsonStr);
 
+    AppLogger.log("KhatmaCubit", "updateDailyTime() for $khatmaId: $newTime");
+
+    await NotificationService.cancelKhatmaNotifications(khatmaId);
+    await NotificationService.rescheduleAllKhatmaNotifications();
+
+    emit(KhatmaLoaded(khatmas));
+  }
+
+  Future<void> updateKhatmaStartDate(
+    String khatmaId,
+    DateTime newStartDate,
+  ) async {
+    if (state is! KhatmaLoaded) return;
+    final khatmas = List<KhatmaModel>.from((state as KhatmaLoaded).khatmas);
+    final kIndex = khatmas.indexWhere((k) => k.id == khatmaId);
+    if (kIndex == -1) return;
+
+    final updatedKhatma = khatmas[kIndex].copyWith(startDate: newStartDate);
+    khatmas[kIndex] = updatedKhatma;
+
+    final box = Hive.box('appDataBox');
+    final jsonStr = jsonEncode(updatedKhatma.toJson());
+    await box.put('khatma_$khatmaId', jsonStr);
+
+    final prefs = CacheHelper.prefs;
+    await prefs.setString('khatma_$khatmaId', jsonStr);
+
+    AppLogger.log(
+      "KhatmaCubit",
+      "updateKhatmaStartDate() for $khatmaId: $newStartDate",
+    );
+
     await NotificationService.cancelKhatmaNotifications(khatmaId);
     await NotificationService.rescheduleAllKhatmaNotifications();
 
@@ -429,8 +529,11 @@ class KhatmaCubit extends Cubit<KhatmaState> {
 
   Future<void> deleteKhatma(String id) async {
     if (state is! KhatmaLoaded) return;
+    final khatmas = List<KhatmaModel>.from((state as KhatmaLoaded).khatmas);
     final prefs = CacheHelper.prefs;
     final box = Hive.box('appDataBox');
+
+    AppLogger.log("KhatmaCubit", "deleteKhatma() -> removing khatma $id");
 
     await box.delete('khatma_$id');
     await prefs.remove('khatma_$id'); // Fallback cleanup
@@ -443,22 +546,8 @@ class KhatmaCubit extends Cubit<KhatmaState> {
 
     final keys = prefs.getKeys();
 
-    // Find the khatma's accountability label before deleting it from state
-    String? accountabilityLabel;
-    final khatmas = List<KhatmaModel>.from((state as KhatmaLoaded).khatmas);
-    final idx = khatmas.indexWhere((k) => k.id == id);
-    if (idx != -1) {
-      accountabilityLabel = khatmas[idx].accountabilityLabel;
-      if (accountabilityLabel.isEmpty) accountabilityLabel = 'ورد التلاوة';
-    }
-
     for (String key in keys) {
       if (key.startsWith('wird_last_page_') || key.startsWith('${id}_')) {
-        await prefs.remove(key);
-      }
-      // Also delete its daily tracker completions
-      if (accountabilityLabel != null &&
-          key.startsWith('wird_done_$accountabilityLabel')) {
         await prefs.remove(key);
       }
     }
@@ -474,6 +563,131 @@ class KhatmaCubit extends Cubit<KhatmaState> {
       // Reschedule remaining khatmas' notifications
       await NotificationService.rescheduleAllKhatmaNotifications();
       emit(KhatmaLoaded(khatmas));
+    }
+  }
+
+  // -------------------------------------------------------------
+  // Completed Khatmas History & Statistics
+  // -------------------------------------------------------------
+  static const String _completedKhatmasKey = 'completed_khatmas_list';
+  static const String _manualCountKey = 'manual_completed_khatmas_count';
+
+  List<CompletedKhatmaModel> getCompletedKhatmas() {
+    try {
+      final box = Hive.box('appDataBox');
+      final data =
+          box.get(_completedKhatmasKey) ??
+          CacheHelper.prefs.getString(_completedKhatmasKey);
+      if (data == null) return [];
+      final List<dynamic> list = data is String
+          ? jsonDecode(data)
+          : (data is List ? data : []);
+      final result = list
+          .map(
+            (e) => CompletedKhatmaModel.fromJson(Map<String, dynamic>.from(e)),
+          )
+          .toList();
+      result.sort((a, b) => b.completedDate.compareTo(a.completedDate));
+      return result;
+    } catch (e) {
+      AppLogger.log("KhatmaCubit", "Error getCompletedKhatmas: $e");
+      return [];
+    }
+  }
+
+  int getManualCompletedCount() {
+    try {
+      final box = Hive.box('appDataBox');
+      final val =
+          box.get(_manualCountKey) ?? CacheHelper.prefs.getInt(_manualCountKey);
+      if (val is int) return val;
+      if (val is String) return int.tryParse(val) ?? 0;
+    } catch (e) {
+      AppLogger.log("KhatmaCubit", "Error getManualCompletedCount: $e");
+    }
+    return 0;
+  }
+
+  int get totalCompletedCount =>
+      getCompletedKhatmas().length + getManualCompletedCount();
+
+  Future<void> setManualCompletedCount(int count) async {
+    final safeCount = count < 0 ? 0 : count;
+    final box = Hive.box('appDataBox');
+    await box.put(_manualCountKey, safeCount);
+    await CacheHelper.prefs.setInt(_manualCountKey, safeCount);
+
+    if (state is KhatmaLoaded) {
+      emit(KhatmaLoaded((state as KhatmaLoaded).khatmas));
+    } else if (state is KhatmaEmpty) {
+      emit(KhatmaEmpty());
+    }
+  }
+
+  Future<void> archiveCompletedKhatma(
+    KhatmaModel khatma, {
+    DateTime? completionDate,
+  }) async {
+    try {
+      final now = completionDate ?? DateTime.now();
+      final diffDays = now.difference(khatma.startDate).inDays;
+      final actualDays = diffDays <= 0 ? 1 : diffDays + 1;
+
+      int pagesCount = 604;
+      if (khatma.wirds.isNotEmpty) {
+        final firstPage = khatma.wirds.first.startPage;
+        final lastPage = khatma.wirds.last.endPage;
+        pagesCount = (lastPage - firstPage + 1).clamp(1, 604);
+      }
+
+      final completedItem = CompletedKhatmaModel(
+        id: khatma.id,
+        name: khatma.name.isNotEmpty ? khatma.name : 'ختمة القرآن الكريم',
+        startDate: khatma.startDate,
+        completedDate: now,
+        daysPlanned: khatma.days,
+        actualDays: actualDays,
+        totalWirds: khatma.wirds.length,
+        pagesCount: pagesCount,
+        notificationType: khatma.notificationType,
+      );
+
+      final currentList = getCompletedKhatmas();
+      currentList.removeWhere((item) => item.id == completedItem.id);
+      currentList.insert(0, completedItem);
+
+      final box = Hive.box('appDataBox');
+      final jsonStr = jsonEncode(currentList.map((e) => e.toJson()).toList());
+      await box.put(_completedKhatmasKey, jsonStr);
+      await CacheHelper.prefs.setString(_completedKhatmasKey, jsonStr);
+
+      AppLogger.log(
+        "KhatmaCubit",
+        "Archived completed khatma: ${completedItem.name}, total completed now: ${currentList.length}",
+      );
+    } catch (e) {
+      AppLogger.log("KhatmaCubit", "Error archiving completed khatma: $e");
+    } finally {
+      await deleteKhatma(khatma.id);
+    }
+  }
+
+  Future<void> deleteCompletedKhatma(String id) async {
+    try {
+      final currentList = getCompletedKhatmas();
+      currentList.removeWhere((item) => item.id == id);
+      final box = Hive.box('appDataBox');
+      final jsonStr = jsonEncode(currentList.map((e) => e.toJson()).toList());
+      await box.put(_completedKhatmasKey, jsonStr);
+      await CacheHelper.prefs.setString(_completedKhatmasKey, jsonStr);
+
+      if (state is KhatmaLoaded) {
+        emit(KhatmaLoaded((state as KhatmaLoaded).khatmas));
+      } else if (state is KhatmaEmpty) {
+        emit(KhatmaEmpty());
+      }
+    } catch (e) {
+      AppLogger.log("KhatmaCubit", "Error deleting completed khatma: $e");
     }
   }
 }

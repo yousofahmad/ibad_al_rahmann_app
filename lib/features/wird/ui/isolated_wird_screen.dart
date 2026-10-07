@@ -14,6 +14,7 @@ import 'package:ibad_al_rahmann/features/quran/data/repo/quran_repo.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/widgets/menus/single_tap_menu.dart';
 import 'package:ibad_al_rahmann/features/wird/bloc/khatma_cubit.dart';
 import 'package:ibad_al_rahmann/features/wird/services/wird_completion_service.dart';
+import 'package:ibad_al_rahmann/features/wird/ui/khatma_stats_screen.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/widgets/core/wbw_page_widget.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -151,7 +152,14 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen>
   }
 
   void _onFinishWird() async {
-    await WirdCompletionService.complete(
+    final khatma = widget.khatmaId != null
+        ? context.read<KhatmaCubit>().getKhatmaById(widget.khatmaId!)
+        : null;
+    final khatmaName = (khatma?.name.isNotEmpty == true)
+        ? khatma!.name
+        : 'ختمة القرآن الكريم';
+
+    final isFinished = await WirdCompletionService.complete(
       context: context,
       isKahfMode: widget.isKahfMode,
       isWirdMode: widget.isWirdMode,
@@ -160,32 +168,38 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen>
     );
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          "أتممت القراءة بنجاح، تقبل الله منا ومنكم صالح الأعمال.",
-          style: TextStyle(
-            fontFamily: AppConsts.cairo,
-            fontWeight: FontWeight.bold,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.fixed,
-      ),
-    );
-
-    if (!mounted) return;
     // Restore UI before navigating to avoid black screen
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
+    if (isFinished) {
+      await showKhatmaCompletionCelebrationDialog(
+        context,
+        khatmaName: khatmaName,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "أتممت القراءة بنجاح، تقبل الله منا ومنكم صالح الأعمال.",
+            style: TextStyle(
+              fontFamily: AppConsts.cairo,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.fixed,
+        ),
+      );
+    }
+
+    if (!mounted) return;
     // If launched from a notification the stack may only have this screen.
     // popUntil(isFirst) goes to home safely; if there are multiple routes, pop() works normally.
     final nav = Navigator.of(context);
     if (nav.canPop()) {
       nav.pop();
     } else {
-      // Stack is empty (opened directly from notification) — go to first route
       nav.popUntil((route) => route.isFirst);
     }
   }
@@ -310,471 +324,464 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen>
                         bottom: false,
                         child: Stack(
                           children: [
-                            Column(
-                              children: [
-                                // ── Top Bar ──
-                                AnimatedContainer(
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                  height: (_showOverlays && !isAutoScrolling)
-                                      ? MediaQuery.of(context).padding.top +
-                                            60.h
-                                      : 0,
-                                  child: AnimatedOpacity(
-                                    duration: const Duration(milliseconds: 200),
-                                    opacity: (_showOverlays && !isAutoScrolling)
-                                        ? 1.0
-                                        : 0.0,
-                                    child: SingleChildScrollView(
-                                      physics:
-                                          const NeverScrollableScrollPhysics(),
-                                      child: Container(
-                                        padding: EdgeInsets.only(
-                                          top: MediaQuery.of(
-                                            context,
-                                          ).padding.top,
-                                          left: 12,
-                                          right: 12,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: barColor,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withAlpha(40),
-                                              blurRadius: 10,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ],
-                                        ),
-                                        child: SizedBox(
-                                          height: 60.h,
-                                          child: Row(
-                                            children: [
-                                              IconButton(
-                                                icon: Icon(
-                                                  Icons.arrow_back_ios_rounded,
-                                                  color: onBar,
-                                                ),
-                                                onPressed: () =>
-                                                    Navigator.pop(context),
-                                              ),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.center,
-                                                  children: [
-                                                    Text(
-                                                      khatmaName,
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: TextStyle(
-                                                        fontFamily: AppConsts
-                                                            .expoArabic,
-                                                        fontSize: 14.sp,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color: onBar,
-                                                      ),
-                                                    ),
-                                                    Text(
-                                                      "من صـ ${widget.targetStartPage.toArabicNums} إلى ${widget.targetEndPage.toArabicNums}",
-                                                      style: TextStyle(
-                                                        fontFamily:
-                                                            AppConsts.cairo,
-                                                        fontSize: 10.sp,
-                                                        color: onBar.withAlpha(
-                                                          180,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              IconButton(
-                                                icon: Icon(
-                                                  Icons.info_outline_rounded,
-                                                  color: onBar,
-                                                ),
-                                                onPressed: () =>
-                                                    _showInstructions(context),
-                                              ),
-                                              IconButton(
-                                                icon: Icon(
-                                                  Icons.palette_outlined,
-                                                  color: onBar,
-                                                ),
-                                                onPressed: () =>
-                                                    PageActionBar.showColorPalette(
-                                                      context,
-                                                    ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
+                            // ── Full-Screen Mushaf Content ──
+                            Positioned.fill(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: _toggleMenu,
+                                onDoubleTap: () {
+                                  _localQuranCubit.changeLayout();
+                                },
+                                child: PageView.builder(
+                                  allowImplicitScrolling: true,
+                                  controller: _pageController,
+                                  itemCount: _itemCount,
+                                  reverse: false,
+                                  onPageChanged: (idx) {
+                                    setState(() => _currentIndex = idx);
+                                    _localQuranCubit.onQuranPageChanged(
+                                      widget.targetStartPage + idx - 1,
+                                    );
+                                  },
+                                  itemBuilder: (context, index) {
+                                    return BlocBuilder<
+                                      KhatmaCubit,
+                                      KhatmaState
+                                    >(
+                                      builder: (context, state) {
+                                        int? sSura, sAyah, eSura, eAyah;
+
+                                        if (widget.isKahfMode) {
+                                          sSura = 18;
+                                          sAyah = 1;
+                                          eSura = 18;
+                                          eAyah = 110;
+                                        } else if (widget.isWirdMode &&
+                                            widget.khatmaId != null &&
+                                            state is KhatmaLoaded) {
+                                          final khatma = state.khatmas
+                                              .firstWhere(
+                                                (k) => k.id == widget.khatmaId,
+                                                orElse: () =>
+                                                    state.khatmas.first,
+                                              );
+                                          if (widget.wirdIndex != null &&
+                                              widget.wirdIndex! <
+                                                  khatma.wirds.length) {
+                                            final wird =
+                                                khatma.wirds[widget.wirdIndex!];
+                                            sSura = wird.startSuraNumber;
+                                            sAyah = wird.startAyah;
+                                            eSura = wird.endSuraNumber;
+                                            eAyah = wird.endAyah;
+                                          }
+                                        }
+
+                                        final isLandscape =
+                                            MediaQuery.of(
+                                              context,
+                                            ).orientation ==
+                                            Orientation.landscape;
+                                        return WbwPageWidget(
+                                          pageNumber:
+                                              widget.targetStartPage + index,
+                                          showHeader: true,
+                                          showPageNumber: true,
+                                          paperColorOverride: bgColor,
+                                          textColorOverride: isActuallyDark
+                                              ? Colors.white
+                                              : Colors.black,
+                                          startSuraNumber: sSura,
+                                          startAyah: sAyah,
+                                          endSuraNumber: eSura,
+                                          endAyah: eAyah,
+                                          collapseOutOfRange: false,
+                                          isLandscape: isLandscape,
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+
+                            // ── Top Bar Overlay ──
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                                height: (_showOverlays && !isAutoScrolling)
+                                    ? MediaQuery.of(context).padding.top + 60.h
+                                    : 0,
+                                child: AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 200),
+                                  opacity: (_showOverlays && !isAutoScrolling)
+                                      ? 1.0
+                                      : 0.0,
+                                  child: SingleChildScrollView(
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    child: Container(
+                                      padding: EdgeInsets.only(
+                                        top: MediaQuery.of(context).padding.top,
+                                        left: 12,
+                                        right: 12,
                                       ),
-                                    ),
-                                  ),
-                                ),
-
-                                // ── Main Content ──
-                                Expanded(
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onTap: _toggleMenu,
-                                    onDoubleTap: () {
-                                      _localQuranCubit.changeLayout();
-                                    },
-                                    child: PageView.builder(
-                                      allowImplicitScrolling: true,
-                                      controller: _pageController,
-                                      itemCount: _itemCount,
-                                      reverse: false,
-                                      onPageChanged: (idx) {
-                                        setState(() => _currentIndex = idx);
-                                        _localQuranCubit.onQuranPageChanged(
-                                          widget.targetStartPage + idx - 1,
-                                        );
-                                      },
-                                      itemBuilder: (context, index) {
-                                        return BlocBuilder<
-                                          KhatmaCubit,
-                                          KhatmaState
-                                        >(
-                                          builder: (context, state) {
-                                            int? sSura, sAyah, eSura, eAyah;
-                                            bool isPartial = false;
-
-                                            if (widget.isKahfMode) {
-                                              sSura = 18;
-                                              sAyah = 1;
-                                              eSura = 18;
-                                              eAyah = 110;
-                                              isPartial = true;
-                                            } else if (widget.isWirdMode &&
-                                                widget.khatmaId != null &&
-                                                state is KhatmaLoaded) {
-                                              final khatma = state.khatmas
-                                                  .firstWhere(
-                                                    (k) =>
-                                                        k.id == widget.khatmaId,
-                                                  );
-                                              if (widget.wirdIndex != null &&
-                                                  widget.wirdIndex! <
-                                                      khatma.wirds.length) {
-                                                final wird = khatma
-                                                    .wirds[widget.wirdIndex!];
-                                                sSura = wird.startSuraNumber;
-                                                sAyah = wird.startAyah;
-                                                eSura = wird.endSuraNumber;
-                                                eAyah = wird.endAyah;
-                                                isPartial = wird.isPartial;
-                                              }
-                                            }
-
-                                            final isLandscape =
-                                                MediaQuery.of(
-                                                  context,
-                                                ).orientation ==
-                                                Orientation.landscape;
-                                            return WbwPageWidget(
-                                              pageNumber:
-                                                  widget.targetStartPage +
-                                                  index,
-                                              showHeader: !_showOverlays,
-                                              showPageNumber: true,
-                                              paperColorOverride: bgColor,
-                                              textColorOverride: isActuallyDark
-                                                  ? Colors.white
-                                                  : Colors.black,
-                                              startSuraNumber: sSura,
-                                              startAyah: sAyah,
-                                              endSuraNumber: eSura,
-                                              endAyah: eAyah,
-                                              collapseOutOfRange: isPartial,
-                                              isLandscape: isLandscape,
-                                            );
-                                          },
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ),
-
-                                // ── Bottom Bar ──
-                                AnimatedContainer(
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                  height: (_showOverlays && !isAutoScrolling)
-                                      ? 120.h
-                                      : 0,
-                                  child: AnimatedOpacity(
-                                    duration: const Duration(milliseconds: 200),
-                                    opacity: (_showOverlays && !isAutoScrolling)
-                                        ? 1.0
-                                        : 0.0,
-                                    child: SingleChildScrollView(
-                                      physics:
-                                          const NeverScrollableScrollPhysics(),
-                                      child: Container(
-                                        padding: EdgeInsets.fromLTRB(
-                                          16.w,
-                                          12.h,
-                                          16.w,
-                                          16.h,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: barColor,
-                                          borderRadius:
-                                              const BorderRadius.vertical(
-                                                top: Radius.circular(24),
-                                              ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withAlpha(40),
-                                              blurRadius: 15,
-                                              offset: const Offset(0, -4),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
+                                      decoration: BoxDecoration(
+                                        color: barColor,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withAlpha(40),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: SizedBox(
+                                        height: 60.h,
+                                        child: Row(
                                           children: [
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: ClipRRect(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          5,
-                                                        ),
-                                                    child: LinearProgressIndicator(
-                                                      value: _itemCount > 1
-                                                          ? (_currentIndex /
-                                                                (_itemCount -
-                                                                    1))
-                                                          : 1.0,
-                                                      backgroundColor: onBar
-                                                          .withAlpha(20),
-                                                      valueColor:
-                                                          const AlwaysStoppedAnimation(
-                                                            Color(0xFFD0A871),
-                                                          ), // Gold progress
-                                                      minHeight: 6,
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 10),
-                                                Text(
-                                                  "${(_currentIndex + 1).toArabicNums} / ${_itemCount.toArabicNums}",
-                                                  style: TextStyle(
-                                                    color: onBar,
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            Padding(
-                                              padding: EdgeInsets.only(
-                                                top: 8.h,
+                                            IconButton(
+                                              icon: Icon(
+                                                Icons.arrow_back_ios_rounded,
+                                                color: onBar,
                                               ),
-                                              child: Row(
+                                              onPressed: () =>
+                                                  Navigator.pop(context),
+                                            ),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
                                                 children: [
-                                                  Expanded(
-                                                    child: ElevatedButton(
-                                                      style: ElevatedButton.styleFrom(
-                                                        backgroundColor: onBar
-                                                            .withValues(
-                                                              alpha: 0.15,
-                                                            ),
-                                                        foregroundColor: onBar,
-                                                        elevation: 0,
-                                                        shape: RoundedRectangleBorder(
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                12,
-                                                              ),
-                                                          side: BorderSide(
-                                                            color: onBar
-                                                                .withValues(
-                                                                  alpha: 0.3,
-                                                                ),
-                                                          ),
-                                                        ),
-                                                        padding:
-                                                            EdgeInsets.symmetric(
-                                                              vertical: 10.h,
-                                                            ),
-                                                      ),
-                                                      onPressed: _onFinishWird,
-                                                      child: const Text(
-                                                        "أتممت القراءة",
-                                                        style: TextStyle(
-                                                          fontFamily:
-                                                              AppConsts.cairo,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                        ),
+                                                  Text(
+                                                    khatmaName,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontFamily:
+                                                          AppConsts.expoArabic,
+                                                      fontSize: 14.sp,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: onBar,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    "من صـ ${widget.targetStartPage.toArabicNums} إلى ${widget.targetEndPage.toArabicNums}",
+                                                    style: TextStyle(
+                                                      fontFamily:
+                                                          AppConsts.cairo,
+                                                      fontSize: 10.sp,
+                                                      color: onBar.withAlpha(
+                                                        180,
                                                       ),
                                                     ),
                                                   ),
-                                                  // Next Wird Button (if available)
-                                                  if (widget.isWirdMode &&
-                                                      widget.khatmaId != null)
-                                                    BlocBuilder<
-                                                      KhatmaCubit,
-                                                      KhatmaState
-                                                    >(
-                                                      builder: (context, khatmaState) {
-                                                        final nextWird = context
-                                                            .read<KhatmaCubit>()
-                                                            .getNextWird(
-                                                              widget.khatmaId!,
-                                                            );
-                                                        if (nextWird == null)
-                                                          return const SizedBox.shrink();
-
-                                                        return Expanded(
-                                                          child: Padding(
-                                                            padding:
-                                                                EdgeInsets.only(
-                                                                  right: 12.w,
-                                                                ),
-                                                            child: ElevatedButton(
-                                                              style: ElevatedButton.styleFrom(
-                                                                backgroundColor:
-                                                                    onBar,
-                                                                foregroundColor:
-                                                                    barColor,
-                                                                elevation: 5,
-                                                                shadowColor: Colors
-                                                                    .black
-                                                                    .withValues(
-                                                                      alpha:
-                                                                          0.3,
-                                                                    ),
-                                                                shape: RoundedRectangleBorder(
-                                                                  borderRadius:
-                                                                      BorderRadius.circular(
-                                                                        12,
-                                                                      ),
-                                                                ),
-                                                                padding:
-                                                                    EdgeInsets.symmetric(
-                                                                      vertical:
-                                                                          10.h,
-                                                                    ),
-                                                              ),
-                                                              onPressed: () {
-                                                                WirdCompletionService.complete(
-                                                                  context:
-                                                                      context,
-                                                                  isKahfMode: widget
-                                                                      .isKahfMode,
-                                                                  isWirdMode: widget
-                                                                      .isWirdMode,
-                                                                  khatmaId: widget
-                                                                      .khatmaId,
-                                                                  wirdIndex: widget
-                                                                      .wirdIndex,
-                                                                );
-                                                                ScaffoldMessenger.of(
-                                                                  context,
-                                                                ).showSnackBar(
-                                                                  const SnackBar(
-                                                                    content: Text(
-                                                                      "تم إتمام الورد بنجاح! جاري الانتقال للورد التالي...",
-                                                                      style: TextStyle(
-                                                                        fontFamily:
-                                                                            AppConsts.cairo,
-                                                                      ),
-                                                                      textAlign:
-                                                                          TextAlign
-                                                                              .center,
-                                                                    ),
-                                                                    backgroundColor:
-                                                                        Colors
-                                                                            .green,
-                                                                    duration:
-                                                                        Duration(
-                                                                          seconds:
-                                                                              2,
-                                                                        ),
-                                                                  ),
-                                                                );
-                                                                Navigator.pushReplacement(
-                                                                  context,
-                                                                  MaterialPageRoute(
-                                                                    builder: (_) => IsolatedWirdScreen(
-                                                                      isWirdMode:
-                                                                          true,
-                                                                      khatmaId:
-                                                                          widget
-                                                                              .khatmaId,
-                                                                      wirdIndex:
-                                                                          nextWird
-                                                                              .wirdIndex,
-                                                                      targetStartPage:
-                                                                          nextWird
-                                                                              .startPage,
-                                                                      targetEndPage:
-                                                                          nextWird
-                                                                              .endPage,
-                                                                    ),
-                                                                  ),
-                                                                );
-                                                              },
-                                                              child: const Text(
-                                                                "الورد التالي",
-                                                                style: TextStyle(
-                                                                  fontFamily:
-                                                                      AppConsts
-                                                                          .cairo,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        );
-                                                      },
-                                                    ),
-                                                  if (!widget.isWirdMode &&
-                                                      _currentIndex <
-                                                          _itemCount - 1)
-                                                    IconButton(
-                                                      onPressed: () {
-                                                        _pageController.nextPage(
-                                                          duration:
-                                                              const Duration(
-                                                                milliseconds:
-                                                                    400,
-                                                              ),
-                                                          curve:
-                                                              Curves.easeInOut,
-                                                        );
-                                                      },
-                                                      icon: Icon(
-                                                        Icons
-                                                            .arrow_forward_ios_rounded,
-                                                        color: onBar,
-                                                      ),
-                                                    ),
                                                 ],
                                               ),
                                             ),
+                                            IconButton(
+                                              icon: Icon(
+                                                Icons.info_outline_rounded,
+                                                color: onBar,
+                                              ),
+                                              onPressed: () =>
+                                                  _showInstructions(context),
+                                            ),
+                                            IconButton(
+                                              icon: Icon(
+                                                Icons.palette_outlined,
+                                                color: onBar,
+                                              ),
+                                              onPressed: () =>
+                                                  PageActionBar.showColorPalette(
+                                                    context,
+                                                  ),
+                                            ),
                                           ],
                                         ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ],
+                              ),
                             ),
+
+                            // ── Bottom Bar Overlay ──
+                            Positioned(
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                                height: (_showOverlays && !isAutoScrolling)
+                                    ? 120.h
+                                    : 0,
+                                child: AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 200),
+                                  opacity: (_showOverlays && !isAutoScrolling)
+                                      ? 1.0
+                                      : 0.0,
+                                  child: SingleChildScrollView(
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    child: Container(
+                                      padding: EdgeInsets.fromLTRB(
+                                        16.w,
+                                        12.h,
+                                        16.w,
+                                        16.h,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: barColor,
+                                        borderRadius:
+                                            const BorderRadius.vertical(
+                                              top: Radius.circular(24),
+                                            ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withAlpha(40),
+                                            blurRadius: 15,
+                                            offset: const Offset(0, -4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: ClipRRect(
+                                                  borderRadius:
+                                                      BorderRadius.circular(5),
+                                                  child: LinearProgressIndicator(
+                                                    value: _itemCount > 1
+                                                        ? (_currentIndex /
+                                                              (_itemCount - 1))
+                                                        : 1.0,
+                                                    backgroundColor: onBar
+                                                        .withAlpha(20),
+                                                    valueColor:
+                                                        const AlwaysStoppedAnimation(
+                                                          Color(0xFFD0A871),
+                                                        ),
+                                                    minHeight: 6,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Text(
+                                                "${(_currentIndex + 1).toArabicNums} / ${_itemCount.toArabicNums}",
+                                                style: TextStyle(
+                                                  color: onBar,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.only(top: 8.h),
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: ElevatedButton(
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: onBar
+                                                          .withValues(
+                                                            alpha: 0.15,
+                                                          ),
+                                                      foregroundColor: onBar,
+                                                      elevation: 0,
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              12,
+                                                            ),
+                                                        side: BorderSide(
+                                                          color: onBar
+                                                              .withValues(
+                                                                alpha: 0.3,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                      padding:
+                                                          EdgeInsets.symmetric(
+                                                            vertical: 10.h,
+                                                          ),
+                                                    ),
+                                                    onPressed: _onFinishWird,
+                                                    child: const Text(
+                                                      "أتممت القراءة",
+                                                      style: TextStyle(
+                                                        fontFamily:
+                                                            AppConsts.cairo,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                // Next Wird Button (if available)
+                                                if (widget.isWirdMode &&
+                                                    widget.khatmaId != null)
+                                                  BlocBuilder<
+                                                    KhatmaCubit,
+                                                    KhatmaState
+                                                  >(
+                                                    builder: (context, khatmaState) {
+                                                      final nextWird = context
+                                                          .read<KhatmaCubit>()
+                                                          .getNextWird(
+                                                            widget.khatmaId!,
+                                                          );
+                                                      if (nextWird == null)
+                                                        return const SizedBox.shrink();
+
+                                                      return Expanded(
+                                                        child: Padding(
+                                                          padding:
+                                                              EdgeInsets.only(
+                                                                right: 12.w,
+                                                              ),
+                                                          child: ElevatedButton(
+                                                            style: ElevatedButton.styleFrom(
+                                                              backgroundColor:
+                                                                  onBar,
+                                                              foregroundColor:
+                                                                  barColor,
+                                                              elevation: 5,
+                                                              shadowColor: Colors
+                                                                  .black
+                                                                  .withValues(
+                                                                    alpha: 0.3,
+                                                                  ),
+                                                              shape: RoundedRectangleBorder(
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      12,
+                                                                    ),
+                                                              ),
+                                                              padding:
+                                                                  EdgeInsets.symmetric(
+                                                                    vertical:
+                                                                        10.h,
+                                                                  ),
+                                                            ),
+                                                            onPressed: () {
+                                                              WirdCompletionService.complete(
+                                                                context:
+                                                                    context,
+                                                                isKahfMode: widget
+                                                                    .isKahfMode,
+                                                                isWirdMode: widget
+                                                                    .isWirdMode,
+                                                                khatmaId: widget
+                                                                    .khatmaId,
+                                                                wirdIndex: widget
+                                                                    .wirdIndex,
+                                                              );
+                                                              ScaffoldMessenger.of(
+                                                                context,
+                                                              ).showSnackBar(
+                                                                const SnackBar(
+                                                                  content: Text(
+                                                                    "تم إتمام الورد بنجاح! جاري الانتقال للورد التالي...",
+                                                                    style: TextStyle(
+                                                                      fontFamily:
+                                                                          AppConsts
+                                                                              .cairo,
+                                                                    ),
+                                                                    textAlign:
+                                                                        TextAlign
+                                                                            .center,
+                                                                  ),
+                                                                  backgroundColor:
+                                                                      Colors
+                                                                          .green,
+                                                                  duration:
+                                                                      Duration(
+                                                                        seconds:
+                                                                            2,
+                                                                      ),
+                                                                ),
+                                                              );
+                                                              Navigator.pushReplacement(
+                                                                context,
+                                                                MaterialPageRoute(
+                                                                  builder: (_) => IsolatedWirdScreen(
+                                                                    isWirdMode:
+                                                                        true,
+                                                                    khatmaId: widget
+                                                                        .khatmaId,
+                                                                    wirdIndex:
+                                                                        nextWird
+                                                                            .wirdIndex,
+                                                                    targetStartPage:
+                                                                        nextWird
+                                                                            .startPage,
+                                                                    targetEndPage:
+                                                                        nextWird
+                                                                            .endPage,
+                                                                  ),
+                                                                ),
+                                                              );
+                                                            },
+                                                            child: const Text(
+                                                              "الورد التالي",
+                                                              style: TextStyle(
+                                                                fontFamily:
+                                                                    AppConsts
+                                                                        .cairo,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
+                                                if (!widget.isWirdMode &&
+                                                    _currentIndex <
+                                                        _itemCount - 1)
+                                                  IconButton(
+                                                    onPressed: () {
+                                                      _pageController.nextPage(
+                                                        duration:
+                                                            const Duration(
+                                                              milliseconds: 400,
+                                                            ),
+                                                        curve: Curves.easeInOut,
+                                                      );
+                                                    },
+                                                    icon: Icon(
+                                                      Icons
+                                                          .arrow_forward_ios_rounded,
+                                                      color: onBar,
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+
                             // Single Tap Menu (PageActionBar)
                             if (_showMenu)
                               Positioned.fill(
@@ -810,7 +817,7 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen>
                                   backgroundColor: Colors.transparent,
                                   valueColor: const AlwaysStoppedAnimation(
                                     Color(0xFFD0A871),
-                                  ), // Gold
+                                  ),
                                   minHeight: 4,
                                 ),
                               ),

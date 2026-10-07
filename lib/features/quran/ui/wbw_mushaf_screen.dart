@@ -132,10 +132,7 @@ class _WbwMushafScreenState extends State<WbwMushafScreen> {
             children: [
               Column(
                 children: [
-                  SizedBox(
-                    height: 100.h,
-                    child: const MobileQuranTopBar(),
-                  ),
+                  SizedBox(height: 100.h, child: const MobileQuranTopBar()),
                   Expanded(
                     child: _TapListener(
                       onSingleTap: () {
@@ -178,7 +175,7 @@ class _WbwMushafScreenState extends State<WbwMushafScreen> {
                               },
                             )
                           : PageView.builder(
-      allowImplicitScrolling: true,
+                              allowImplicitScrolling: true,
                               controller: _pageController,
                               itemCount: 604,
                               reverse: true,

@@ -87,7 +87,8 @@ class MobileMinQuranBottomSection extends StatelessWidget {
           ),
           BlocBuilder<QuranCubit, QuranState>(
             buildWhen: (previous, current) {
-              return previous.juzNumber != current.juzNumber || previous.currentPage != current.currentPage;
+              return previous.juzNumber != current.juzNumber ||
+                  previous.currentPage != current.currentPage;
             },
             builder: (context, state) {
               final pageNum = state.currentPage ?? 1;
@@ -104,11 +105,16 @@ class MobileMinQuranBottomSection extends StatelessWidget {
                   ),
                   SizedBox(height: 2.h),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 2.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 10.w,
+                      vertical: 2.h,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFD0A871).withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(8.r),
-                      border: Border.all(color: const Color(0xFFD0A871).withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: const Color(0xFFD0A871).withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Text(
                       hizbLabel,

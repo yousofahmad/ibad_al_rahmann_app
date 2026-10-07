@@ -1,4 +1,4 @@
-package app.ibad_al_rahmann
+﻿package app.ibad_al_rahmann
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -89,33 +89,33 @@ object NativeAzkarScheduler {
         // 2360 = بعد الفجر يوم الجمعة بساعة
         val kahfSalawatEnabled = safeBool(fp, "flutter.notif_kahf_salawat", true)
         if (kahfSalawatEnabled) {
-            val calFri = java.util.Calendar.getInstance()
-            calFri.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.FRIDAY)
-            val friTimes = NativePrayerManager.calculatePrayerTimes(context, calFri.time)
+            val calThu = java.util.Calendar.getInstance()
+            calThu.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.THURSDAY)
+            val thuTimes = NativePrayerManager.calculatePrayerTimes(context, calThu.time)
 
-            // ── إشعار بعد العشاء بساعة (2350) ──────────────────────────────
+            // ── إشعار ليلة الجمعة (الخميس بعد العشاء بساعة) (2350) ──
             var ishaHour = 22
             var ishaMin = 0
-            if (friTimes != null) {
-                val ishaCal = java.util.Calendar.getInstance().apply { time = friTimes.isha }
+            if (thuTimes != null) {
+                val ishaCal = java.util.Calendar.getInstance().apply { time = thuTimes.isha }
                 ishaCal.add(java.util.Calendar.HOUR_OF_DAY, 1)
                 ishaHour = ishaCal.get(java.util.Calendar.HOUR_OF_DAY)
                 ishaMin  = ishaCal.get(java.util.Calendar.MINUTE)
             }
-            val calIshaFri = java.util.Calendar.getInstance()
-            calIshaFri.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.FRIDAY)
-            calIshaFri.set(java.util.Calendar.HOUR_OF_DAY, ishaHour)
-            calIshaFri.set(java.util.Calendar.MINUTE, ishaMin)
-            calIshaFri.set(java.util.Calendar.SECOND, 0)
-            if (calIshaFri.timeInMillis <= now) calIshaFri.add(java.util.Calendar.WEEK_OF_YEAR, 1)
+            val calIshaThu = java.util.Calendar.getInstance()
+            calIshaThu.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.THURSDAY)
+            calIshaThu.set(java.util.Calendar.HOUR_OF_DAY, ishaHour)
+            calIshaThu.set(java.util.Calendar.MINUTE, ishaMin)
+            calIshaThu.set(java.util.Calendar.SECOND, 0)
+            if (calIshaThu.timeInMillis <= now) calIshaThu.add(java.util.Calendar.WEEK_OF_YEAR, 1)
             MainActivity.scheduleAlarmInternal(
                 context, editor, 2350,
-                year = calIshaFri.get(java.util.Calendar.YEAR),
-                month = calIshaFri.get(java.util.Calendar.MONTH) + 1,
-                day = calIshaFri.get(java.util.Calendar.DAY_OF_MONTH),
+                year = calIshaThu.get(java.util.Calendar.YEAR),
+                month = calIshaThu.get(java.util.Calendar.MONTH) + 1,
+                day = calIshaThu.get(java.util.Calendar.DAY_OF_MONTH),
                 hour = ishaHour, minute = ishaMin,
                 soundName = "saly_3ala_mo7amad",
-                title = "الجمعة — ليلة مباركة",
+                title = "ليلة الجمعة",
                 body = "لا تنس قراءة سورة الكهف والإكثار من الصلاة على النبي ﷺ",
                 payload = "kahf",
                 isRepeating = false,
@@ -124,26 +124,20 @@ object NativeAzkarScheduler {
                 customSoundName = "saly_3ala_mo7amad"
             )
 
-            // ── إشعار بعد الفجر بساعة (2360) ──────────────────────────────
-            var friHour = 6
-            var friMin  = 30
-            if (friTimes != null) {
-                val fCal = java.util.Calendar.getInstance().apply { time = friTimes.fajr }
-                fCal.add(java.util.Calendar.HOUR_OF_DAY, 1)
-                friHour = fCal.get(java.util.Calendar.HOUR_OF_DAY)
-                friMin  = fCal.get(java.util.Calendar.MINUTE)
-            }
-            val calFajrFri = java.util.Calendar.getInstance()
-            calFajrFri.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.FRIDAY)
-            calFajrFri.set(java.util.Calendar.HOUR_OF_DAY, friHour)
-            calFajrFri.set(java.util.Calendar.MINUTE, friMin)
-            calFajrFri.set(java.util.Calendar.SECOND, 0)
-            if (calFajrFri.timeInMillis <= now) calFajrFri.add(java.util.Calendar.WEEK_OF_YEAR, 1)
+            // ── إشعار يوم الجمعة (09:00 صباحاً) (2360) ──
+            var friHour = 9
+            var friMin  = 0
+            val calFri = java.util.Calendar.getInstance()
+            calFri.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.FRIDAY)
+            calFri.set(java.util.Calendar.HOUR_OF_DAY, friHour)
+            calFri.set(java.util.Calendar.MINUTE, friMin)
+            calFri.set(java.util.Calendar.SECOND, 0)
+            if (calFri.timeInMillis <= now) calFri.add(java.util.Calendar.WEEK_OF_YEAR, 1)
             MainActivity.scheduleAlarmInternal(
                 context, editor, 2360,
-                year = calFajrFri.get(java.util.Calendar.YEAR),
-                month = calFajrFri.get(java.util.Calendar.MONTH) + 1,
-                day = calFajrFri.get(java.util.Calendar.DAY_OF_MONTH),
+                year = calFri.get(java.util.Calendar.YEAR),
+                month = calFri.get(java.util.Calendar.MONTH) + 1,
+                day = calFri.get(java.util.Calendar.DAY_OF_MONTH),
                 hour = friHour, minute = friMin,
                 soundName = "saly_3ala_mo7amad",
                 title = "يوم الجمعة",
@@ -431,3 +425,4 @@ object NativeAzkarScheduler {
         }
     }
 }
+

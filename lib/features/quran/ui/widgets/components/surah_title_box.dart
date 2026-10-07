@@ -8,13 +8,19 @@ class SurahTitleBox extends StatelessWidget {
   final int surahIndex;
   final bool selected;
 
-  const SurahTitleBox({super.key, required this.surahIndex, required this.selected});
+  const SurahTitleBox({
+    super.key,
+    required this.surahIndex,
+    required this.selected,
+  });
 
   @override
   Widget build(BuildContext context) {
     return AdaptiveLayout(
-      mobileLayout: (_) => SurahTitleBoxMobile(surahIndex: surahIndex, selected: selected),
-      tabletLayout: (_) => SurahTitleBoxTablet(surahIndex: surahIndex, selected: selected),
+      mobileLayout: (_) =>
+          SurahTitleBoxMobile(surahIndex: surahIndex, selected: selected),
+      tabletLayout: (_) =>
+          SurahTitleBoxTablet(surahIndex: surahIndex, selected: selected),
     );
   }
 }
@@ -31,12 +37,16 @@ class SurahTitleBoxMobile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isPrimaryDark = ThemeData.estimateBrightnessForColor(context.primaryColor) == Brightness.dark;
-    final Color selectedTextColor = isPrimaryDark ? Colors.white : Colors.black87;
+    final bool isPrimaryDark =
+        ThemeData.estimateBrightnessForColor(context.primaryColor) ==
+        Brightness.dark;
+    final Color selectedTextColor = isPrimaryDark
+        ? Colors.white
+        : Colors.black87;
 
     final bgColor = selected ? context.primaryColor : context.secondary;
-    final textColor = selected 
-        ? selectedTextColor 
+    final textColor = selected
+        ? selectedTextColor
         : (bgColor.computeLuminance() > 0.5 ? Colors.black87 : Colors.white);
 
     return Container(
@@ -48,7 +58,7 @@ class SurahTitleBoxMobile extends StatelessWidget {
           selected: selected,
           backgroundColor: bgColor,
           borderColor: selected ? context.outline : context.secondary,
-          borderWidth: 3, 
+          borderWidth: 3,
         ),
         child: Center(
           child: Padding(
@@ -84,12 +94,16 @@ class SurahTitleBoxTablet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isPrimaryDark = ThemeData.estimateBrightnessForColor(context.primaryColor) == Brightness.dark;
-    final Color selectedTextColor = isPrimaryDark ? Colors.white : Colors.black87;
+    final bool isPrimaryDark =
+        ThemeData.estimateBrightnessForColor(context.primaryColor) ==
+        Brightness.dark;
+    final Color selectedTextColor = isPrimaryDark
+        ? Colors.white
+        : Colors.black87;
 
     final bgColor = selected ? context.primaryColor : context.secondary;
-    final textColor = selected 
-        ? selectedTextColor 
+    final textColor = selected
+        ? selectedTextColor
         : (bgColor.computeLuminance() > 0.5 ? Colors.black87 : Colors.white);
 
     return Container(

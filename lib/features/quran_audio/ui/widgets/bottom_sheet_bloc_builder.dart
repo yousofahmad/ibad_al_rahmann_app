@@ -18,7 +18,8 @@ class SurahOverlayPlayerBuilder extends StatelessWidget {
       },
       builder: (context, state) {
         if (state is QuranBottomSheetShowed || state is SliderValueChanged) {
-          if (qaree == (context.read<QuranPlayerCubit>().reciter ?? qaree)) {
+          final currentReciter = context.read<QuranPlayerCubit>().reciter;
+          if (currentReciter == null || currentReciter.id == qaree.id || currentReciter.folderName == qaree.folderName) {
             return SurahOverlayPlayer(reciter: qaree);
           }
         }

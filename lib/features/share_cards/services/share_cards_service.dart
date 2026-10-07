@@ -22,7 +22,7 @@ class ShareCardsService {
         final data = response.data is String
             ? jsonDecode(response.data)
             : response.data;
-        
+
         List<dynamic> cardsJson;
         if (data is List) {
           // Fallback if the user put share_cards directly as a list at root (unlikely given current logic but good for safety)

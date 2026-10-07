@@ -4,14 +4,15 @@ class DioConsumer {
   final Dio dio;
 
   DioConsumer({Dio? client})
-      : dio = client ??
-            Dio(
-              BaseOptions(
-                connectTimeout: const Duration(seconds: 10),
-                receiveTimeout: const Duration(seconds: 15),
-                sendTimeout: const Duration(seconds: 10),
-              ),
-            );
+    : dio =
+          client ??
+          Dio(
+            BaseOptions(
+              connectTimeout: const Duration(seconds: 10),
+              receiveTimeout: const Duration(seconds: 15),
+              sendTimeout: const Duration(seconds: 10),
+            ),
+          );
 
   Future<Response> get(
     String url, {

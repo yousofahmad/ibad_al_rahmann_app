@@ -6,7 +6,9 @@ import '../../data/surah_list.dart';
 part 'quran_state.dart';
 
 class QuranAudioCubit extends Cubit<QuranState> {
-  QuranAudioCubit(this.reciter) : super(QuranInitial());
+  QuranAudioCubit(this.reciter) : super(QuranInitial()) {
+    getQuran();
+  }
   final ReciterAudioModel reciter;
 
   List<SurahAudioModel> quran = [];
@@ -17,7 +19,8 @@ class QuranAudioCubit extends Cubit<QuranState> {
       final surahsMap = await ReciterAudioHelper.getSurahs(reciter);
       if (surahsMap.isNotEmpty) {
         quran = surahsMap.values.map((item) {
-          final sName = (item.surahNumber >= 1 && item.surahNumber <= quranSurahs.length)
+          final sName =
+              (item.surahNumber >= 1 && item.surahNumber <= quranSurahs.length)
               ? quranSurahs[item.surahNumber - 1]
               : 'سورة ${item.surahNumber}';
           return SurahAudioModel(
@@ -37,7 +40,8 @@ class QuranAudioCubit extends Cubit<QuranState> {
           final sNum = index + 1;
           final sName = quranSurahs[index];
           return SurahAudioModel(
-            url: 'https://audio-cdn.tarteel.ai/quran/surah/${reciter.folderName}/murattal/mp3/${sNum.toString().padLeft(3, '0')}.mp3',
+            url:
+                'https://audio-cdn.tarteel.ai/quran/surah/${reciter.folderName}/murattal/mp3/${sNum.toString().padLeft(3, '0')}.mp3',
             name: sName,
             surahNumber: sNum,
           );
@@ -51,4 +55,3 @@ class QuranAudioCubit extends Cubit<QuranState> {
     }
   }
 }
-

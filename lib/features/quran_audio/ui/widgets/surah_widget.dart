@@ -1,3 +1,4 @@
+import 'package:just_audio/just_audio.dart';
 import 'package:ibad_al_rahmann/features/quran_reciters/services/quran_audio_download_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -11,11 +12,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../data/surah_list.dart';
 
 class SurahWidget extends StatelessWidget {
-  const SurahWidget({
-    super.key,
-    required this.index,
-    required this.selected,
-  });
+  const SurahWidget({super.key, required this.index, required this.selected});
 
   final int index;
   final bool selected;
@@ -26,78 +23,101 @@ class SurahWidget extends StatelessWidget {
     final primaryColor = Theme.of(context).primaryColor;
 
     return Center(
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-        width: 330.w,
-        decoration: BoxDecoration(
-          color: selected
-              ? primaryColor.withValues(alpha: isDark ? 0.25 : 0.12)
-              : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
-          borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16.r),
+        onTap: () {
+          context.read<QuranPlayerCubit>().playSurah(index);
+        },
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+          width: 330.w,
+          decoration: BoxDecoration(
             color: selected
-                ? primaryColor
-                : primaryColor.withValues(alpha: isDark ? 0.25 : 0.25),
-            width: selected ? 1.5 : 1.0,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: isDark
-                  ? Colors.black.withValues(alpha: 0.2)
-                  : primaryColor.withValues(alpha: 0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+                ? primaryColor.withValues(alpha: isDark ? 0.25 : 0.12)
+                : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+            borderRadius: BorderRadius.circular(16.r),
+            border: Border.all(
+              color: selected
+                  ? primaryColor
+                  : primaryColor.withValues(alpha: isDark ? 0.25 : 0.25),
+              width: selected ? 1.5 : 1.0,
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.only(top: 6),
-              width: context.isLandscape ? 50.h : 38.w,
-              height: context.isLandscape ? 50.h : 38.w,
-              decoration: const BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage(AppAssets.imagesVerseFrame),
-                ),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.2)
+                    : primaryColor.withValues(alpha: 0.06),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
-              child: Center(
-                child: Text(
-                  index.toArabicNums,
-                  style: AppStyles.style16BFantezy.copyWith(
-                    color: isDark ? Colors.white70 : const Color(0xff606060),
-                    fontSize: !context.isTablet ? 18.sp : null,
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.only(top: 6),
+                width: context.isLandscape ? 50.h : 38.w,
+                height: context.isLandscape ? 50.h : 38.w,
+                decoration: const BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage(AppAssets.imagesVerseFrame),
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    index.toArabicNums,
+                    style: AppStyles.style16BFantezy.copyWith(
+                      color: isDark ? Colors.white70 : const Color(0xff606060),
+                      fontSize: !context.isTablet ? 18.sp : null,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 14),
-            Text(
-              quranSurahs[index - 1],
-              style: AppStyles.style24harmattan.copyWith(
-                color: isDark ? Colors.white : const Color(0xFF2D2D2D),
-                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+              const SizedBox(width: 14),
+              Text(
+                quranSurahs[index - 1],
+                style: AppStyles.style24harmattan.copyWith(
+                  color: isDark ? Colors.white : const Color(0xFF2D2D2D),
+                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                ),
               ),
-            ),
-            const Spacer(),
-            _DownloadButton(
-              reciterId: context.read<QuranPlayerCubit>().reciter?.folderName ?? '',
-              surahNumber: index,
-            ),
-            IconButton(
-              padding: EdgeInsets.zero,
-              onPressed: () {
-                context.read<QuranPlayerCubit>().playSurah(index);
-              },
-              iconSize: 32.w,
-              icon: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: selected
-                    ? Icon(Icons.pause_circle_filled_rounded, size: 36, color: primaryColor)
-                    : Icon(Icons.play_circle_fill_rounded, size: 36, color: primaryColor),
+              const Spacer(),
+              _DownloadButton(
+                reciterId:
+                    context.read<QuranPlayerCubit>().reciter?.folderName ?? '',
+                surahNumber: index,
               ),
-            ),
-          ],
+              StreamBuilder<PlayerState>(
+                stream: context.read<QuranPlayerCubit>().player.playerStateStream,
+                builder: (context, snapshot) {
+                  final isPlaying = selected &&
+                      (snapshot.data?.playing ?? false) &&
+                      snapshot.data?.processingState != ProcessingState.completed;
+                  return IconButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: () {
+                      context.read<QuranPlayerCubit>().playSurah(index);
+                    },
+                    iconSize: 32.w,
+                    icon: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: isPlaying
+                          ? Icon(
+                              Icons.pause_circle_filled_rounded,
+                              size: 36,
+                              color: primaryColor,
+                            )
+                          : Icon(
+                              Icons.play_circle_fill_rounded,
+                              size: 36,
+                              color: primaryColor,
+                            ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -117,7 +137,10 @@ class _DownloadButtonState extends State<_DownloadButton> {
   @override
   void initState() {
     super.initState();
-    QuranAudioDownloadService().checkState(widget.reciterId, widget.surahNumber);
+    QuranAudioDownloadService().checkState(
+      widget.reciterId,
+      widget.surahNumber,
+    );
   }
 
   @override
@@ -127,14 +150,23 @@ class _DownloadButtonState extends State<_DownloadButton> {
     return AnimatedBuilder(
       animation: QuranAudioDownloadService(),
       builder: (context, child) {
-        final state = QuranAudioDownloadService().getState(widget.reciterId, widget.surahNumber);
-        final progress = QuranAudioDownloadService().getProgress(widget.reciterId, widget.surahNumber);
+        final state = QuranAudioDownloadService().getState(
+          widget.reciterId,
+          widget.surahNumber,
+        );
+        final progress = QuranAudioDownloadService().getProgress(
+          widget.reciterId,
+          widget.surahNumber,
+        );
 
         if (state == AudioDownloadState.downloaded) {
           return IconButton(
             icon: const Icon(Icons.check_circle, color: Colors.green),
             onPressed: () {
-              QuranAudioDownloadService().deleteSurah(widget.reciterId, widget.surahNumber);
+              QuranAudioDownloadService().deleteSurah(
+                widget.reciterId,
+                widget.surahNumber,
+              );
             },
           );
         } else if (state == AudioDownloadState.downloading) {
@@ -143,14 +175,20 @@ class _DownloadButtonState extends State<_DownloadButton> {
             child: SizedBox(
               width: 24,
               height: 24,
-              child: CircularProgressIndicator(value: progress > 0 ? progress : null, strokeWidth: 2),
+              child: CircularProgressIndicator(
+                value: progress > 0 ? progress : null,
+                strokeWidth: 2,
+              ),
             ),
           );
         } else {
           return IconButton(
             icon: const Icon(Icons.download, color: Colors.grey),
             onPressed: () {
-              QuranAudioDownloadService().downloadSurah(widget.reciterId, widget.surahNumber);
+              QuranAudioDownloadService().downloadSurah(
+                widget.reciterId,
+                widget.surahNumber,
+              );
             },
           );
         }

@@ -50,10 +50,14 @@ class RecitersSearchBar extends StatelessWidget {
             color: isDark ? Colors.white38 : Colors.grey.shade500,
           ),
           hintTextDirection: TextDirection.rtl,
-          contentPadding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 20.w),
+          contentPadding: EdgeInsets.symmetric(
+            vertical: 10.h,
+            horizontal: 20.w,
+          ),
           border: InputBorder.none,
           prefixIcon: Icon(Icons.search, color: primaryColor, size: 22.sp),
-          suffixIcon: context.read<QuranReadersCubit>().searchController.text.isNotEmpty
+          suffixIcon:
+              context.read<QuranReadersCubit>().searchController.text.isNotEmpty
               ? IconButton(
                   icon: Icon(Icons.close, color: primaryColor, size: 18.sp),
                   onPressed: () {

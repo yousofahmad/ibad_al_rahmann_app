@@ -7,67 +7,115 @@ import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 
 class ShareHelper {
   /// Captures the widget bound to [key] as a high-resolution PNG image.
-  static Future<ui.Image?> _captureImage(GlobalKey key, {double pixelRatio = 5.0}) async {
-    try {
-      final boundary =
-          key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) {
-        debugPrint('🔴 ShareHelper: Boundary is null for key $key');
-        return null;
+  static Future<ui.Image?> _captureImage(
+    GlobalKey key, {
+    double pixelRatio = 3.0,
+  }) async {
+    final double targetRatio = pixelRatio > 3.0 ? 3.0 : pixelRatio;
+    for (int attempt = 0; attempt < 10; attempt++) {
+      try {
+        final context = key.currentContext;
+        if (context == null || !context.mounted) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          await WidgetsBinding.instance.endOfFrame;
+          continue;
+        }
+
+        final boundary = context.findRenderObject() as RenderRepaintBoundary?;
+        if (boundary == null ||
+            !boundary.hasSize ||
+            boundary.size.width <= 0 ||
+            boundary.size.height <= 0) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          await WidgetsBinding.instance.endOfFrame;
+          continue;
+        }
+
+        final double currentRatio = attempt == 0
+            ? targetRatio
+            : (attempt == 1 ? 2.0 : 1.5);
+
+        AppLogger.log(
+          "ShareHelper",
+          "Starting capture for key $key with pixelRatio $currentRatio (attempt $attempt, size: ${boundary.size})",
+        );
+        return await boundary.toImage(pixelRatio: currentRatio);
+      } catch (e) {
+        AppLogger.log(
+          "ShareHelper",
+          "Error in _captureImage (attempt $attempt): $e",
+        );
+        await Future.delayed(const Duration(milliseconds: 100));
       }
-      debugPrint('🟢 ShareHelper: Starting capture with pixelRatio $pixelRatio...');
-      return await boundary.toImage(pixelRatio: pixelRatio);
-    } catch (e) {
-      debugPrint('🔴 ShareHelper: Error in _captureImage at ratio $pixelRatio: $e');
-      // Fallback logic
-      if (pixelRatio > 2.0) {
-        debugPrint('🟡 ShareHelper: High-res capture failed. Falling back to lower ratio...');
-        return _captureImage(key, pixelRatio: pixelRatio / 2);
-      }
-      return null;
     }
+    AppLogger.log(
+      "ShareHelper",
+      "Boundary capture failed after 10 attempts for key $key",
+    );
+    return null;
   }
 
   /// Writes the captured image to a temporary file and returns its path.
-  static Future<String?> _saveToTempFile(GlobalKey key, String fileName, {double quality = 5.0}) async {
+  static Future<String?> _saveToTempFile(
+    GlobalKey key,
+    String fileName, {
+    double quality = 3.0,
+  }) async {
     try {
-      // Wait for the UI to be fully settled (e.g. after long-press or tap)
-      await Future.delayed(const Duration(milliseconds: 600));
-
       final image = await _captureImage(key, pixelRatio: quality);
-      if (image == null) return null;
+      if (image == null) {
+        AppLogger.log(
+          "ShareHelper",
+          "_saveToTempFile: captured image is null for key $key",
+        );
+        return null;
+      }
 
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) return null;
+      if (byteData == null) {
+        AppLogger.log(
+          "ShareHelper",
+          "_saveToTempFile: toByteData returned null for key $key",
+        );
+        return null;
+      }
 
       final buffer = byteData.buffer.asUint8List();
       final directory = await getTemporaryDirectory();
-      
+
       // FIX: Ensure the filename has a valid image extension (.png) for Gal compatibility
       String safeName = fileName;
       if (!safeName.toLowerCase().endsWith('.png')) {
         safeName = '$safeName.png';
       }
-      
+
       final filePath = '${directory.path}/$safeName';
       final file = File(filePath);
 
       await file.writeAsBytes(buffer);
-      debugPrint('🟢 ShareHelper: Image saved to temp file: $filePath');
+      AppLogger.log(
+        "ShareHelper",
+        "Image saved to temp file: $filePath (${buffer.length} bytes)",
+      );
       return filePath;
     } catch (e) {
-      debugPrint('🔴 ShareHelper: Exception in _saveToTempFile: $e');
+      AppLogger.log("ShareHelper", "Exception in _saveToTempFile: $e");
       return null;
     }
   }
 
-  static void showTopNotification(BuildContext context, String message, {bool isError = false}) {
+  static void showTopNotification(
+    BuildContext context,
+    String message, {
+    bool isError = false,
+  }) {
     final overlay = Overlay.of(context, rootOverlay: true);
     late OverlayEntry entry;
-    
+
     entry = OverlayEntry(
       builder: (ctx) => _TopNotificationWidget(
         message: message,
@@ -93,22 +141,25 @@ class ShareHelper {
     BuildContext context,
     GlobalKey key,
     String fileName, {
-    double quality = 5.0,
+    double quality = 3.0,
   }) async {
     try {
       final filePath = await _saveToTempFile(key, fileName, quality: quality);
       if (filePath == null) {
         if (!context.mounted) return;
-        showTopNotification(context, 'تعذر التقاط الصفحة للمشاركة', isError: true);
+        showTopNotification(
+          context,
+          'تعذر التقاط الصفحة للمشاركة',
+          isError: true,
+        );
         return;
       }
 
       debugPrint('🟢 ShareHelper: Invoking Share for $filePath');
       // ignore: deprecated_member_use
-      await Share.shareXFiles(
-        [XFile(filePath)],
-        text: 'من تطبيق عِبَادُ الرَّحْمَٰن 📖',
-      );
+      await Share.shareXFiles([
+        XFile(filePath),
+      ], text: 'من تطبيق عِبَادُ الرَّحْمَٰن 📖');
     } catch (e) {
       debugPrint('🔴 ShareHelper: Share error: $e');
       if (!context.mounted) return;
@@ -121,7 +172,7 @@ class ShareHelper {
     BuildContext context,
     GlobalKey key,
     String fileName, {
-    double quality = 5.0,
+    double quality = 3.0,
   }) async {
     try {
       final filePath = await _saveToTempFile(key, fileName, quality: quality);
@@ -154,13 +205,17 @@ class ShareHelper {
     required List<GlobalKey> keys,
     required List<String> fileNames,
     void Function(int completed, int total)? onProgress,
-    double quality = 5.0,
+    double quality = 3.0,
   }) async {
     final List<String> paths = [];
     final total = keys.length;
 
     for (int i = 0; i < total; i++) {
-      final path = await _saveToTempFile(keys[i], fileNames[i], quality: quality);
+      final path = await _saveToTempFile(
+        keys[i],
+        fileNames[i],
+        quality: quality,
+      );
       if (path != null) {
         paths.add(path);
       }
@@ -178,7 +233,7 @@ class ShareHelper {
     required List<GlobalKey> keys,
     required List<String> fileNames,
     void Function(int completed, int total)? onProgress,
-    double quality = 5.0,
+    double quality = 3.0,
   }) async {
     try {
       final paths = await captureMultiplePages(
@@ -211,7 +266,7 @@ class ShareHelper {
     required List<GlobalKey> keys,
     required List<String> fileNames,
     void Function(int completed, int total)? onProgress,
-    double quality = 5.0,
+    double quality = 3.0,
   }) async {
     try {
       final paths = await captureMultiplePages(

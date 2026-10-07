@@ -1,3 +1,7 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
+import 'package:path_provider/path_provider.dart';
 import '../services/wird_completion_service.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -7,22 +11,25 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gal/gal.dart';
+import 'package:intl/intl.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/core/theme/quran_theme_extension.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
-import 'package:ibad_al_rahmann/core/helpers/share_helper.dart';
 import 'package:quran/quran.dart' as quran;
 import 'package:share_plus/share_plus.dart';
 import 'package:ibad_al_rahmann/core/helpers/fonts_helper.dart';
 import 'package:ibad_al_rahmann/features/quran/data/db_helper.dart';
 import '../bloc/khatma_cubit.dart';
 import '../../quran/bloc/quran/quran_cubit.dart';
+import '../../quran/bloc/verse_player/verse_player_cubit.dart';
 import '../../quran/data/repo/quran_repo.dart';
+import 'package:toastification/toastification.dart';
 import '../../quran/ui/widgets/core/wbw_page_widget.dart';
 import '../../../main.dart';
 import 'isolated_wird_screen.dart';
 import 'wird_list_screen.dart';
+import 'khatma_stats_screen.dart';
 import '../data/khatma_model.dart';
 import '../../../services/prayer_service.dart';
 
@@ -336,24 +343,39 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
-                            onPressed: () {
+                            onPressed: () async {
                               if (currentIndex >= totalWirds) return;
-                              WirdCompletionService.complete(
-                                context: context,
-                                isWirdMode: true,
-                                khatmaId: khatma.id,
-                                wirdIndex: currentWirdIndex,
-                              );
+                              final isFinished =
+                                  await WirdCompletionService.complete(
+                                    context: context,
+                                    isWirdMode: true,
+                                    khatmaId: khatma.id,
+                                    wirdIndex: currentWirdIndex,
+                                  );
                               CacheHelper.prefs.setInt(
                                 'wird_${khatma.id}_${currentWirdIndex}_current_page',
                                 0,
                               );
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('تقبل الله طاعتكم!'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
+                              if (!context.mounted) return;
+                              if (isFinished) {
+                                await showKhatmaCompletionCelebrationDialog(
+                                  context,
+                                  khatmaName: khatma.name.isNotEmpty
+                                      ? khatma.name
+                                      : 'ختمة القرآن الكريم',
+                                );
+                                if (context.mounted &&
+                                    Navigator.of(context).canPop()) {
+                                  Navigator.of(context).pop();
+                                }
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('تقبل الله طاعتكم!'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
                             },
                           ),
                         ),
@@ -508,8 +530,29 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.grey, fontSize: 14),
               ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    FontAwesomeIcons.calendarDay,
+                    size: 13,
+                    color: Color(0xFFD0A871),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    "تاريخ البدء: ${DateFormat('d MMMM yyyy', 'ar').format(khatma.startDate)}",
+                    style: TextStyle(
+                      color: const Color(0xFFD0A871).withValues(alpha: 0.8),
+                      fontSize: 12.5,
+                      fontFamily: AppConsts.cairo,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 24),
 
               Row(
                 children: [
@@ -799,16 +842,24 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
       _exportTotal = totalPages;
     });
 
+    final wurde = widget.khatma.wirds[wirdIndex];
+    final isPartial = wurde.isPartial;
     final completer = Completer<List<String>>();
 
     navigatorKey.currentState!.push(
       MaterialPageRoute(
-        builder: (_) => BlocProvider(
-          create: (context) => QuranCubit(QuranRepo()),
+        builder: (_) => MultiBlocProvider(
+          providers: [
+            BlocProvider(create: (context) => QuranCubit(QuranRepo())),
+            BlocProvider(create: (context) => VersePlayerCubit()),
+          ],
           child: _ExportWirdRenderer(
-            wirdIndex: wirdIndex,
             startPage: startPage,
             endPage: endPage,
+            startSuraNumber: isPartial ? wurde.startSuraNumber : null,
+            startAyah: isPartial ? wurde.startAyah : null,
+            endSuraNumber: isPartial ? wurde.endSuraNumber : null,
+            endAyah: isPartial ? wurde.endAyah : null,
             quality: quality,
             onProgress: (completed, total) {
               if (mounted) {
@@ -899,68 +950,25 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
     String message, {
     bool isError = false,
   }) {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Notification',
-      barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 400),
-      pageBuilder: (ctx, anim1, anim2) {
-        return Align(
-          alignment: Alignment.topCenter,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 25),
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: isError ? Colors.red : Colors.green,
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontFamily: 'cairo',
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-      transitionBuilder: (ctx, anim1, anim2, child) {
-        return SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0, -1),
-            end: Offset.zero,
-          ).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
-          child: FadeTransition(opacity: anim1, child: child),
-        );
-      },
-    );
-
-    // Auto-dismiss after 2.5 seconds
-    Future.delayed(const Duration(milliseconds: 2500), () {
-      if (context.mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
-    });
+    if (isError) {
+      toastification.show(
+        context: context,
+        alignment: Alignment.topCenter,
+        type: ToastificationType.error,
+        direction: ui.TextDirection.rtl,
+        autoCloseDuration: const Duration(seconds: 4),
+        title: Text(message, style: const TextStyle(fontFamily: 'cairo')),
+      );
+    } else {
+      toastification.show(
+        context: context,
+        alignment: Alignment.topCenter,
+        type: ToastificationType.success,
+        direction: ui.TextDirection.rtl,
+        autoCloseDuration: const Duration(seconds: 4),
+        title: Text(message, style: const TextStyle(fontFamily: 'cairo')),
+      );
+    }
   }
 
   Widget _buildWirdLine(String title, String subtitle) {
@@ -1068,6 +1076,8 @@ extension _WirdTextShare on _KhatmaDetailsViewState {
     HijriCalendar.setLocal('ar');
     // Use the offset-adjusted Hijri date so the shared text matches the app UI.
     final hijri = PrayerService().getAdjustedHijri();
+    final now = DateTime.now();
+    final dayName = DateFormat('EEEE', 'ar').format(now);
     final today = _toArabicDigits(hijri.hDay);
     final yearH = _toArabicDigits(hijri.hYear);
     final monthName = _hijriMonthName(hijri.hMonth);
@@ -1103,7 +1113,7 @@ extension _WirdTextShare on _KhatmaDetailsViewState {
     // ── Format 2: full formatted (no app name) ──────────────────────
     final formatted =
         '*• الـوِرد الـيَـومِـي لِشَهْرِ $monthName لِعام $yearH هـ :*\n\n'
-        '*📅 — الـيوم : " $today "*\n'
+        '*📅 — الـيوم : " $dayName ( $today ) "*\n'
         '*📖 — إسـم السورة : ( $surahShort )*\n'
         '*🕋 — وِرد : ( $wirdTime )*\n'
         '*$pageCount — الصفحات مِـن : \' $startPage  -  $endPage \'*';
@@ -1248,7 +1258,7 @@ extension _WirdTextShare on _KhatmaDetailsViewState {
                         child: Text(
                           displayText,
                           textAlign: TextAlign.right,
-                          textDirection: TextDirection.rtl,
+                          textDirection: ui.TextDirection.rtl,
                           style: TextStyle(
                             fontFamily: AppConsts.cairo,
                             fontSize: 13,
@@ -1279,7 +1289,9 @@ extension _WirdTextShare on _KhatmaDetailsViewState {
                           ),
                           onPressed: () {
                             Clipboard.setData(ClipboardData(text: displayText));
-                            Navigator.pop(ctx);
+                            if (ctx.mounted && (ModalRoute.of(ctx)?.isCurrent ?? false)) {
+                              Navigator.pop(ctx);
+                            }
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('✅ تم نسخ النص'),
@@ -1327,17 +1339,23 @@ extension _WirdTextShare on _KhatmaDetailsViewState {
 }
 
 class _ExportWirdRenderer extends StatefulWidget {
-  final int wirdIndex;
   final int startPage;
   final int endPage;
+  final int? startSuraNumber;
+  final int? startAyah;
+  final int? endSuraNumber;
+  final int? endAyah;
   final double quality;
   final void Function(int completed, int total) onProgress;
   final void Function(List<String> paths) onComplete;
 
   const _ExportWirdRenderer({
-    required this.wirdIndex,
     required this.startPage,
     required this.endPage,
+    this.startSuraNumber,
+    this.startAyah,
+    this.endSuraNumber,
+    this.endAyah,
     required this.quality,
     required this.onProgress,
     required this.onComplete,
@@ -1348,90 +1366,154 @@ class _ExportWirdRenderer extends StatefulWidget {
 }
 
 class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
-  late PageController _pageController;
+  final GlobalKey _captureKey = GlobalKey();
+  late int _currentPage;
   int _totalPages = 0;
-  int _currentCapturingPage = 0;
+  int _currentCapturingIndex = 0;
+  Completer<void>? _pageLoadCompleter;
 
   @override
   void initState() {
     super.initState();
+    _currentPage = widget.startPage;
     _totalPages = (widget.endPage - widget.startPage + 1).clamp(0, 604);
-    _pageController = PageController();
     WidgetsBinding.instance.addPostFrameCallback((_) => _startCapture());
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
   }
 
   Future<void> _startCapture() async {
     final cubit = context.read<QuranCubit>();
     final List<String> capturedPaths = [];
 
-    // Preload all fonts and DB data for all pages before capturing to ensure zero white/blank glyphs
+    AppLogger.log(
+      "ExportWird",
+      "Starting export for pages ${widget.startPage} to ${widget.endPage} (total: $_totalPages pages, quality: ${widget.quality})",
+    );
+
+    // 1. Preload all fonts and DB data for all pages before capturing
     for (int p = widget.startPage; p <= widget.endPage; p++) {
-      final family = FontsHelper.getFontFamily(p);
-      if (!FontsHelper.isFontLoaded(family)) {
-        await FontsHelper.loadFontFromFamily(family);
+      try {
+        final family = FontsHelper.getFontFamily(p);
+        if (!FontsHelper.isFontLoaded(family)) {
+          await FontsHelper.loadFontFromFamily(family);
+        }
+        await QuranWbwDbHelper.instance.getPageLines(p);
+        await QuranWbwDbHelper.instance.getPageWords(p);
+      } catch (e) {
+        AppLogger.log("ExportWird", "Preload warning for page $p: $e");
       }
-      await QuranWbwDbHelper.instance.getPageLines(p);
-      await QuranWbwDbHelper.instance.getPageWords(p);
     }
 
     cubit.toggleExporting(true);
 
-    for (int i = 0; i < _totalPages; i++) {
+    // 2. Sequential render and capture
+    for (int p = widget.startPage; p <= widget.endPage; p++) {
+      final index = p - widget.startPage + 1;
+      _pageLoadCompleter = Completer<void>();
+
       if (mounted) {
         setState(() {
-          _currentCapturingPage = i + 1;
+          _currentPage = p;
+          _currentCapturingIndex = index;
         });
       }
 
+      // Await page loading signal with safety timeout
       try {
-        if (_pageController.hasClients) {
-          _pageController.jumpToPage(i);
-        }
-
-        // Wait for font decoding, layout, and repaint to fully stabilize
-        await Future<void>.delayed(const Duration(milliseconds: 350));
-        await WidgetsBinding.instance.endOfFrame;
-        await Future<void>.delayed(const Duration(milliseconds: 250));
-
-        final realPage = widget.startPage + i;
-        final key = cubit.getPageKey(realPage);
-        
-        AppLogger.log("ExportWird", "Capturing page $realPage with key $key (current context $context)");
-
-        if (key.currentContext == null) {
-          AppLogger.log("ExportWird", "ERROR: key.currentContext is null for page $realPage!");
-        }
-
-        // Rule 3: Explicit Extension
-        final fileName = 'wird_page_$realPage.png';
-
-        // Rule 1: Sequential Loop (standard for loop)
-        final paths = await ShareHelper.captureMultiplePages(
-          keys: [key],
-          fileNames: [fileName],
-          quality: widget.quality,
+        await _pageLoadCompleter!.future.timeout(
+          const Duration(milliseconds: 2500),
+          onTimeout: () {
+            AppLogger.log("ExportWird", "Page $p load timeout fallback");
+          },
         );
-        capturedPaths.addAll(paths);
-        
-        AppLogger.log("ExportWird", "Successfully captured page $realPage to ${paths.isNotEmpty ? paths.first : 'empty'}");
+      } catch (_) {}
+
+      // Wait for layout and repaint frames
+      await WidgetsBinding.instance.endOfFrame;
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await WidgetsBinding.instance.endOfFrame;
+
+      try {
+        RenderRepaintBoundary? boundary;
+        final currentCtx = _captureKey.currentContext;
+        if (currentCtx != null && currentCtx.mounted) {
+          final ro = currentCtx.findRenderObject();
+          if (ro is RenderRepaintBoundary &&
+              ro.hasSize &&
+              ro.size.width > 0 &&
+              ro.size.height > 0) {
+            boundary = ro;
+          }
+        }
+
+        if (boundary == null) {
+          AppLogger.log(
+            "ExportWird",
+            "ERROR: RenderRepaintBoundary not ready for page $p!",
+          );
+        } else {
+          AppLogger.log(
+            "ExportWird",
+            "Page $p ready for capture (size: ${boundary.size}, quality: ${widget.quality})",
+          );
+
+          ui.Image? image;
+          try {
+            image = await boundary.toImage(pixelRatio: widget.quality);
+          } catch (e) {
+            AppLogger.log(
+              "ExportWird",
+              "High-res capture failed at ratio ${widget.quality}: $e, retrying with lower ratio...",
+            );
+            if (widget.quality > 2.0) {
+              image = await boundary.toImage(pixelRatio: 2.0);
+            }
+          }
+
+          if (image != null) {
+            final byteData = await image.toByteData(
+              format: ui.ImageByteFormat.png,
+            );
+            if (byteData != null) {
+              final buffer = byteData.buffer.asUint8List();
+              final directory = await getTemporaryDirectory();
+              final fileName =
+                  'wird_page_${p}_${DateTime.now().millisecondsSinceEpoch}.png';
+              final filePath = '${directory.path}/$fileName';
+              final file = File(filePath);
+              await file.writeAsBytes(buffer);
+              capturedPaths.add(filePath);
+
+              AppLogger.log(
+                "ExportWird",
+                "Successfully saved page $p to $filePath (${buffer.length} bytes)",
+              );
+            } else {
+              AppLogger.log(
+                "ExportWird",
+                "ERROR: toByteData returned null for page $p",
+              );
+            }
+          }
+        }
       } catch (e) {
-        // Rule 4: Graceful Error Handling (Log and continue)
-        AppLogger.log("ExportWird", 'Error capturing page index $i: $e');
+        AppLogger.log(
+          "ExportWird",
+          "Exception capturing page $p: $e",
+        );
       }
 
-      widget.onProgress(i + 1, _totalPages);
+      widget.onProgress(index, _totalPages);
     }
 
     cubit.toggleExporting(false);
 
-    if (mounted && Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
+    AppLogger.log(
+      "ExportWird",
+      "Finished export. Total captured: ${capturedPaths.length} / $_totalPages",
+    );
+
+    if (mounted && navigatorKey.currentState!.canPop()) {
+      navigatorKey.currentState!.pop();
     }
     widget.onComplete(capturedPaths);
   }
@@ -1456,8 +1538,6 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
         ? Colors.white
         : Colors.black;
 
-    final (sSura, sAyah, eSura, eAyah) = _getWirdBounds(context);
-
     return PopScope(
       canPop: false,
       child: Scaffold(
@@ -1467,25 +1547,26 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
             SizedBox(
               width: MediaQuery.of(context).size.width,
               height: MediaQuery.of(context).size.height,
-              child: PageView.builder(
-                allowImplicitScrolling: true,
-                controller: _pageController,
-                itemCount: _totalPages,
-                physics: const NeverScrollableScrollPhysics(),
-                itemBuilder: (context, index) {
-                  final realPage = widget.startPage + index;
-                  return WbwPageWidget(
-                    pageNumber: realPage,
-                    startSuraNumber: sSura,
-                    startAyah: sAyah,
-                    endSuraNumber: eSura,
-                    endAyah: eAyah,
-                    collapseOutOfRange: true,
-                    isZoomEnabled: false,
-                    paperColorOverride: savedColor,
-                    textColorOverride: textColor,
-                  );
-                },
+              child: RepaintBoundary(
+                key: _captureKey,
+                child: WbwPageWidget(
+                  key: ValueKey('export_page_$_currentPage'),
+                  pageNumber: _currentPage,
+                  startSuraNumber: widget.startSuraNumber,
+                  startAyah: widget.startAyah,
+                  endSuraNumber: widget.endSuraNumber,
+                  endAyah: widget.endAyah,
+                  collapseOutOfRange: true,
+                  isZoomEnabled: false,
+                  paperColorOverride: savedColor,
+                  textColorOverride: textColor,
+                  onPageLoaded: () {
+                    if (_pageLoadCompleter != null &&
+                        !_pageLoadCompleter!.isCompleted) {
+                      _pageLoadCompleter!.complete();
+                    }
+                  },
+                ),
               ),
             ),
             // Progress Overlay to avoid blank/white canvas appearance
@@ -1494,7 +1575,10 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
               child: Center(
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 32),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 28,
+                  ),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                     borderRadius: BorderRadius.circular(20),
@@ -1522,7 +1606,7 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '$_currentCapturingPage / $_totalPages',
+                        '$_currentCapturingIndex / $_totalPages',
                         style: const TextStyle(
                           fontFamily: AppConsts.cairo,
                           fontSize: 15,
@@ -1539,37 +1623,5 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
         ),
       ),
     );
-  }
-
-  (int?, int?, int?, int?) _getWirdBounds(BuildContext ctx) {
-    final state = ctx.read<KhatmaCubit>().state;
-    if (state is KhatmaLoaded) {
-      // Find the specific khatma that contains this wird.
-      // Since _ExportWirdRenderer doesn't have khatmaId, we might need to find it
-      // or pass it. But usually only one khatma is active in this context.
-      // Looking at KhatmaDetailsView, it HAS the khatma.
-      // Wait, I should have passed khatmaId to _ExportWirdRenderer.
-
-      // Let's see if we can find the khatma from the state by matching wirds?
-      // Better: let's check how _ExportWirdRenderer is instantiated.
-
-      // For now, let's look at all khatmas and find one that matches the start/end pages.
-      for (final k in state.khatmas) {
-        if (widget.wirdIndex < k.wirds.length) {
-          final w = k.wirds[widget.wirdIndex];
-          if (w.startPage == widget.startPage && w.endPage == widget.endPage) {
-            if (w.isPartial) {
-              return (
-                w.startSuraNumber,
-                w.startAyah,
-                w.endSuraNumber,
-                w.endAyah,
-              );
-            }
-          }
-        }
-      }
-    }
-    return (null, null, null, null);
   }
 }

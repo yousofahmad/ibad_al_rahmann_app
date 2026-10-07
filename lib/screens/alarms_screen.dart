@@ -458,13 +458,17 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const PrayerAlarmsScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const PrayerAlarmsScreen(),
+                  ),
                 );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: _gold,
                 padding: EdgeInsets.symmetric(vertical: 14.h),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14.r),
+                ),
               ),
               child: Text(
                 'ضبط إشعارات الصلوات',
@@ -994,7 +998,14 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
             child: _intervalChips(
               label: 'فترة التكرار',
               options: const [2, 5, 10, 15, 20, 30],
-              labels: const ['دقيقتين', '5 دق', '10 دق', '15 دق', '20 دق', '30 دق'],
+              labels: const [
+                'دقيقتين',
+                '5 دق',
+                '10 دق',
+                '15 دق',
+                '20 دق',
+                '30 دق',
+              ],
               value: _eidFitrTakbeerInterval,
               onChanged: (v) {
                 setState(() => _eidFitrTakbeerInterval = v);
@@ -1429,7 +1440,11 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
         Row(
           children: [
             IconButton(
-              icon: Icon(Icons.remove_circle_outline, color: _gold, size: 24.sp),
+              icon: Icon(
+                Icons.remove_circle_outline,
+                color: _gold,
+                size: 24.sp,
+              ),
               onPressed: value > min
                   ? () => onChanged((value - step).clamp(min, max))
                   : null,
@@ -1492,10 +1507,7 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
               onTap: () => onChanged(options[i]),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding: EdgeInsets.symmetric(
-                  horizontal: 14.w,
-                  vertical: 8.h,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
                 decoration: BoxDecoration(
                   color: selected ? _gold : Colors.transparent,
                   borderRadius: BorderRadius.circular(20.r),

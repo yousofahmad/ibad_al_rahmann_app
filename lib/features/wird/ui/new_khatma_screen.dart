@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
@@ -22,6 +23,11 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
   // Simple duration selection
   int _totalDays = 30; // 1 to 365
 
+  // Start date & past progress
+  bool _isCustomStartDate = false;
+  DateTime _startDate = DateTime.now();
+  int _initialCompletedWirds = 0;
+
   // Amount selection
   int _amountValue = 1;
   WirdUnit _selectedUnit = WirdUnit.page;
@@ -39,6 +45,9 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
   // Custom Adhan delay (minutes after prayer for Wird notification)
   int _adhanDelayMinutes = 30;
 
+  // Prayer start calculation preference
+  bool _startPrayerFromBeginningOfDay = true;
+
   bool _isLoading = false;
 
   // Accountability Label Selection
@@ -53,20 +62,16 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
 
   void _loadAccountabilityLabels() {
     final prefs = CacheHelper.prefs;
-    final defaultQuran = [
-      'ورد التلاوة',
-      'حفظ جديد',
-      'مراجعة',
-      'سماع قرآن',
-    ];
+    final defaultQuran = ['ورد التلاوة', 'حفظ جديد', 'مراجعة', 'سماع قرآن'];
     final custom = prefs.getStringList('custom_items_temp_quran') ?? [];
-    final deleted = (prefs.getStringList('deleted_items_temp_quran') ?? []).toSet();
-    
+    final deleted = (prefs.getStringList('deleted_items_temp_quran') ?? [])
+        .toSet();
+
     final List<String> items = [
       ...defaultQuran.where((e) => !deleted.contains(e)),
       ...custom.where((e) => !deleted.contains(e)),
     ];
-    
+
     setState(() {
       _accountabilityLabels = items;
       _accountabilityLabels.add('+ بند جديد بنفس اسم الختمة');
@@ -176,6 +181,62 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
     super.dispose();
   }
 
+  /// Days elapsed since the chosen start date
+  int get _passedDaysSinceStart {
+    if (!_isCustomStartDate) return 0;
+    final today = DateTime.now();
+    final startDay = DateTime(
+      _startDate.year,
+      _startDate.month,
+      _startDate.day,
+    );
+    final nowDay = DateTime(today.year, today.month, today.day);
+    final diff = nowDay.difference(startDay).inDays;
+    return diff > 0 ? diff : 0;
+  }
+
+  /// Expected completed wirds based on passed days and division type
+  int get _expectedWirdsByDate {
+    final passed = _passedDaysSinceStart;
+    if (passed == 0) return 0;
+    final expected = _isPerPrayer ? passed * 5 : passed;
+    return expected.clamp(0, _estimatedWirds);
+  }
+
+  void _pickStartDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _startDate.isAfter(now) ? now : _startDate,
+      firstDate: DateTime(now.year - 2, 1, 1),
+      lastDate: DateTime(now.year + 2, 12, 31),
+      helpText: 'تاريخ بدء الختمة',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+                  primary: const Color(0xFFD0A871),
+                  onPrimary: Colors.black,
+                  surface: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF1E1E1E)
+                      : Colors.white,
+                ),
+          ),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: child!,
+          ),
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _startDate = picked;
+        _initialCompletedWirds = _expectedWirdsByDate;
+      });
+    }
+  }
+
   void _pickDailyTime() async {
     final picked = await showTimePicker(
       context: context,
@@ -236,6 +297,9 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
       dailyTime: _effectiveDivision == 'daily' ? timeStr : null,
       notificationOffsetMinutes: _adhanDelayMinutes,
       accountabilityLabel: _selectedAccountabilityLabel,
+      startFromBeginningOfDay: _startPrayerFromBeginningOfDay,
+      startDate: _isCustomStartDate ? _startDate : DateTime.now(),
+      initialCompletedWirds: _isCustomStartDate ? _initialCompletedWirds : 0,
     );
 
     if (mounted) {
@@ -638,6 +702,332 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
 
             const SizedBox(height: 20),
 
+            // ═══ تاريخ بدء الختمة ═══
+            _buildCard(
+              context: context,
+              title: "تاريخ بدء الختمة",
+              icon: FontAwesomeIcons.calendarCheck,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Toggle: Today vs Past / Custom Date
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: goldColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() {
+                              _isCustomStartDate = false;
+                              _startDate = DateTime.now();
+                              _initialCompletedWirds = 0;
+                            }),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: !_isCustomStartDate
+                                    ? goldColor
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  "اليوم (افتراضي)",
+                                  style: TextStyle(
+                                    color: !_isCustomStartDate
+                                        ? Colors.black
+                                        : goldColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: AppConsts.cairo,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _isCustomStartDate = true;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: _isCustomStartDate
+                                    ? goldColor
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  "تاريخ سابق / مخصص",
+                                  style: TextStyle(
+                                    color: _isCustomStartDate
+                                        ? Colors.black
+                                        : goldColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: AppConsts.cairo,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  if (_isCustomStartDate) ...[
+                    InkWell(
+                      onTap: _pickStartDate,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: goldColor.withValues(alpha: 0.06),
+                          border: Border.all(
+                            color: goldColor.withValues(alpha: 0.4),
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.calendar_month,
+                              color: goldColor,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    DateFormat(
+                                      'EEEE، d MMMM yyyy',
+                                      'ar',
+                                    ).format(_startDate),
+                                    style: TextStyle(
+                                      color: textColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: AppConsts.cairo,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  if (_passedDaysSinceStart > 0)
+                                    Text(
+                                      "بدأت منذ $_passedDaysSinceStart يوم",
+                                      style: TextStyle(
+                                        color: goldColor.withValues(alpha: 0.8),
+                                        fontSize: 12,
+                                        fontFamily: AppConsts.cairo,
+                                      ),
+                                    )
+                                  else
+                                    const Text(
+                                      "تاريخ اليوم أو تاريخ قادم",
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 12,
+                                        fontFamily: AppConsts.cairo,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.edit_calendar,
+                              color: goldColor,
+                              size: 18,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // ── اختيار عدد الأوراد المنجزة ──
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF141414)
+                            : const Color(0xFFFAF6EE),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: goldColor.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                FontAwesomeIcons.circleCheck,
+                                color: goldColor,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                "عدد الأوراد المنجزة حتى الآن:",
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: AppConsts.cairo,
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Center(
+                            child: _buildQuantityRow(
+                              value: _initialCompletedWirds,
+                              min: 0,
+                              max: _estimatedWirds,
+                              suffix:
+                                  "$_initialCompletedWirds من أصل $_estimatedWirds ورد",
+                              onChanged: (v) {
+                                setState(() {
+                                  _initialCompletedWirds = v;
+                                });
+                              },
+                              goldColor: goldColor,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          // Quick selection chips
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              ActionChip(
+                                label: const Text("لم أبدأ (0)"),
+                                labelStyle: TextStyle(
+                                  color: _initialCompletedWirds == 0
+                                      ? Colors.black
+                                      : goldColor,
+                                  fontFamily: AppConsts.cairo,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                backgroundColor: _initialCompletedWirds == 0
+                                    ? goldColor
+                                    : goldColor.withValues(alpha: 0.1),
+                                onPressed: () {
+                                  setState(() => _initialCompletedWirds = 0);
+                                },
+                              ),
+                              if (_expectedWirdsByDate > 0 &&
+                                  _expectedWirdsByDate <= _estimatedWirds)
+                                ActionChip(
+                                  label: Text(
+                                    "متوافق مع التاريخ ($_expectedWirdsByDate)",
+                                  ),
+                                  labelStyle: TextStyle(
+                                    color: _initialCompletedWirds ==
+                                            _expectedWirdsByDate
+                                        ? Colors.black
+                                        : goldColor,
+                                    fontFamily: AppConsts.cairo,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  backgroundColor: _initialCompletedWirds ==
+                                          _expectedWirdsByDate
+                                      ? goldColor
+                                      : goldColor.withValues(alpha: 0.1),
+                                  onPressed: () {
+                                    setState(
+                                      () => _initialCompletedWirds =
+                                          _expectedWirdsByDate,
+                                    );
+                                  },
+                                ),
+                              if (_estimatedWirds >= 4)
+                                ActionChip(
+                                  label: Text(
+                                    "النصف (${(_estimatedWirds / 2).round()})",
+                                  ),
+                                  labelStyle: TextStyle(
+                                    color: _initialCompletedWirds ==
+                                            (_estimatedWirds / 2).round()
+                                        ? Colors.black
+                                        : goldColor,
+                                    fontFamily: AppConsts.cairo,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  backgroundColor: _initialCompletedWirds ==
+                                          (_estimatedWirds / 2).round()
+                                      ? goldColor
+                                      : goldColor.withValues(alpha: 0.1),
+                                  onPressed: () {
+                                    setState(
+                                      () => _initialCompletedWirds =
+                                          (_estimatedWirds / 2).round(),
+                                    );
+                                  },
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          // Dynamic Status message
+                          if (_passedDaysSinceStart > 0) ...[
+                            if (_initialCompletedWirds < _expectedWirdsByDate)
+                              Text(
+                                "⚠️ سيتم احتساب تأخير بمقدار ${_expectedWirdsByDate - _initialCompletedWirds} ورد للبدء في تعويضه.",
+                                style: const TextStyle(
+                                  color: Colors.orangeAccent,
+                                  fontSize: 12,
+                                  fontFamily: AppConsts.cairo,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            else if (_initialCompletedWirds ==
+                                _expectedWirdsByDate)
+                              const Text(
+                                "🌟 أنت في الموعد المحدد تماماً بحسب تاريخ البدء.",
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontSize: 12,
+                                  fontFamily: AppConsts.cairo,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            else
+                              Text(
+                                "🌟 ممتاز! أنت متقدم بمقدار ${_initialCompletedWirds - _expectedWirdsByDate} ورد عن الجدول.",
+                                style: const TextStyle(
+                                  color: Colors.green,
+                                  fontSize: 12,
+                                  fontFamily: AppConsts.cairo,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
             // ═══ التوزيع والتذكير ═══
             _buildCard(
               context: context,
@@ -822,7 +1212,7 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
                       activeColor: goldColor,
                       enabled: _canDistributeOverPrayers,
                     ),
-                    if (_reminderType == 'prayer')
+                    if (_reminderType == 'prayer') ...[
                       Padding(
                         padding: const EdgeInsets.only(
                           right: 32,
@@ -861,6 +1251,72 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
                           ),
                         ),
                       ),
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          right: 32,
+                          left: 16,
+                          bottom: 8,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "حساب ورد أول يوم:",
+                              style: TextStyle(
+                                color: goldColor,
+                                fontFamily: AppConsts.cairo,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            RadioListTile<bool>(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                "من صلاة الفجر (اليوم كاملاً ٥ صلوات)",
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontFamily: AppConsts.cairo,
+                                  color: textColor,
+                                ),
+                              ),
+                              value: true,
+                              groupValue: _startPrayerFromBeginningOfDay,
+                              activeColor: goldColor,
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(
+                                    () => _startPrayerFromBeginningOfDay = val,
+                                  );
+                                }
+                              },
+                            ),
+                            RadioListTile<bool>(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                "من الصلاة الحالية / القادمة",
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontFamily: AppConsts.cairo,
+                                  color: textColor,
+                                ),
+                              ),
+                              value: false,
+                              groupValue: _startPrayerFromBeginningOfDay,
+                              activeColor: goldColor,
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(
+                                    () => _startPrayerFromBeginningOfDay = val,
+                                  );
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -918,14 +1374,16 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
                 ],
               ),
             ),
-            
+
             // ═══ Accountability Label ═══
             _buildCard(
               context: context,
               title: "الربط بحاسب نفسك (المتابعة اليومية)",
               icon: FontAwesomeIcons.listCheck,
               child: DropdownButton<String>(
-                value: _isPerPrayer ? '+ بند جديد بنفس اسم الختمة' : _selectedAccountabilityLabel,
+                value: _isPerPrayer
+                    ? '+ بند جديد بنفس اسم الختمة'
+                    : _selectedAccountabilityLabel,
                 isExpanded: true,
                 dropdownColor: isDark ? Colors.grey[900] : Colors.white,
                 style: TextStyle(
@@ -935,12 +1393,17 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
                   fontSize: 14,
                 ),
                 underline: const SizedBox(),
-                items: (_isPerPrayer ? ['+ بند جديد بنفس اسم الختمة'] : _accountabilityLabels).map((label) {
-                  return DropdownMenuItem<String>(
-                    value: label,
-                    child: Text(label, overflow: TextOverflow.ellipsis),
-                  );
-                }).toList(),
+                items:
+                    (_isPerPrayer
+                            ? ['+ بند جديد بنفس اسم الختمة']
+                            : _accountabilityLabels)
+                        .map((label) {
+                          return DropdownMenuItem<String>(
+                            value: label,
+                            child: Text(label, overflow: TextOverflow.ellipsis),
+                          );
+                        })
+                        .toList(),
                 onChanged: (val) {
                   if (val != null) {
                     setState(() => _selectedAccountabilityLabel = val);

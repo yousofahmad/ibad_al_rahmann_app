@@ -110,7 +110,9 @@ class SupplicationsScreen extends StatelessWidget {
                   Color(0xFFB88A4A),
                 ],
               ),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(30.r)),
+              borderRadius: BorderRadius.vertical(
+                bottom: Radius.circular(30.r),
+              ),
             ),
           ),
         ),

@@ -406,7 +406,10 @@ extension _AccuracyBadge on _QiblahCompassState {
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(30.r),
-              border: Border.all(color: color.withValues(alpha: 0.5), width: 1.2),
+              border: Border.all(
+                color: color.withValues(alpha: 0.5),
+                width: 1.2,
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,

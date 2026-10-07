@@ -56,6 +56,39 @@ class NotificationDismissReceiver : BroadcastReceiver() {
             }
             flipToMuteManager?.startListening()
         }
+
+        fun cleanupEmptyGroupSummaries(context: Context, dismissedAlarmId: Int = -1) {
+            try {
+                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    val active = nm.activeNotifications ?: return
+
+                    // 1. PRAYER_GROUP summary (ID 666)
+                    val prayerChildren = active.filter { sbn ->
+                        sbn.id != 666 && sbn.id != 667 && sbn.id != 777 && sbn.id != dismissedAlarmId &&
+                        (sbn.notification.group == "PRAYER_GROUP" || 
+                         sbn.id in 100..139 || sbn.id in 3000..3099 || sbn.id in 5000..5099 || sbn.id == 110 || sbn.id in 730..739)
+                    }
+                    if (prayerChildren.isEmpty()) {
+                        NativeLogger.log(context, "NotificationDismissReceiver: No active children in PRAYER_GROUP. Cancelling summary 666.")
+                        nm.cancel(666)
+                    }
+
+                    // 2. GENERAL_GROUP summary (ID 667)
+                    val generalChildren = active.filter { sbn ->
+                        sbn.id != 666 && sbn.id != 667 && sbn.id != 777 && sbn.id != dismissedAlarmId &&
+                        (sbn.notification.group == "GENERAL_GROUP" || 
+                         (sbn.id !in 100..139 && sbn.id !in 3000..3099 && sbn.id !in 5000..5099 && sbn.id != 110 && sbn.id !in 730..739))
+                    }
+                    if (generalChildren.isEmpty()) {
+                        NativeLogger.log(context, "NotificationDismissReceiver: No active children in GENERAL_GROUP. Cancelling summary 667.")
+                        nm.cancel(667)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -71,5 +104,6 @@ class NotificationDismissReceiver : BroadcastReceiver() {
                 e.printStackTrace()
             }
         }
+        cleanupEmptyGroupSummaries(context, alarmId)
     }
 }

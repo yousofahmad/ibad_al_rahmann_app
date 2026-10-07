@@ -78,7 +78,11 @@ class _PrayerTaqwimScreenState extends State<PrayerTaqwimScreen> {
     );
   }
 
-  void _showTopNotification(BuildContext context, String message, {bool isError = false}) {
+  void _showTopNotification(
+    BuildContext context,
+    String message, {
+    bool isError = false,
+  }) {
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -94,7 +98,10 @@ class _PrayerTaqwimScreenState extends State<PrayerTaqwimScreen> {
               color: Colors.transparent,
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: isError ? Colors.red : Colors.green,
                   borderRadius: BorderRadius.circular(30),
@@ -142,75 +149,222 @@ class _PrayerTaqwimScreenState extends State<PrayerTaqwimScreen> {
   Future<void> _showQualityPicker(Function(double) onSelected) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     const gold = Color(0xFFD0A871);
-    double quality = 5.0;
+    double selectedQuality = 3.0;
+
+    final qualities = [
+      {
+        'title': 'فائقة (4K Ultra HD)',
+        'subtitle': 'أعلى وضوح ونقاء فائق لجدول المواقيت',
+        'value': 5.0,
+        'badge': 'أفضل نقاء 🌟',
+      },
+      {
+        'title': 'عالية (QHD)',
+        'subtitle': 'دقة ممتازة وسريعة في الحفظ والمشاركة',
+        'value': 3.0,
+        'badge': 'سريعة ومتوازنة ⚡',
+      },
+      {
+        'title': 'قياسية (Full HD)',
+        'subtitle': 'حجم مناسب ومثالي للمشاركة السريعة',
+        'value': 1.5,
+        'badge': 'خفيفة وسريعة 📱',
+      },
+    ];
 
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-          title: const Text(
-            'اختر جودة الصورة',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontFamily: 'cairo', fontWeight: FontWeight.bold, color: gold),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24.r),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+          backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          titlePadding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 10.h),
+          contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
+          actionsPadding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 16.h),
+          title: Row(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildQualityOption('عالية', 5.0, quality == 5.0, (v) => setDlgState(() => quality = v)),
-                  const SizedBox(width: 8),
-                  _buildQualityOption('متوسطة', 3.0, quality == 3.0, (v) => setDlgState(() => quality = v)),
-                  const SizedBox(width: 8),
-                  _buildQualityOption('منخفضة', 1.0, quality == 1.0, (v) => setDlgState(() => quality = v)),
-                ],
+              Container(
+                padding: EdgeInsets.all(8.w),
+                decoration: BoxDecoration(
+                  color: gold.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.photo_filter_rounded,
+                  color: gold,
+                  size: 22.sp,
+                ),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: gold,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: Text(
+                  'اختر دقة صورة جدول المواقيت',
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16.sp,
+                    color: gold,
                   ),
-                  onPressed: () {
-                    onSelected(quality);
-                    Navigator.pop(ctx);
-                  },
-                  child: const Text('تأكيد', style: TextStyle(fontFamily: 'cairo', fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQualityOption(String label, double value, bool isSelected, Function(double) onTap) {
-    const gold = Color(0xFFD0A871);
-    return InkWell(
-      onTap: () => onTap(value),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? gold : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: gold),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'cairo',
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: isSelected ? Colors.white : gold,
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: qualities.map((q) {
+                final double val = q['value'] as double;
+                final bool isSelected = selectedQuality == val;
+                return InkWell(
+                  onTap: () => setDlgState(() => selectedQuality = val),
+                  borderRadius: BorderRadius.circular(16.r),
+                  child: Container(
+                    margin: EdgeInsets.symmetric(vertical: 5.h),
+                    padding: EdgeInsets.all(12.w),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? gold.withValues(alpha: 0.12)
+                          : (isDark
+                              ? Colors.white.withValues(alpha: 0.04)
+                              : Colors.black.withValues(alpha: 0.03)),
+                      borderRadius: BorderRadius.circular(16.r),
+                      border: Border.all(
+                        color: isSelected ? gold : Colors.transparent,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelected
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.radio_button_off_rounded,
+                          color: isSelected ? gold : Colors.grey,
+                          size: 20.sp,
+                        ),
+                        SizedBox(width: 10.w),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    q['title'] as String,
+                                    style: TextStyle(
+                                      fontFamily: 'Cairo',
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13.sp,
+                                      color: isSelected
+                                          ? gold
+                                          : (isDark
+                                              ? Colors.white
+                                              : Colors.black87),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 6.w,
+                                      vertical: 2.h,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? gold.withValues(alpha: 0.2)
+                                          : Colors.grey.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6.r),
+                                    ),
+                                    child: Text(
+                                      q['badge'] as String,
+                                      style: TextStyle(
+                                        fontFamily: 'Cairo',
+                                        fontSize: 10.sp,
+                                        fontWeight: FontWeight.bold,
+                                        color: isSelected ? gold : Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 2.h),
+                              Text(
+                                q['subtitle'] as String,
+                                style: TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontSize: 11.sp,
+                                  color: isDark
+                                      ? Colors.grey[400]
+                                      : Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
           ),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 12.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      side: BorderSide(
+                        color: Colors.grey.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(
+                      'إلغاء',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.sp,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 10.w),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: gold,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 12.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      onSelected(selectedQuality);
+                      Navigator.pop(ctx);
+                    },
+                    child: Text(
+                      'متابعة',
+                      style: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.sp,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -454,7 +608,10 @@ class _PrayerTaqwimScreenState extends State<PrayerTaqwimScreen> {
       decoration: BoxDecoration(
         color: goldColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20.r),
-        border: Border.all(color: goldColor.withValues(alpha: 0.3), width: 1.0.w),
+        border: Border.all(
+          color: goldColor.withValues(alpha: 0.3),
+          width: 1.0.w,
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -518,7 +675,10 @@ class _TaqwimPage extends StatelessWidget {
         decoration: BoxDecoration(
           color: cardBg,
           borderRadius: BorderRadius.circular(25.r),
-          border: Border.all(color: goldColor.withValues(alpha: 0.5), width: 2.w),
+          border: Border.all(
+            color: goldColor.withValues(alpha: 0.5),
+            width: 2.w,
+          ),
           boxShadow: [
             BoxShadow(
               color: isLightBg
@@ -545,9 +705,7 @@ class _TaqwimPage extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(23.r),
-                ),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(23.r)),
               ),
               child: Column(
                 children: [
@@ -577,7 +735,10 @@ class _TaqwimPage extends StatelessWidget {
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 10.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 15.w,
+                    vertical: 10.h,
+                  ),
                   child: Column(
                     children: [
                       // Dates Section
@@ -704,7 +865,10 @@ class _TaqwimPage extends StatelessWidget {
               color: mainColor,
               height: 1.1,
               shadows: [
-                Shadow(color: mainColor.withValues(alpha: 0.3), blurRadius: 10.r),
+                Shadow(
+                  color: mainColor.withValues(alpha: 0.3),
+                  blurRadius: 10.r,
+                ),
               ],
             ),
           ),

@@ -80,11 +80,15 @@ class QuranCubit extends Cubit<QuranState> {
   /// Load the last page from cache and set it as initial page
   Future<void> _loadLastPage() async {
     int? lastPage;
-    
+
     if (isKahfMode) {
       lastPage = await DailyTrackerService.getKahfProgress();
     } else if (isWirdMode && khatmaId != null && wirdIndex != null) {
-      final int relative = CacheHelper.prefs.getInt('wird_${khatmaId}_${wirdIndex}_current_page') ?? 0;
+      final int relative =
+          CacheHelper.prefs.getInt(
+            'wird_${khatmaId}_${wirdIndex}_current_page',
+          ) ??
+          0;
       lastPage = (wirdStartPage ?? 1) - 1 + relative;
     } else if (isWirdMode) {
       lastPage = CacheHelper.prefs.getInt(_lastWirdPageKey);
@@ -99,12 +103,9 @@ class QuranCubit extends Cubit<QuranState> {
     final int? quranColorVal = CacheHelper.prefs.getInt(_quranColorKey);
     final int? wirdColorVal = CacheHelper.prefs.getInt(_wirdColorKey);
     final int? kahfColorVal = CacheHelper.prefs.getInt(_kahfColorKey);
-    
+
     final double savedMargin =
-        (CacheHelper.prefs.getDouble(_quranMarginKey) ?? 16.0).clamp(
-          0.0,
-          40.0,
-        );
+        (CacheHelper.prefs.getDouble(_quranMarginKey) ?? 16.0).clamp(0.0, 40.0);
     final Color? qColorSaved = (quranColorVal != null && quranColorVal != -1)
         ? Color(quranColorVal)
         : null;
@@ -115,8 +116,8 @@ class QuranCubit extends Cubit<QuranState> {
         ? Color(kahfColorVal)
         : null;
 
-    // The Mushaf has 'special treatment' and does not strictly follow the app's 
-    // global theme or system brightness for its paper background. 
+    // The Mushaf has 'special treatment' and does not strictly follow the app's
+    // global theme or system brightness for its paper background.
     // We default to a traditional cream color (0xFFFFF9E5).
     const Color fallbackColor = Color(0xFFFFF9E5);
 
@@ -125,9 +126,9 @@ class QuranCubit extends Cubit<QuranState> {
     final Color kColor = kColorSaved ?? fallbackColor;
 
     final bool initialIsWird = isWirdMode || isKahfMode;
-    final QuranLayout initialLayout = initialIsWird ? QuranLayout.full : (lastLayoutString == 'full'
-          ? QuranLayout.full
-          : QuranLayout.min);
+    final QuranLayout initialLayout = initialIsWird
+        ? QuranLayout.full
+        : (lastLayoutString == 'full' ? QuranLayout.full : QuranLayout.min);
 
     if (lastPage != null) {
       final int pageNumber = lastPage + 1;
@@ -173,7 +174,6 @@ class QuranCubit extends Cubit<QuranState> {
     }
 
     if (state.isWirdMode && state.khatmaId != null && state.wirdIndex != null) {
-      
       final int startPage = state.wirdStartPage ?? 1;
       final int relativeIndex = (pageIndex - (startPage - 1)).clamp(0, 604);
 
@@ -357,7 +357,9 @@ class QuranCubit extends Cubit<QuranState> {
   }
 
   void changeLayout() {
-    final nextLayout = state.layout == QuranLayout.min ? QuranLayout.full : QuranLayout.min;
+    final nextLayout = state.layout == QuranLayout.min
+        ? QuranLayout.full
+        : QuranLayout.min;
     AppLogger.log('Quran', 'Double-tap layout switched to ${nextLayout.name}');
 
     if (state.layout == QuranLayout.min) {
@@ -376,13 +378,19 @@ class QuranCubit extends Cubit<QuranState> {
     }
   }
 
-  void jumpToWird({required int startPage, required int endPage, required int index}) {
-    emit(state.copyWith(
-      wirdStartPage: startPage,
-      targetEndPage: endPage,
-      wirdIndex: index,
-      currentPage: startPage - 1,
-    ));
+  void jumpToWird({
+    required int startPage,
+    required int endPage,
+    required int index,
+  }) {
+    emit(
+      state.copyWith(
+        wirdStartPage: startPage,
+        targetEndPage: endPage,
+        wirdIndex: index,
+        currentPage: startPage - 1,
+      ),
+    );
     navigateToPage(startPage - 1);
   }
 

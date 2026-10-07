@@ -42,7 +42,7 @@ class _QadaaScreenState extends State<QadaaScreen> {
 
   Future<void> _loadData() async {
     final prefs = CacheHelper.prefs;
-    
+
     // Load Ramadan Qada Count (linked to Ramadan Screen)
     int missed = 0;
     for (int i = 1; i <= 30; i++) {
@@ -120,7 +120,10 @@ class _QadaaScreenState extends State<QadaaScreen> {
     } else {
       // Find last missed day and mark as done
       if (missedDays.isNotEmpty) {
-        await prefs.setBool('qada_${_currentRamadanYear}_${missedDays.last}', false);
+        await prefs.setBool(
+          'qada_${_currentRamadanYear}_${missedDays.last}',
+          false,
+        );
       }
     }
     _loadData();
@@ -230,7 +233,10 @@ class _QadaaScreenState extends State<QadaaScreen> {
               InkWell(
                 onTap: () => _showAddPeriodDialog(goldColor),
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12.w,
+                    vertical: 6.h,
+                  ),
                   decoration: BoxDecoration(
                     color: goldColor.withAlpha(30),
                     borderRadius: BorderRadius.circular(10),
@@ -307,11 +313,36 @@ class _QadaaScreenState extends State<QadaaScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildPrayerCounter("الفجر", fajr, maxFajr, (v) => setState(() => fajr = v)),
-                _buildPrayerCounter("الظهر", dhuhr, maxDhuhr, (v) => setState(() => dhuhr = v)),
-                _buildPrayerCounter("العصر", asr, maxAsr, (v) => setState(() => asr = v)),
-                _buildPrayerCounter("المغرب", maghrib, maxMaghrib, (v) => setState(() => maghrib = v)),
-                _buildPrayerCounter("العشاء", isha, maxIsha, (v) => setState(() => isha = v)),
+                _buildPrayerCounter(
+                  "الفجر",
+                  fajr,
+                  maxFajr,
+                  (v) => setState(() => fajr = v),
+                ),
+                _buildPrayerCounter(
+                  "الظهر",
+                  dhuhr,
+                  maxDhuhr,
+                  (v) => setState(() => dhuhr = v),
+                ),
+                _buildPrayerCounter(
+                  "العصر",
+                  asr,
+                  maxAsr,
+                  (v) => setState(() => asr = v),
+                ),
+                _buildPrayerCounter(
+                  "المغرب",
+                  maghrib,
+                  maxMaghrib,
+                  (v) => setState(() => maghrib = v),
+                ),
+                _buildPrayerCounter(
+                  "العشاء",
+                  isha,
+                  maxIsha,
+                  (v) => setState(() => isha = v),
+                ),
               ],
             ),
           ),
@@ -356,11 +387,26 @@ class _QadaaScreenState extends State<QadaaScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildPeriodOption('سنين', selectedPeriod, goldColor, (val) => setStateDialog(() => selectedPeriod = val)),
+                      _buildPeriodOption(
+                        'سنين',
+                        selectedPeriod,
+                        goldColor,
+                        (val) => setStateDialog(() => selectedPeriod = val),
+                      ),
                       SizedBox(width: 8.w),
-                      _buildPeriodOption('شهور', selectedPeriod, goldColor, (val) => setStateDialog(() => selectedPeriod = val)),
+                      _buildPeriodOption(
+                        'شهور',
+                        selectedPeriod,
+                        goldColor,
+                        (val) => setStateDialog(() => selectedPeriod = val),
+                      ),
                       SizedBox(width: 8.w),
-                      _buildPeriodOption('أيام', selectedPeriod, goldColor, (val) => setStateDialog(() => selectedPeriod = val)),
+                      _buildPeriodOption(
+                        'أيام',
+                        selectedPeriod,
+                        goldColor,
+                        (val) => setStateDialog(() => selectedPeriod = val),
+                      ),
                     ],
                   ),
                   SizedBox(height: 15.h),
@@ -368,7 +414,9 @@ class _QadaaScreenState extends State<QadaaScreen> {
                     controller: controller,
                     keyboardType: TextInputType.number,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
                     decoration: InputDecoration(
                       hintText: "أدخل العدد",
                       hintStyle: TextStyle(color: Colors.grey, fontSize: 14.sp),
@@ -387,7 +435,10 @@ class _QadaaScreenState extends State<QadaaScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text("إلغاء", style: TextStyle(color: Colors.grey)),
+                  child: const Text(
+                    "إلغاء",
+                    style: TextStyle(color: Colors.grey),
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: () {
@@ -396,7 +447,7 @@ class _QadaaScreenState extends State<QadaaScreen> {
                       int multiplier = 1;
                       if (selectedPeriod == 'شهور') multiplier = 30;
                       if (selectedPeriod == 'سنين') multiplier = 365;
-                      
+
                       final days = count * multiplier;
                       setState(() {
                         fajr += days;
@@ -416,17 +467,25 @@ class _QadaaScreenState extends State<QadaaScreen> {
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(backgroundColor: goldColor),
-                  child: const Text("إضافة", style: TextStyle(color: Colors.white)),
+                  child: const Text(
+                    "إضافة",
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
               ],
             );
-          }
+          },
         );
       },
     );
   }
 
-  Widget _buildPeriodOption(String title, String selected, Color goldColor, Function(String) onTap) {
+  Widget _buildPeriodOption(
+    String title,
+    String selected,
+    Color goldColor,
+    Function(String) onTap,
+  ) {
     final isSelected = title == selected;
     return GestureDetector(
       onTap: () => onTap(title),
@@ -449,7 +508,12 @@ class _QadaaScreenState extends State<QadaaScreen> {
     );
   }
 
-  Widget _buildPrayerCounter(String name, int count, int max, Function(int) onUpdate) {
+  Widget _buildPrayerCounter(
+    String name,
+    int count,
+    int max,
+    Function(int) onUpdate,
+  ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     double progress = (max == 0) ? 1.0 : (1.0 - (count / max));
 
@@ -517,13 +581,18 @@ class _QadaaScreenState extends State<QadaaScreen> {
                     if (name == "الفجر" && fajr > maxFajr) maxFajr = fajr;
                     if (name == "الظهر" && dhuhr > maxDhuhr) maxDhuhr = dhuhr;
                     if (name == "العصر" && asr > maxAsr) maxAsr = asr;
-                    if (name == "المغرب" && maghrib > maxMaghrib) maxMaghrib = maghrib;
+                    if (name == "المغرب" && maghrib > maxMaghrib)
+                      maxMaghrib = maghrib;
                     if (name == "العشاء" && isha > maxIsha) maxIsha = isha;
                   });
                   _saveData();
                 },
                 borderRadius: BorderRadius.circular(20),
-                child: Icon(Icons.add_circle, color: const Color(0xFFD0A871), size: 28.w),
+                child: Icon(
+                  Icons.add_circle,
+                  color: const Color(0xFFD0A871),
+                  size: 28.w,
+                ),
               ),
               SizedBox(width: 4.w),
               InkWell(
@@ -534,7 +603,11 @@ class _QadaaScreenState extends State<QadaaScreen> {
                   }
                 },
                 borderRadius: BorderRadius.circular(20),
-                child: Icon(Icons.check_circle, color: Colors.green, size: 28.w),
+                child: Icon(
+                  Icons.check_circle,
+                  color: Colors.green,
+                  size: 28.w,
+                ),
               ),
             ],
           ),
@@ -590,7 +663,10 @@ class _QadaaScreenState extends State<QadaaScreen> {
                       width: 80.w,
                       height: 80.w,
                       child: TweenAnimationBuilder<double>(
-                        tween: Tween<double>(begin: 0, end: fasting > 0 ? (fasting / 30) : 0.0),
+                        tween: Tween<double>(
+                          begin: 0,
+                          end: fasting > 0 ? (fasting / 30) : 0.0,
+                        ),
                         duration: const Duration(milliseconds: 1200),
                         builder: (context, value, child) {
                           return CircularProgressIndicator(
@@ -618,7 +694,10 @@ class _QadaaScreenState extends State<QadaaScreen> {
                   InkWell(
                     onTap: () => _updateFastingCount(true),
                     child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20.w,
+                        vertical: 10.h,
+                      ),
                       decoration: BoxDecoration(
                         color: goldColor.withAlpha(30),
                         borderRadius: BorderRadius.circular(10),
@@ -638,7 +717,10 @@ class _QadaaScreenState extends State<QadaaScreen> {
                   InkWell(
                     onTap: () => _updateFastingCount(false),
                     child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 30.w, vertical: 10.h),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 30.w,
+                        vertical: 10.h,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.green.withAlpha(30),
                         borderRadius: BorderRadius.circular(10),
@@ -679,31 +761,47 @@ class _QadaaScreenState extends State<QadaaScreen> {
     if (displayDate != null) {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      
+
       // Calculate next occurrence based on Hijri year (approx 354 days)
       final hDate = HijriCalendar.fromDate(displayDate);
       final currentH = HijriCalendar.now();
-      
+
       // Find the next occurrence of this Hijri day/month
       var targetHYear = currentH.hYear;
       DateTime target;
-      
+
       try {
-        target = HijriCalendar().hijriToGregorian(targetHYear, hDate.hMonth, hDate.hDay);
+        target = HijriCalendar().hijriToGregorian(
+          targetHYear,
+          hDate.hMonth,
+          hDate.hDay,
+        );
       } catch (_) {
         // Handle case where day 30 doesn't exist in that Hijri month
-        target = HijriCalendar().hijriToGregorian(targetHYear, hDate.hMonth, 29);
+        target = HijriCalendar().hijriToGregorian(
+          targetHYear,
+          hDate.hMonth,
+          29,
+        );
       }
 
       if (target.isBefore(today)) {
         targetHYear++;
         try {
-          target = HijriCalendar().hijriToGregorian(targetHYear, hDate.hMonth, hDate.hDay);
+          target = HijriCalendar().hijriToGregorian(
+            targetHYear,
+            hDate.hMonth,
+            hDate.hDay,
+          );
         } catch (_) {
-          target = HijriCalendar().hijriToGregorian(targetHYear, hDate.hMonth, 29);
+          target = HijriCalendar().hijriToGregorian(
+            targetHYear,
+            hDate.hMonth,
+            29,
+          );
         }
       }
-      
+
       daysLeft = target.difference(today).inDays;
       displayDate = target;
     }
@@ -746,7 +844,12 @@ class _QadaaScreenState extends State<QadaaScreen> {
                     width: 90.w,
                     height: 90.w,
                     child: TweenAnimationBuilder<double>(
-                      tween: Tween<double>(begin: 0, end: (daysLeft > 0 && daysLeft <= 365) ? (daysLeft / 355) : 0.0), // Use 355 for Hijri scale
+                      tween: Tween<double>(
+                        begin: 0,
+                        end: (daysLeft > 0 && daysLeft <= 365)
+                            ? (daysLeft / 355)
+                            : 0.0,
+                      ), // Use 355 for Hijri scale
                       duration: const Duration(milliseconds: 1200),
                       builder: (context, value, child) {
                         return CircularProgressIndicator(
@@ -797,7 +900,10 @@ class _QadaaScreenState extends State<QadaaScreen> {
                   InkWell(
                     onTap: () => _showZakatDatePicker(context),
                     child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20.w,
+                        vertical: 10.h,
+                      ),
                       decoration: BoxDecoration(
                         color: goldColor,
                         borderRadius: BorderRadius.circular(10),
@@ -827,7 +933,9 @@ class _QadaaScreenState extends State<QadaaScreen> {
       builder: (ctx) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.r),
+          ),
           backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
           child: Container(
             height: 400.h,
@@ -839,10 +947,15 @@ class _QadaaScreenState extends State<QadaaScreen> {
                   TabBar(
                     indicatorColor: const Color(0xFFD0A871),
                     labelColor: const Color(0xFFD0A871),
-                    unselectedLabelColor: isDark ? Colors.white38 : Colors.black45,
+                    unselectedLabelColor: isDark
+                        ? Colors.white38
+                        : Colors.black45,
                     indicatorSize: TabBarIndicatorSize.tab,
                     dividerColor: Colors.transparent,
-                    labelStyle: const TextStyle(fontFamily: AppConsts.expoArabic, fontWeight: FontWeight.bold),
+                    labelStyle: const TextStyle(
+                      fontFamily: AppConsts.expoArabic,
+                      fontWeight: FontWeight.bold,
+                    ),
                     tabs: const [
                       Tab(text: "ميلادي"),
                       Tab(text: "هجري"),
@@ -851,10 +964,7 @@ class _QadaaScreenState extends State<QadaaScreen> {
                   SizedBox(height: 10.h),
                   Expanded(
                     child: TabBarView(
-                      children: [
-                        _buildGregorianTab(ctx),
-                        _buildHijriTab(ctx),
-                      ],
+                      children: [_buildGregorianTab(ctx), _buildHijriTab(ctx)],
                     ),
                   ),
                 ],
@@ -862,7 +972,7 @@ class _QadaaScreenState extends State<QadaaScreen> {
             ),
           ),
         );
-      }
+      },
     );
   }
 
@@ -889,7 +999,9 @@ class _QadaaScreenState extends State<QadaaScreen> {
               final picked = await showDatePicker(
                 context: ctx,
                 initialDate: zakatDate ?? DateTime.now(),
-                firstDate: DateTime.now().subtract(const Duration(days: 365 * 2)),
+                firstDate: DateTime.now().subtract(
+                  const Duration(days: 365 * 2),
+                ),
                 lastDate: DateTime.now().add(const Duration(days: 365 * 10)),
                 builder: (context, child) {
                   return Theme(
@@ -898,7 +1010,12 @@ class _QadaaScreenState extends State<QadaaScreen> {
                         primary: const Color(0xFFD0A871),
                         onPrimary: Colors.white,
                         onSurface: isDark ? Colors.white : Colors.black,
-                      ), dialogTheme: DialogThemeData(backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white),
+                      ),
+                      dialogTheme: DialogThemeData(
+                        backgroundColor: isDark
+                            ? const Color(0xFF1A1A1A)
+                            : Colors.white,
+                      ),
                     ),
                     child: child!,
                   );
@@ -916,9 +1033,17 @@ class _QadaaScreenState extends State<QadaaScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFD0A871),
               padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
             ),
-            label: const Text("فتح التقويم", style: TextStyle(color: Colors.white, fontFamily: AppConsts.expoArabic)),
+            label: const Text(
+              "فتح التقويم",
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: AppConsts.expoArabic,
+              ),
+            ),
           ),
         ],
       ),
@@ -931,8 +1056,18 @@ class _QadaaScreenState extends State<QadaaScreen> {
     int year = HijriCalendar.now().hYear;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final List<String> hijriMonths = [
-      "محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة",
-      "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
+      "محرم",
+      "صفر",
+      "ربيع الأول",
+      "ربيع الآخر",
+      "جمادى الأولى",
+      "جمادى الآخرة",
+      "رجب",
+      "شعبان",
+      "رمضان",
+      "شوال",
+      "ذو القعدة",
+      "ذو الحجة",
     ];
 
     return StatefulBuilder(
@@ -953,7 +1088,9 @@ class _QadaaScreenState extends State<QadaaScreen> {
             Container(
               padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
               decoration: BoxDecoration(
-                color: isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+                color: isDark
+                    ? Colors.white.withAlpha(10)
+                    : Colors.black.withAlpha(5),
                 borderRadius: BorderRadius.circular(15.r),
               ),
               child: Row(
@@ -974,7 +1111,10 @@ class _QadaaScreenState extends State<QadaaScreen> {
                   ),
                   _buildHijriDropdown<int>(
                     value: year,
-                    items: List.generate(10, (i) => HijriCalendar.now().hYear + i - 1),
+                    items: List.generate(
+                      10,
+                      (i) => HijriCalendar.now().hYear + i - 1,
+                    ),
                     onChanged: (v) => setModalState(() => year = v!),
                     isDark: isDark,
                   ),
@@ -999,13 +1139,21 @@ class _QadaaScreenState extends State<QadaaScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFD0A871),
                 padding: EdgeInsets.symmetric(horizontal: 40.w, vertical: 12.h),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
               ),
-              child: const Text("حفظ التاريخ", style: TextStyle(color: Colors.white, fontFamily: AppConsts.expoArabic)),
-            )
+              child: const Text(
+                "حفظ التاريخ",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: AppConsts.expoArabic,
+                ),
+              ),
+            ),
           ],
         );
-      }
+      },
     );
   }
 

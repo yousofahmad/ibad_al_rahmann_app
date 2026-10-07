@@ -45,8 +45,8 @@ class _LandscapeQuranWidgetState extends State<LandscapeQuranWidget> {
         height: context.screenHeight,
         color: context.onPrimary,
         child: PageView.builder(
-      physics: const EasyPageScrollPhysics(),
-      allowImplicitScrolling: true,
+          physics: const EasyPageScrollPhysics(),
+          allowImplicitScrolling: true,
           controller: context.read<QuranCubit>().fullQuranController,
           itemCount: totalPagesCount,
           onPageChanged: (index) {

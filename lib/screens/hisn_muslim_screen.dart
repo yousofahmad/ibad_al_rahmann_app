@@ -15,6 +15,7 @@ class HisnMuslimScreen extends StatefulWidget {
 }
 
 class _HisnMuslimScreenState extends State<HisnMuslimScreen> {
+  final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _allChapters = [];
   List<String> _favoriteChapters = []; // List of titles
   bool _showFavoritesOnly = false;
@@ -25,6 +26,12 @@ class _HisnMuslimScreenState extends State<HisnMuslimScreen> {
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   // Load JSON and Favorites
@@ -44,6 +51,10 @@ class _HisnMuslimScreenState extends State<HisnMuslimScreen> {
           "title": key,
           "text": List<String>.from(value['text']),
           "footnote": List<String>.from(value['footnote'] ?? []),
+          "normalizedTitle": ArabicSearchHelper.normalizeArabic(key),
+          "normalizedText": List<String>.from(
+            value['text'],
+          ).map((t) => ArabicSearchHelper.normalizeArabic(t)).toList(),
         });
       });
       _allChapters = temp;
@@ -88,7 +99,17 @@ class _HisnMuslimScreenState extends State<HisnMuslimScreen> {
         ? baseChapters
         : baseChapters
               .where(
-                (c) => ArabicSearchHelper.normalizeArabic(c['title'] as String? ?? '').contains(ArabicSearchHelper.normalizeArabic(_searchQuery)) || (c['text'] as List<String>).any((t) => ArabicSearchHelper.normalizeArabic(t).contains(ArabicSearchHelper.normalizeArabic(_searchQuery))),
+                (c) =>
+                    ArabicSearchHelper.normalizeArabic(
+                      c['title'] as String? ?? '',
+                    ).contains(
+                      ArabicSearchHelper.normalizeArabic(_searchQuery),
+                    ) ||
+                    (c['text'] as List<String>).any(
+                      (t) => ArabicSearchHelper.normalizeArabic(t).contains(
+                        ArabicSearchHelper.normalizeArabic(_searchQuery),
+                      ),
+                    ),
               )
               .toList();
 
@@ -151,129 +172,269 @@ class _HisnMuslimScreenState extends State<HisnMuslimScreen> {
                 Padding(
                   padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 4.h),
                   child: TextField(
+                    controller: _searchController,
                     textDirection: TextDirection.rtl,
-                    onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                    onChanged: (val) =>
+                        setState(() => _searchQuery = val.trim()),
                     decoration: InputDecoration(
                       hintText: 'ابحث في الأدعية...',
-                      hintStyle: TextStyle(fontFamily: AppConsts.expoArabic, fontSize: 13.sp),
+                      hintStyle: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontSize: 13.sp,
+                      ),
                       hintTextDirection: TextDirection.rtl,
-                      prefixIcon: const Icon(Icons.search, color: Color(0xFFD0A871)),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: Color(0xFFD0A871),
+                      ),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.close, size: 18),
-                              onPressed: () => setState(() => _searchQuery = ''),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
                             )
                           : null,
-                      contentPadding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 16.w),
+                      contentPadding: EdgeInsets.symmetric(
+                        vertical: 8.h,
+                        horizontal: 16.w,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25.r),
                         borderSide: const BorderSide(color: Color(0xFFD0A871)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25.r),
-                        borderSide: const BorderSide(color: Color(0xFFD0A871), width: 1.5),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFD0A871),
+                          width: 1.5,
+                        ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25.r),
-                        borderSide: BorderSide(color: const Color(0xFFD0A871).withValues(alpha: 0.4)),
+                        borderSide: BorderSide(
+                          color: const Color(0xFFD0A871).withValues(alpha: 0.4),
+                        ),
                       ),
                     ),
                   ),
                 ),
                 Expanded(
                   child: displayedChapters.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.bookmark_remove_outlined,
-                    size: 60.sp,
-                    color: Colors.grey.withValues(alpha: 0.5),
-                  ),
-                  SizedBox(height: 10.h),
-                  Text(
-                    _showFavoritesOnly
-                        ? "لا توجد أدعية مفضلة"
-                        : "لا توجد بيانات",
-                    style: TextStyle(
-                      fontFamily: AppConsts.expoArabic,
-                      color: textColor,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: EdgeInsets.fromLTRB(10.w, 20.h, 10.w, 10.h),
-              itemCount: displayedChapters.length,
-              itemBuilder: (context, index) {
-                final chapter = displayedChapters[index];
-                final isFav = _favoriteChapters.contains(chapter['title']);
-
-                return Card(
-                  elevation: 2,
-                  color: cardColor,
-                  margin: EdgeInsets.symmetric(vertical: 6.h),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15.r),
-                    side: BorderSide(
-                      color: const Color(0xFFD0A871).withValues(alpha: 0.3),
-                      width: 1.w,
-                    ),
-                  ),
-                  child: ListTile(
-                    title: Text(
-                      chapter['title'],
-                      style: TextStyle(
-                        fontFamily: AppConsts.expoArabic,
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.bold,
-                        color: textColor,
-                      ),
-                    ),
-                    leading: CircleAvatar(
-                      backgroundColor: const Color(
-                        0xFFD0A871,
-                      ).withValues(alpha: 0.1),
-                      child: Text(
-                        '${_allChapters.indexOf(chapter) + 1}', // Use original index
-                        style: const TextStyle(
-                          color: Color(0xFFD0A871),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    // Heart Icon to toggle favorite directly from list
-                    trailing: IconButton(
-                      icon: Icon(
-                        isFav ? Icons.favorite : Icons.favorite_border,
-                        color: isFav ? Colors.red : Colors.grey.shade400,
-                      ),
-                      onPressed: () => _toggleFavorite(chapter['title']),
-                    ),
-                    onTap: () async {
-                      // Wait for result in case user changes favorite status inside detail screen
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => HisnDetailScreen(
-                            title: chapter['title'],
-                            texts: chapter['text'],
-                            footnotes: chapter['footnote'],
-                            isFavorite: isFav,
-                            onFavoriteToggle: () =>
-                                _toggleFavorite(chapter['title']),
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.bookmark_remove_outlined,
+                                size: 60.sp,
+                                color: Colors.grey.withValues(alpha: 0.5),
+                              ),
+                              SizedBox(height: 10.h),
+                              Text(
+                                _showFavoritesOnly
+                                    ? "لا توجد أدعية مفضلة"
+                                    : "لا توجد بيانات",
+                                style: TextStyle(
+                                  fontFamily: AppConsts.expoArabic,
+                                  color: textColor,
+                                ),
+                              ),
+                            ],
                           ),
+                        )
+                      : ListView.builder(
+                          padding: EdgeInsets.fromLTRB(10.w, 20.h, 10.w, 10.h),
+                          itemCount: displayedChapters.length,
+                          itemBuilder: (context, index) {
+                            final chapter = displayedChapters[index];
+                            final isFav = _favoriteChapters.contains(
+                              chapter['title'],
+                            );
+
+                            return Card(
+                              elevation: 2,
+                              color: cardColor,
+                              margin: EdgeInsets.symmetric(vertical: 6.h),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15.r),
+                                side: BorderSide(
+                                  color: const Color(
+                                    0xFFD0A871,
+                                  ).withValues(alpha: 0.3),
+                                  width: 1.w,
+                                ),
+                              ),
+                              child: ListTile(
+                                title: _searchQuery.isNotEmpty
+                                    ? Text.rich(
+                                        TextSpan(
+                                          children:
+                                              ArabicSearchHelper.highlightMatch(
+                                                chapter['title'],
+                                                _searchQuery,
+                                                TextStyle(
+                                                  backgroundColor: isDark
+                                                      ? const Color(
+                                                          0xFFB88A4A,
+                                                        ).withValues(
+                                                          alpha: 0.45,
+                                                        )
+                                                      : const Color(
+                                                          0xFFFFE082,
+                                                        ).withValues(
+                                                          alpha: 0.8,
+                                                        ),
+                                                  color: isDark
+                                                      ? const Color(0xFFFFF8E1)
+                                                      : const Color(0xFF4E342E),
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                baseStyle: TextStyle(
+                                                  fontFamily:
+                                                      AppConsts.expoArabic,
+                                                  fontSize: 16.sp,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: textColor,
+                                                ),
+                                              ),
+                                        ),
+                                      )
+                                    : Text(
+                                        chapter['title'],
+                                        style: TextStyle(
+                                          fontFamily: AppConsts.expoArabic,
+                                          fontSize: 16.sp,
+                                          fontWeight: FontWeight.bold,
+                                          color: textColor,
+                                        ),
+                                      ),
+                                subtitle: _searchQuery.isNotEmpty
+                                    ? Builder(
+                                        builder: (context) {
+                                          final texts = List<String>.from(
+                                            chapter['text'] ?? [],
+                                          );
+                                          final queryNorm =
+                                              ArabicSearchHelper.normalizeArabic(
+                                                _searchQuery,
+                                              );
+                                          final matchingText = texts.firstWhere(
+                                            (t) =>
+                                                ArabicSearchHelper.normalizeArabic(
+                                                  t,
+                                                ).contains(queryNorm),
+                                            orElse: () => texts.isNotEmpty
+                                                ? texts.first
+                                                : '',
+                                          );
+                                          if (matchingText.isEmpty)
+                                            return const SizedBox.shrink();
+                                          final snippet =
+                                              ArabicSearchHelper.getSnippet(
+                                                matchingText,
+                                                _searchQuery,
+                                                contextChars: 90,
+                                              );
+                                          return Padding(
+                                            padding: EdgeInsets.only(top: 4.h),
+                                            child: Text.rich(
+                                              TextSpan(
+                                                children:
+                                                    ArabicSearchHelper.highlightMatch(
+                                                      snippet,
+                                                      _searchQuery,
+                                                      TextStyle(
+                                                        backgroundColor: isDark
+                                                            ? const Color(
+                                                                0xFFB88A4A,
+                                                              ).withValues(
+                                                                alpha: 0.45,
+                                                              )
+                                                            : const Color(
+                                                                0xFFFFE082,
+                                                              ).withValues(
+                                                                alpha: 0.8,
+                                                              ),
+                                                        color: isDark
+                                                            ? const Color(
+                                                                0xFFFFF8E1,
+                                                              )
+                                                            : const Color(
+                                                                0xFF4E342E,
+                                                              ),
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                      baseStyle: TextStyle(
+                                                        fontFamily:
+                                                            AppConsts.cairo,
+                                                        fontSize: 12.5.sp,
+                                                        height: 1.4,
+                                                        color: textColor
+                                                            .withValues(
+                                                              alpha: 0.75,
+                                                            ),
+                                                      ),
+                                                    ),
+                                              ),
+                                              maxLines: 3,
+                                              overflow: TextOverflow.ellipsis,
+                                              textDirection: TextDirection.rtl,
+                                            ),
+                                          );
+                                        },
+                                      )
+                                    : null,
+                                leading: CircleAvatar(
+                                  backgroundColor: const Color(
+                                    0xFFD0A871,
+                                  ).withValues(alpha: 0.1),
+                                  child: Text(
+                                    '${_allChapters.indexOf(chapter) + 1}', // Use original index
+                                    style: const TextStyle(
+                                      color: Color(0xFFD0A871),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                // Heart Icon to toggle favorite directly from list
+                                trailing: IconButton(
+                                  icon: Icon(
+                                    isFav
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    color: isFav
+                                        ? Colors.red
+                                        : Colors.grey.shade400,
+                                  ),
+                                  onPressed: () =>
+                                      _toggleFavorite(chapter['title']),
+                                ),
+                                onTap: () async {
+                                  // Wait for result in case user changes favorite status inside detail screen
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => HisnDetailScreen(
+                                        title: chapter['title'],
+                                        texts: chapter['text'],
+                                        footnotes: chapter['footnote'],
+                                        isFavorite: isFav,
+                                        searchQuery: _searchQuery,
+                                        onFavoriteToggle: () =>
+                                            _toggleFavorite(chapter['title']),
+                                      ),
+                                    ),
+                                  );
+                                  // Refresh state to update list if changed inside detail
+                                  setState(() {});
+                                },
+                              ),
+                            );
+                          },
                         ),
-                      );
-                      // Refresh state to update list if changed inside detail
-                      setState(() {});
-                    },
-                  ),
-                );
-              },
-            ),
                 ), // Expanded
               ],
             ), // Column
@@ -393,52 +554,18 @@ class _HisnDetailScreenState extends State<HisnDetailScreen> {
             ),
             child: Column(
               children: [
-                Builder(builder: (context) {
-                  final String textStr = widget.texts[index];
-                  if (widget.searchQuery != null && widget.searchQuery!.isNotEmpty && textStr.contains(widget.searchQuery!)) {
-                    final query = widget.searchQuery!;
-                    final parts = textStr.split(query);
-                    final spans = <TextSpan>[];
-                    for (int i = 0; i < parts.length; i++) {
-                      spans.add(TextSpan(text: parts[i]));
-                      if (i != parts.length - 1) {
-                        spans.add(TextSpan(
-                          text: query,
-                          style: TextStyle(
-                            backgroundColor: Colors.yellow.withOpacity(0.4),
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ));
-                      }
-                    }
-                    return RichText(
-                      textAlign: TextAlign.center,
-                      textDirection: TextDirection.rtl,
-                      text: TextSpan(
-                        style: TextStyle(
-                          fontFamily: AppConsts.amiri,
-                          fontSize: 20.sp,
-                          height: 1.8,
-                          color: textColor,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        children: spans,
-                      ),
-                    );
-                  }
-                  return Text(
-                    textStr,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: AppConsts.amiri,
-                      fontSize: 20.sp,
-                      height: 1.8,
-                      color: textColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  );
-                }),
+                Text(
+                  widget.texts[index],
+                  textAlign: TextAlign.center,
+                  textDirection: TextDirection.rtl,
+                  style: TextStyle(
+                    fontFamily: AppConsts.amiri,
+                    fontSize: 20.sp,
+                    height: 1.8,
+                    color: textColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
 
                 if (currentFootnote.isNotEmpty) ...[
                   Divider(
@@ -503,7 +630,11 @@ class _HisnDetailScreenState extends State<HisnDetailScreen> {
                           ),
                         ),
                         SizedBox(width: 5.w),
-                        Icon(Icons.copy, size: 16.sp, color: const Color(0xFFD0A871)),
+                        Icon(
+                          Icons.copy,
+                          size: 16.sp,
+                          color: const Color(0xFFD0A871),
+                        ),
                       ],
                     ),
                   ),

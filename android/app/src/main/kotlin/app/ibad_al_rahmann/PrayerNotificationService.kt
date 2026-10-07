@@ -13,10 +13,12 @@ import android.os.IBinder
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
+import android.os.PowerManager
 import java.io.File
 import android.content.ContentResolver
 
@@ -25,6 +27,8 @@ class PrayerNotificationService : Service() {
     private var mediaPlayer: MediaPlayer? = null
     private lateinit var audioVolumeManager: AudioVolumeManager
     private var flipToMuteManager: FlipToMuteManager? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var audioFocusRequest: Any? = null
     
     private val refreshHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val refreshRunnable = object : Runnable {
@@ -133,11 +137,14 @@ class PrayerNotificationService : Service() {
         }
 
         stopAudio()
+        acquireWakeLock()
         audioVolumeManager.captureState()
         val forceSpeaker = flutterPrefs.getBoolean("flutter.force_speaker", false)
         if (useCustomVolume || overrideSilent || forceSpeaker) {
             audioVolumeManager.applySettings(volumePercent, overrideSilent, forceSpeaker)
         }
+
+        requestAudioFocus()
 
         val soundUri = resolveSoundUri(soundName, audioPath, customSoundName, alarmId)
         
@@ -147,10 +154,10 @@ class PrayerNotificationService : Service() {
         if (soundUri != null) {
             try {
                 mediaPlayer = MediaPlayer().apply {
-                    setWakeMode(this@PrayerNotificationService, android.os.PowerManager.PARTIAL_WAKE_LOCK)
+                    setWakeMode(this@PrayerNotificationService, PowerManager.PARTIAL_WAKE_LOCK)
                     setDataSource(this@PrayerNotificationService, soundUri)
                     setAudioAttributes(AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                         .setUsage(AudioAttributes.USAGE_ALARM)
                         .build())
                     
@@ -169,16 +176,106 @@ class PrayerNotificationService : Service() {
                 
                 flipToMuteManager?.startListening()
                 
-                // FORCE IMMEDIATE UI UPDATE FOR ONGOING NOTIFICATION AND WIDGETS
-                syncFromSharedPrefs() 
+                // Offload heavy prayer calculation and widget update to background thread
+                // so it doesn't freeze the main thread or cause audio buffer underrun/stutter at start!
+                Thread {
+                    try {
+                        syncFromSharedPrefs()
+                    } catch (e: Exception) {
+                        NativeLogger.log(this@PrayerNotificationService, "syncFromSharedPrefs background error: ${e.message}")
+                    }
+                }.start()
                 
             } catch (e: Exception) {
                 e.printStackTrace()
                 stopAudio()
             }
         } else {
+            abandonAudioFocus()
+            releaseWakeLock()
             NotificationQueueManager.onAudioFinished(this)
         }
+    }
+
+    private fun acquireWakeLock() {
+        try {
+            if (wakeLock == null) {
+                val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+                wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "PrayerApp:AdhanWakeLock").apply {
+                    setReferenceCounted(false)
+                }
+            }
+            if (wakeLock?.isHeld == false) {
+                wakeLock?.acquire(10 * 60 * 1000L) // 10 minutes safety timeout
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        wakeLock = null
+    }
+
+    private fun requestAudioFocus(): Boolean {
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val playbackAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+                val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                    .setAudioAttributes(playbackAttributes)
+                    .setAcceptsDelayedFocusGain(false)
+                    .setOnAudioFocusChangeListener { focusChange ->
+                        if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
+                            stopAudio()
+                        }
+                    }
+                    .build()
+                audioFocusRequest = request
+                audioManager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.requestAudioFocus(
+                    { focusChange ->
+                        if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
+                            stopAudio()
+                        }
+                    },
+                    AudioManager.STREAM_ALARM,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE
+                ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                (audioFocusRequest as? AudioFocusRequest)?.let {
+                    audioManager.abandonAudioFocusRequest(it)
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.abandonAudioFocus(null)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        audioFocusRequest = null
     }
 
     private fun resolveSoundUri(soundName: String, audioPath: String?, customSoundName: String?, alarmId: Int): Uri? {
@@ -229,6 +326,8 @@ class PrayerNotificationService : Service() {
         } catch (e: Exception) { e.printStackTrace() }
         mediaPlayer = null
         flipToMuteManager?.stopListening()
+        abandonAudioFocus()
+        releaseWakeLock()
         audioVolumeManager.restoreState() // Restoration guarantee
         NotificationQueueManager.onAudioFinished(this)
     }
@@ -267,12 +366,13 @@ class PrayerNotificationService : Service() {
 
             try {
                 notificationManager.deleteNotificationChannel("prayer_sound_channel_v12")
+                notificationManager.deleteNotificationChannel("prayer_sound_channel_v13")
             } catch (_: Exception) {}
 
-            // Create Sound Channel (IMPORTANCE_HIGH so persistent notification with IMPORTANCE_MAX stays on TOP)
-            val soundChannel = NotificationChannel("prayer_sound_channel_v13", "صوت الأذان والتنبيهات", NotificationManager.IMPORTANCE_HIGH).apply {
+            // Create Sound Channel (IMPORTANCE_HIGH, vibration disabled so system vibrator does not duck/cut audio playback)
+            val soundChannel = NotificationChannel("prayer_sound_channel_v14", "صوت الأذان والتنبيهات", NotificationManager.IMPORTANCE_HIGH).apply {
                 setSound(null, null)
-                enableVibration(true)
+                enableVibration(false)
                 group = "prayer_group"
             }
             notificationManager.createNotificationChannel(soundChannel)
@@ -286,11 +386,25 @@ class PrayerNotificationService : Service() {
             notificationManager.createNotificationChannel(silentChannel)
         }
 
-        val channelId = if (isSilentNotif) "prayer_silent_channel_v1" else "prayer_sound_channel_v13"
+        val channelId = if (isSilentNotif) "prayer_silent_channel_v1" else "prayer_sound_channel_v14"
 
         val isPrayerGroup = alarmId in 100..139 || alarmId in 3000..3099 || alarmId in 5000..5099 || alarmId == 110 || alarmId in 730..739
         val notifGroup    = if (isPrayerGroup) "PRAYER_GROUP" else "GENERAL_GROUP"
         val summaryTitle  = if (isPrayerGroup) "مواقيت الصلاة" else "تنبيهات عامة"
+        val summaryId     = if (isPrayerGroup) 666 else 667
+
+        val deleteIntent = Intent(this, NotificationDismissReceiver::class.java).apply {
+            action = "ACTION_NOTIFICATION_DISMISSED"
+            putExtra("alarm_id", alarmId)
+            putExtra("group_key", notifGroup)
+            putExtra("summary_id", summaryId)
+        }
+        val deletePendingIntent = PendingIntent.getBroadcast(
+            this,
+            alarmId + 20000,
+            deleteIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
         val builder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.mipmap.launcher_icon)
@@ -305,6 +419,7 @@ class PrayerNotificationService : Service() {
             .setSortKey("z_alarm")
             .addAction(android.R.drawable.ic_media_pause, "إيقاف الصوت", stopPendingIntent)
             .setContentIntent(fullPendingIntent)
+            .setDeleteIntent(deletePendingIntent)
 
         // For Adhans, we can still use full screen intent to show over lock screen
         if (isAdhan(alarmId)) {
@@ -346,7 +461,6 @@ class PrayerNotificationService : Service() {
 
         // Group summary — setOngoing(true) prevents swiping it (which would dismiss ALL notifications)
         // setSilent(true) prevents the summary itself from making noise
-        val summaryId = if (isPrayerGroup) 666 else 667
         val groupSummary = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.mipmap.launcher_icon)
             .setContentTitle(summaryTitle)
