@@ -339,7 +339,7 @@ class KhatmaCubit extends Cubit<KhatmaState> {
     if (k == null) return 0;
 
     final khatma = k;
-    final now = DateTime.parse(IslamicDay.todayKeySync());
+    final now = DateTime.now();
     // Use true calendar day difference to avoid 24h shifting issues.
     final startDay = DateTime(
       khatma.startDate.year,

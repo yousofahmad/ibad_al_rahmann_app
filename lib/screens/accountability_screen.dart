@@ -1,3 +1,4 @@
+import 'package:ibad_al_rahmann/services/prayer_service.dart' as ibad_al_rahmann_prayer;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -24,6 +25,26 @@ class AccountabilityScreen extends StatefulWidget {
 }
 
 class _AccountabilityScreenState extends State<AccountabilityScreen> with WidgetsBindingObserver {
+  bool _isPrayerPast(String prayerName) {
+    final times = ibad_al_rahmann_prayer.PrayerService().getPrayerTimes();
+    if (times == null) return true;
+    final now = DateTime.now();
+    switch (prayerName) {
+      case 'Ø§Ù„Ù Ø¬Ø±':
+        return now.isAfter(times.fajr);
+      case 'Ø§Ù„Ø¸Ù‡Ø±':
+      case 'Ø§Ù„Ø¬Ù…Ø¹Ø©':
+        return now.isAfter(times.dhuhr);
+      case 'Ø§Ù„Ø¹ØµØ±':
+        return now.isAfter(times.asr);
+      case 'Ø§Ù„Ù…ØºØ±Ø¨':
+        return now.isAfter(times.maghrib);
+      case 'Ø§Ù„Ø¹Ø´Ø§Ø¡':
+        return now.isAfter(times.isha);
+      default:
+        return true;
+    }
+  }
   final List<String> _defaultPrayers = [
     'الفجر',
     'الظهر',
@@ -309,8 +330,11 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
 
   // دالة حفظ الإحصائيات (بدون رسالة)
   Future<void> _saveStatsSilent() async {
-    int totalPrayerItems = _prayers.length;
-    int checkedPrayerItems = _prayers.values.where((e) => e).length;
+    
+    final pastPrayers = _prayers.keys.where((k) => _isPrayerPast(k)).toList();
+    int totalPrayerItems = pastPrayers.length;
+    int checkedPrayerItems = pastPrayers.where((k) => _prayers[k] == true).length;
+
     double prayerScore = totalPrayerItems == 0
         ? 0.0
         : (checkedPrayerItems / totalPrayerItems) * 100.0;

@@ -1,8 +1,10 @@
+import 'package:adhan/adhan.dart';
 import 'dart:convert';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/services/daily_tracker_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/islamic_day.dart';
 import 'package:ibad_al_rahmann/core/helpers/prayer_day_helper.dart';
+import 'package:ibad_al_rahmann/services/prayer_service.dart';
 
 class AccountabilitySyncService {
   static final List<String> _defaultPrayers = [
@@ -71,6 +73,27 @@ class AccountabilitySyncService {
     return map.isEmpty ? 0 : (checked / map.length) * 100;
   }
 
+  static bool _isPrayerPast(String prayerName) {
+    final times = PrayerService().getPrayerTimes();
+    if (times == null) return true;
+    final now = DateTime.now();
+    switch (prayerName) {
+      case 'Ø§Ù„Ù Ø¬Ø±':
+        return now.isAfter(times.fajr);
+      case 'Ø§Ù„Ø¸Ù‡Ø±':
+      case 'Ø§Ù„Ø¬Ù…Ø¹Ø©':
+        return now.isAfter(times.dhuhr);
+      case 'Ø§Ù„Ø¹ØµØ±':
+        return now.isAfter(times.asr);
+      case 'Ø§Ù„Ù…ØºØ±Ø¨':
+        return now.isAfter(times.maghrib);
+      case 'Ø§Ù„Ø¹Ø´Ø§Ø¡':
+        return now.isAfter(times.isha);
+      default:
+        return true;
+    }
+  }
+
   static Future<void> syncAndSaveTodayStats() async {
     final prefs = CacheHelper.prefs;
     final todayKey = await IslamicDay.todayKey();
@@ -126,8 +149,9 @@ class AccountabilitySyncService {
     await prefs.setString('temp_deeds', json.encode(deedsMap));
 
     // 5. Calculate and save stats
-    int totalPrayers = prayersMap.length;
-    int checkedPrayers = prayersMap.values.where((e) => e).length;
+    final pastPrayers = prayersMap.keys.where((k) => _isPrayerPast(k)).toList();
+    int totalPrayers = pastPrayers.length;
+    int checkedPrayers = pastPrayers.where((k) => prayersMap[k] == true).length;
     double prayerScore =
         totalPrayers == 0 ? 0.0 : (checkedPrayers / totalPrayers) * 100.0;
 
