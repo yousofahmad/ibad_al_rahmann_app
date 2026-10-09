@@ -701,6 +701,7 @@ object PrayerFocusOverlay {
                 nm.cancel(5000 + prayerIndex)           // Iqama
                 nm.cancel(1000 + prayerIndex)           // Alternate adhan IDs
                 NativeLogger.log(context, "onPrayed: cancelled notifications for prayerIndex=$prayerIndex (adhan=${100+prayerIndex}, pre-adhan=${3000+prayerIndex}, iqama=${5000+prayerIndex})")
+                NotificationDismissReceiver.cleanupEmptyGroupSummaries(context)
             }
         }
 
