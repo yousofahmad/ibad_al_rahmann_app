@@ -1330,25 +1330,14 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
                         ),
                       ),
                       child: InkWell(
-                        onTap: () async {
-                          final newStatus = !isDone;
-                          setState(() {
-                            _dynamicWirds[key] = newStatus;
-                          });
-                          final dateStr =
-                              PrayerDayHelper.getActivePrayerCycleDate();
-                          if (newStatus) {
-                            await DailyTrackerService.markWirdDone(
-                              key,
-                              dateKey: dateStr,
-                            );
-                          } else {
-                            await CacheHelper.prefs.setBool(
-                              'wird_done_${key}_$dateStr',
-                              false,
-                            );
-                          }
-                          await _saveStatsSilent();
+                        onTap: () {
+                          scaffoldMessengerKey.currentState?.showSnackBar(
+                            const SnackBar(
+                              content: Text("برجاء إكمال الورد من داخل المصحف"),
+                              backgroundColor: Colors.orange,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
                         },
                         borderRadius: BorderRadius.circular(10.r),
                         child: Row(
@@ -1428,19 +1417,14 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
                     checkColor: Colors.white,
                     contentPadding: EdgeInsets.symmetric(horizontal: 4.w),
                     value: _isKahfDone,
-                    onChanged: (val) async {
-                      final isChecked = val ?? false;
-                      if (isChecked) {
-                        await DailyTrackerService.markKahfDone();
-                      } else {
-                        final today = await IslamicDay.todayKey();
-                        await CacheHelper.prefs.setBool(
-                          'kahf_done_$today',
-                          false,
-                        );
-                      }
-                      setState(() => _isKahfDone = isChecked);
-                      await _saveStatsSilent();
+                    onChanged: (val) {
+                      scaffoldMessengerKey.currentState?.showSnackBar(
+                        const SnackBar(
+                          content: Text("برجاء قراءة سورة الكهف من الشاشة المخصصة لها"),
+                          backgroundColor: Colors.orange,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
                     },
                     title: Padding(
                       padding: EdgeInsets.only(top: 2.h, bottom: 4.h),
