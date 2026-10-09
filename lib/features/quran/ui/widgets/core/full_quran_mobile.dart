@@ -163,6 +163,10 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
       _showOverlays = !_showOverlays;
       if (_showOverlays) {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        final playerCubit = context.read<VersePlayerCubit>();
+        if (playerCubit.currnetVerse != null) {
+          playerCubit.showPlayer();
+        }
       } else {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       }

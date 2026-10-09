@@ -78,6 +78,10 @@ class _WirdQuranWidgetState extends State<WirdQuranWidget>
       _showOverlays = !_showMenu;
       if (_showOverlays) {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        final playerCubit = context.read<VersePlayerCubit>();
+        if (playerCubit.currnetVerse != null) {
+          playerCubit.showPlayer();
+        }
       } else {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       }

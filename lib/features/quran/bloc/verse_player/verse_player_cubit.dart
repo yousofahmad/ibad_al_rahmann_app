@@ -28,6 +28,23 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   double playbackSpeed = 1.0;
   bool isLooping = false;
   bool autoPlayNext = true;
+  Timer? _hideTimer;
+
+  void showPlayer() {
+    _hideTimer?.cancel();
+    if (currnetVerse != null) {
+      emit(VersePlayerInitial(showed: true, loading: state.loading, currentVerse: currnetVerse, activeWordIndex: state.activeWordIndex));
+    }
+  }
+
+  void _startHideTimer() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(seconds: 4), () {
+      if (player.playing && currnetVerse != null) {
+        emit(VersePlayerInitial(showed: false, loading: state.loading, currentVerse: currnetVerse, activeWordIndex: state.activeWordIndex));
+      }
+    });
+  }
   bool isHighlightWordByWord =
       CacheHelper.prefs.getBool('verse_player_highlight_wbw') ?? true;
   ReciterAudioModel? currentReciterModel;
@@ -106,8 +123,9 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
     int surahNumber,
     int verseNumber,
     String reciterId,
+    ReciterAudioModel? currentReciterModel,
   ) {
-    final folder = reciterFolders[reciterId] ?? 'Alafasy_128kbps';
+    final folder = currentReciterModel?.everyAyahFolder ?? reciterFolders[reciterId] ?? 'Alafasy_128kbps';
     final s = surahNumber.toString().padLeft(3, '0');
     final v = verseNumber.toString().padLeft(3, '0');
     return 'https://everyayah.com/data/$folder/$s$v.mp3';
@@ -253,6 +271,7 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
           currnetVerse!.surahNumber,
           currnetVerse!.verseNumber,
           activeReciter,
+          currentReciterModel,
         );
 
         emit(
@@ -260,6 +279,7 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
             showed: true,
             loading: true,
             currentVerse: currnetVerse,
+            activeWordIndex: state.activeWordIndex,
           ),
         );
 
@@ -284,15 +304,17 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
 
           if (autoPlay) {
             player.play();
+            _startHideTimer();
           }
 
           emit(
-            VersePlayerInitial(
-              showed: true,
-              loading: false,
-              currentVerse: currnetVerse,
-            ),
-          );
+          VersePlayerInitial(
+            showed: true,
+            loading: false,
+            currentVerse: currnetVerse,
+            activeWordIndex: state.activeWordIndex,
+          ),
+        );
 
           // Fetch segments asynchronously in background for word-by-word highlight without delaying audio
           _loadSegmentsAsync(
@@ -303,12 +325,13 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
         } catch (e) {
           debugPrint('Error setting verse audio source: $e');
           emit(
-            VersePlayerInitial(
-              showed: true,
-              loading: false,
-              currentVerse: currnetVerse,
-            ),
-          );
+          VersePlayerInitial(
+            showed: true,
+            loading: false,
+            currentVerse: currnetVerse,
+            activeWordIndex: state.activeWordIndex,
+          ),
+        );
         }
       }
     } finally {
@@ -405,6 +428,11 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   void verseListener() {
     playerStateSubscription?.cancel();
     playerStateSubscription = player.playerStateStream.listen((playerState) {
+      if (playerState.playing) {
+        _startHideTimer();
+      } else {
+        _hideTimer?.cancel();
+      }
       if (playerState.processingState == ProcessingState.completed) {
         if (autoPlayNext && !isLooping) {
           playNextVerse();
@@ -412,12 +440,13 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
           player.seek(Duration.zero);
           player.pause();
           emit(
-            VersePlayerInitial(
-              showed: true,
-              loading: false,
-              currentVerse: currnetVerse,
-            ),
-          );
+          VersePlayerInitial(
+            showed: true,
+            loading: false,
+            currentVerse: currnetVerse,
+            activeWordIndex: state.activeWordIndex,
+          ),
+        );
         }
       } else if (playerState.processingState == ProcessingState.buffering ||
           playerState.processingState == ProcessingState.loading) {
@@ -426,6 +455,7 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
             showed: true,
             loading: true,
             currentVerse: currnetVerse,
+            activeWordIndex: state.activeWordIndex,
           ),
         );
       } else if (playerState.processingState == ProcessingState.ready) {
@@ -434,6 +464,7 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
             showed: true,
             loading: false,
             currentVerse: currnetVerse,
+            activeWordIndex: state.activeWordIndex,
           ),
         );
       }
@@ -514,12 +545,13 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
       }
       // Re-emit state to trigger UI update for the play/pause icon
       emit(
-        VersePlayerInitial(
-          showed: true,
-          loading: false,
-          currentVerse: currnetVerse,
-        ),
-      );
+          VersePlayerInitial(
+            showed: true,
+            loading: false,
+            currentVerse: currnetVerse,
+            activeWordIndex: state.activeWordIndex,
+          ),
+        );
     }
   }
 
