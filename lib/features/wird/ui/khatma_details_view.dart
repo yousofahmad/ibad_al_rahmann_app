@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
@@ -1113,7 +1113,7 @@ extension _WirdTextShare on _KhatmaDetailsViewState {
     // ── Format 2: full formatted (no app name) ──────────────────────
     final formatted =
         '*• الـوِرد الـيَـومِـي لِشَهْرِ $monthName لِعام $yearH هـ :*\n\n'
-        '*📅 — الـيوم : " $dayName ( $today ) "*\n'
+        '*📅 — الـيوم : " $dayName ( $today $monthName ) "*\n'
         '*📖 — إسـم السورة : ( $surahShort )*\n'
         '*🕋 — وِرد : ( $wirdTime )*\n'
         '*$pageCount — الصفحات مِـن : \' $startPage  -  $endPage \'*';
@@ -1625,3 +1625,5 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
     );
   }
 }
+
+
