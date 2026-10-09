@@ -72,7 +72,7 @@ class SurahPlayerControllers extends StatelessWidget {
             final cubit = context.read<QuranPlayerCubit>();
             await cubit.player.stop();
             cubit.selectedSurah = null;
-            cubit.emit(QuranPlayerInitial());
+            cubit.unShowBottomSheet();
           },
           icon: const Icon(Icons.close_rounded, color: Colors.white70),
         ),
