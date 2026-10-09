@@ -250,13 +250,30 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
               builder: (context, state) {
                 if (state is KhatmaLoaded && state.khatmas.length == 1) {
                   final khatma = state.khatmas.first;
-                  return IconButton(
-                    tooltip: 'تعديل وقت التنبيه',
-                    icon: const Icon(
-                      FontAwesomeIcons.clock,
-                      color: Color(0xFFD0A871),
-                      size: 18,
-                    ),
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'تعديل تاريخ بدء الختمة',
+                        icon: const Icon(
+                          FontAwesomeIcons.calendarDay,
+                          color: Color(0xFFD0A871),
+                          size: 18,
+                        ),
+                        onPressed: () => _showStartDatePickerDialog(
+                          context,
+                          context.read<KhatmaCubit>(),
+                          khatma.startDate,
+                          khatma.id,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'تعديل وقت التنبيه',
+                        icon: const Icon(
+                          FontAwesomeIcons.clock,
+                          color: Color(0xFFD0A871),
+                          size: 18,
+                        ),
                     onPressed: () {
                       if (khatma.notificationType == 'prayer') {
                         _showPrayerOffsetsDialog(
@@ -273,7 +290,8 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
                         );
                       }
                     },
-                  );
+                  ),
+                ]);
                 }
                 return const SizedBox.shrink();
               },

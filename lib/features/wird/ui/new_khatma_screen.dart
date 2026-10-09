@@ -1041,10 +1041,12 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
                 child: Column(
                   children: [
                     // ── 1. بدون تذكير ──
-                    const RadioListTile<String>(
-                      title: Text("بدون تذكير"),
+                    RadioListTile<String>(
+                      title: const Text("بدون تذكير"),
                       value: 'none',
+                      groupValue: _reminderType,
                       activeColor: goldColor,
+                      onChanged: (val) => setState(() => _reminderType = val!),
                     ),
                     // Sub-selector for division when بدون تذكير
                     if (_reminderType == 'none')
@@ -1132,10 +1134,12 @@ class _NewKhatmaScreenState extends State<NewKhatmaScreen> {
                       ),
 
                     // ── 2. تذكير يومي ──
-                    const RadioListTile<String>(
-                      title: Text("تذكير يومي للورد"),
+                    RadioListTile<String>(
+                      title: const Text("تذكير يومي للورد"),
                       value: 'daily',
+                      groupValue: _reminderType,
                       activeColor: goldColor,
+                      onChanged: (val) => setState(() => _reminderType = val!),
                     ),
                     if (_reminderType == 'daily')
                       Padding(
