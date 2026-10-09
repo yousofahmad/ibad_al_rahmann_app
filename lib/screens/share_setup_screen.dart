@@ -1205,14 +1205,17 @@ class _ShareFooter extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10.0),
-        Text(
-          'صنع بواسطة تطبيق عباد الرحمن',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontFamily: 'Cairo',
-            fontSize: 22.0,
-            fontWeight: FontWeight.w600,
-            color: textColor,
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10.0),
+          child: Text(
+            'صنع بواسطة تطبيق عباد الرحمن',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: AppConsts.motoNastaliq,
+              fontSize: 28.0,
+              fontWeight: FontWeight.normal,
+              color: textColor,
+            ),
           ),
         ),
       ],

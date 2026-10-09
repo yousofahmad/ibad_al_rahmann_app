@@ -1182,8 +1182,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
                             fontSize: 23.sp,
                             fontWeight: FontWeight.normal,
                             color: const Color(0xFFD0A871),
-                            height: 2.2,
-                          ),
+                            ),
                         ),
                       ),
                       SizedBox(height: 4.h),
@@ -1299,8 +1298,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
                               fontSize: 18.sp,
                               fontWeight: FontWeight.normal,
                               color: const Color(0xFFD0A871),
-                              height: 2.2,
-                            ),
+                              ),
                           ),
                         ),
                       ],
@@ -1435,8 +1433,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
                           fontSize: 18.sp,
                           fontWeight: FontWeight.normal,
                           color: const Color(0xFFD0A871),
-                          height: 2.2,
-                        ),
+                          ),
                       ),
                     ),
                     subtitle: Text(
@@ -1480,17 +1477,13 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Padding(
-                padding: EdgeInsets.only(top: 4.h, bottom: 6.h),
-                child: Text(
-                  "الصلاة على النبي ﷺ",
-                  style: TextStyle(
-                    fontFamily: AppConsts.motoNastaliq,
-                    fontSize: 21.sp,
-                    fontWeight: FontWeight.normal,
-                    color: const Color(0xFFD0A871),
-                    height: 2.2,
-                  ),
+              Text(
+                "الصلاة على النبي ﷺ",
+                style: TextStyle(
+                  fontFamily: AppConsts.motoNastaliq,
+                  fontSize: 21.sp,
+                  fontWeight: FontWeight.normal,
+                  color: const Color(0xFFD0A871),
                 ),
               ),
               if (_salawatCount > 0)
@@ -1644,8 +1637,7 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
                             fontSize: 23.sp,
                             fontWeight: FontWeight.normal,
                             color: const Color(0xFFD0A871),
-                            height: 2.2,
-                          ),
+                            ),
                         ),
                       ),
                       SizedBox(height: 4.h),

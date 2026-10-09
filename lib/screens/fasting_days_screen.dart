@@ -1500,14 +1500,17 @@ class _FastingShareDesign extends StatelessWidget {
                           filterQuality: FilterQuality.high,
                         ),
                         const SizedBox(width: 20),
-                        const Text(
-                          "عباد الرحمن",
-                          style: TextStyle(
-                            fontFamily: AppConsts.expoArabic,
-                            fontSize: 44,
-                            fontWeight: FontWeight.w900,
-                            color: gold,
-                            letterSpacing: 1.2,
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 20),
+                          child: Text(
+                            "عباد الرحمن",
+                            style: TextStyle(
+                              fontFamily: AppConsts.motoNastaliq,
+                              fontSize: 54,
+                              fontWeight: FontWeight.normal,
+                              color: gold,
+                              letterSpacing: 1.2,
+                            ),
                           ),
                         ),
                       ],
