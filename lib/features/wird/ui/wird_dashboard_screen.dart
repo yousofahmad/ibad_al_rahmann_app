@@ -170,6 +170,48 @@ class _WirdDashboardScreenState extends State<WirdDashboardScreen> {
     );
   }
 
+  Future<void> _showStartDatePickerDialog(
+    BuildContext context,
+    KhatmaCubit cubit,
+    DateTime currentStartDate,
+    String kId,
+  ) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: currentStartDate,
+      firstDate: DateTime(now.year - 2, 1, 1),
+      lastDate: DateTime(now.year + 2, 12, 31),
+      helpText: 'تعديل تاريخ بدء الختمة',
+      builder: (ctx, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(context).colorScheme.copyWith(
+                primary: const Color(0xFFD0A871),
+                onPrimary: Colors.black,
+              ),
+        ),
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: child!,
+        ),
+      ),
+    );
+    if (picked != null) {
+      await cubit.updateKhatmaStartDate(kId, picked);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تم تعديل تاريخ بدء الختمة وتحديث جدول التأخير بنجاح',
+              style: TextStyle(fontFamily: AppConsts.cairo),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _showTimePickerDialog(
     BuildContext context,
     KhatmaCubit cubit,
