@@ -15,12 +15,7 @@ class QuranAudioScreen extends StatefulWidget {
 }
 
 class _QuranAudioScreenState extends State<QuranAudioScreen> {
-  @override
-  void dispose() {
-    context.read<QuranPlayerCubit>().player.stop();
-    context.read<QuranPlayerCubit>().selectedSurah = null;
-    super.dispose();
-  }
+
 
   @override
   Widget build(BuildContext context) {

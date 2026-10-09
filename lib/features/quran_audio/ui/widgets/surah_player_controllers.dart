@@ -66,6 +66,16 @@ class SurahPlayerControllers extends StatelessWidget {
           },
           icon: const Icon(Icons.skip_previous_rounded),
         ),
+        IconButton(
+          iconSize: 32,
+          onPressed: () async {
+            final cubit = context.read<QuranPlayerCubit>();
+            await cubit.player.stop();
+            cubit.selectedSurah = null;
+            cubit.emit(QuranPlayerInitial());
+          },
+          icon: const Icon(Icons.close_rounded, color: Colors.white70),
+        ),
       ],
     );
   }
