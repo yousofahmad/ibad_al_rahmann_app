@@ -5,6 +5,7 @@ import 'package:ibad_al_rahmann/services/daily_tracker_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/islamic_day.dart';
 import 'package:ibad_al_rahmann/core/helpers/prayer_day_helper.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
+import 'accountability_prayer_status.dart';
 
 class AccountabilitySyncService {
   static final List<String> _defaultPrayers = [
@@ -75,23 +76,7 @@ class AccountabilitySyncService {
 
   static bool _isPrayerPast(String prayerName) {
     final times = PrayerService().getPrayerTimes();
-    if (times == null) return true;
-    final now = DateTime.now();
-    switch (prayerName) {
-      case 'Ø§Ù„Ù Ø¬Ø±':
-        return now.isAfter(times.fajr);
-      case 'Ø§Ù„Ø¸Ù‡Ø±':
-      case 'Ø§Ù„Ø¬Ù…Ø¹Ø©':
-        return now.isAfter(times.dhuhr);
-      case 'Ø§Ù„Ø¹ØµØ±':
-        return now.isAfter(times.asr);
-      case 'Ø§Ù„Ù…ØºØ±Ø¨':
-        return now.isAfter(times.maghrib);
-      case 'Ø§Ù„Ø¹Ø´Ø§Ø¡':
-        return now.isAfter(times.isha);
-      default:
-        return true;
-    }
+    return AccountabilityPrayerStatus.isPast(prayerName, times);
   }
 
   static Future<void> syncAndSaveTodayStats() async {

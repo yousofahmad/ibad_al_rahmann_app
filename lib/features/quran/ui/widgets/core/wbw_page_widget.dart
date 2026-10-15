@@ -21,6 +21,7 @@ import '../../../../../core/helpers/fonts_helper.dart';
 import '../components/ayah_marker_widget.dart';
 
 import 'package:ibad_al_rahmann/widgets/app_skeleton.dart';
+import 'package:ibad_al_rahmann/features/quran_audio/logic/quran_player/quran_player_cubit.dart';
 
 class WbwPageWidget extends StatefulWidget {
   final int pageNumber;
@@ -311,6 +312,18 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
     );
     final playingVerse = playerState.currentVerse;
     final activeWordIndex = playerState.activeWordIndex;
+    final surahPlayer = context.watch<QuranPlayerCubit>();
+    final isFullSurahPlaybackActive =
+        surahPlayer.player.playing && surahPlayer.selectedSurah != null;
+    final activePlaybackSurah = isFullSurahPlaybackActive
+        ? surahPlayer.selectedSurah
+        : playingVerse?.surahNumber;
+    final activePlaybackAyah = isFullSurahPlaybackActive
+        ? surahPlayer.activeVerseNumber
+        : playingVerse?.verseNumber;
+    final activePlaybackWordIndex = isFullSurahPlaybackActive
+        ? surahPlayer.activeWordIndex
+        : activeWordIndex;
     final isWbwMode = context.select<VersePlayerCubit, bool>(
       (cubit) => cubit.isHighlightWordByWord,
     );
@@ -705,9 +718,9 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                           currentWAyah,
                         );
 
-                        final bool isPlayingThisAyah = (playingVerse != null &&
-                            playingVerse.surahNumber == currentWSura &&
-                            playingVerse.verseNumber == currentWAyah);
+                        final bool isPlayingThisAyah =
+                            activePlaybackSurah == currentWSura &&
+                            activePlaybackAyah == currentWAyah;
 
                         final bool isSelectedOrNav =
                             (_selectedWord != null &&
@@ -723,12 +736,12 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                         // Is this individual word currently playing in Word-by-Word mode?
                         final bool isWordActive = isPlayingThisAyah &&
                             isWbwMode &&
-                            activeWordIndex != null &&
-                            word.position == activeWordIndex;
+                            activePlaybackWordIndex != null &&
+                            word.position == activePlaybackWordIndex;
 
                         // When in Word-by-Word mode with valid word timing, do NOT highlight whole verse
                         final bool isVerseHighlighted = isPlayingThisAyah &&
-                            (!isWbwMode || activeWordIndex == null);
+                            (!isWbwMode || activePlaybackWordIndex == null);
 
                         final bool isMarkerHighlighted =
                             (isVerseHighlighted || isSelectedOrNav);
