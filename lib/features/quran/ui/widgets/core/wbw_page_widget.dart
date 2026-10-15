@@ -774,10 +774,10 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                         }
 
                         if (isLastWordOfAyah) {
-                          final double sizeMultiplier = isPage1or2 ? 1.20 : 2.0;
+                          final double sizeMultiplier = isPage1or2 ? 1.08 : 1.8;
                           final double fontMultiplier = isPage1or2
-                              ? 0.40
-                              : 0.45;
+                              ? 0.36
+                              : 0.405;
 
                           final double markerSize =
                               canvasFontSize * sizeMultiplier;
@@ -786,7 +786,7 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
 
                           Widget marker = Padding(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 4.0,
+                              horizontal: 3.0,
                             ),
                             child: Container(
                               decoration: BoxDecoration(

@@ -981,11 +981,11 @@ class _VersesSection extends StatelessWidget {
 
     if (isMarker) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+        padding: const EdgeInsets.symmetric(horizontal: 6.0),
         child: AyahMarkerWidget(
           ayahNumber: word.ayahNumber ?? 0,
-          size: fontSize * 1.4,
-          fontSize: fontSize * 0.42,
+          size: fontSize * 1.26,
+          fontSize: fontSize * 0.378,
           numberColor: textColor.computeLuminance() > 0.5
               ? const Color(0xFFFFF8E1)
               : const Color(0xFF3E2723),
@@ -1126,11 +1126,11 @@ class _VersesSection extends StatelessWidget {
             alignment: PlaceholderAlignment.middle,
             baseline: TextBaseline.alphabetic,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              padding: const EdgeInsets.symmetric(horizontal: 3.0),
               child: AyahMarkerWidget(
                 ayahNumber: word.ayahNumber ?? 0,
-                size: normalFontSize * 1.05,
-                fontSize: normalFontSize * 0.36,
+                size: normalFontSize * 0.945,
+                fontSize: normalFontSize * 0.324,
                 numberColor: textColor.computeLuminance() > 0.5
                     ? const Color(0xFFFFF8E1)
                     : const Color(0xFF3E2723),

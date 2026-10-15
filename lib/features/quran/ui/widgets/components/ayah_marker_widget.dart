@@ -11,7 +11,7 @@ class AyahMarkerWidget extends StatelessWidget {
   final int ayahNumber;
 
   /// The overall size of the square container that holds the SVG + number.
-  /// Default 50 — large enough to be clearly readable at a glance.
+  /// Default 45 — compact while keeping the number clearly readable.
   final double size;
 
   /// Colour of the Arabic numeral drawn on top of the SVG.
@@ -24,9 +24,9 @@ class AyahMarkerWidget extends StatelessWidget {
   const AyahMarkerWidget({
     super.key,
     required this.ayahNumber,
-    this.size = 50,
+    this.size = 45,
     this.numberColor = const Color(0xFF3E2723),
-    this.fontSize = 14,
+    this.fontSize = 12.6,
   });
 
   @override
@@ -52,7 +52,7 @@ class AyahMarkerWidget extends StatelessWidget {
               ayahNumber.toArabicNums,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: fontSize + 1, // slight bump to match proportions
+                fontSize: fontSize + 0.9, // keep the number proportional to the marker
                 fontWeight: FontWeight.bold,
                 color: numberColor,
                 height: 1.0,
@@ -69,19 +69,19 @@ class AyahMarkerWidget extends StatelessWidget {
 /// Convenience factory that returns the [WidgetSpan] ready to be inserted
 /// into a [TextSpan] children list (used by mobile/tablet RichText views).
 ///
-/// [size] defaults to 50 — visually prominent and clearly readable.
+/// [size] defaults to 45 — compact and clearly readable.
 WidgetSpan ayahMarkerSpan({
   required int ayahNumber,
-  double size = 50,
+  double size = 45,
   Color numberColor = const Color(0xFF3E2723),
-  double fontSize = 14,
+  double fontSize = 12.6,
   bool isDark = false,
 }) {
   return WidgetSpan(
     alignment: PlaceholderAlignment.middle,
     child: Padding(
       // A tiny breathing room so the marker doesn't touch adjacent glyphs.
-      padding: const EdgeInsets.symmetric(horizontal: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 2.5),
       child: AyahMarkerWidget(
         ayahNumber: ayahNumber,
         size: size,

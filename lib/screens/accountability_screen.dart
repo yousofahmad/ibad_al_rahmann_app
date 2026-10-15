@@ -1431,7 +1431,6 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
   Widget _buildSalawatCounterCard(bool isDark, Color textColor) {
     return Container(
       margin: EdgeInsets.only(bottom: 20.h),
-      padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF000000) : Colors.white,
         borderRadius: BorderRadius.circular(20.r),
@@ -1448,72 +1447,113 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
       ),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "الصلاة على النبي ﷺ",
-                style: TextStyle(
-                  fontFamily: AppConsts.motoNastaliq,
-                  fontSize: 21.sp,
-                  fontWeight: FontWeight.normal,
-                  color: const Color(0xFFD0A871),
-                ),
-              ),
-              if (_salawatCount > 0)
-                IconButton(
-                  icon: const Icon(Icons.refresh, size: 20, color: Colors.grey),
-                  tooltip: "إعادة ضبط العداد",
-                  onPressed: () => _updateSalawatCount(0),
-                ),
-            ],
-          ),
-          SizedBox(height: 8.h),
-          InkWell(
-            onTap: () => _updateSalawatCount(_salawatCount + 1),
-            borderRadius: BorderRadius.circular(16.r),
-            child: Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(vertical: 18.h),
-              decoration: BoxDecoration(
-                color: const Color(0xFFD0A871).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16.r),
-                border: Border.all(
-                  color: const Color(0xFFD0A871).withValues(alpha: 0.3),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    _salawatCount.toArabicNums,
-                    style: TextStyle(
-                      fontFamily: AppConsts.expoArabic,
-                      fontSize: 34.sp,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFFD0A871),
-                    ),
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD0A871).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+            ),
+            child: Row(
+              children: [
+                SizedBox(width: 48.w, height: 48.h),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "الصلاة على النبي",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: AppConsts.motoNastaliq,
+                          fontSize: 21.sp,
+                          fontWeight: FontWeight.normal,
+                          color: const Color(0xFFD0A871),
+                        ),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        "صلى الله عليه وسلم",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: AppConsts.expoArabic,
+                          fontSize: 13.sp,
+                          color: const Color(0xFFD0A871),
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    "اضغط هنا لزيادة العداد +1",
-                    style: TextStyle(
-                      fontFamily: AppConsts.expoArabic,
-                      fontSize: 11.5.sp,
-                      color: isDark ? Colors.white60 : Colors.black54,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                SizedBox(
+                  width: 48.w,
+                  height: 48.h,
+                  child: _salawatCount > 0
+                      ? IconButton(
+                          icon: Icon(
+                            Icons.refresh,
+                            size: 20.sp,
+                            color: Colors.grey,
+                          ),
+                          tooltip: "إعادة ضبط العداد",
+                          onPressed: () => _updateSalawatCount(0),
+                        )
+                      : null,
+                ),
+              ],
             ),
           ),
-          SizedBox(height: 12.h),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildQuickSalawatBtn("+10", 10),
-              _buildQuickSalawatBtn("+33", 33),
-              _buildQuickSalawatBtn("+100", 100),
-            ],
+          Padding(
+            padding: EdgeInsets.fromLTRB(16.w, 14.h, 16.w, 16.h),
+            child: Column(
+              children: [
+                InkWell(
+                  onTap: () => _updateSalawatCount(_salawatCount + 1),
+                  borderRadius: BorderRadius.circular(16.r),
+                  child: Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.symmetric(vertical: 18.h),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD0A871).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16.r),
+                      border: Border.all(
+                        color: const Color(0xFFD0A871).withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          _salawatCount.toArabicNums,
+                          style: TextStyle(
+                            fontFamily: AppConsts.expoArabic,
+                            fontSize: 34.sp,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFFD0A871),
+                          ),
+                        ),
+                        SizedBox(height: 4.h),
+                        Text(
+                          "اضغط هنا لزيادة العداد +1",
+                          style: TextStyle(
+                            fontFamily: AppConsts.expoArabic,
+                            fontSize: 11.5.sp,
+                            color: isDark ? Colors.white60 : Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(height: 12.h),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildQuickSalawatBtn("+10", 10),
+                    _buildQuickSalawatBtn("+33", 33),
+                    _buildQuickSalawatBtn("+100", 100),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
