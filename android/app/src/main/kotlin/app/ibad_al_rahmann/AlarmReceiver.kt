@@ -1,4 +1,4 @@
-﻿package app.ibad_al_rahmann
+package app.ibad_al_rahmann
 
 import android.app.AlarmManager
 import android.app.Notification
@@ -55,6 +55,23 @@ class AlarmReceiver : BroadcastReceiver() {
         }
 
         val alarmId = intent.getIntExtra("alarm_id", 0)
+
+        if (intent.getBooleanExtra(PrayerRelativeAlarmScheduler.EXTRA_MARKER, false)) {
+            try {
+                PrayerRelativeAlarmScheduler.schedule(context)
+            } catch (e: Exception) {
+                NativeLogger.log(context, "PrayerRelativeAlarm reschedule failed: ${e.message}")
+            }
+        }
+
+        if (payload == PrayerSilenceScheduler.BOUNDARY_PAYLOAD) {
+            try {
+                PrayerSilenceScheduler.onBoundary(context)
+            } catch (e: Exception) {
+                NativeLogger.log(context, "PrayerSilence boundary failed: ${e.message}")
+            }
+            return
+        }
 
         // ── محرك منتصف الليل (تحديث الويدجت والأذان لليوم الجديد ذاتياً) ──
         if (alarmId == 9999) {
@@ -643,4 +660,3 @@ class AlarmReceiver : BroadcastReceiver() {
 
 
 }
-

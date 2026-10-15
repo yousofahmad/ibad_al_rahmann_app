@@ -47,6 +47,12 @@ object NativePrayerScheduler {
         synchronized(scheduleLock) {
             if (now - lastScheduleMs < DEBOUNCE_MS) {
                 NativeLogger.log(context, "scheduleToday: debounced (${now - lastScheduleMs}ms since last call, min=${DEBOUNCE_MS}ms)")
+                try {
+                    PrayerSilenceScheduler.schedule(context)
+                    PrayerRelativeAlarmScheduler.schedule(context)
+                } catch (e: Exception) {
+                    NativeLogger.log(context, "Prayer feature reschedule after debounce failed: ${e.message}")
+                }
                 return
             }
             lastScheduleMs = now
@@ -55,6 +61,16 @@ object NativePrayerScheduler {
     }
 
     private fun _scheduleTodayInternal(context: Context) {
+        try {
+            PrayerSilenceScheduler.schedule(context)
+        } catch (e: Exception) {
+            NativeLogger.log(context, "PrayerSilence scheduling failed: ${e.message}")
+        }
+        try {
+            PrayerRelativeAlarmScheduler.schedule(context)
+        } catch (e: Exception) {
+            NativeLogger.log(context, "PrayerRelativeAlarm scheduling failed: ${e.message}")
+        }
         val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val now          = System.currentTimeMillis()

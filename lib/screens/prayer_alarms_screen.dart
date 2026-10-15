@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/widgets/app_skeleton.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
+import 'package:ibad_al_rahmann/services/prayer_silence_platform_channel.dart';
+import 'package:ibad_al_rahmann/services/prayer_relative_alarm_platform_channel.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'muezzin_selection_screen.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
@@ -15,7 +18,8 @@ class PrayerAlarmsScreen extends StatefulWidget {
   State<PrayerAlarmsScreen> createState() => _PrayerAlarmsScreenState();
 }
 
-class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
+class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen>
+    with WidgetsBindingObserver {
   bool _isLoading = true;
   late SharedPreferences _prefs;
   static const Color _gold = Color(0xFFD0A871);
@@ -36,15 +40,24 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
   final Map<String, int> _adjustments = {};
 
   bool _hasChanges = false;
+  bool _prayerSilenceEnabled = false;
+  bool _hasNotificationPolicyAccess = false;
+  int _silenceBeforeMinutes = 5;
+  int _silenceAfterMinutes = 30;
+  bool _prayerRelativeAlarmEnabled = false;
+  String _prayerRelativeAlarmPrayer = 'Fajr';
+  int _prayerRelativeAlarmBeforeMinutes = 5;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadPrefs();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_hasChanges) {
       PrayerService().scheduleNotificationsDebounced(isUserAction: true);
     }
@@ -54,6 +67,18 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
   Future<void> _loadPrefs() async {
     _prefs = CacheHelper.prefs;
     setState(() {
+      _prayerSilenceEnabled =
+          _prefs.getBool('prayer_silence_enabled') ?? false;
+      _silenceBeforeMinutes =
+          _prefs.getInt('prayer_silence_before_minutes') ?? 5;
+      _silenceAfterMinutes =
+          _prefs.getInt('prayer_silence_after_minutes') ?? 30;
+      _prayerRelativeAlarmEnabled =
+          _prefs.getBool('prayer_relative_alarm_enabled') ?? false;
+      _prayerRelativeAlarmPrayer =
+          _prefs.getString('prayer_relative_alarm_prayer') ?? 'Fajr';
+      _prayerRelativeAlarmBeforeMinutes =
+          _prefs.getInt('prayer_relative_alarm_before_minutes') ?? 5;
       for (var key in _fardEnabled.keys) {
         final lower = key.toLowerCase();
         _adhanMode[key] =
@@ -76,6 +101,123 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
       }
       _isLoading = false;
     });
+    await _refreshNotificationPolicyAccess();
+    if (_prayerSilenceEnabled && _hasNotificationPolicyAccess) {
+      await PrayerSilencePlatformChannel.reschedule();
+    }
+    if (_prayerRelativeAlarmEnabled) {
+      await PrayerRelativeAlarmPlatformChannel.reschedule();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshNotificationPolicyAccess();
+    }
+  }
+
+  Future<void> _refreshNotificationPolicyAccess() async {
+    final wasGranted = _hasNotificationPolicyAccess;
+    final isGranted =
+        await PrayerSilencePlatformChannel.hasNotificationPolicyAccess();
+    if (!mounted) return;
+    setState(() => _hasNotificationPolicyAccess = isGranted);
+    if (wasGranted != isGranted && _prayerSilenceEnabled) {
+      await PrayerSilencePlatformChannel.reschedule();
+    }
+  }
+
+  Future<void> _openNotificationPolicySettings() async {
+    final openSettings = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        title: const Text(
+          'إذن وضع عدم الإزعاج',
+          textDirection: TextDirection.rtl,
+          style: TextStyle(fontFamily: AppConsts.expoArabic, color: _gold),
+        ),
+        content: const Text(
+          'يحتاج التطبيق إلى إذن خاص من أندرويد لتفعيل الصمت وإعادته تلقائيًا. '
+          'سيمنع وضع عدم الإزعاج المكالمات والإشعارات العادية مع إبقاء أصوات المنبهات مسموحة. '
+          'بعد منح الإذن ارجع إلى الشاشة وفعّل الخيار.',
+          textDirection: TextDirection.rtl,
+          style: TextStyle(fontFamily: AppConsts.cairo),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('فتح إعدادات أندرويد'),
+          ),
+        ],
+      ),
+    );
+    if (openSettings == true) {
+      await PrayerSilencePlatformChannel.openNotificationPolicySettings();
+    }
+  }
+
+  Future<void> _setPrayerSilenceEnabled(bool enabled) async {
+    if (enabled && !_hasNotificationPolicyAccess) {
+      await _openNotificationPolicySettings();
+      return;
+    }
+    await _prefs.setBool('prayer_silence_enabled', enabled);
+    if (!mounted) return;
+    setState(() => _prayerSilenceEnabled = enabled);
+    await PrayerSilencePlatformChannel.reschedule();
+  }
+
+  Future<void> _setPrayerSilenceDuration({
+    required bool beforePrayer,
+    required int minutes,
+  }) async {
+    setState(() {
+      if (beforePrayer) {
+        _silenceBeforeMinutes = minutes;
+      } else {
+        _silenceAfterMinutes = minutes;
+      }
+    });
+    await _prefs.setInt(
+      beforePrayer
+          ? 'prayer_silence_before_minutes'
+          : 'prayer_silence_after_minutes',
+      minutes,
+    );
+    if (_prayerSilenceEnabled) {
+      await PrayerSilencePlatformChannel.reschedule();
+    }
+  }
+
+  Future<void> _setPrayerRelativeAlarmEnabled(bool enabled) async {
+    await _prefs.setBool('prayer_relative_alarm_enabled', enabled);
+    if (!mounted) return;
+    setState(() => _prayerRelativeAlarmEnabled = enabled);
+    await PrayerRelativeAlarmPlatformChannel.reschedule();
+  }
+
+  Future<void> _setPrayerRelativeAlarmPrayer(String prayer) async {
+    await _prefs.setString('prayer_relative_alarm_prayer', prayer);
+    if (!mounted) return;
+    setState(() => _prayerRelativeAlarmPrayer = prayer);
+    if (_prayerRelativeAlarmEnabled) {
+      await PrayerRelativeAlarmPlatformChannel.reschedule();
+    }
+  }
+
+  Future<void> _setPrayerRelativeAlarmOffset(int minutes) async {
+    await _prefs.setInt('prayer_relative_alarm_before_minutes', minutes);
+    if (!mounted) return;
+    setState(() => _prayerRelativeAlarmBeforeMinutes = minutes);
+    if (_prayerRelativeAlarmEnabled) {
+      await PrayerRelativeAlarmPlatformChannel.reschedule();
+    }
   }
 
   Future<void> _checkNotificationPermission() async {
@@ -331,7 +473,244 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
             ),
           ),
           SizedBox(height: 10.h),
+          if (defaultTargetPlatform == TargetPlatform.android) ...[
+            _buildPrayerRelativeAlarmCard(),
+            _buildPrayerSilenceCard(),
+          ],
           ..._buildPrayerCards(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrayerRelativeAlarmCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    const prayers = <String, String>{
+      'Fajr': 'الفجر',
+      'Dhuhr': 'الظهر',
+      'Asr': 'العصر',
+      'Maghrib': 'المغرب',
+      'Isha': 'العشاء',
+    };
+    final selectedPrayer = prayers.containsKey(_prayerRelativeAlarmPrayer)
+        ? _prayerRelativeAlarmPrayer
+        : 'Fajr';
+    return Container(
+      margin: EdgeInsets.only(bottom: 14.h),
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(14.r),
+        border: Border.all(
+          color: _prayerRelativeAlarmEnabled
+              ? _gold.withValues(alpha: 0.65)
+              : (isDark ? Colors.white10 : Colors.grey.withAlpha(40)),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.alarm_on_rounded, color: _gold, size: 22.sp),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: Text(
+                  'منبه مرتبط بوقت الصلاة',
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+              ),
+              Switch.adaptive(
+                value: _prayerRelativeAlarmEnabled,
+                activeTrackColor: _gold,
+                onChanged: _setPrayerRelativeAlarmEnabled,
+              ),
+            ],
+          ),
+          Text(
+            'يُضبط موعده تلقائيًا قبل الصلاة المختارة، ويتجدد مع تغيّر مواقيت الأيام. '
+            'يظهر كأقرب منبه للنظام، لكنه لا يُضاف إلى قائمة تطبيق الساعة الأصلي.',
+            textDirection: TextDirection.rtl,
+            style: TextStyle(
+              fontFamily: AppConsts.cairo,
+              fontSize: 11.sp,
+              height: 1.45,
+              color: isDark ? Colors.grey[400] : Colors.grey[700],
+            ),
+          ),
+          if (_prayerRelativeAlarmEnabled) ...[
+            Divider(height: 18.h),
+            Row(
+              children: [
+                Text(
+                  'الصلاة',
+                  style: TextStyle(
+                    fontFamily: AppConsts.cairo,
+                    fontSize: 12.sp,
+                    color: textColor,
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: DropdownButton<String>(
+                    value: selectedPrayer,
+                    isExpanded: true,
+                    items: prayers.entries
+                        .map(
+                          (entry) => DropdownMenuItem<String>(
+                            value: entry.key,
+                            child: Text(
+                              entry.value,
+                              style: TextStyle(
+                                fontFamily: AppConsts.cairo,
+                                fontSize: 13.sp,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) _setPrayerRelativeAlarmPrayer(value);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            CompactMinutesPickerWidget(
+              prefix: 'قبل الصلاة بـ',
+              initialValue: _prayerRelativeAlarmBeforeMinutes,
+              min: 0,
+              max: 180,
+              step: 1,
+              goldColor: _gold,
+              onChanged: _setPrayerRelativeAlarmOffset,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrayerSilenceCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    return Container(
+      margin: EdgeInsets.only(bottom: 14.h),
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(14.r),
+        border: Border.all(
+          color: _prayerSilenceEnabled
+              ? _gold.withValues(alpha: 0.65)
+              : (isDark ? Colors.white10 : Colors.grey.withAlpha(40)),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.do_not_disturb_on_outlined, color: _gold, size: 22.sp),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: Text(
+                  'كتم الهاتف حول الصلاة',
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+              ),
+              Switch.adaptive(
+                value: _prayerSilenceEnabled,
+                activeTrackColor: _gold,
+                onChanged: _setPrayerSilenceEnabled,
+              ),
+            ],
+          ),
+          Text(
+            'يُفعّل وضع عدم الإزعاج من المدة المحددة قبل الأذان حتى المدة المحددة بعده. '
+            'يكتم المكالمات والإشعارات العادية، ويُبقي أصوات المنبهات مسموحة حتى لا يتعطل منبه الصلاة.',
+            textDirection: TextDirection.rtl,
+            style: TextStyle(
+              fontFamily: AppConsts.cairo,
+              fontSize: 11.sp,
+              height: 1.45,
+              color: isDark ? Colors.grey[400] : Colors.grey[700],
+            ),
+          ),
+          if (!_hasNotificationPolicyAccess) ...[
+            SizedBox(height: 6.h),
+            Row(
+              children: [
+                Icon(Icons.lock_outline, color: Colors.orange, size: 16.sp),
+                SizedBox(width: 5.w),
+                Expanded(
+                  child: Text(
+                    'لم يُمنح إذن عدم الإزعاج من أندرويد بعد.',
+                    style: TextStyle(
+                      fontFamily: AppConsts.cairo,
+                      fontSize: 11.sp,
+                      color: Colors.orange,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _openNotificationPolicySettings,
+                  child: const Text('منح الإذن'),
+                ),
+              ],
+            ),
+          ],
+          if (_prayerSilenceEnabled) ...[
+            Divider(height: 18.h),
+            CompactMinutesPickerWidget(
+              prefix: 'قبل الأذان بـ',
+              initialValue: _silenceBeforeMinutes,
+              min: 0,
+              max: 180,
+              step: 5,
+              goldColor: _gold,
+              onChanged: (minutes) => _setPrayerSilenceDuration(
+                beforePrayer: true,
+                minutes: minutes,
+              ),
+            ),
+            SizedBox(height: 6.h),
+            CompactMinutesPickerWidget(
+              prefix: 'بعد الأذان بـ',
+              initialValue: _silenceAfterMinutes,
+              min: 0,
+              max: 180,
+              step: 5,
+              goldColor: _gold,
+              onChanged: (minutes) => _setPrayerSilenceDuration(
+                beforePrayer: false,
+                minutes: minutes,
+              ),
+            ),
+            if (_silenceBeforeMinutes == 0 && _silenceAfterMinutes == 0)
+              Padding(
+                padding: EdgeInsets.only(top: 6.h),
+                child: Text(
+                  'اختر مدة واحدة على الأقل لتفعيل الكتم حول الصلاة.',
+                  style: TextStyle(
+                    fontFamily: AppConsts.cairo,
+                    fontSize: 10.sp,
+                    color: Colors.orange,
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );

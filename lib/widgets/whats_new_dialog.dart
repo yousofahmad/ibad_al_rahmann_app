@@ -8,7 +8,7 @@ class WhatsNewDialog extends StatelessWidget {
   const WhatsNewDialog({super.key});
 
   static const String _versionKey = 'last_seen_whats_new_version';
-  static const String _currentVersion = '1.3.0';
+  static const String _currentVersion = '1.3.1';
 
   static Future<void> checkAndShow(BuildContext context) async {
     final prefs = CacheHelper.prefs;
@@ -34,6 +34,24 @@ class WhatsNewDialog extends StatelessWidget {
     final textColor = isDark ? Colors.white : const Color(0xFF1C1A18);
 
     final List<Map<String, dynamic>> items = [
+      {
+        'icon': Icons.alarm_on_rounded,
+        'color': const Color(0xFF1565C0),
+        'title': 'منبه مرتبط بوقت الصلاة',
+        'desc': 'اختر الصلاة وعدد الدقائق قبلها؛ يُعاد ضبط موعد المنبه تلقائيًا مع تغيّر المواقيت ويظهر كأقرب منبه للنظام. لا يتيح أندرويد للتطبيقات الأخرى إدارة منبهات يومية متغيرة داخل قائمة تطبيق الساعة الأصلي.',
+      },
+      {
+        'icon': Icons.do_not_disturb_on_rounded,
+        'color': const Color(0xFF7B1FA2),
+        'title': 'كتم الهاتف تلقائيًا حول الصلاة',
+        'desc': 'اختر عدد الدقائق قبل الأذان وبعده لتفعيل وضع عدم الإزعاج ثم استعادة حالته السابقة. يتطلب ذلك إذنًا خاصًا من أندرويد؛ ويكتم المكالمات والإشعارات العادية مع إبقاء أصوات المنبهات مسموحة.',
+      },
+      {
+        'icon': Icons.text_fields,
+        'color': const Color(0xFF00897B),
+        'title': 'تحسين بطاقة الصلاة على النبي',
+        'desc': 'أصبحت عبارة «الصلاة على النبي صلى الله عليه وسلم» في سطر واحد مع احتواء النص داخل إطار البطاقة.',
+      },
       {
         'icon': Icons.volume_up_rounded,
         'color': const Color(0xFFD0A871),

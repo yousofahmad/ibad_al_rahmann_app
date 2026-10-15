@@ -1458,30 +1458,39 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
               children: [
                 SizedBox(width: 48.w, height: 48.h),
                 Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        "الصلاة على النبي",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: AppConsts.motoNastaliq,
-                          fontSize: 21.sp,
-                          fontWeight: FontWeight.normal,
-                          color: const Color(0xFFD0A871),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      textDirection: TextDirection.rtl,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          "الصلاة على النبي",
+                          maxLines: 1,
+                          softWrap: false,
+                          style: TextStyle(
+                            fontFamily: AppConsts.motoNastaliq,
+                            fontSize: 18.sp,
+                            height: 1.0,
+                            fontWeight: FontWeight.normal,
+                            color: const Color(0xFFD0A871),
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 4.h),
-                      Text(
-                        "صلى الله عليه وسلم",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: AppConsts.expoArabic,
-                          fontSize: 13.sp,
-                          color: const Color(0xFFD0A871),
+                        SizedBox(width: 4.w),
+                        Text(
+                          "صلى الله عليه وسلم",
+                          maxLines: 1,
+                          softWrap: false,
+                          style: TextStyle(
+                            fontFamily: AppConsts.expoArabic,
+                            fontSize: 12.sp,
+                            height: 1.0,
+                            color: const Color(0xFFD0A871),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 SizedBox(
