@@ -1283,6 +1283,20 @@ class _SettingsScreenState extends State<SettingsScreen>
                     "تطبيق إسلامي شامل يهدف لخدمة المسلمين في شتى بقاع الأرض.",
                     style: TextStyle(fontSize: 14.sp, fontFamily: 'Cairo'),
                   ),
+                  SizedBox(height: 10.h),
+                  Text(
+                    "التحديثات الأخيرة:",
+                    style: TextStyle(fontSize: 14.sp, fontFamily: 'Cairo', fontWeight: FontWeight.bold, color: const Color(0xFFD0A871)),
+                  ),
+                  SizedBox(height: 5.h),
+                  Text(
+                    "• تنبيهات الصلاة على النبي مع ساعات الهدوء.\n"
+                    "• استمرار تشغيل القرآن في الخلفية وتظليل الكلمات.\n"
+                    "• توزيع أوراد الختمة على الصلوات تلقائياً.\n"
+                    "• تحسين شاشة (حاسب نفسك) ومنطق الختمة.\n"
+                    "• حذف إشعارات الصلوات الفارغة وتنظيفها.",
+                    style: TextStyle(fontSize: 13.sp, fontFamily: 'Cairo', height: 1.5),
+                  ),
                 ],
               );
             },

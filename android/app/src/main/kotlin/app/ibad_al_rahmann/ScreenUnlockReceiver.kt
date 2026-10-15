@@ -90,10 +90,8 @@ class ScreenUnlockReceiver : BroadcastReceiver() {
             }
         }
 
-        // Check quiet hours
-        val quietHoursEnabled = prefs.getBoolean("flutter.quiet_hours_enabled", false)
-            || prefs.getBoolean("quiet_hours_enabled", false)
-        if (quietHoursEnabled && isInQuietHours(prefs)) {
+        // Always respect quiet hours for Salawat unlock since the dialog has no ON/OFF switch
+        if (isInQuietHours(prefs)) {
             Log.d(TAG, "Skipping screen unlock salawat due to active quiet hours")
             return
         }

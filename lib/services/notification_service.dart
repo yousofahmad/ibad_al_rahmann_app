@@ -1147,7 +1147,7 @@ class NotificationService {
 
     final prefs = await SharedPreferences.getInstance();
     final soundName =
-        prefs.getString('flutter.salawat_periodic_sound') ??
+        prefs.getString('salawat_periodic_sound') ??
         'saly_3ala_mo7amad';
 
     await _scheduleNative(

@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
@@ -29,6 +29,22 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   bool isLooping = false;
   bool autoPlayNext = true;
   Timer? _hideTimer;
+
+  
+  bool get isPlaying => player.playing;
+
+  void hideUiOnly() {
+    _hideTimer?.cancel();
+    emit(VersePlayerInitial(showed: false, loading: state.loading, currentVerse: currnetVerse, activeWordIndex: state.activeWordIndex));
+  }
+
+  void toggleUiOnly() {
+    if (state.showed) {
+      hideUiOnly();
+    } else {
+      showPlayer();
+    }
+  }
 
   void showPlayer() {
     _hideTimer?.cancel();
@@ -135,13 +151,14 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
 
   void init() async {
     reciter =
-        CacheHelper.prefs.getString('reciter') ?? defaultReciters.keys.first;
+        CacheHelper.prefs.getString('verse_player_reciter') ?? CacheHelper.prefs.getString('reciter') ?? defaultReciters.keys.first;
     autoPlayNext = CacheHelper.prefs.getBool('verse_player_auto_play') ?? false;
+    currentReciterModel = ReciterAudioHelper.getReciterById(reciter!);
   }
 
   void changeReciter(String value) {
     reciter = value;
-    CacheHelper.prefs.setString('reciter', value);
+    CacheHelper.prefs.setString('verse_player_reciter', value);
     emit(
       VersePlayerInitial(
         showed: state.showed,
@@ -401,9 +418,13 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
               final ms = pos.inMilliseconds;
               int? currentWord;
               if (isHighlightWordByWord) {
+                int offset = 0;
+                if (wordSegments.isNotEmpty && wordSegments.first.wordIndex == 0) {
+                  offset = 1; // Map 0-based index to 1-based index (db format)
+                }
                 for (final seg in wordSegments) {
                   if (ms >= seg.startMs && ms <= seg.endMs) {
-                    currentWord = seg.wordIndex;
+                    currentWord = seg.wordIndex + offset;
                     break;
                   }
                 }
@@ -625,3 +646,5 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
     return super.close();
   }
 }
+
+

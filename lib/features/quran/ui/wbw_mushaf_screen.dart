@@ -1,4 +1,4 @@
-import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
+﻿import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -12,6 +12,7 @@ import 'widgets/menus/single_tap_menu.dart';
 import 'layouts/mobile_quran_top_bar.dart';
 import 'layouts/mobile_min_quran_bottom_section.dart';
 import '../bloc/quran/quran_cubit.dart';
+import '../bloc/verse_player/verse_player_cubit.dart';
 
 class WbwMushafScreen extends StatefulWidget {
   const WbwMushafScreen({super.key});
@@ -136,10 +137,18 @@ class _WbwMushafScreenState extends State<WbwMushafScreen> {
                   Expanded(
                     child: _TapListener(
                       onSingleTap: () {
-                        if (!isAutoScrolling) {
-                          setState(() => _showMenu = !_showMenu);
-                        }
-                      },
+                          if (!isAutoScrolling) {
+                            final vpCubit = context.read<VersePlayerCubit>();
+                            if (vpCubit.state.showed) {
+                              vpCubit.hideUiOnly();
+                              return;
+                            } else if (vpCubit.isPlaying) {
+                              vpCubit.showPlayer();
+                              return;
+                            }
+                            setState(() => _showMenu = !_showMenu);
+                          }
+                        },
                       onDoubleTap: () =>
                           context.read<QuranCubit>().changeLayout(),
                       onPointerDown: () {
@@ -366,3 +375,5 @@ class _TapListenerState extends State<_TapListener> {
     );
   }
 }
+
+
