@@ -67,11 +67,6 @@ class _TabletSurahVersesWidgetState extends State<TabletSurahVersesWidget> {
   late String selectedVerse = widget.highlightedVerse ?? '';
 
   bool _isHighlighted(QuranWord word) {
-    if (selectedVerse.isEmpty &&
-        (!_usePropHighlight || (widget.highlightedVerse ?? '').isEmpty)) {
-      return false;
-    }
-
     final playingVerse = cubit.state.currentVerse;
     final activeWordIndex = cubit.state.activeWordIndex;
     if (playingVerse != null &&
@@ -124,6 +119,7 @@ class _TabletSurahVersesWidgetState extends State<TabletSurahVersesWidget> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<VersePlayerCubit>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black;
 

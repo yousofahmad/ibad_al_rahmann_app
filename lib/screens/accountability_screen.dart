@@ -16,6 +16,7 @@ import '../services/daily_tracker_service.dart';
 import 'package:ibad_al_rahmann/main.dart'; // To access scaffoldMessengerKey
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
+import 'package:ibad_al_rahmann/features/accountability/accountability_prayer_status.dart';
 
 class AccountabilityScreen extends StatefulWidget {
   const AccountabilityScreen({super.key});
@@ -27,23 +28,7 @@ class AccountabilityScreen extends StatefulWidget {
 class _AccountabilityScreenState extends State<AccountabilityScreen> with WidgetsBindingObserver {
   bool _isPrayerPast(String prayerName) {
     final times = ibad_al_rahmann_prayer.PrayerService().getPrayerTimes();
-    if (times == null) return true;
-    final now = DateTime.now();
-    switch (prayerName) {
-      case 'Ø§Ù„Ù Ø¬Ø±':
-        return now.isAfter(times.fajr);
-      case 'Ø§Ù„Ø¸Ù‡Ø±':
-      case 'Ø§Ù„Ø¬Ù…Ø¹Ø©':
-        return now.isAfter(times.dhuhr);
-      case 'Ø§Ù„Ø¹ØµØ±':
-        return now.isAfter(times.asr);
-      case 'Ø§Ù„Ù…ØºØ±Ø¨':
-        return now.isAfter(times.maghrib);
-      case 'Ø§Ù„Ø¹Ø´Ø§Ø¡':
-        return now.isAfter(times.isha);
-      default:
-        return true;
-    }
+    return AccountabilityPrayerStatus.isPast(prayerName, times);
   }
   final List<String> _defaultPrayers = [
     'الفجر',
@@ -166,19 +151,8 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
     if (focusLogRaw != null) {
       try {
         final Map<String, dynamic> focusMap = json.decode(focusLogRaw);
-        focusMap.forEach((k, v) {
-          String actualKey = k;
-          if (k == 'الجمعة' && _prayers.containsKey('الظهر')) {
-            actualKey = 'الظهر';
-          }
-          if (_prayers.containsKey(actualKey)) {
-            if (v is Map && v['status'] != null && v['status'] != 'missed') {
-              _prayers[actualKey] = true;
-            } else if (v == true) {
-              _prayers[actualKey] = true;
-            }
-          }
-        });
+        AccountabilityPrayerStatus.applyFocusLog(_prayers, focusMap);
+        await prefs.setString('temp_prayers', json.encode(_prayers));
       } catch (_) {}
     }
 

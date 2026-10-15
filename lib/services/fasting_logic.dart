@@ -13,12 +13,7 @@ class FastingLogic {
     // ─────────────────────────────────────────────────────────────────────────
 
     // Estimate middle of the Hijri month to get a safe Gregorian center
-    HijriCalendar targetH = HijriCalendar()
-      ..hYear = hYear
-      ..hMonth = hMonth
-      ..hDay = 15;
-
-    DateTime centerGreg = targetH.hijriToGregorian(hYear, hMonth, 15);
+    DateTime centerGreg = PrayerService.hijriToGregorianDate(hYear, hMonth, 15);
     // Start searching 20 days before center to comfortably cover all possible days
     DateTime startGreg = centerGreg.subtract(const Duration(days: 20));
 

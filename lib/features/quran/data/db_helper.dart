@@ -207,7 +207,8 @@ class QuranWbwDbHelper {
           w.id as word_id, 
           w.text, 
           w.surah, 
-          w.ayah
+          w.ayah,
+          w.word AS word_position
         FROM map_db.pages m
         LEFT JOIN words w ON w.id BETWEEN m.first_word_id AND m.last_word_id
         WHERE m.page_number = ?
@@ -229,7 +230,7 @@ class QuranWbwDbHelper {
           lineType: map['line_type']?.toString(),
           isCentered: _toInt(map['is_centered']) == 1,
           headerSurah: _toInt(map['header_surah']),
-          position: null, // No longer tracked internally like this
+          position: _toInt(map['word_position']),
         );
       }).toList();
       _updateLru(_pageWordsCache, pageNumber, result, _maxCachePages);
@@ -284,7 +285,8 @@ class QuranWbwDbHelper {
           id as word_id, 
           text, 
           surah, 
-          ayah
+          ayah,
+          word AS word_position
         FROM words
         WHERE surah = ? AND ayah = ?
         ORDER BY id ASC
@@ -302,6 +304,7 @@ class QuranWbwDbHelper {
           pageNumber: null, // Column doesn't exist in words table
           text: map['text']?.toString() ?? '',
           wordId: _toInt(map['word_id']),
+          position: _toInt(map['word_position']),
         );
       }).toList();
     } catch (e) {
@@ -322,7 +325,8 @@ class QuranWbwDbHelper {
           id as word_id, 
           text, 
           surah, 
-          ayah
+          ayah,
+          word AS word_position
         FROM words
         WHERE id BETWEEN ? AND ?
         ORDER BY id ASC
@@ -339,6 +343,7 @@ class QuranWbwDbHelper {
           ayahNumber: _toInt(map['ayah']),
           text: map['text']?.toString() ?? '',
           wordId: _toInt(map['word_id']),
+          position: _toInt(map['word_position']),
         );
       }).toList();
     } catch (e) {

@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -87,9 +88,8 @@ class _SettingsScreenState extends State<SettingsScreen>
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("خطأ: $e")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("خطأ: $e")));
     }
   }
 
@@ -594,9 +594,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             Icons.explore_rounded,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const AppFeaturesGuideScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const AppFeaturesGuideScreen()),
             ),
           ),
           _buildListTile(
@@ -607,13 +605,14 @@ class _SettingsScreenState extends State<SettingsScreen>
             FontAwesomeIcons.calendarDay,
             onTap: _showHijriSystemDialog,
           ),
-          if (_hijriSystem != PrayerService.systemEgyptian)
-            _buildListTile(
-              "ضبط التاريخ الهجري",
-              "تحديث ومزامنة وتعديل التاريخ يدوياً",
-              FontAwesomeIcons.calendarDays,
-              onTap: () => Navigator.pushNamed(context, '/hijri_confirmation'),
-            ),
+          _buildListTile(
+            "تحديث وضبط التاريخ الهجري",
+            _hijriSystem == PrayerService.systemEgyptian
+                ? "مزامنة مصرية، إعادة المحاولة، أو تحديد 30/غرة الشهر يدويًا"
+                : "عرض تاريخ أم القرى وضبطه يدويًا",
+            FontAwesomeIcons.calendarDays,
+            onTap: () => Navigator.pushNamed(context, '/hijri_confirmation'),
+          ),
 
           // 2. Appearance
           _buildSectionHeader("المظهر"),
@@ -961,7 +960,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                 : () async {
                     if (BackupService.isSyncing) {
                       scaffoldMessengerKey.currentState?.showSnackBar(
-                        const SnackBar(content: Text('يرجى الانتظار، هناك عملية مزامنة قيد التنفيذ.')),
+                        const SnackBar(
+                          content: Text(
+                            'يرجى الانتظار، هناك عملية مزامنة قيد التنفيذ.',
+                          ),
+                        ),
                       );
                       return;
                     }
@@ -1057,7 +1060,9 @@ class _SettingsScreenState extends State<SettingsScreen>
               if (BackupService.isSyncing || _isSyncingToDrive) {
                 scaffoldMessengerKey.currentState?.showSnackBar(
                   const SnackBar(
-                    content: Text('يرجى الانتظار، هناك عملية مزامنة قيد التنفيذ.'),
+                    content: Text(
+                      'يرجى الانتظار، هناك عملية مزامنة قيد التنفيذ.',
+                    ),
                   ),
                 );
                 return;
@@ -1201,9 +1206,8 @@ class _SettingsScreenState extends State<SettingsScreen>
               } catch (e) {
                 if (context.mounted) AppLoadingDialog.hide(context);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text('خطأ: $e')));
                 }
               }
             },
@@ -1224,9 +1228,8 @@ class _SettingsScreenState extends State<SettingsScreen>
               } catch (e) {
                 if (context.mounted) AppLoadingDialog.hide(context);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text('خطأ: $e')));
                 }
               }
             },
@@ -1995,193 +1998,225 @@ class _ExportSelectionBottomSheetState
         top: 20.h,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24.h,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'تصدير نسخة احتياطية',
-                style: TextStyle(
-                  fontFamily: 'Cairo',
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.bold,
-                  color: goldColor,
-                ),
-              ),
-              TextButton(
-                onPressed: () => _toggleAll(!allSelected),
-                child: Text(
-                  allSelected ? 'إلغاء التحديد' : 'تحديد الكل',
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'تصدير نسخة احتياطية',
                   style: TextStyle(
                     fontFamily: 'Cairo',
-                    fontSize: 12.sp,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
                     color: goldColor,
                   ),
                 ),
-              ),
-            ],
-          ),
-          Text(
-            'اختر الأقسام التي ترغب في تضمينها داخل النسخة الاحتياطية:',
-            style: TextStyle(
-              fontFamily: 'Cairo',
-              fontSize: 12.sp,
-              color: Colors.grey,
-            ),
-          ),
-          SizedBox(height: 12.h),
-          ...categories.map((item) {
-            final cat = item.$1;
-            final title = item.$2;
-            final icon = item.$3;
-            final isChecked = _selected.contains(cat);
-
-            return InkWell(
-              onTap: () {
-                setState(() {
-                  if (isChecked) {
-                    _selected.remove(cat);
-                  } else {
-                    _selected.add(cat);
-                  }
-                });
-              },
-              borderRadius: BorderRadius.circular(10.r),
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 6.h, horizontal: 4.w),
-                child: Row(
-                  children: [
-                    Icon(
-                      icon,
-                      color: isChecked ? goldColor : Colors.grey,
-                      size: 20.sp,
+                TextButton(
+                  onPressed: () => _toggleAll(!allSelected),
+                  child: Text(
+                    allSelected ? 'إلغاء التحديد' : 'تحديد الكل',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 12.sp,
+                      color: goldColor,
                     ),
-                    SizedBox(width: 12.w),
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: TextStyle(
-                          fontFamily: 'Cairo',
-                          fontSize: 13.sp,
-                          color: isChecked
-                              ? (isDark ? Colors.white : Colors.black87)
-                              : Colors.grey,
-                        ),
+                  ),
+                ),
+              ],
+            ),
+            Text(
+              'اختر الأقسام التي ترغب في تضمينها داخل النسخة الاحتياطية:',
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontSize: 12.sp,
+                color: Colors.grey,
+              ),
+            ),
+            SizedBox(height: 10.h),
+            Container(
+              padding: EdgeInsets.all(12.w),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(10.r),
+                border: Border.all(color: Colors.amber.withOpacity(0.45)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.privacy_tip_outlined,
+                    color: Colors.amber.shade700,
+                    size: 18.sp,
+                  ),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: Text(
+                      'تنبيه خصوصية: ملف النسخة غير مشفّر بصيغة JSON وقد يتضمن موقعك وسجل المتابعة. اختر ما تحتاجه فقط، وشاركه أو احفظه في مكان تثق به.',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 11.sp,
+                        color: isDark ? Colors.white70 : Colors.black87,
                       ),
                     ),
-                    Checkbox(
-                      value: isChecked,
-                      activeColor: goldColor,
-                      onChanged: (val) {
-                        setState(() {
-                          if (val == true) {
-                            _selected.add(cat);
-                          } else {
-                            _selected.remove(cat);
-                          }
-                        });
-                      },
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            );
-          }),
-          SizedBox(height: 16.h),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: goldColor,
-                    foregroundColor: Colors.black87,
-                    padding: EdgeInsets.symmetric(vertical: 12.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                  ),
-                  icon: const Icon(Icons.share_rounded, size: 18),
-                  label: Text(
-                    'مشاركة الملف',
-                    style: TextStyle(
-                      fontFamily: 'Cairo',
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  onPressed: _selected.isEmpty
-                      ? null
-                      : () async {
-                          Navigator.pop(context);
-                          final categoriesToExport = Set<BackupCategory>.from(
-                            _selected,
-                          );
-                          final success = await BackupService.exportBackup(
-                            categories: categoriesToExport,
-                          );
-                          if (success) {
-                            scaffoldMessengerKey.currentState?.showSnackBar(
-                              const SnackBar(
-                                content: Text('تم فتح نافذة المشاركة'),
-                              ),
-                            );
-                          } else {
-                            scaffoldMessengerKey.currentState?.showSnackBar(
-                              const SnackBar(
-                                content: Text('فشل تصدير البيانات'),
-                              ),
-                            );
-                          }
+            ),
+            SizedBox(height: 12.h),
+            ...categories.map((item) {
+              final cat = item.$1;
+              final title = item.$2;
+              final icon = item.$3;
+              final isChecked = _selected.contains(cat);
+
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    if (isChecked) {
+                      _selected.remove(cat);
+                    } else {
+                      _selected.add(cat);
+                    }
+                  });
+                },
+                borderRadius: BorderRadius.circular(10.r),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6.h, horizontal: 4.w),
+                  child: Row(
+                    children: [
+                      Icon(
+                        icon,
+                        color: isChecked ? goldColor : Colors.grey,
+                        size: 20.sp,
+                      ),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontSize: 13.sp,
+                            color: isChecked
+                                ? (isDark ? Colors.white : Colors.black87)
+                                : Colors.grey,
+                          ),
+                        ),
+                      ),
+                      Checkbox(
+                        value: isChecked,
+                        activeColor: goldColor,
+                        onChanged: (val) {
+                          setState(() {
+                            if (val == true) {
+                              _selected.add(cat);
+                            } else {
+                              _selected.remove(cat);
+                            }
+                          });
                         },
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              SizedBox(width: 12.w),
-              Expanded(
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: goldColor,
-                    side: const BorderSide(color: goldColor),
-                    padding: EdgeInsets.symmetric(vertical: 12.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.r),
+              );
+            }),
+            SizedBox(height: 16.h),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: goldColor,
+                      foregroundColor: Colors.black87,
+                      padding: EdgeInsets.symmetric(vertical: 12.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
                     ),
-                  ),
-                  icon: const Icon(Icons.save_alt_rounded, size: 18),
-                  label: Text(
-                    'حفظ بالجهاز',
-                    style: TextStyle(
-                      fontFamily: 'Cairo',
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.bold,
+                    icon: const Icon(Icons.share_rounded, size: 18),
+                    label: Text(
+                      'مشاركة الملف',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  onPressed: _selected.isEmpty
-                      ? null
-                      : () async {
-                          Navigator.pop(context);
-                          final categoriesToExport = Set<BackupCategory>.from(
-                            _selected,
-                          );
-                          final success =
-                              await BackupService.saveBackupToDevice(
-                                categories: categoriesToExport,
+                    onPressed: _selected.isEmpty
+                        ? null
+                        : () async {
+                            Navigator.pop(context);
+                            final categoriesToExport = Set<BackupCategory>.from(
+                              _selected,
+                            );
+                            final success = await BackupService.exportBackup(
+                              categories: categoriesToExport,
+                            );
+                            if (success) {
+                              scaffoldMessengerKey.currentState?.showSnackBar(
+                                const SnackBar(
+                                  content: Text('تم فتح نافذة المشاركة'),
+                                ),
                               );
-                          if (success) {
-                            scaffoldMessengerKey.currentState?.showSnackBar(
-                              const SnackBar(
-                                content: Text('تم حفظ البيانات بنجاح'),
-                              ),
-                            );
-                          }
-                        },
+                            } else {
+                              scaffoldMessengerKey.currentState?.showSnackBar(
+                                const SnackBar(
+                                  content: Text('فشل تصدير البيانات'),
+                                ),
+                              );
+                            }
+                          },
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: goldColor,
+                      side: const BorderSide(color: goldColor),
+                      padding: EdgeInsets.symmetric(vertical: 12.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                    ),
+                    icon: const Icon(Icons.save_alt_rounded, size: 18),
+                    label: Text(
+                      'حفظ بالجهاز',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    onPressed: _selected.isEmpty
+                        ? null
+                        : () async {
+                            Navigator.pop(context);
+                            final categoriesToExport = Set<BackupCategory>.from(
+                              _selected,
+                            );
+                            final success =
+                                await BackupService.saveBackupToDevice(
+                                  categories: categoriesToExport,
+                                );
+                            if (success) {
+                              scaffoldMessengerKey.currentState?.showSnackBar(
+                                const SnackBar(
+                                  content: Text('تم حفظ البيانات بنجاح'),
+                                ),
+                              );
+                            }
+                          },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

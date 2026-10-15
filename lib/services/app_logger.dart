@@ -22,6 +22,14 @@ class AppLogger {
   static final _buffer = StringBuffer();
   static Timer? _flushTimer;
 
+  static String _redactSensitiveData(String content) {
+    final emailPattern = RegExp(
+      r'\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b',
+      caseSensitive: false,
+    );
+    return content.replaceAll(emailPattern, '[email redacted]');
+  }
+
   static Future<void> init() async {
     if (_initialized) return;
     try {
@@ -267,7 +275,7 @@ class AppLogger {
       final timeStr = DateFormat('yyyy_MM_dd_HHmmss').format(DateTime.now());
       final dir = await getTemporaryDirectory();
       final tempFile = File('${dir.path}/ibad_app_log_$timeStr.txt');
-      await tempFile.writeAsString(combined);
+      await tempFile.writeAsString(_redactSensitiveData(combined));
 
       await Share.shareXFiles(
         [XFile(tempFile.path)],
@@ -312,7 +320,7 @@ class AppLogger {
 
       final dir = await getTemporaryDirectory();
       final tempFile = File('${dir.path}/ibad_issue_report_$timeStr.txt');
-      await tempFile.writeAsString(combined);
+      await tempFile.writeAsString(_redactSensitiveData(combined));
 
       const messageText =
           'السلام عليكم ورحمة الله وبركاته،\n'

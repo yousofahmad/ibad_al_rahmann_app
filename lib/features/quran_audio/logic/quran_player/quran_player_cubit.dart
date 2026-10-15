@@ -14,13 +14,19 @@ part 'quran_player_state.dart';
 class QuranPlayerCubit extends Cubit<QuranPlayerState> {
   QuranPlayerCubit() : super(QuranPlayerInitial()) {
     _initPlayerListener();
+    _positionSubscription = player.positionStream.listen(
+      _updateActivePlaybackPosition,
+    );
   }
   final player = AudioPlayer();
   StreamSubscription<PlayerState>? _playerStateSubscription;
+  StreamSubscription<Duration>? _positionSubscription;
   Duration sliderPosition = Duration.zero;
   String? currentReciterName;
   ReciterAudioModel? reciter;
   int? selectedSurah;
+  int? activeVerseNumber;
+  int? activeWordIndex;
   Map<String, VerseTiming> currentSegments = {};
   double currentSpeed = 1.0;
   bool isLooping = false;
@@ -135,6 +141,9 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
     currentReciterName = reciter?.name;
     try {
       selectedSurah = surahNum;
+      currentSegments = {};
+      activeVerseNumber = null;
+      activeWordIndex = null;
       final url = await getSurahUrl(surahNum);
 
       final surahTitle = (surahNum >= 1 && surahNum <= quranSurahs.length)
@@ -191,6 +200,7 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
         reciterModel,
       ).timeout(const Duration(seconds: 8));
       currentSegments = segments;
+      _updateActivePlaybackPosition(player.position);
       AppLogger.log(
         "QuranAudio",
         "Loaded ${segments.length} segment timestamps for ${reciterModel.name}",
@@ -200,6 +210,55 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
         "QuranAudio",
         "Segment timestamps not available for ${reciterModel.name}: $e",
       );
+    }
+  }
+
+  void _updateActivePlaybackPosition(Duration position) {
+    final surahNumber = selectedSurah;
+    final positionMs = position.inMilliseconds;
+    VerseTiming? timing;
+
+    if (surahNumber != null) {
+      for (final candidate in currentSegments.values) {
+        if (candidate.surahNumber == surahNumber &&
+            positionMs >= candidate.timestampFrom &&
+            positionMs <= candidate.timestampTo) {
+          timing = candidate;
+          break;
+        }
+      }
+    }
+
+    int? wordIndex;
+    if (timing != null && timing.segments.isNotEmpty) {
+      final firstSegmentStart = timing.segments.first.startMs;
+      final lastSegmentEnd = timing.segments.last.endMs;
+      final segmentsUseSurahClock =
+          timing.timestampFrom > 0 &&
+          firstSegmentStart >= timing.timestampFrom &&
+          lastSegmentEnd <= timing.timestampTo;
+      final segmentPositionMs = segmentsUseSurahClock
+          ? positionMs
+          : positionMs - timing.timestampFrom;
+
+      for (final segment in timing.segments) {
+        if (segmentPositionMs >= segment.startMs &&
+            segmentPositionMs <= segment.endMs) {
+          wordIndex = segment.wordIndex;
+          break;
+        }
+      }
+    }
+
+    final verseNumber = timing?.verseNumber;
+    if (verseNumber == activeVerseNumber && wordIndex == activeWordIndex) {
+      return;
+    }
+
+    activeVerseNumber = verseNumber;
+    activeWordIndex = wordIndex;
+    if (!isClosed && selectedSurah != null) {
+      emit(QuranBottomSheetShowed());
     }
   }
 
@@ -290,6 +349,7 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
   Future<void> close() async {
     AppLogger.log("QuranAudio", "Closing QuranPlayerCubit");
     _playerStateSubscription?.cancel();
+    _positionSubscription?.cancel();
     await player.stop();
     await player.dispose();
     return super.close();

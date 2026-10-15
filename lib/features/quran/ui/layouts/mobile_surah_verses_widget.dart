@@ -70,11 +70,6 @@ class _MobileSurahVersesWidgetState extends State<MobileSurahVersesWidget> {
   late String selectedVerse = widget.highlightedVerse ?? '';
 
   bool _isHighlighted(QuranWord word) {
-    if (selectedVerse.isEmpty &&
-        (!_usePropHighlight || (widget.highlightedVerse ?? '').isEmpty)) {
-      return false;
-    }
-
     // If the word represents the verse being played or highlighted, return true.
     // In the new word-based logic, we check surah/ayah match.
     final playingVerse = cubit.state.currentVerse;
@@ -130,6 +125,7 @@ class _MobileSurahVersesWidgetState extends State<MobileSurahVersesWidget> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<VersePlayerCubit>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black;
 
