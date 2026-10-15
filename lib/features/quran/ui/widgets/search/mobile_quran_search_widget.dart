@@ -33,6 +33,8 @@ class _MobileQuranSearchState extends State<MobileQuranSearch> {
         child: CupertinoSearchTextField(
           placeholder: 'ابحث بالآية',
           controller: cubit.controller,
+          textDirection: TextDirection.rtl,
+          textAlign: TextAlign.right,
           padding: const EdgeInsets.all(10),
           style: AppStyles.style16.copyWith(
             fontFamily: AppConsts.uthmanic,
