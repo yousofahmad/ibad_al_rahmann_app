@@ -82,6 +82,9 @@ void callbackDispatcher() async {
   // 3. Perform Refresh
   final prayerService = PrayerService();
   await prayerService.init();
+  await HijriSourceService.syncOffsetIfNeeded(
+    rescheduleNotifications: false,
+  );
   final times = prayerService.getPrayerTimes();
   if (times != null) {
     await NotificationService.scheduleAll(times);
@@ -182,8 +185,8 @@ Future<void> _runBackgroundInits() async {
   AppLogger.log('BgInit', 'AppMigrationHelper check done');
 
   AppLogger.log('BgInit', 'PrayerService.init start');
-  PrayerService().init();
-  AppLogger.log('BgInit', 'PrayerService.init triggered');
+  await PrayerService().init();
+  AppLogger.log('BgInit', 'PrayerService.init done');
 
   AppLogger.log('BgInit', 'HijriSourceService.syncOffsetIfNeeded start');
   await HijriSourceService.syncOffsetIfNeeded();

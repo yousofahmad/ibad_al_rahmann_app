@@ -31,6 +31,7 @@ Future<void> backgroundWidgetUpdateCallback() async {
 
   try {
     debugPrint("Background Task: Running Midnight Refresh...");
+    await CacheHelper.init();
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
@@ -42,6 +43,9 @@ Future<void> backgroundWidgetUpdateCallback() async {
 
     final service = PrayerService();
     await service.init();
+    await HijriSourceService.syncOffsetIfNeeded(
+      rescheduleNotifications: false,
+    );
     await service.scheduleNotifications(isUserAction: true);
     debugPrint("Background Task: Refresh Complete.");
   } catch (e) {
@@ -1247,7 +1251,9 @@ class PrayerService extends ChangeNotifier {
     await prefs.setString(keyHijriSystem, system);
     if (system == systemEgyptian) {
       try {
-        await HijriSourceService.syncOffsetIfNeeded();
+        await HijriSourceService.syncOffsetIfNeeded(
+          rescheduleNotifications: false,
+        );
       } catch (_) {}
     }
     notifyListeners();

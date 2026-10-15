@@ -154,6 +154,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   bool _showHijri29Banner = false;
+  String? _hijriNotificationForDate;
 
   void _checkHijri29() {
     final prefs = CacheHelper.prefs;
@@ -162,6 +163,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final todayStr = DateTime.now().toString().substring(0, 10);
       final confirmedDate = prefs.getString('local_hijri_confirmed_date');
       if (confirmedDate != todayStr) {
+        final notificationKey = 'hijri_confirmation_notified_$todayStr';
+        if (_hijriNotificationForDate != todayStr &&
+            prefs.getBool(notificationKey) != true) {
+          _hijriNotificationForDate = todayStr;
+          prefs.setBool(notificationKey, true);
+          NotificationService.showImmediateNotification(
+            title: 'تأكيد التاريخ الهجري',
+            body: 'قد يبدأ الشهر الهجري الجديد بعد ثبوت الرؤية. اضغط للتأكد من التاريخ.',
+            payload: 'hijri_confirmation',
+          );
+        }
         if (!_showHijri29Banner) {
           setState(() {
             _showHijri29Banner = true;
