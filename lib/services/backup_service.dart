@@ -157,6 +157,7 @@ class BackupService {
       'cache_',
       'lib_cash',
       'firebase_token',
+      'last_sync_email',
       'last_auto_sync_status',
     };
 
