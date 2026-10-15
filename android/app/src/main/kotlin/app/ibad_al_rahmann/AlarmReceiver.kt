@@ -1,4 +1,4 @@
-package app.ibad_al_rahmann
+﻿package app.ibad_al_rahmann
 
 import android.app.AlarmManager
 import android.app.Notification
@@ -297,8 +297,8 @@ class AlarmReceiver : BroadcastReceiver() {
             var skipNotif = isNotificationExplicitlyDisabled(context, alarmId, soundName)
             if (!skipNotif) {
                 if (alarmId == 950 || alarmId in 8000..8999) {
-                    // Salawat range (8000+) uses general quiet_hours
-                    if (isInQuietHours(context, "quiet_hours")) {
+                    // Salawat range (8000+) uses general quiet_hours (ignore toggle, always enforce)
+                    if (isInQuietHours(context, "quiet_hours", true)) {
                         skipNotif = true
                     }
                 } else if (alarmId in 9000..9199) {
@@ -314,8 +314,6 @@ class AlarmReceiver : BroadcastReceiver() {
             var finalPayload = payload
             var finalCustomSoundName = customSoundName
             if (alarmId == 950 || alarmId in 8000..9500) {
-                finalSoundName = "saly_3ala_mo7amad"
-                finalCustomSoundName = "saly_3ala_mo7amad"
                 finalPayload = "salawat"
             }
 
@@ -332,8 +330,6 @@ class AlarmReceiver : BroadcastReceiver() {
         var chainPayload = payload
         var chainCustomSoundName = customSoundName
         if (alarmId == 950 || alarmId in 8000..9500) {
-            chainSoundName = "saly_3ala_mo7amad"
-            chainCustomSoundName = "saly_3ala_mo7amad"
             chainPayload = "salawat"
         }
 
@@ -376,10 +372,10 @@ class AlarmReceiver : BroadcastReceiver() {
         return false
     }
 
-    private fun isInQuietHours(context: Context, prefix: String): Boolean {
+    private fun isInQuietHours(context: Context, prefix: String, ignoreEnabledFlag: Boolean = false): Boolean {
         val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val isEnabled = prefs.getBoolean("flutter.${prefix}_enabled", false) || prefs.getBoolean("${prefix}_enabled", false)
-        if (!isEnabled) return false
+        if (!isEnabled && !ignoreEnabledFlag) return false
         
         // Flutter's shared_preferences stores ints as Longs on Android.
         // Reading as getInt() will crash if the value was saved by Flutter.
@@ -697,3 +693,4 @@ class AlarmReceiver : BroadcastReceiver() {
 
 
 }
+

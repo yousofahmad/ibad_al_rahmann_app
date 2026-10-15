@@ -1,4 +1,4 @@
-package app.ibad_al_rahmann
+﻿package app.ibad_al_rahmann
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -94,6 +94,7 @@ class NotificationDismissReceiver : BroadcastReceiver() {
         
         
 
+    }
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
         val alarmId = intent.getIntExtra("alarm_id", -1)
@@ -110,3 +111,4 @@ class NotificationDismissReceiver : BroadcastReceiver() {
         cleanupEmptyGroupSummaries(context, alarmId)
     }
 }
+

@@ -1,4 +1,4 @@
-import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
+﻿import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -11,6 +11,7 @@ import 'widgets/menus/single_tap_menu.dart';
 import '../bloc/quran/quran_cubit.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import '../../../widgets/app_skeleton.dart';
+import '../bloc/verse_player/verse_player_cubit.dart';
 
 class MushafScreen extends StatefulWidget {
   const MushafScreen({super.key});
@@ -142,6 +143,14 @@ class _MushafScreenState extends State<MushafScreen>
                         }
                       },
                       onPointerUp: (_) {
+                        final vpCubit = context.read<VersePlayerCubit>();
+                        if (vpCubit.state.showed) {
+                          vpCubit.hideUiOnly();
+                          return;
+                        } else if (vpCubit.isPlaying) {
+                          vpCubit.showPlayer();
+                          return;
+                        }
                         setState(() {
                           _showMenu = !_showMenu;
                         });
@@ -335,3 +344,4 @@ class _MushafScreenState extends State<MushafScreen>
     );
   }
 }
+
