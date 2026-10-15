@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
-import 'package:hijri/hijri_calendar.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
@@ -19,9 +18,11 @@ class _QadaListScreenState extends State<QadaListScreen> {
   @override
   void initState() {
     super.initState();
-    final hijriOffset = PrayerService().hijriOffset;
-    final adjustedDate = DateTime.now().add(Duration(days: hijriOffset));
-    final hijri = HijriCalendar.fromDate(adjustedDate);
+    final prayerService = PrayerService();
+    final hijri = PrayerService.getHijriWithOffset(
+      prayerService.hijriOffset,
+      DateTime.now(),
+    );
     // Until the 1st of the next Ramadan (Month 9) arrives, we track the preceding Ramadan
     _currentRamadanYear = hijri.hMonth >= 9 ? hijri.hYear : hijri.hYear - 1;
     _loadData();
@@ -48,9 +49,11 @@ class _QadaListScreenState extends State<QadaListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hijriOffset = PrayerService().hijriOffset;
-    final adjustedDate = DateTime.now().add(Duration(days: hijriOffset));
-    HijriCalendar now = HijriCalendar.fromDate(adjustedDate);
+    final prayerService = PrayerService();
+    final now = PrayerService.getHijriWithOffset(
+      prayerService.hijriOffset,
+      DateTime.now(),
+    );
     bool isRamadan = now.hMonth == 9;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 

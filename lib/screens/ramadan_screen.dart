@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
-import 'package:hijri/hijri_calendar.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
 import 'package:flutter/services.dart';
+
 import 'qada_list_screen.dart';
 
 // New Imports for Share Cards
@@ -97,9 +97,11 @@ class _RamadanScreenState extends State<RamadanScreen> {
   Future<void> _loadSettings() async {
     final prefs = CacheHelper.prefs;
     int missed = 0;
-    final hijriOffset = PrayerService().hijriOffset;
-    final adjustedDate = DateTime.now().add(Duration(days: hijriOffset));
-    final hijri = HijriCalendar.fromDate(adjustedDate);
+    final prayerService = PrayerService();
+    final hijri = PrayerService.getHijriWithOffset(
+      prayerService.hijriOffset,
+      DateTime.now(),
+    );
     final int year = hijri.hMonth >= 9 ? hijri.hYear : hijri.hYear - 1;
     for (int i = 1; i <= 30; i++) {
       if (prefs.getBool('qada_${year}_$i') ?? false) missed++;

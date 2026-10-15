@@ -173,6 +173,11 @@ class MainActivity: AudioServiceFragmentActivity() {
         // Disable state restoration to ensure app starts fresh on Home
         intent?.removeExtra("androidx.lifecycle.InstanceStateSavedStateRegistry.Key")
         super.onCreate(null)
+        try {
+            HijriSyncScheduler.onAppStarted(this)
+        } catch (e: Exception) {
+            NativeLogger.log(this, "Hijri sync scheduling failed: ${e.message}")
+        }
         // Only accept payloads that come from a real notification tap.
         // Widget taps and PrayerFocusOverlay internal navigation do NOT set from_notification,
         // so they won't trigger spurious warm-restart deliveries on subsequent app opens.

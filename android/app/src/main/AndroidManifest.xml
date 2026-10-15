@@ -91,6 +91,23 @@
             </intent-filter>
         </receiver>
 
+        <!-- Isolated Hijri date sync: independent from prayer-alarm receivers. -->
+        <receiver android:name=".HijriSyncReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="app.ibad_al_rahmann.action.HIJRI_MIDNIGHT_CHECK" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.USER_PRESENT" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
         <receiver android:name=".NotificationDismissReceiver" 
             android:enabled="true" 
             android:exported="false" />

@@ -248,7 +248,7 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
   Widget _buildHijriTab(BuildContext ctx) {
     int day = 1;
     int month = 1;
-    int year = HijriCalendar.now().hYear;
+    int year = PrayerService().getAdjustedHijri().hYear;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return StatefulBuilder(
@@ -294,7 +294,7 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
                     value: year,
                     items: List.generate(
                       10,
-                      (i) => HijriCalendar.now().hYear + i - 1,
+                      (i) => PrayerService().getAdjustedHijri().hYear + i - 1,
                     ),
                     onChanged: (v) => setModalState(() => year = v!),
                     isDark: isDark,
@@ -306,8 +306,11 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
             ElevatedButton(
               onPressed: () async {
                 try {
-                  final temp = HijriCalendar();
-                  final greg = temp.hijriToGregorian(year, month, day);
+                  final greg = PrayerService.hijriToGregorianDate(
+                    year,
+                    month,
+                    day,
+                  );
                   final prefs = CacheHelper.prefs;
                   await prefs.setString(
                     'qadaa_zakat_date',
@@ -419,7 +422,7 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
               await prefs.remove('qadaa_max_isha');
               await prefs.remove('qadaa_zakat_date');
               // Clear current month fasting misses if applicable
-              final year = HijriCalendar.now().hYear;
+              final year = PrayerService().getAdjustedHijri().hYear;
               for (int i = 1; i <= 30; i++) {
                 await prefs.remove('qada_${year}_$i');
               }

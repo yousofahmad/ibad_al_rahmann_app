@@ -26,33 +26,26 @@ class _OccasionsScreenState extends State<OccasionsScreen> {
   @override
   Widget build(BuildContext context) {
     // Current Date with user's hijri offset
-    HijriCalendar.setLocal('ar');
-    final hijriOffset = PrayerService().hijriOffset;
     final now = DateTime.now();
-    final adjustedDate = now.add(Duration(days: hijriOffset));
-    final nowH = HijriCalendar.fromDate(adjustedDate);
+    final prayerService = PrayerService();
+    final nowH = PrayerService.getHijriWithOffset(
+      prayerService.hijriOffset,
+      now,
+    );
     final int currentYear = nowH.hYear;
 
     // Calculate all events for the current Hijri year
     List<_IslamicEventDisplay> yearEvents = [];
 
     // Reference start of the CURRENT Hijri year
-    final refStartH = HijriCalendar();
-    refStartH.hYear = currentYear;
-    refStartH.hMonth = 1;
-    refStartH.hDay = 1;
-    DateTime refStartG = refStartH
-        .hijriToGregorian(currentYear, 1, 1)
-        .subtract(Duration(days: hijriOffset));
+    final refStartG = PrayerService.hijriToGregorianDate(currentYear, 1, 1);
 
     for (var event in _events) {
-      final temp = HijriCalendar();
-      DateTime gregDate = temp.hijriToGregorian(
+      DateTime gregDate = PrayerService.hijriToGregorianDate(
         currentYear,
         event.hMonth,
         event.hDay,
       );
-      gregDate = gregDate.subtract(Duration(days: hijriOffset));
 
       final nowGreg = DateTime(now.year, now.month, now.day);
       final eventGregOnly = DateTime(
@@ -64,12 +57,11 @@ class _OccasionsScreenState extends State<OccasionsScreen> {
 
       // If event passed this year, show it for next year
       if (daysDiff < 0) {
-        gregDate = temp.hijriToGregorian(
+        gregDate = PrayerService.hijriToGregorianDate(
           currentYear + 1,
           event.hMonth,
           event.hDay,
         );
-        gregDate = gregDate.subtract(Duration(days: hijriOffset));
         daysDiff = DateTime(
           gregDate.year,
           gregDate.month,
@@ -77,8 +69,9 @@ class _OccasionsScreenState extends State<OccasionsScreen> {
         ).difference(nowGreg).inDays;
       }
 
-      final hDate = HijriCalendar.fromDate(
-        gregDate.add(Duration(days: hijriOffset)),
+      final hDate = PrayerService.getHijriWithOffset(
+        prayerService.hijriOffset,
+        gregDate,
       );
 
       // Progress calculation: Distance from CURRENT year start to event vs now

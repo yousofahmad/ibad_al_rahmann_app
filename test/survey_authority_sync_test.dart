@@ -60,6 +60,26 @@ void main() {
     expect(shawwalDate?.month, equals(10));
   });
 
+  test('Dar Al-Ifta stays primary until the full ESA calendar matches', () {
+    const darDate = HijriSourceDate(day: 1, month: 10, year: 1448);
+    const staleSurveyDate = HijriSourceDate(day: 30, month: 9, year: 1448);
+
+    expect(
+      HijriSourceService.selectLiveDate(
+        darAlIftaDate: darDate,
+        surveyAuthorityDate: staleSurveyDate,
+      ),
+      same(darDate),
+    );
+    expect(
+      HijriSourceService.selectLiveDate(
+        darAlIftaDate: null,
+        surveyAuthorityDate: staleSurveyDate,
+      ),
+      isNull,
+    );
+  });
+
   test('Resolves an official first-of-month date from a local day 30', () {
     DateTime? localDay30;
     for (var i = 0; i < 370; i++) {
@@ -85,5 +105,22 @@ void main() {
       HijriSourceService.resolveOffsetForDate(authorityDate, localDay30),
       equals(1),
     );
+  });
+
+  test('Offline projection advances daily but never guesses beyond day 29', () {
+    final day28 = HijriSourceDate(day: 28, month: 9, year: 1448);
+    expect(HijriSourceService.projectOfflineDate(day28, 1).day, equals(29));
+    final heldAt29 = HijriSourceService.projectOfflineDate(day28, 8);
+    expect(heldAt29.day, equals(29));
+    expect(heldAt29.month, equals(9));
+    expect(heldAt29.year, equals(1448));
+  });
+
+  test('A saved day 30 advances to the next Hijri month offline', () {
+    final endOfYear = HijriSourceDate(day: 30, month: 12, year: 1448);
+    final nextDay = HijriSourceService.projectOfflineDate(endOfYear, 1);
+    expect(nextDay.day, equals(1));
+    expect(nextDay.month, equals(1));
+    expect(nextDay.year, equals(1449));
   });
 }

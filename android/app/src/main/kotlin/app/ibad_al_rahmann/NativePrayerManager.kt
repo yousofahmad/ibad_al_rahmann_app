@@ -169,12 +169,19 @@ object HijriCalendarHelper {
             } catch (_: Exception) {}
         }
 
-        val totalOffset = if (prefs.contains("flutter.local_hijri_offset")) {
-            sourceOffset + manualDayAdjustment
-        } else if (prefs.contains("flutter.hijri_offset_manual") || prefs.contains("flutter.hijri_local_delta")) {
-            manualOffset + localDelta + parseOffset("flutter.global_hijri_offset")
+        val isEgyptianSystem = prefs.getString("flutter.hijri_system", "umm_alqura") == "egyptian"
+        val totalOffset = if (isEgyptianSystem) {
+            if (prefs.contains("flutter.local_hijri_offset")) sourceOffset else generalOffset
         } else {
-            generalOffset
+            val libraryOffset = if (
+                prefs.contains("flutter.hijri_offset_manual") ||
+                prefs.contains("flutter.hijri_local_delta")
+            ) {
+                manualOffset + localDelta + parseOffset("flutter.global_hijri_offset")
+            } else {
+                generalOffset
+            }
+            libraryOffset + manualDayAdjustment
         }
         
         val adjustedCal = Calendar.getInstance()

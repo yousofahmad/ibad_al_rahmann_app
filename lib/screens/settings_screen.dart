@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -87,9 +88,8 @@ class _SettingsScreenState extends State<SettingsScreen>
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("خطأ: $e")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("خطأ: $e")));
     }
   }
 
@@ -594,9 +594,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             Icons.explore_rounded,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const AppFeaturesGuideScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const AppFeaturesGuideScreen()),
             ),
           ),
           _buildListTile(
@@ -607,13 +605,14 @@ class _SettingsScreenState extends State<SettingsScreen>
             FontAwesomeIcons.calendarDay,
             onTap: _showHijriSystemDialog,
           ),
-          if (_hijriSystem != PrayerService.systemEgyptian)
-            _buildListTile(
-              "ضبط التاريخ الهجري",
-              "تحديث ومزامنة وتعديل التاريخ يدوياً",
-              FontAwesomeIcons.calendarDays,
-              onTap: () => Navigator.pushNamed(context, '/hijri_confirmation'),
-            ),
+          _buildListTile(
+            "تحديث وضبط التاريخ الهجري",
+            _hijriSystem == PrayerService.systemEgyptian
+                ? "مزامنة مصرية، إعادة المحاولة، أو تحديد 30/غرة الشهر يدويًا"
+                : "عرض تاريخ أم القرى وضبطه يدويًا",
+            FontAwesomeIcons.calendarDays,
+            onTap: () => Navigator.pushNamed(context, '/hijri_confirmation'),
+          ),
 
           // 2. Appearance
           _buildSectionHeader("المظهر"),
@@ -961,7 +960,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                 : () async {
                     if (BackupService.isSyncing) {
                       scaffoldMessengerKey.currentState?.showSnackBar(
-                        const SnackBar(content: Text('يرجى الانتظار، هناك عملية مزامنة قيد التنفيذ.')),
+                        const SnackBar(
+                          content: Text(
+                            'يرجى الانتظار، هناك عملية مزامنة قيد التنفيذ.',
+                          ),
+                        ),
                       );
                       return;
                     }
@@ -1057,7 +1060,9 @@ class _SettingsScreenState extends State<SettingsScreen>
               if (BackupService.isSyncing || _isSyncingToDrive) {
                 scaffoldMessengerKey.currentState?.showSnackBar(
                   const SnackBar(
-                    content: Text('يرجى الانتظار، هناك عملية مزامنة قيد التنفيذ.'),
+                    content: Text(
+                      'يرجى الانتظار، هناك عملية مزامنة قيد التنفيذ.',
+                    ),
                   ),
                 );
                 return;
@@ -1201,9 +1206,8 @@ class _SettingsScreenState extends State<SettingsScreen>
               } catch (e) {
                 if (context.mounted) AppLoadingDialog.hide(context);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text('خطأ: $e')));
                 }
               }
             },
@@ -1224,9 +1228,8 @@ class _SettingsScreenState extends State<SettingsScreen>
               } catch (e) {
                 if (context.mounted) AppLoadingDialog.hide(context);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text('خطأ: $e')));
                 }
               }
             },

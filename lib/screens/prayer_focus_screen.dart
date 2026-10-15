@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/features/accountability/accountability_sync_service.dart';
 import 'package:flutter/services.dart';
@@ -6,10 +7,12 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../services/prayer_service.dart';
+
 import 'package:adhan/adhan.dart';
-import 'package:hijri/hijri_calendar.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+
 import '../core/helpers/prayer_day_helper.dart';
 
 /// شاشة "صلاتي" — التركيز للصلاة
@@ -995,7 +998,11 @@ class _PrayerFocusScreenState extends State<PrayerFocusScreen>
 
   String _getHijriDateString(DateTime date) {
     try {
-      final h = HijriCalendar.fromDate(date);
+      final prayerService = PrayerService();
+      final h = PrayerService.getHijriWithOffset(
+        prayerService.hijriOffset,
+        date,
+      );
       return '${h.hDay} ${h.longMonthName} ${h.hYear} هـ';
     } catch (_) {
       return '';

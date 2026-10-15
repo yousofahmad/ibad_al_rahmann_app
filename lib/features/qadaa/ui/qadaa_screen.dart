@@ -4,10 +4,11 @@ import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
-import 'package:hijri/hijri_calendar.dart';
 import 'package:ibad_al_rahmann/screens/qada_list_screen.dart';
+
 import 'fiqh_screen.dart';
 import 'qadaa_settings_screen.dart';
+
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class QadaaScreen extends StatefulWidget {
@@ -33,9 +34,11 @@ class _QadaaScreenState extends State<QadaaScreen> {
   @override
   void initState() {
     super.initState();
-    final hijriOffset = PrayerService().hijriOffset;
-    final adjustedDate = DateTime.now().add(Duration(days: hijriOffset));
-    final hijri = HijriCalendar.fromDate(adjustedDate);
+    final prayerService = PrayerService();
+    final hijri = PrayerService.getHijriWithOffset(
+      prayerService.hijriOffset,
+      DateTime.now(),
+    );
     _currentRamadanYear = hijri.hMonth >= 9 ? hijri.hYear : hijri.hYear - 1;
     _loadData();
   }
@@ -763,22 +766,25 @@ class _QadaaScreenState extends State<QadaaScreen> {
       final today = DateTime(now.year, now.month, now.day);
 
       // Calculate next occurrence based on Hijri year (approx 354 days)
-      final hDate = HijriCalendar.fromDate(displayDate);
-      final currentH = HijriCalendar.now();
+      final hDate = PrayerService.getHijriWithOffset(
+        PrayerService().hijriOffset,
+        displayDate,
+      );
+      final currentH = PrayerService().getAdjustedHijri();
 
       // Find the next occurrence of this Hijri day/month
       var targetHYear = currentH.hYear;
       DateTime target;
 
       try {
-        target = HijriCalendar().hijriToGregorian(
+        target = PrayerService.hijriToGregorianDate(
           targetHYear,
           hDate.hMonth,
           hDate.hDay,
         );
       } catch (_) {
         // Handle case where day 30 doesn't exist in that Hijri month
-        target = HijriCalendar().hijriToGregorian(
+        target = PrayerService.hijriToGregorianDate(
           targetHYear,
           hDate.hMonth,
           29,
@@ -788,13 +794,13 @@ class _QadaaScreenState extends State<QadaaScreen> {
       if (target.isBefore(today)) {
         targetHYear++;
         try {
-          target = HijriCalendar().hijriToGregorian(
+          target = PrayerService.hijriToGregorianDate(
             targetHYear,
             hDate.hMonth,
             hDate.hDay,
           );
         } catch (_) {
-          target = HijriCalendar().hijriToGregorian(
+          target = PrayerService.hijriToGregorianDate(
             targetHYear,
             hDate.hMonth,
             29,
@@ -1053,7 +1059,7 @@ class _QadaaScreenState extends State<QadaaScreen> {
   Widget _buildHijriTab(BuildContext ctx) {
     int day = 1;
     int month = 1;
-    int year = HijriCalendar.now().hYear;
+    int year = PrayerService().getAdjustedHijri().hYear;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final List<String> hijriMonths = [
       "محرم",
@@ -1113,7 +1119,7 @@ class _QadaaScreenState extends State<QadaaScreen> {
                     value: year,
                     items: List.generate(
                       10,
-                      (i) => HijriCalendar.now().hYear + i - 1,
+                      (i) => PrayerService().getAdjustedHijri().hYear + i - 1,
                     ),
                     onChanged: (v) => setModalState(() => year = v!),
                     isDark: isDark,
@@ -1125,8 +1131,11 @@ class _QadaaScreenState extends State<QadaaScreen> {
             ElevatedButton(
               onPressed: () async {
                 try {
-                  final temp = HijriCalendar();
-                  final greg = temp.hijriToGregorian(year, month, day);
+                  final greg = PrayerService.hijriToGregorianDate(
+                    year,
+                    month,
+                    day,
+                  );
                   setState(() {
                     zakatDate = greg;
                   });

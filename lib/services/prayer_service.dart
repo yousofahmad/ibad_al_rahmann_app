@@ -1,24 +1,37 @@
 import 'package:flutter/widgets.dart';
+
 import 'dart:async';
+
 import 'package:adhan/adhan.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'notification_service.dart';
 import 'home_widget_service.dart';
+
 import 'package:home_widget/home_widget.dart';
+
 import 'prayer_notification_platform_channel.dart';
+
 import 'package:ibad_al_rahmann/features/locations/models/city_profile.dart';
 import 'package:hijri/hijri_calendar.dart';
+
 import 'dart:convert';
+
 import 'package:intl/intl.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:geocoding/geocoding.dart';
+
 import 'remote_config_service.dart';
+
 import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:firebase_core/firebase_core.dart';
+
 import '../../firebase_options.dart';
+
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/core/helpers/app_formatters.dart';
+
 import 'hijri_source_service.dart';
 
 @pragma('vm:entry-point')
@@ -43,9 +56,7 @@ Future<void> backgroundWidgetUpdateCallback() async {
 
     final service = PrayerService();
     await service.init();
-    await HijriSourceService.syncOffsetIfNeeded(
-      rescheduleNotifications: false,
-    );
+    await HijriSourceService.syncOffsetIfNeeded(rescheduleNotifications: false);
     await service.scheduleNotifications(isUserAction: true);
     debugPrint("Background Task: Refresh Complete.");
   } catch (e) {
@@ -733,7 +744,10 @@ class PrayerService extends ChangeNotifier {
     _localHijriDelta = prefs.getInt(keyLocalHijriDelta) ?? 0;
     _is24Hour = prefs.getBool(keyIs24Hour) ?? false;
     _currentCityName = prefs.getString('last_city_name') ?? "";
-    final currentHijriMonth = HijriCalendar.fromDate(DateTime.now()).hMonth;
+    final currentHijriMonth = getHijriWithOffset(
+      hijriOffset,
+      DateTime.now(),
+    ).hMonth;
     final savedOffsetMonth = prefs.getInt(keyHijriOffsetMonth);
     if (savedOffsetMonth != null && savedOffsetMonth != currentHijriMonth) {
       _hijriOffset = 0;
@@ -1245,6 +1259,25 @@ class PrayerService extends ChangeNotifier {
       CacheHelper.prefs.getString(keyHijriSystem) ?? systemUmmAlQura;
 
   static bool get isEgyptianSystem => hijriSystem == systemEgyptian;
+
+  /// Effective day adjustment used by every screen when converting a selected
+  /// Hijri date back to the corresponding Gregorian civil date.
+  static int get effectiveHijriDayAdjustment {
+    final prefs = CacheHelper.prefs;
+    final generalOffset =
+        RemoteConfigService.globalHijriOffset +
+        (prefs.getInt(keyHijriOffset) ?? 0) +
+        (prefs.getInt(keyLocalHijriDelta) ?? 0);
+    if (isEgyptianSystem) {
+      return prefs.getInt('local_hijri_offset') ?? generalOffset;
+    }
+    return generalOffset + (prefs.getInt('manual_day_adjustment') ?? 0);
+  }
+
+  static DateTime hijriToGregorianDate(int year, int month, int day) {
+    final calculated = HijriCalendar().hijriToGregorian(year, month, day);
+    return calculated.subtract(Duration(days: effectiveHijriDayAdjustment));
+  }
 
   Future<void> setHijriSystem(String system) async {
     final prefs = CacheHelper.prefs;
