@@ -202,12 +202,12 @@ class _HijriConfirmationScreenState extends State<HijriConfirmationScreen> {
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.all(16),
                     ),
-                    child: const Text(
+                    child: Text(
                       isEgyptian
                           ? 'اليوم 30\nمن الشهر الحالي'
                           : 'لسه يوم 29\n(الشهر مخلصش)',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontFamily: AppConsts.cairo),
+                      style: const TextStyle(fontFamily: AppConsts.cairo),
                     ),
                   ),
                 ),
@@ -218,12 +218,12 @@ class _HijriConfirmationScreenState extends State<HijriConfirmationScreen> {
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.all(16),
                     ),
-                    child: const Text(
+                    child: Text(
                       isEgyptian
                           ? 'غرة الشهر الجديد\n(اليوم 1)'
                           : 'بدأ الشهر الجديد\n(غرة شهر جديد)',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontFamily: AppConsts.cairo),
+                      style: const TextStyle(fontFamily: AppConsts.cairo),
                     ),
                   ),
                 ),
