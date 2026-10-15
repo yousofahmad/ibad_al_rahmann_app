@@ -56,6 +56,38 @@ void main() {
     },
   );
 
+  test('Only prayers present in today focus log remain checked', () async {
+    final todayKey = await IslamicDay.todayKey();
+    final prefs = CacheHelper.prefs;
+    await prefs.setString(
+      'temp_prayers',
+      json.encode({
+        'الفجر': true,
+        'الظهر': true,
+        'العصر': true,
+        'المغرب': true,
+        'العشاء': true,
+      }),
+    );
+    await prefs.setString(
+      'prayer_focus_log_$todayKey',
+      json.encode({
+        'الفجر': {'status': 'ontime'},
+        'الظهر': {'status': 'late'},
+      }),
+    );
+
+    await AccountabilitySyncService.syncAndSaveTodayStats();
+
+    final saved = json.decode(prefs.getString('temp_prayers')!)
+        as Map<String, dynamic>;
+    expect(saved['الفجر'], isTrue);
+    expect(saved['الظهر'], isTrue);
+    expect(saved['العصر'], isFalse);
+    expect(saved['المغرب'], isFalse);
+    expect(saved['العشاء'], isFalse);
+  });
+
   test(
     'Friday (الجمعة) prayer in Prayer Focus maps to Dhuhr (الظهر) in accountability',
     () async {

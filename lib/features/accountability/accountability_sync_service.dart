@@ -97,19 +97,7 @@ class AccountabilitySyncService {
     if (focusLogRaw != null) {
       try {
         final Map<String, dynamic> focusMap = json.decode(focusLogRaw);
-        focusMap.forEach((k, v) {
-          String actualKey = k;
-          if (k == 'الجمعة' && prayersMap.containsKey('الظهر')) {
-            actualKey = 'الظهر';
-          }
-          if (prayersMap.containsKey(actualKey)) {
-            if (v is Map && v['status'] != null && v['status'] != 'missed') {
-              prayersMap[actualKey] = true;
-            } else if (v == true) {
-              prayersMap[actualKey] = true;
-            }
-          }
-        });
+        AccountabilityPrayerStatus.applyFocusLog(prayersMap, focusMap);
       } catch (_) {}
     }
 

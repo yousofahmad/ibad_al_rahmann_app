@@ -151,19 +151,8 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
     if (focusLogRaw != null) {
       try {
         final Map<String, dynamic> focusMap = json.decode(focusLogRaw);
-        focusMap.forEach((k, v) {
-          String actualKey = k;
-          if (k == 'الجمعة' && _prayers.containsKey('الظهر')) {
-            actualKey = 'الظهر';
-          }
-          if (_prayers.containsKey(actualKey)) {
-            if (v is Map && v['status'] != null && v['status'] != 'missed') {
-              _prayers[actualKey] = true;
-            } else if (v == true) {
-              _prayers[actualKey] = true;
-            }
-          }
-        });
+        AccountabilityPrayerStatus.applyFocusLog(_prayers, focusMap);
+        await prefs.setString('temp_prayers', json.encode(_prayers));
       } catch (_) {}
     }
 
