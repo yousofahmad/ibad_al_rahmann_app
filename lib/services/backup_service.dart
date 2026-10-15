@@ -573,7 +573,7 @@ class BackupService {
         _cachedAccount = account;
         final prefs = CacheHelper.prefs;
         await prefs.setString('last_sync_email', account.email);
-        AppLogger.log('GoogleDrive', 'Interactive auth OK: ${account.email}');
+        AppLogger.log('GoogleDrive', 'Interactive auth completed');
 
         // Retrieve the authorized headers immediately
         final authHeaders = await GoogleSignIn.instance.authorizationClient
@@ -585,7 +585,7 @@ class BackupService {
           _cachedAuthHeaders = authHeaders;
           AppLogger.log(
             'GoogleDrive',
-            'DriveApi client ready for ${account.email}',
+            'DriveApi client ready',
           );
           return drive.DriveApi(GoogleAuthClient(authHeaders));
         }

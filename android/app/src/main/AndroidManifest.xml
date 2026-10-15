@@ -37,6 +37,7 @@
         <!-- Audio Service Service -->
         <service android:name="com.ryanheise.audioservice.AudioService"
             android:foregroundServiceType="mediaPlayback"
+            android:permission="android.permission.BIND_MEDIA_BROWSER"
             android:exported="true"
             tools:ignore="Instantiatable">
             <intent-filter>
@@ -78,7 +79,7 @@
         <!-- Boot Receiver for rescheduling alarms and notifications -->
         <receiver android:name=".AlarmReceiver" 
             android:enabled="true" 
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
@@ -135,7 +136,7 @@
         <!-- Screen Unlock Salawat Receiver — يشغّل الصلاة على النبي ﷺ عند فتح الشاشة بدون خدمة أو إشعار ثابت -->
         <receiver android:name=".ScreenUnlockReceiver"
             android:enabled="true"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.USER_PRESENT" />
             </intent-filter>

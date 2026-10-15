@@ -89,10 +89,14 @@ class TafsirHelper {
   }
 
   static Future<void> setSelectedBookId(String id) async {
+    if (!RegExp(r'^[A-Za-z0-9_-]{1,64}$').hasMatch(id)) return;
     await CacheHelper.prefs.setString('selected_tafsir_book_id', id);
   }
 
   static Future<Directory> _getBookDirectory(String bookId) async {
+    if (!RegExp(r'^[A-Za-z0-9_-]{1,64}$').hasMatch(bookId)) {
+      throw ArgumentError.value(bookId, 'bookId', 'Invalid tafsir book ID');
+    }
     final dir = await getApplicationDocumentsDirectory();
     final bookDir = Directory('${dir.path}/tafseer/$bookId');
     if (!await bookDir.exists()) {
@@ -102,39 +106,81 @@ class TafsirHelper {
   }
 
   static String normalizeDownloadUrl(String url) {
-    // 1. Google Drive Links
-    if (url.contains('drive.google.com')) {
-      final match =
-          RegExp(r'/d/([a-zA-Z0-9_-]+)').firstMatch(url) ??
-          RegExp(r'id=([a-zA-Z0-9_-]+)').firstMatch(url);
-      if (match != null) {
-        final fileId = match.group(1);
-        return 'https://drive.google.com/uc?export=download&id=$fileId&confirm=t';
+    final value = url.trim();
+    if (value.isEmpty) {
+      throw const FormatException('Empty tafsir download URL');
+    }
+
+    // Relative paths and slugs are resolved only inside the trusted feature repo.
+    if (RegExp(r'^tafseer/[A-Za-z0-9_./-]+$').hasMatch(value) &&
+        !value.contains('..') &&
+        !value.contains('//')) {
+      final filePath = value.endsWith('.zip') || value.endsWith('.json')
+          ? value
+          : '$value.zip';
+      return '$_repoBaseUrl$filePath';
+    }
+    if (RegExp(r'^[A-Za-z0-9_-]{1,64}$').hasMatch(value)) {
+      return '${_repoBaseUrl}tafseer/$value.zip';
+    }
+
+    final uri = Uri.tryParse(value);
+    if (uri == null ||
+        uri.scheme != 'https' ||
+        uri.userInfo.isNotEmpty ||
+        uri.port != 443 ||
+        uri.hasFragment) {
+      throw const FormatException('Unsupported tafsir download URL');
+    }
+    final segments = uri.pathSegments;
+    if (segments.any((segment) => segment == '.' || segment == '..')) {
+      throw const FormatException('Invalid tafsir download path');
+    }
+
+    // Preserve Google Drive links, but only when the exact HTTPS host is used.
+    if (uri.host.toLowerCase() == 'drive.google.com') {
+      final pathMatch = RegExp(r'/d/([A-Za-z0-9_-]+)').firstMatch(uri.path);
+      final fileId = pathMatch?.group(1) ?? uri.queryParameters['id'];
+      if (fileId != null && RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(fileId)) {
+        return Uri.https('drive.google.com', '/uc', {
+          'export': 'download',
+          'id': fileId,
+          'confirm': 't',
+        }).toString();
       }
+      throw const FormatException('Invalid Google Drive file URL');
     }
 
-    // 2. GitHub web blob links -> convert to raw.githubusercontent.com
-    if (url.contains('github.com') && url.contains('/blob/')) {
-      return url
-          .replaceFirst('github.com', 'raw.githubusercontent.com')
-          .replaceFirst('/blob/', '/');
+    // Only accept repository files under the app's trusted feature repository.
+    final isTrustedRepo =
+        segments.length >= 4 &&
+        segments[0] == 'yousofahmad' &&
+        segments[1] == 'ibad-alrahman-features' &&
+        segments[2] == 'main' &&
+        segments[3] == 'tafseer';
+    if (uri.host.toLowerCase() == 'raw.githubusercontent.com' &&
+        isTrustedRepo &&
+        !uri.hasQuery) {
+      return uri.toString();
     }
 
-    // 3. Direct full URLs
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
+    // Convert only canonical blob URLs from the same trusted repository.
+    final isTrustedBlob =
+        segments.length >= 5 &&
+        segments[0] == 'yousofahmad' &&
+        segments[1] == 'ibad-alrahman-features' &&
+        segments[2] == 'blob' &&
+        segments[3] == 'main' &&
+        segments[4] == 'tafseer';
+    if (uri.host.toLowerCase() == 'github.com' &&
+        isTrustedBlob &&
+        !uri.hasQuery) {
+      final rawPath =
+          '/yousofahmad/ibad-alrahman-features/${segments.skip(3).join('/')}';
+      return Uri.https('raw.githubusercontent.com', rawPath).toString();
     }
 
-    // 4. Relative paths from repo (e.g. tafseer/ar-tafsir-ibn-kathir.zip)
-    if (url.startsWith('tafseer/')) {
-      if (url.endsWith('.zip') || url.endsWith('.json')) {
-        return '$_repoBaseUrl$url';
-      }
-      return '$_repoBaseUrl$url.zip';
-    }
-
-    // 5. Short slug (e.g. ar-tafsir-ibn-kathir)
-    return '${_repoBaseUrl}tafseer/$url.zip';
+    throw const FormatException('Untrusted tafsir download host or path');
   }
 
   static Future<void> fetchRemoteBooks() async {
@@ -177,7 +223,7 @@ class TafsirHelper {
       if (item is Map<String, dynamic> || item is Map) {
         final map = Map<String, dynamic>.from(item as Map);
         final book = TafsirBook.fromJson(map);
-        if (book.id.isEmpty) continue;
+        if (!RegExp(r'^[A-Za-z0-9_-]{1,64}$').hasMatch(book.id)) continue;
         final existingIdx = _availableBooks.indexWhere((b) => b.id == book.id);
         if (existingIdx >= 0) {
           if (!_availableBooks[existingIdx].isBuiltIn) {
