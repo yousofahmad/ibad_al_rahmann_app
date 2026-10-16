@@ -1462,7 +1462,6 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
                     fit: BoxFit.scaleDown,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
-                      textDirection: TextDirection.rtl,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Text(
