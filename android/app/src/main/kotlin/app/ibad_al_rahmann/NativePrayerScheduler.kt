@@ -49,9 +49,13 @@ object NativePrayerScheduler {
                 NativeLogger.log(context, "scheduleToday: debounced (${now - lastScheduleMs}ms since last call, min=${DEBOUNCE_MS}ms)")
                 try {
                     PrayerSilenceScheduler.schedule(context)
-                    PrayerRelativeAlarmScheduler.schedule(context)
                 } catch (e: Exception) {
-                    NativeLogger.log(context, "Prayer feature reschedule after debounce failed: ${e.message}")
+                    NativeLogger.log(context, "PrayerSilence reschedule after debounce failed: ${e.message}")
+                }
+                try {
+                    PrayerRelativeAlarmScheduler.cancel(context)
+                } catch (e: Exception) {
+                    NativeLogger.log(context, "Legacy PrayerRelativeAlarm cancellation failed: ${e.message}")
                 }
                 return
             }
@@ -67,9 +71,9 @@ object NativePrayerScheduler {
             NativeLogger.log(context, "PrayerSilence scheduling failed: ${e.message}")
         }
         try {
-            PrayerRelativeAlarmScheduler.schedule(context)
+            PrayerRelativeAlarmScheduler.cancel(context)
         } catch (e: Exception) {
-            NativeLogger.log(context, "PrayerRelativeAlarm scheduling failed: ${e.message}")
+            NativeLogger.log(context, "Legacy PrayerRelativeAlarm cancellation failed: ${e.message}")
         }
         val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager

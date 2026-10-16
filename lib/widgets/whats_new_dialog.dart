@@ -8,7 +8,7 @@ class WhatsNewDialog extends StatelessWidget {
   const WhatsNewDialog({super.key});
 
   static const String _versionKey = 'last_seen_whats_new_version';
-  static const String _currentVersion = '1.3.1';
+  static const String _currentVersion = '1.3.2';
 
   static Future<void> checkAndShow(BuildContext context) async {
     final prefs = CacheHelper.prefs;
@@ -35,16 +35,10 @@ class WhatsNewDialog extends StatelessWidget {
 
     final List<Map<String, dynamic>> items = [
       {
-        'icon': Icons.alarm_on_rounded,
-        'color': const Color(0xFF1565C0),
-        'title': 'منبه مرتبط بوقت الصلاة',
-        'desc': 'اختر الصلاة وعدد الدقائق قبلها؛ يُعاد ضبط موعد المنبه تلقائيًا مع تغيّر المواقيت ويظهر كأقرب منبه للنظام. لا يتيح أندرويد للتطبيقات الأخرى إدارة منبهات يومية متغيرة داخل قائمة تطبيق الساعة الأصلي.',
-      },
-      {
-        'icon': Icons.do_not_disturb_on_rounded,
+        'icon': Icons.volume_off_rounded,
         'color': const Color(0xFF7B1FA2),
-        'title': 'كتم الهاتف تلقائيًا حول الصلاة',
-        'desc': 'اختر عدد الدقائق قبل الأذان وبعده لتفعيل وضع عدم الإزعاج ثم استعادة حالته السابقة. يتطلب ذلك إذنًا خاصًا من أندرويد؛ ويكتم المكالمات والإشعارات العادية مع إبقاء أصوات المنبهات مسموحة.',
+        'title': 'وضع الهاتف على الصامت تلقائيًا حول الصلاة',
+        'desc': 'اختر المدة قبل الأذان وبعده لتحويل رنين الهاتف الفعلي إلى الصامت ثم استعادة وضع الرنين السابق. لا يفعّل وضع عدم الإزعاج ولا يغيّر مستوى صوت المنبهات.',
       },
       {
         'icon': Icons.text_fields,

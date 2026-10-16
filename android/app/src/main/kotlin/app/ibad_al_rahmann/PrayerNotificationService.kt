@@ -388,7 +388,7 @@ class PrayerNotificationService : Service() {
 
         val channelId = if (isSilentNotif) "prayer_silent_channel_v1" else "prayer_sound_channel_v14"
 
-        val isPrayerGroup = alarmId in 100..139 || alarmId in 3000..3099 || alarmId in 5000..5099 || alarmId == 110 || alarmId in 730..739 || alarmId == PrayerRelativeAlarmScheduler.ALARM_ID
+        val isPrayerGroup = alarmId in 100..139 || alarmId in 3000..3099 || alarmId in 5000..5099 || alarmId == 110 || alarmId in 730..739
         val notifGroup    = if (isPrayerGroup) "PRAYER_GROUP" else "GENERAL_GROUP"
         val summaryTitle  = if (isPrayerGroup) "مواقيت الصلاة" else "تنبيهات عامة"
         val summaryId     = if (isPrayerGroup) 666 else 667

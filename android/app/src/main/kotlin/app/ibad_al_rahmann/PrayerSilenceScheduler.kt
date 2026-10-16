@@ -5,13 +5,11 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.os.Build
 import java.util.Calendar
 
-/**
- * Schedules temporary system-wide Do Not Disturb windows around the five fard prayers.
- * The user must grant Notification Policy Access before this scheduler can change DND.
- */
+/** Schedules temporary phone-ringer silent windows around the five fard prayers. */
 object PrayerSilenceScheduler {
     const val BOUNDARY_PAYLOAD = "prayer_silence_boundary"
 
@@ -20,8 +18,12 @@ object PrayerSilenceScheduler {
     private const val ENABLED_KEY = "flutter.prayer_silence_enabled"
     private const val BEFORE_KEY = "flutter.prayer_silence_before_minutes"
     private const val AFTER_KEY = "flutter.prayer_silence_after_minutes"
-    private const val MANAGED_KEY = "prayer_silence_managed_dnd"
-    private const val ORIGINAL_FILTER_KEY = "prayer_silence_original_filter"
+    private const val MANAGED_KEY = "prayer_silence_managed_ringer_mode"
+    private const val ORIGINAL_RINGER_MODE_KEY = "prayer_silence_original_ringer_mode"
+
+    // Used only to restore DND that an earlier app version enabled.
+    private const val LEGACY_MANAGED_DND_KEY = "prayer_silence_managed_dnd"
+    private const val LEGACY_ORIGINAL_FILTER_KEY = "prayer_silence_original_filter"
 
     // Reserved for this feature; distinct request codes let every boundary be replaced safely.
     private const val FIRST_ALARM_ID = 12000
@@ -32,36 +34,25 @@ object PrayerSilenceScheduler {
 
     private data class Window(val startMs: Long, var endMs: Long)
 
-    fun hasPolicyAccess(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        return manager.isNotificationPolicyAccessGranted
-    }
-
     /** Called from the prayer scheduler, settings bridge, and after a boundary fires. */
     @Synchronized
     fun schedule(context: Context) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         cancelBoundaries(context, alarmManager)
+        restoreLegacyDnd(context)
 
         val flutterPrefs = context.getSharedPreferences(FLUTTER_PREFS, Context.MODE_PRIVATE)
         val enabled = flutterPrefs.getBoolean(ENABLED_KEY, false)
         val beforeMinutes = safeInt(flutterPrefs.all[BEFORE_KEY], 5).coerceIn(0, 180)
         val afterMinutes = safeInt(flutterPrefs.all[AFTER_KEY], 30).coerceIn(0, 180)
-        val hasAccess = hasPolicyAccess(context)
-
         if (!enabled || (beforeMinutes == 0 && afterMinutes == 0)) {
-            if (hasAccess) reconcileDnd(context, shouldMute = false)
-            return
-        }
-        if (!hasAccess) {
-            NativeLogger.log(context, "PrayerSilence: not scheduled; notification policy access is missing")
+            reconcileRingerMode(context, shouldMute = false)
             return
         }
 
         val now = System.currentTimeMillis()
         val windows = buildMergedWindows(context, now, beforeMinutes, afterMinutes)
-        reconcileDnd(context, windows.any { now >= it.startMs && now < it.endMs })
+        reconcileRingerMode(context, windows.any { now >= it.startMs && now < it.endMs })
 
         val horizon = now + TWO_DAYS_MS
         val boundaries = windows.flatMap { listOf(it.startMs, it.endMs) }
@@ -73,7 +64,7 @@ object PrayerSilenceScheduler {
         boundaries.forEachIndexed { index, triggerAt ->
             scheduleBoundary(context, alarmManager, FIRST_ALARM_ID + index, triggerAt)
         }
-        NativeLogger.log(context, "PrayerSilence: scheduled ${boundaries.size} future boundaries")
+        NativeLogger.log(context, "PrayerSilence: scheduled ${boundaries.size} future silent-mode boundaries")
     }
 
     fun onBoundary(context: Context) {
@@ -136,57 +127,74 @@ object PrayerSilenceScheduler {
         return merged
     }
 
-    private fun reconcileDnd(context: Context, shouldMute: Boolean) {
-        if (!hasPolicyAccess(context)) return
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    private fun reconcileRingerMode(context: Context, shouldMute: Boolean) {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val state = context.getSharedPreferences(NATIVE_PREFS, Context.MODE_PRIVATE)
         val managed = state.getBoolean(MANAGED_KEY, false)
-        val currentFilter = manager.currentInterruptionFilter
+        val currentMode = audioManager.ringerMode
 
         if (shouldMute) {
             if (managed) {
-                // Respect a manual/system change made during the window instead of fighting it.
-                if (currentFilter != NotificationManager.INTERRUPTION_FILTER_ALARMS) {
-                    state.edit().remove(MANAGED_KEY).remove(ORIGINAL_FILTER_KEY).apply()
+                // Respect a manual ringer-mode change made during a quiet window.
+                if (currentMode != AudioManager.RINGER_MODE_SILENT) {
+                    state.edit().remove(MANAGED_KEY).remove(ORIGINAL_RINGER_MODE_KEY).apply()
                 }
                 return
             }
-            // Preserve an existing user-selected full-DND or alarms-only state.
-            if (currentFilter == NotificationManager.INTERRUPTION_FILTER_NONE ||
-                currentFilter == NotificationManager.INTERRUPTION_FILTER_ALARMS
-            ) return
+            // Do not claim or later change a silent mode the user already selected.
+            if (currentMode == AudioManager.RINGER_MODE_SILENT) return
 
             state.edit()
-                .putInt(ORIGINAL_FILTER_KEY, currentFilter)
+                .putInt(ORIGINAL_RINGER_MODE_KEY, currentMode)
                 .putBoolean(MANAGED_KEY, true)
                 .apply()
             try {
-                // Alarms-only DND blocks calls and ordinary notifications but keeps alarm audio,
-                // including the prayer-relative alarm, available during the quiet window.
-                manager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALARMS)
-                NativeLogger.log(context, "PrayerSilence: enabled alarms-only DND until the window ends")
-            } catch (e: SecurityException) {
-                state.edit().remove(MANAGED_KEY).remove(ORIGINAL_FILTER_KEY).apply()
-                NativeLogger.log(context, "PrayerSilence: unable to enable DND: ${e.message}")
+                audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
+                NativeLogger.log(context, "PrayerSilence: enabled phone silent ringer mode")
+            } catch (e: Exception) {
+                state.edit().remove(MANAGED_KEY).remove(ORIGINAL_RINGER_MODE_KEY).apply()
+                NativeLogger.log(context, "PrayerSilence: unable to enable silent ringer mode: ${e.message}")
             }
             return
         }
 
         if (!managed) return
         try {
-            // Restore only if DND is still the state this feature applied; do not override a
-            // different state the user or another system rule selected while we were quiet.
-            if (currentFilter == NotificationManager.INTERRUPTION_FILTER_ALARMS) {
-                val original = state.getInt(
-                    ORIGINAL_FILTER_KEY,
+            // Restore only if the phone is still in the silent mode this feature applied.
+            if (audioManager.ringerMode == AudioManager.RINGER_MODE_SILENT) {
+                val originalMode = state.getInt(
+                    ORIGINAL_RINGER_MODE_KEY,
+                    AudioManager.RINGER_MODE_NORMAL,
+                )
+                audioManager.ringerMode = originalMode
+                NativeLogger.log(context, "PrayerSilence: restored previous ringer mode $originalMode")
+            }
+            state.edit().remove(MANAGED_KEY).remove(ORIGINAL_RINGER_MODE_KEY).apply()
+        } catch (e: Exception) {
+            NativeLogger.log(context, "PrayerSilence: unable to restore ringer mode: ${e.message}")
+        }
+    }
+
+    /** Undo a DND state managed by the preceding app version, when that access is still granted. */
+    private fun restoreLegacyDnd(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        val state = context.getSharedPreferences(NATIVE_PREFS, Context.MODE_PRIVATE)
+        if (!state.getBoolean(LEGACY_MANAGED_DND_KEY, false)) return
+
+        try {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (!manager.isNotificationPolicyAccessGranted) return
+            if (manager.currentInterruptionFilter == NotificationManager.INTERRUPTION_FILTER_ALARMS) {
+                val originalFilter = state.getInt(
+                    LEGACY_ORIGINAL_FILTER_KEY,
                     NotificationManager.INTERRUPTION_FILTER_ALL,
                 )
-                manager.setInterruptionFilter(original)
-                NativeLogger.log(context, "PrayerSilence: restored previous DND filter $original")
+                manager.setInterruptionFilter(originalFilter)
+                NativeLogger.log(context, "PrayerSilence: restored legacy DND filter $originalFilter")
             }
-            state.edit().remove(MANAGED_KEY).remove(ORIGINAL_FILTER_KEY).apply()
-        } catch (e: SecurityException) {
-            NativeLogger.log(context, "PrayerSilence: unable to restore DND: ${e.message}")
+            state.edit().remove(LEGACY_MANAGED_DND_KEY).remove(LEGACY_ORIGINAL_FILTER_KEY).apply()
+        } catch (e: Exception) {
+            NativeLogger.log(context, "PrayerSilence: unable to restore legacy DND state: ${e.message}")
         }
     }
 

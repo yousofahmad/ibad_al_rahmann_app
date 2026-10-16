@@ -58,10 +58,11 @@ class AlarmReceiver : BroadcastReceiver() {
 
         if (intent.getBooleanExtra(PrayerRelativeAlarmScheduler.EXTRA_MARKER, false)) {
             try {
-                PrayerRelativeAlarmScheduler.schedule(context)
+                PrayerRelativeAlarmScheduler.cancel(context)
             } catch (e: Exception) {
-                NativeLogger.log(context, "PrayerRelativeAlarm reschedule failed: ${e.message}")
+                NativeLogger.log(context, "Legacy PrayerRelativeAlarm cancellation failed: ${e.message}")
             }
+            return
         }
 
         if (payload == PrayerSilenceScheduler.BOUNDARY_PAYLOAD) {

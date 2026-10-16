@@ -5,7 +5,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.provider.Settings
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodChannel
 
@@ -329,43 +328,12 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
                     }.start()
                     result.success("Native prayer engine started")
                 }
-                "isNotificationPolicyAccessGranted" -> {
-                    result.success(PrayerSilenceScheduler.hasPolicyAccess(context))
-                }
-                "openNotificationPolicyAccessSettings" -> {
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-                        result.error("UNSUPPORTED", "Do Not Disturb access requires Android 6.0 or newer", null)
-                    } else {
-                        try {
-                            val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                }
-                            }
-                            context.startActivity(intent)
-                            result.success(null)
-                        } catch (e: Exception) {
-                            result.error("SETTINGS_ERROR", e.message, null)
-                        }
-                    }
-                }
                 "schedulePrayerSilence" -> {
                     Thread {
                         try {
                             PrayerSilenceScheduler.schedule(context)
                         } catch (e: Exception) {
                             NativeLogger.log(context, "PrayerSilence scheduling failed: ${e.message}")
-                        }
-                    }.start()
-                    result.success(null)
-                }
-                "schedulePrayerRelativeAlarm" -> {
-                    Thread {
-                        try {
-                            PrayerRelativeAlarmScheduler.schedule(context)
-                        } catch (e: Exception) {
-                            NativeLogger.log(context, "PrayerRelativeAlarm scheduling failed: ${e.message}")
                         }
                     }.start()
                     result.success(null)
