@@ -1208,7 +1208,7 @@ class _ShareFooter extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(bottom: 10.0),
           child: Text(
-            'صنع بواسطة تطبيق عباد الرحمن',
+            'تطبيق عباد الرحمن',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: AppConsts.motoNastaliq,

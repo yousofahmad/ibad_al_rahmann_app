@@ -8,7 +8,7 @@ class WhatsNewDialog extends StatelessWidget {
   const WhatsNewDialog({super.key});
 
   static const String _versionKey = 'last_seen_whats_new_version';
-  static const String _currentVersion = '1.3.2';
+  static const String _currentVersion = '1.3.3';
 
   static Future<void> checkAndShow(BuildContext context) async {
     final prefs = CacheHelper.prefs;
@@ -34,6 +34,12 @@ class WhatsNewDialog extends StatelessWidget {
     final textColor = isDark ? Colors.white : const Color(0xFF1C1A18);
 
     final List<Map<String, dynamic>> items = [
+      {
+        'icon': Icons.image_rounded,
+        'color': const Color(0xFFD0A871),
+        'title': 'تبسيط اسم التطبيق في صور المشاركة',
+        'desc': 'أزلنا عبارة «صنع بواسطة» من تذييل الصورة، ليظهر «تطبيق عباد الرحمن» فقط.',
+      },
       {
         'icon': Icons.volume_off_rounded,
         'color': const Color(0xFF7B1FA2),
