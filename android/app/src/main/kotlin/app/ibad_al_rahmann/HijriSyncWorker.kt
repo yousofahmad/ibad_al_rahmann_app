@@ -291,13 +291,16 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
             add(Calendar.DAY_OF_YEAR, offset)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val islamic = android.icu.util.IslamicCalendar(TimeZone.getDefault(), Locale("ar", "EG"))
-            islamic.calculationType = android.icu.util.IslamicCalendar.CalculationType.ISLAMIC_UMALQURA
-            islamic.timeInMillis = calendar.timeInMillis
+            val islamic = android.icu.util.IslamicCalendar(
+                android.icu.util.TimeZone.getDefault(),
+                Locale("ar", "EG"),
+            )
+            islamic.setCalculationType(android.icu.util.IslamicCalendar.CalculationType.ISLAMIC_UMALQURA)
+            islamic.setTimeInMillis(calendar.timeInMillis)
             return HijriDate(
-                islamic.get(android.icu.util.IslamicCalendar.DAY_OF_MONTH),
-                islamic.get(android.icu.util.IslamicCalendar.MONTH) + 1,
-                islamic.get(android.icu.util.IslamicCalendar.YEAR),
+                islamic.get(android.icu.util.Calendar.DAY_OF_MONTH),
+                islamic.get(android.icu.util.Calendar.MONTH) + 1,
+                islamic.get(android.icu.util.Calendar.YEAR),
             )
         }
         return tabularHijri(calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1, calendar.get(Calendar.DAY_OF_MONTH))
@@ -345,7 +348,7 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
         } catch (_: Exception) { 0 }
         if (elapsed == 0) return
 
-        var projected = saved
+        var projected = saved ?: return
         for (day in 0 until elapsed) {
             if (projected.day == 29) break
             projected = if (projected.day == 30) {
