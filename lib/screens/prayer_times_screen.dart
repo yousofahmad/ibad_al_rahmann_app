@@ -5,13 +5,14 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/services/notification_service.dart';
 import 'package:intl/intl.dart';
-import 'package:hijri/hijri_calendar.dart';
 import '../services/prayer_service.dart';
+import '../services/egyptian_hijri_calendar.dart';
 import 'widgets/prayer_detail_modal.dart';
 import 'widgets/prayer_ring_widget.dart';
 import 'prayer_taqwim_screen.dart';
 
 import '../widgets/app_skeleton.dart';
+import '../widgets/egyptian_hijri_sync_status.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/widgets/app_loading_dialog.dart';
 
@@ -39,6 +40,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   @override
   void initState() {
     super.initState();
+    EgyptianHijriCalendar.instance.addListener(_onCalendarChanged);
     _loadData();
     _timer = Timer.periodic(
       const Duration(seconds: 1),
@@ -48,8 +50,13 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
 
   @override
   void dispose() {
+    EgyptianHijriCalendar.instance.removeListener(_onCalendarChanged);
     _timer?.cancel();
     super.dispose();
+  }
+
+  void _onCalendarChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadData() async {
@@ -306,11 +313,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hijriOffset = PrayerService().hijriOffset;
-    final adjustedDate = _selectedDate.add(Duration(days: hijriOffset));
-    final selectedHijri = HijriCalendar.fromDate(adjustedDate);
-    final hijriStr =
-        "${selectedHijri.hDay} ${selectedHijri.longMonthName} ${selectedHijri.hYear}";
+    final selectedHijri = EgyptianHijriCalendar.instance.lookup(_selectedDate);
+    final hijriStr = selectedHijri?.format ?? 'التاريخ المصري غير متاح لهذا اليوم';
     final gregStr = DateFormat('d MMMM yyyy', 'ar').format(_selectedDate);
     final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
 
@@ -373,6 +377,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
               physics: const BouncingScrollPhysics(),
               child: Column(
                 children: [
+                  const EgyptianHijriSyncStatus(),
                   if (isToday)
                     Padding(
                       padding: EdgeInsets.only(top: 14.h, bottom: 8.h),
@@ -430,6 +435,10 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                                     fontSize: 12.sp,
                                   ),
                                 ),
+                                Text(
+                                  EgyptianHijriCalendar.instance.dateSourceLabel(_selectedDate),
+                                  style: TextStyle(fontFamily: AppConsts.cairo, color: Colors.grey, fontSize: 9.sp),
+                                ),
                               ],
                             ),
                           ],
@@ -449,7 +458,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                         : _prayers.length + 1,
                     itemBuilder: (context, index) {
                       if (index == 0) {
-                        return _buildDateHeader(hijriStr);
+                        return _buildDateHeader(hijriStr, _selectedDate);
                       }
                       if (index <= _prayers.length) {
                         final p = _prayers[index - 1];
@@ -458,15 +467,9 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                       }
                       if (isToday) {
                         if (index == _prayers.length + 1) {
-                          final tomorrowDate = DateTime.now().add(
-                            const Duration(days: 1),
-                          );
-                          final tomorrowH = HijriCalendar.fromDate(
-                            tomorrowDate.add(Duration(days: hijriOffset)),
-                          );
-                          return _buildDateHeader(
-                            "${tomorrowH.hDay} ${tomorrowH.longMonthName} ${tomorrowH.hYear}",
-                          );
+                          final tomorrowDate = _selectedDate.add(const Duration(days: 1));
+                          final tomorrowH = EgyptianHijriCalendar.instance.lookup(tomorrowDate);
+                          return _buildDateHeader(tomorrowH?.format ?? 'التاريخ المصري غير متاح لهذا اليوم', tomorrowDate);
                         }
                         final p = _tomorrowPrayers[index - _prayers.length - 2];
                         final isNext = p == _nextPrayer;
@@ -481,7 +484,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     );
   }
 
-  Widget _buildDateHeader(String dateText) {
+  Widget _buildDateHeader(String dateText, DateTime civilDate) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 20.h),
       child: Row(
@@ -489,14 +492,19 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
           const Expanded(child: Divider(color: _goldColor)),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 10.w),
-            child: Text(
-              dateText,
-              style: TextStyle(
-                fontFamily: AppConsts.expoArabic,
-                color: _goldColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 14.sp,
-              ),
+            child: Column(
+              children: [
+                Text(
+                  dateText,
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    color: _goldColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14.sp,
+                  ),
+                ),
+                Text(EgyptianHijriCalendar.instance.dateSourceLabel(civilDate), style: TextStyle(fontFamily: AppConsts.cairo, color: Colors.grey, fontSize: 9.sp)),
+              ],
             ),
           ),
           const Expanded(child: Divider(color: _goldColor)),
