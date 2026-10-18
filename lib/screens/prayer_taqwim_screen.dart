@@ -13,6 +13,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../core/constants/daily_wisdoms.dart';
 import '../widgets/app_skeleton.dart';
+import '../widgets/egyptian_hijri_sync_status.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class PrayerTaqwimScreen extends StatefulWidget {
@@ -43,8 +44,13 @@ class _PrayerTaqwimScreenState extends State<PrayerTaqwimScreen> {
   @override
   void initState() {
     super.initState();
+    EgyptianHijriCalendar.instance.addListener(_onCalendarChanged);
     _pageController = PageController(initialPage: _initialPage);
     _loadBgColor();
+  }
+
+  void _onCalendarChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadBgColor() async {
@@ -63,6 +69,7 @@ class _PrayerTaqwimScreenState extends State<PrayerTaqwimScreen> {
 
   @override
   void dispose() {
+    EgyptianHijriCalendar.instance.removeListener(_onCalendarChanged);
     _pageController.dispose();
     super.dispose();
   }
@@ -289,6 +296,7 @@ class _PrayerTaqwimScreenState extends State<PrayerTaqwimScreen> {
       ),
       body: Column(
         children: [
+          const EgyptianHijriSyncStatus(),
           // Navigation Bar
           _buildNavBar(isDark, goldColor),
 
@@ -628,7 +636,7 @@ class _TaqwimPage extends StatelessWidget {
                       Padding(
                         padding: EdgeInsets.only(top: 2.h, bottom: 6.h),
                         child: Text(
-                          'التاريخ الهجري الرسمي: الهيئة المصرية العامة للمساحة — القاهرة',
+                          'التاريخ الهجري المصري: ${EgyptianHijriCalendar.instance.dateSourceLabel(date)}',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 9.sp, color: subTextColor),
                         ),

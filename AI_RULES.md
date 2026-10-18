@@ -86,3 +86,10 @@
     - On app version updates (`AppMigrationHelper`), cached Google Sign-In email and session tokens MUST be cleaned and disconnected to prevent ghost sessions or repeated account selection dialog loops.
     - Silent authentication timeout must be capped at 3 seconds, gracefully falling back to interactive authentication or notification prompting when backup/sync is requested.
 
+
+32. **التاريخ المصري في النتيجة وصفحة المواقيت — تأكيد المستخدم**:
+    - لهذا النطاق تحديدًا، جدول الهيئة المصرية العامة للمساحة هو الأساس الوطني الموحد، ولا يوجد اختيار محافظة ولا جلب مواقيت من المصدر.
+    - اختلاف قراءة دار الإفتاء لا يثبت خطأ الهيئة: قد تتأخر أي خدمة في التحديث، ولا تُفترض ساعة تحديث موثقة دون دليل.
+    - عند الاشتباه يُطلب تأكيد التاريخ المعروض أو أقل بيوم أو أكثر بيوم، مع عرض القيم الفعلية، ولا يستبدل التاريخ بالإفتاء تلقائيًا.
+    - يُحفظ اختيار المستخدم مستقلاً ويُتبع داخل الشهر حتى يوم 29، وعنده يعاد التحقق والتأكيد؛ لا يُمدد التصحيح عبر حد شهر مفترض ولا تستعمل مكتبة هجري لهذا النطاق.
+    - هذه القاعدة تعلو قواعد ICU والإزاحات العامة للشاشتين فقط؛ لا تتغير حسابات الصلاة والإشعارات وودجت أندرويد.

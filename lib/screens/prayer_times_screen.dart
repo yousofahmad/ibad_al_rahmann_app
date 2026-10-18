@@ -12,6 +12,7 @@ import 'widgets/prayer_ring_widget.dart';
 import 'prayer_taqwim_screen.dart';
 
 import '../widgets/app_skeleton.dart';
+import '../widgets/egyptian_hijri_sync_status.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/widgets/app_loading_dialog.dart';
 
@@ -39,6 +40,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   @override
   void initState() {
     super.initState();
+    EgyptianHijriCalendar.instance.addListener(_onCalendarChanged);
     _loadData();
     _timer = Timer.periodic(
       const Duration(seconds: 1),
@@ -48,8 +50,13 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
 
   @override
   void dispose() {
+    EgyptianHijriCalendar.instance.removeListener(_onCalendarChanged);
     _timer?.cancel();
     super.dispose();
+  }
+
+  void _onCalendarChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadData() async {
@@ -370,6 +377,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
               physics: const BouncingScrollPhysics(),
               child: Column(
                 children: [
+                  const EgyptianHijriSyncStatus(),
                   if (isToday)
                     Padding(
                       padding: EdgeInsets.only(top: 14.h, bottom: 8.h),
@@ -428,7 +436,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                                   ),
                                 ),
                                 Text(
-                                  'وفق الهيئة المصرية العامة للمساحة',
+                                  EgyptianHijriCalendar.instance.dateSourceLabel(_selectedDate),
                                   style: TextStyle(fontFamily: AppConsts.cairo, color: Colors.grey, fontSize: 9.sp),
                                 ),
                               ],
@@ -450,7 +458,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                         : _prayers.length + 1,
                     itemBuilder: (context, index) {
                       if (index == 0) {
-                        return _buildDateHeader(hijriStr);
+                        return _buildDateHeader(hijriStr, _selectedDate);
                       }
                       if (index <= _prayers.length) {
                         final p = _prayers[index - 1];
@@ -461,7 +469,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                         if (index == _prayers.length + 1) {
                           final tomorrowDate = _selectedDate.add(const Duration(days: 1));
                           final tomorrowH = EgyptianHijriCalendar.instance.lookup(tomorrowDate);
-                          return _buildDateHeader(tomorrowH?.format ?? 'التاريخ المصري غير متاح لهذا اليوم');
+                          return _buildDateHeader(tomorrowH?.format ?? 'التاريخ المصري غير متاح لهذا اليوم', tomorrowDate);
                         }
                         final p = _tomorrowPrayers[index - _prayers.length - 2];
                         final isNext = p == _nextPrayer;
@@ -476,7 +484,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     );
   }
 
-  Widget _buildDateHeader(String dateText) {
+  Widget _buildDateHeader(String dateText, DateTime civilDate) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 20.h),
       child: Row(
@@ -495,7 +503,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                     fontSize: 14.sp,
                   ),
                 ),
-                Text('الهيئة المصرية العامة للمساحة', style: TextStyle(fontFamily: AppConsts.cairo, color: Colors.grey, fontSize: 9.sp)),
+                Text(EgyptianHijriCalendar.instance.dateSourceLabel(civilDate), style: TextStyle(fontFamily: AppConsts.cairo, color: Colors.grey, fontSize: 9.sp)),
               ],
             ),
           ),

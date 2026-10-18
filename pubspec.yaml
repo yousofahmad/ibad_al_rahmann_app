@@ -30,6 +30,7 @@ dependencies:
   # باقي مكتباتك
   android_alarm_manager_plus: ^5.0.0
   http: ^1.2.0
+  html: ^0.15.6
   url_launcher: ^6.2.5
   adhan: ^2.0.0+1
   geolocator: ^14.0.2

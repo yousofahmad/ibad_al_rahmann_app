@@ -22,6 +22,7 @@ import 'screens/bubble_overlay.dart';
 import 'services/notification_service.dart';
 import 'services/daily_tracker_service.dart';
 import 'services/egyptian_hijri_calendar.dart';
+import 'services/egyptian_hijri_sync_runner.dart';
 import 'services/prayer_service.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'screens/tasbeeh_screen.dart';
@@ -186,6 +187,9 @@ Future<void> _runBackgroundInits() async {
   AppLogger.log('BgInit', 'AppMigrationHelper check start');
   await AppMigrationHelper.checkAndPerformMigration();
   AppLogger.log('BgInit', 'AppMigrationHelper check done');
+
+  // Calendar network work is independent of prayer scheduling and frame 0.
+  EgyptianHijriSyncRunner.instance.start();
 
   AppLogger.log('BgInit', 'PrayerService.init start');
   PrayerService().init();
