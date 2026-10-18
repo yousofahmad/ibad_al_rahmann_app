@@ -21,6 +21,7 @@ import 'package:ibad_al_rahmann/features/wird/bloc/khatma_cubit.dart';
 import 'screens/bubble_overlay.dart';
 import 'services/notification_service.dart';
 import 'services/daily_tracker_service.dart';
+import 'services/egyptian_hijri_calendar.dart';
 import 'services/prayer_service.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'screens/tasbeeh_screen.dart';
@@ -103,6 +104,13 @@ Future<void> main() async {
 
   // 1. Core Platform Inits
   await initializeDateFormatting('ar', null);
+  try {
+    await EgyptianHijriCalendar.instance.initialize();
+  } catch (error) {
+    // Keep prayer times usable; date views show unavailable, never a
+    // calculated replacement attributed to the Egyptian Survey Authority.
+    debugPrint('Official Egyptian Hijri calendar unavailable: $error');
+  }
   await CacheHelper.init();
   await AppLogger.init(); // ← يجب أن يكون بعد CacheHelper مباشرةً
   AppLogger.log('main', 'app started — Flutter init complete');
