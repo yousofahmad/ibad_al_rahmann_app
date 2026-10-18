@@ -114,6 +114,34 @@ class BlockingSources extends FakeSources {
   }
 }
 
+class ChangingMonthSources extends FakeSources {
+  ChangingMonthSources({
+    required this.firstMonthDay,
+    required this.secondMonthDay,
+  }) : super(
+         annualDay: firstMonthDay,
+         monthDay: secondMonthDay,
+         darDay: secondMonthDay,
+       );
+  final int firstMonthDay;
+  final int secondMonthDay;
+
+  @override
+  Future<Map<String, Map<String, int>>> fetchSurveyYear(int year) async {
+    annualCalls++;
+    return _fullYear(year, currentDay: firstMonthDay);
+  }
+
+  @override
+  Future<Map<String, Map<String, int>>> fetchSurveyMonth(
+    int month,
+    int year,
+  ) async {
+    monthCalls++;
+    return _fullMonth(year, month, currentDay: secondMonthDay);
+  }
+}
+
 Map<String, dynamic> _state({
   Map<String, dynamic>? survey,
   String? annualYear,
@@ -143,6 +171,28 @@ Future<EgyptianHijriSync> _refresh(
   return engine;
 }
 
+Future<EgyptianHijriSync> _refreshAt(
+  FakeSources source,
+  DateTime at, {
+  bool force = false,
+}) async {
+  final engine = EgyptianHijriSync(sources: source, clock: () => at);
+  await engine.refresh(force: force);
+  return engine;
+}
+
+Future<Map<String, dynamic>> _savedState() async {
+  final prefs = await SharedPreferences.getInstance();
+  return jsonDecode(prefs.getString(EgyptianHijriSync.stateKey)!)
+      as Map<String, dynamic>;
+}
+
+Future<void> _makePending(FakeSources source) async {
+  await _seed(_state());
+  await _refreshAt(source, _now);
+  await _refreshAt(source, _now.add(EgyptianHijriSync.minConfirmationInterval));
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   tearDown(() {
@@ -151,16 +201,16 @@ void main() {
   });
 
   test(
-    'ESA=8 and Dar=7 creates pending confirmation while lookup stays 8',
+    'first ESA=8 and Dar=7 observation is not immediately actionable',
     () async {
       final source = FakeSources();
       await _seed(_state());
       await _refresh(source);
       final calendar = EgyptianHijriCalendar.instance;
       expect(calendar.lookup(_now)?.hDay, 8);
-      expect(calendar.pendingConfirmation?.displayedDate.hDay, 8);
-      expect(calendar.pendingConfirmation?.reason, 'sources_disagree');
-      expect(calendar.shouldPromptConfirmation, isTrue);
+      expect(calendar.pendingConfirmation, isNull);
+      expect(calendar.shouldPromptConfirmation, isFalse);
+      expect((await _savedState())['disagreement']['checks'], 1);
     },
   );
 
@@ -168,12 +218,15 @@ void main() {
     'confirm displayed 8 with adjustment 0 stores 8 and manual lookup wins',
     () async {
       final source = FakeSources();
-      await _seed(_state());
-      final engine = await _refresh(source);
+      await _makePending(source);
+      final engine = EgyptianHijriSync(
+        sources: source,
+        clock: () => _now.add(EgyptianHijriSync.minConfirmationInterval),
+      );
       final calendar = EgyptianHijriCalendar.instance;
       await engine.confirmDate(
         civilDate: _now,
-        displayedDate: calendar.pendingConfirmation!.displayedDate,
+        displayedDate: calendar.lookup(_now)!,
         adjustment: 0,
       );
       expect(calendar.lookup(_now)?.hDay, 8);
@@ -188,28 +241,19 @@ void main() {
   test(
     'adjustments -1/+1 choose 7/9, but manual continuation stops at 29',
     () async {
-      await _seed(_state());
-      final engine = await _refresh(FakeSources());
+      final source = FakeSources();
+      await _makePending(source);
+      final engine = EgyptianHijriSync(
+        sources: source,
+        clock: () => _now.add(EgyptianHijriSync.minConfirmationInterval),
+      );
       final c = EgyptianHijriCalendar.instance;
-      expect(
-        c
-            .choiceForAdjustment(
-              _now,
-              c.pendingConfirmation!.displayedDate,
-              -1,
-            )!
-            .hDay,
-        7,
-      );
-      expect(
-        c
-            .choiceForAdjustment(_now, c.pendingConfirmation!.displayedDate, 1)!
-            .hDay,
-        9,
-      );
+      final displayed = c.pendingConfirmation!.displayedDate;
+      expect(c.choiceForAdjustment(_now, displayed, -1)!.hDay, 7);
+      expect(c.choiceForAdjustment(_now, displayed, 1)!.hDay, 9);
       await engine.confirmDate(
         civilDate: _now,
-        displayedDate: c.pendingConfirmation!.displayedDate,
+        displayedDate: displayed,
         adjustment: 0,
       );
       expect(c.userConfirmation!.lookup(DateTime.utc(2026, 11, 9))!.hDay, 29);
@@ -218,11 +262,15 @@ void main() {
   );
 
   test(
-    'day 29 always has manual_recheck, confirming 29 does not repeat today, and day 30 prompts again',
+    'day 29 confirmation does not repeat today; expiry waits for persistent disagreement',
     () async {
       final source = FakeSources(annualDay: 29, darDay: 28, monthDay: 29);
       await _seed(_state());
-      final engine = await _refresh(source);
+      await _refreshAt(source, _now);
+      final engine = await _refreshAt(
+        source,
+        _now.add(EgyptianHijriSync.minConfirmationInterval),
+      );
       final c = EgyptianHijriCalendar.instance;
       expect(c.pendingConfirmation, isNotNull);
       await engine.confirmDate(
@@ -234,11 +282,15 @@ void main() {
       await _refresh(FakeSources(annualDay: 29, darDay: 29, monthDay: 29));
       expect(c.pendingConfirmation, isNull);
       final tomorrow = DateTime.utc(2026, 10, 20);
-      await _refresh(
-        FakeSources(annualDay: 30, darDay: 30, monthDay: 30),
-        clock: () => DateTime.utc(2026, 10, 20, 12),
+      final tomorrowSource = FakeSources(
+        annualDay: 30,
+        darDay: 30,
+        monthDay: 30,
       );
+      await _refreshAt(tomorrowSource, tomorrow.add(const Duration(hours: 12)));
       expect(c.lookup(tomorrow), isNotNull);
+      expect(c.pendingConfirmation, isNull);
+      await _refreshAt(tomorrowSource, tomorrow.add(const Duration(hours: 13)));
       expect(c.pendingConfirmation?.reason, 'manual_recheck');
     },
   );
@@ -338,12 +390,16 @@ void main() {
   test(
     'confirmation survives restart before network and annual state cannot overwrite independent manual key',
     () async {
-      await _seed(_state());
-      final first = await _refresh(FakeSources());
+      final source = FakeSources();
+      await _makePending(source);
+      final first = EgyptianHijriSync(
+        sources: source,
+        clock: () => _now.add(EgyptianHijriSync.minConfirmationInterval),
+      );
       final c = EgyptianHijriCalendar.instance;
       await first.confirmDate(
         civilDate: _now,
-        displayedDate: c.pendingConfirmation!.displayedDate,
+        displayedDate: c.lookup(_now)!,
         adjustment: 0,
       );
       c.resetForTesting();
@@ -363,14 +419,205 @@ void main() {
   test(
     'manual confirmation expired never extrapolates and defer persists the civil date',
     () async {
-      await _seed(_state());
-      final engine = await _refresh(FakeSources());
+      final source = FakeSources();
+      await _makePending(source);
+      final engine = EgyptianHijriSync(
+        sources: source,
+        clock: () => _now.add(const Duration(hours: 1)),
+      );
       final c = EgyptianHijriCalendar.instance;
       await engine.deferConfirmation();
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString(egyptianHijriDeferredKey), _key(_now));
       expect(c.shouldPromptConfirmation, isFalse);
       expect(c.userConfirmation, isNull);
+    },
+  );
+  test(
+    'same disagreement needs two fresh observations one hour apart',
+    () async {
+      final source = FakeSources();
+      await _seed(_state());
+      await _refreshAt(source, _now);
+      expect((await _savedState())['disagreement']['checks'], 1);
+      await _refreshAt(
+        source,
+        _now.add(const Duration(minutes: 59)),
+        force: true,
+      );
+      expect((await _savedState())['disagreement']['checks'], 1);
+      await _refreshAt(source, _now.add(const Duration(hours: 1)), force: true);
+      final state = await _savedState();
+      expect(state['disagreement']['checks'], 2);
+      expect(
+        EgyptianHijriCalendar.instance.pendingConfirmation?.reason,
+        'sources_disagree',
+      );
+    },
+  );
+
+  test(
+    'cached reload and repeated force under one hour do not count',
+    () async {
+      final source = FakeSources();
+      await _seed(_state());
+      await _refreshAt(source, _now);
+      final calls = source.darCalls;
+      await _refreshAt(
+        source,
+        _now.add(const Duration(minutes: 30)),
+        force: true,
+      );
+      await _refreshAt(
+        source,
+        _now.add(const Duration(minutes: 45)),
+        force: true,
+      );
+      expect(source.darCalls, calls + 2);
+      expect((await _savedState())['disagreement']['checks'], 1);
+      expect(EgyptianHijriCalendar.instance.pendingConfirmation, isNull);
+      EgyptianHijriCalendar.instance.resetForTesting();
+      await EgyptianHijriCalendar.instance.initialize();
+      await _refreshAt(source, _now.add(const Duration(minutes: 50)));
+      expect((await _savedState())['disagreement']['checks'], 1);
+    },
+  );
+
+  test('failed Dar or ESA second observation does not count', () async {
+    final source = FakeSources();
+    await _seed(_state());
+    await _refreshAt(source, _now);
+    source.failDar = true;
+    source.failAnnual = true;
+    source.failMonth = true;
+    await _refreshAt(source, _now.add(const Duration(hours: 1)), force: true);
+    expect((await _savedState())['disagreement']['checks'], 1);
+    expect(EgyptianHijriCalendar.instance.pendingConfirmation, isNull);
+  });
+
+  test('changing civil day or date pair resets disagreement period', () async {
+    final source = FakeSources();
+    await _seed(_state());
+    await _refreshAt(source, _now);
+    await _refreshAt(source, _now.add(const Duration(days: 1)));
+    expect((await _savedState())['disagreement']['checks'], 1);
+    final changed = FakeSources(darDay: 6, annualDay: 8, monthDay: 8);
+    await _refreshAt(
+      changed,
+      _now.add(const Duration(days: 1, hours: 1)),
+      force: true,
+    );
+    final record = (await _savedState())['disagreement'];
+    expect(record['checks'], 1);
+    expect(record['dar']['day'], 6);
+  });
+
+  test(
+    'Dar catches up from 7 to 8: no dialog and no stored correction',
+    () async {
+      final source = FakeSources();
+      await _seed(_state());
+      await _refreshAt(source, _now);
+      expect((await _savedState())['disagreement']['checks'], 1);
+      source.darDay = 8;
+      await _refreshAt(source, _now.add(const Duration(hours: 1)));
+      final calendar = EgyptianHijriCalendar.instance;
+      expect(calendar.lookup(_now)?.hDay, 8);
+      expect(calendar.pendingConfirmation, isNull);
+      expect(calendar.userConfirmation, isNull);
+      expect((await _savedState())['disagreement'], isNull);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(egyptianHijriConfirmationKey), isNull);
+    },
+  );
+
+  for (final failedSource in ['dar', 'esa']) {
+    test(
+      'failure of only $failedSource cannot confirm a disagreement',
+      () async {
+        final source = FakeSources();
+        await _seed(_state());
+        await _refreshAt(source, _now);
+        source.failDar = failedSource == 'dar';
+        source.failMonth = failedSource == 'esa';
+        await _refreshAt(source, _now.add(const Duration(hours: 1)));
+        expect((await _savedState())['disagreement']['checks'], 1);
+        expect(EgyptianHijriCalendar.instance.pendingConfirmation, isNull);
+      },
+    );
+  }
+
+  test(
+    'day 29 and expiry do not ask when both official sources agree',
+    () async {
+      await _seed(_state());
+      final engine = await _refresh(
+        FakeSources(annualDay: 29, darDay: 29, monthDay: 29),
+      );
+      final calendar = EgyptianHijriCalendar.instance;
+      await engine.confirmDate(
+        civilDate: _now,
+        displayedDate: calendar.lookup(_now)!,
+        adjustment: 0,
+      );
+      await _refreshAt(
+        FakeSources(annualDay: 29, darDay: 29, monthDay: 29),
+        _now.add(const Duration(hours: 1)),
+      );
+      expect(calendar.pendingConfirmation, isNull);
+      final tomorrow = _now.add(const Duration(days: 1));
+      await _refreshAt(FakeSources(darDay: 20), tomorrow);
+      expect(calendar.userConfirmation!.lookup(tomorrow), isNull);
+      expect(calendar.pendingConfirmation, isNull);
+      expect(
+        calendar.dateSourceLabel(tomorrow),
+        EgyptianHijriCalendar.sourceName,
+      );
+    },
+  );
+
+  test(
+    'restart does not publish old confirmed disagreement before a fresh match',
+    () async {
+      final source = FakeSources();
+      await _makePending(source);
+      final calendar = EgyptianHijriCalendar.instance;
+      calendar.resetForTesting();
+      await calendar.initialize();
+      final notifications = <PendingHijriConfirmation?>[];
+      void listener() => notifications.add(calendar.pendingConfirmation);
+      calendar.addListener(listener);
+      source.darDay = 8;
+      try {
+        await _refreshAt(source, _now.add(const Duration(hours: 2)));
+      } finally {
+        calendar.removeListener(listener);
+      }
+      expect(notifications.whereType<PendingHijriConfirmation>(), isEmpty);
+      expect((await _savedState())['disagreement'], isNull);
+    },
+  );
+
+  test(
+    'late ESA month match prevents an intermediate pending notification',
+    () async {
+      await _seed(_state());
+      final source = ChangingMonthSources(firstMonthDay: 8, secondMonthDay: 7);
+      await _refreshAt(source, _now, force: true);
+      expect((await _savedState())['disagreement']['checks'], 1);
+      final calendar = EgyptianHijriCalendar.instance;
+      final notifications = <PendingHijriConfirmation?>[];
+      void listener() => notifications.add(calendar.pendingConfirmation);
+      calendar.addListener(listener);
+      try {
+        await _refreshAt(source, _now.add(const Duration(hours: 1)));
+      } finally {
+        calendar.removeListener(listener);
+      }
+      expect(source.monthCalls, 1);
+      expect(notifications.whereType<PendingHijriConfirmation>(), isEmpty);
+      expect(EgyptianHijriCalendar.instance.pendingConfirmation, isNull);
+      expect((await _savedState())['disagreement'], isNull);
     },
   );
 }

@@ -11,6 +11,8 @@ import 'egyptian_hijri_sources.dart';
 /// Only an explicit user confirmation can override the displayed ESA date.
 class EgyptianHijriSync {
   static const stateKey = egyptianHijriStateKey;
+  // An observation gap, not a claim about either site's update schedule.
+  static const minConfirmationInterval = Duration(hours: 1);
   static final instance = EgyptianHijriSync();
   final EgyptianHijriSources sources;
   final Future<SharedPreferences> Function() _prefsFactory;
@@ -96,6 +98,89 @@ class EgyptianHijriSync {
     }
   }
 
+  static bool _sameDisagreement(
+    dynamic record,
+    String day,
+    EgyptianHijriDate? survey,
+    EgyptianHijriDate? dar,
+  ) {
+    if (record is! Map ||
+        survey == null ||
+        dar == null ||
+        survey == dar ||
+        record['civilDate'] != day) {
+      return false;
+    }
+    try {
+      return EgyptianHijriCalendar.parseDates({day: record['survey']})[day] ==
+              survey &&
+          EgyptianHijriCalendar.parseDates({day: record['dar']})[day] == dar;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static bool _confirmedDisagreement(
+    dynamic record,
+    String day,
+    EgyptianHijriDate? survey,
+    EgyptianHijriDate? dar,
+    DateTime now,
+  ) {
+    if (!_sameDisagreement(record, day, survey, dar) || record['checks'] != 2) {
+      return false;
+    }
+    final first = DateTime.tryParse(record['firstSeenAt']?.toString() ?? '');
+    final last = DateTime.tryParse(record['lastSeenAt']?.toString() ?? '');
+    return first != null &&
+        last != null &&
+        !last.isAfter(now) &&
+        last.difference(first) >= minConfirmationInterval &&
+        EgyptianHijriCalendar.civilKey(cairoToday(first)) == day &&
+        EgyptianHijriCalendar.civilKey(cairoToday(last)) == day;
+  }
+
+  static void _observeDisagreement(
+    Map<String, dynamic> state,
+    String day,
+    EgyptianHijriDate? survey,
+    EgyptianHijriDate? dar,
+    DateTime now, {
+    required bool freshPair,
+  }) {
+    final previous = state['disagreement'];
+    final same = _sameDisagreement(previous, day, survey, dar);
+    if (!same) state.remove('disagreement');
+    if (!freshPair || survey == null || dar == null || survey == dar) return;
+    final first = same
+        ? DateTime.tryParse(previous['firstSeenAt']?.toString() ?? '')
+        : null;
+    final last = same
+        ? DateTime.tryParse(previous['lastSeenAt']?.toString() ?? '')
+        : null;
+    if (first == null ||
+        last == null ||
+        first.isAfter(now) ||
+        last.isAfter(now) ||
+        EgyptianHijriCalendar.civilKey(cairoToday(first)) != day) {
+      state['disagreement'] = {
+        'civilDate': day,
+        'survey': survey.toJson(),
+        'dar': dar.toJson(),
+        'firstSeenAt': now.toIso8601String(),
+        'lastSeenAt': now.toIso8601String(),
+        'checks': 1,
+      };
+    } else if (now.difference(first) >= minConfirmationInterval &&
+        now.difference(last) >= minConfirmationInterval) {
+      state['disagreement'] = {
+        ...Map<String, dynamic>.from(previous as Map),
+        'lastSeenAt': now.toIso8601String(),
+        'checks': 2,
+      };
+    }
+  }
+
   Future<void> refresh({bool force = false}) async {
     if (_busy) return;
     _busy = true;
@@ -120,24 +205,29 @@ class EgyptianHijriSync {
       };
       calendar.restoreUserConfirmation(prefs);
       var dar = _cachedDar(state, key);
-      var conflict = state['conflictActive'] == true;
+      var conflict = dar != null && survey[key] != null
+          ? survey[key] != dar
+          : state['conflictActive'] == true;
       var attempted = false;
+      var freshDar = false, freshSurvey = false;
+      var canPrompt = false;
       final errors = <String>[];
 
       PendingHijriConfirmation? pending() {
+        if (!canPrompt) return null;
         final user = calendar.userConfirmation;
         final manual = user?.lookup(today);
         final baseline = manual ?? survey[key] ?? dar;
         if (baseline == null) return null;
         final recheck = user?.recheckDue(today) ?? false;
         if (manual != null && !recheck) return null;
-        final disagree =
-            dar != null && survey[key] != null && survey[key] != dar;
-        if (!recheck &&
-            !disagree &&
-            !(survey[key] == null && dar != null) &&
-            !(dar == null &&
-                (conflict || baseline.hDay >= 29 || baseline.hDay == 1))) {
+        if (!_confirmedDisagreement(
+          state['disagreement'],
+          key,
+          survey[key],
+          dar,
+          now,
+        )) {
           return null;
         }
         return PendingHijriConfirmation(
@@ -145,28 +235,25 @@ class EgyptianHijriSync {
           displayedDate: baseline,
           surveyDate: survey[key],
           darDate: dar,
-          reason: recheck
-              ? 'manual_recheck'
-              : (disagree
-                    ? 'sources_disagree'
-                    : (survey[key] == null
-                          ? 'survey_unavailable'
-                          : 'verification_unavailable')),
+          reason: recheck ? 'manual_recheck' : 'sources_disagree',
         );
       }
 
       String status() {
         final manual = calendar.userConfirmation?.lookup(today);
+        if (pending() != null) {
+          return 'استمر اختلاف المصدرين بعد إعادة التحقق؛ نحتاج تأكيدك للتاريخ.';
+        }
         if (manual != null) {
           return calendar.userConfirmation!.recheckDue(today)
-              ? 'وصلنا إلى يوم ٢٩؛ راجع التاريخ وأكّده مجددًا.'
+              ? 'بلغ تأكيدك يوم ٢٩؛ نراجع المصدرين مجددًا دون طلب تعديل بسبب قراءة واحدة.'
               : 'نعمل بتأكيدك للتاريخ حتى يوم ٢٩؛ اختلاف المصدرين لا يغيّره تلقائيًا.';
-        }
-        if (pending() != null) {
-          return 'نحتاج تأكيدك؛ اختلاف المصدرين قد يكون بسبب تأخر التحديث.';
         }
         if (dar != null && survey[key] == dar) {
           return 'تاريخ المساحة مطابق لآخر قراءة اليوم من دار الإفتاء.';
+        }
+        if (dar != null && survey[key] != null && survey[key] != dar) {
+          return 'قد يكون أحد المصدرين متأخرًا؛ نحتفظ بجدول المساحة ونعيد التحقق في مزامنة لاحقة.';
         }
         return 'جدول المساحة محفوظ؛ لم تكتمل مراجعة المصدر الآخر لهذا اليوم.';
       }
@@ -220,11 +307,12 @@ class EgyptianHijriSync {
               'Invalid Dar Ifta observation provenance',
             );
           }
+          freshDar = true;
           conflict = survey[key] != null && survey[key] != dar;
         } catch (error) {
           errors.add('Dar Ifta: $error');
         }
-        publish();
+        // Do not open a new dialog before ESA has also had a chance to catch up.
         await save();
       }
 
@@ -246,6 +334,7 @@ class EgyptianHijriSync {
           state['annualSuccess'] = stamp;
           state['surveySuccessDay'] = key;
           downloadedToday = true;
+          freshSurvey = true;
           if (dar != null) conflict = survey[key] != dar;
         } catch (error) {
           errors.add('ESA year: $error');
@@ -263,7 +352,7 @@ class EgyptianHijriSync {
       if (!downloadedToday &&
           (force || conflict || boundary) &&
           (force ||
-              state['surveySuccessDay'] != key &&
+              (conflict || state['surveySuccessDay'] != key) &&
                   _due(
                     state['surveyAttempt'],
                     now,
@@ -282,11 +371,35 @@ class EgyptianHijriSync {
           );
           survey.addAll(data);
           state['surveySuccessDay'] = key;
+          freshSurvey = true;
           if (dar != null) conflict = survey[key] != dar;
         } catch (error) {
           errors.add('ESA month: $error');
         }
       }
+      _observeDisagreement(
+        state,
+        key,
+        survey[key],
+        dar,
+        now,
+        freshPair: freshDar && freshSurvey,
+      );
+      canPrompt =
+          freshDar && freshSurvey ||
+          !attempted &&
+              _confirmedDisagreement(
+                state['disagreement'],
+                key,
+                survey[key],
+                dar,
+                now,
+              ) &&
+              !_due(
+                (state['disagreement'] as Map)['lastSeenAt'],
+                now,
+                minConfirmationInterval,
+              );
       state['lastAttempt'] = attempted ? stamp : state['lastAttempt'];
       publish();
       await save();
