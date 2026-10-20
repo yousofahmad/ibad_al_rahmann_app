@@ -7,11 +7,13 @@ import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/services/notification_service.dart';
 import 'package:intl/intl.dart';
 import '../services/prayer_service.dart';
+import '../services/egyptian_hijri_calendar.dart';
 import 'widgets/prayer_detail_modal.dart';
 import 'widgets/prayer_ring_widget.dart';
 import 'prayer_taqwim_screen.dart';
 
 import '../widgets/app_skeleton.dart';
+import '../widgets/egyptian_hijri_sync_status.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/widgets/app_loading_dialog.dart';
 
@@ -39,6 +41,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   @override
   void initState() {
     super.initState();
+    EgyptianHijriCalendar.instance.addListener(_onCalendarChanged);
     _loadData();
     _timer = Timer.periodic(
       const Duration(seconds: 1),
@@ -46,8 +49,13 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     );
   }
 
+  void _onCalendarChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    EgyptianHijriCalendar.instance.removeListener(_onCalendarChanged);
     _timer?.cancel();
     super.dispose();
   }
@@ -307,11 +315,12 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hijriOffset = PrayerService().hijriOffset;
-    final selectedHijri = PrayerService.getHijriWithOffset(
-      hijriOffset,
-      _selectedDate,
-    );
+    final selectedHijri = EgyptianHijriCalendar.instance.lookup(_selectedDate);
+    if (selectedHijri == null) {
+      return const Scaffold(
+        body: Center(child: Text('التاريخ الرسمي غير متاح')),
+      );
+    }
     final hijriStrRaw =
         "${selectedHijri.hDay} ${selectedHijri.longMonthName} ${selectedHijri.hYear}";
     final hijriStr = AppFormatters.toArabicDigits(hijriStrRaw);
@@ -378,6 +387,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
               physics: const BouncingScrollPhysics(),
               child: Column(
                 children: [
+                  const EgyptianHijriSyncStatus(),
                   if (isToday)
                     Padding(
                       padding: EdgeInsets.only(top: 14.h, bottom: 8.h),
@@ -458,7 +468,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                         : _prayers.length + 1,
                     itemBuilder: (context, index) {
                       if (index == 0) {
-                        return _buildDateHeader(hijriStr);
+                        return _buildDateHeader(hijriStr, _selectedDate);
                       }
                       if (index <= _prayers.length) {
                         final p = _prayers[index - 1];
@@ -470,14 +480,12 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                           final tomorrowDate = DateTime.now().add(
                             const Duration(days: 1),
                           );
-                          final tomorrowH = PrayerService.getHijriWithOffset(
-                            hijriOffset,
-                            tomorrowDate,
-                          );
+                          final tomorrowH = EgyptianHijriCalendar.instance
+                              .lookup(tomorrowDate);
                           final dateStr = AppFormatters.toArabicDigits(
-                            "${tomorrowH.hDay} ${tomorrowH.longMonthName} ${tomorrowH.hYear} هـ",
+                            "${tomorrowH?.hDay ?? "-"} ${tomorrowH?.longMonthName ?? ""} ${tomorrowH?.hYear ?? "-"} هـ",
                           );
-                          return _buildDateHeader(dateStr);
+                          return _buildDateHeader(dateStr, tomorrowDate);
                         }
                         final p = _tomorrowPrayers[index - _prayers.length - 2];
                         final isNext = p == _nextPrayer;
@@ -492,7 +500,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     );
   }
 
-  Widget _buildDateHeader(String dateText) {
+  Widget _buildDateHeader(String dateText, DateTime civilDate) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 20.h),
       child: Row(
@@ -500,14 +508,26 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
           const Expanded(child: Divider(color: _goldColor)),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 10.w),
-            child: Text(
-              dateText,
-              style: TextStyle(
-                fontFamily: AppConsts.expoArabic,
-                color: _goldColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 14.sp,
-              ),
+            child: Column(
+              children: [
+                Text(
+                  dateText,
+                  style: TextStyle(
+                    fontFamily: AppConsts.expoArabic,
+                    color: _goldColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14.sp,
+                  ),
+                ),
+                Text(
+                  EgyptianHijriCalendar.instance.dateSourceLabel(civilDate),
+                  style: TextStyle(
+                    fontFamily: AppConsts.cairo,
+                    color: Colors.grey,
+                    fontSize: 9.sp,
+                  ),
+                ),
+              ],
             ),
           ),
           const Expanded(child: Divider(color: _goldColor)),

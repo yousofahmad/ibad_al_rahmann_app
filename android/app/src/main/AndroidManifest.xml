@@ -33,6 +33,7 @@
         android:name=".MainApplication"
         android:icon="@mipmap/launcher_icon"
         android:allowBackup="false"
+        android:networkSecurityConfig="@xml/egyptian_calendar_network_security"
         android:fullBackupContent="false"
         tools:replace="android:label,android:allowBackup">
         

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Public date only. All other hosts retain the platform's HTTPS policy. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">di107.dar-alifta.org</domain>
+    </domain-config>
+</network-security-config>
