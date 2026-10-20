@@ -25,9 +25,29 @@ class VersePlayer extends StatelessWidget {
           secondChild: const SizedBox(),
           firstChild: Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: context.isLandscape
-                ? LandscapeVersePlayer(isLoading: state.loading)
-                : PortraitVersePlayer(isLoading: state.loading),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (context.isLandscape)
+                  LandscapeVersePlayer(isLoading: state.loading)
+                else
+                  PortraitVersePlayer(isLoading: state.loading),
+                if (state.errorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 6,
+                    ),
+                    child: Text(
+                      state.errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },

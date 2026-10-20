@@ -77,8 +77,10 @@ class _MobileSurahVersesWidgetState extends State<MobileSurahVersesWidget> {
     if (playingVerse != null &&
         playingVerse.surahNumber == word.suraNumber &&
         playingVerse.verseNumber == word.ayahNumber) {
-      if (cubit.isHighlightWordByWord && activeWordIndex != null) {
-        return word.position == activeWordIndex;
+      if (cubit.isHighlightWordByWord) {
+        // No timing index means the player is between words: do not paint the
+        // complete ayah (or an arbitrary word) during that gap.
+        return activeWordIndex != null && word.position == activeWordIndex;
       }
       return true;
     }
@@ -193,8 +195,11 @@ class _MobileSurahVersesWidgetState extends State<MobileSurahVersesWidget> {
                   children: lineWords.map((word) {
                     final isHighlighted = _isHighlighted(word);
                     return GestureDetector(
+                      onTap: () => cubit.toggleUiOnly(),
                       onLongPress: () {
-                        if (word.suraNumber == null ||
+                        // Audio sessions remain authoritative while paused or hidden.
+                        if (cubit.hasAudioSession ||
+                            word.suraNumber == null ||
                             word.ayahNumber == null) {
                           return;
                         }

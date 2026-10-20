@@ -10,7 +10,33 @@ class ReciterDropdown extends StatelessWidget {
 
   const ReciterDropdown({super.key, required this.cubit});
 
-  static void showReciterSelectionModal(BuildContext context, VersePlayerCubit cubit) {
+  @visibleForTesting
+  static List<ReciterAudioModel> filterReciters({
+    required Iterable<ReciterAudioModel> reciters,
+    required bool wordByWord,
+    String? category,
+    String searchQuery = '',
+  }) {
+    final query = searchQuery.trim().toLowerCase();
+    return reciters.where((r) {
+      final supportsMode = wordByWord
+          ? r.highlightSupport == ReciterHighlightSupport.wordByWord
+          : r.highlightSupport != ReciterHighlightSupport.none;
+      if (!supportsMode) return false;
+      if (category != null && category != 'الكل' && r.category != category) {
+        return false;
+      }
+      if (query.isEmpty) return true;
+      return r.name.toLowerCase().contains(query) ||
+          r.style.toLowerCase().contains(query) ||
+          r.category.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  static void showReciterSelectionModal(
+    BuildContext context,
+    VersePlayerCubit cubit,
+  ) {
     final activeModel =
         cubit.currentReciterModel ??
         ReciterAudioHelper.getReciterById(cubit.reciter ?? 'mishari_alafasy');
@@ -39,18 +65,12 @@ class ReciterDropdown extends StatelessWidget {
             final textColor = isDark ? Colors.white : Colors.black87;
             const gold = Color(0xFFD0A871);
 
-            final filteredReciters = allReciters.where((r) {
-              if (selectedCategory != null &&
-                  selectedCategory != 'الكل' &&
-                  r.category != selectedCategory) {
-                return false;
-              }
-              if (searchQuery.trim().isEmpty) return true;
-              final q = searchQuery.trim().toLowerCase();
-              return r.name.toLowerCase().contains(q) ||
-                  r.style.toLowerCase().contains(q) ||
-                  r.category.toLowerCase().contains(q);
-            }).toList();
+            final filteredReciters = ReciterDropdown.filterReciters(
+              reciters: allReciters,
+              wordByWord: cubit.isHighlightWordByWord,
+              category: selectedCategory,
+              searchQuery: searchQuery,
+            );
 
             return Container(
               height: context.screenHeight * 0.82,
@@ -91,13 +111,17 @@ class ReciterDropdown extends StatelessWidget {
                           size: 24.sp,
                         ),
                         SizedBox(width: 10.w),
-                        Text(
-                          'اختيار القارئ ونمط التظليل',
-                          style: TextStyle(
-                            fontFamily: AppConsts.expoArabic,
-                            fontSize: 16.5.sp,
-                            fontWeight: FontWeight.bold,
-                            color: gold,
+                        Expanded(
+                          child: Text(
+                            'اختيار القارئ ونمط التظليل',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: AppConsts.expoArabic,
+                              fontSize: 16.5.sp,
+                              fontWeight: FontWeight.bold,
+                              color: gold,
+                            ),
                           ),
                         ),
                         const Spacer(),
@@ -124,9 +148,7 @@ class ReciterDropdown extends StatelessWidget {
                           ? Colors.white.withValues(alpha: 0.06)
                           : Colors.black.withValues(alpha: 0.04),
                       borderRadius: BorderRadius.circular(16.r),
-                      border: Border.all(
-                        color: gold.withValues(alpha: 0.25),
-                      ),
+                      border: Border.all(color: gold.withValues(alpha: 0.25)),
                     ),
                     child: Row(
                       children: [
@@ -156,15 +178,20 @@ class ReciterDropdown extends StatelessWidget {
                                         : textColor.withValues(alpha: 0.6),
                                   ),
                                   SizedBox(width: 6.w),
-                                  Text(
-                                    'مقسم كلمات (تظليل كلمة)',
-                                    style: TextStyle(
-                                      fontFamily: AppConsts.expoArabic,
-                                      fontSize: 12.sp,
-                                      fontWeight: FontWeight.bold,
-                                      color: cubit.isHighlightWordByWord
-                                          ? Colors.white
-                                          : textColor.withValues(alpha: 0.7),
+                                  Flexible(
+                                    child: Text(
+                                      'مقسم كلمات (تظليل كلمة)',
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontFamily: AppConsts.expoArabic,
+                                        fontSize: 12.sp,
+                                        fontWeight: FontWeight.bold,
+                                        color: cubit.isHighlightWordByWord
+                                            ? Colors.white
+                                            : textColor.withValues(alpha: 0.7),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -198,15 +225,20 @@ class ReciterDropdown extends StatelessWidget {
                                         : textColor.withValues(alpha: 0.6),
                                   ),
                                   SizedBox(width: 6.w),
-                                  Text(
-                                    'مقسم آيات (تظليل آية)',
-                                    style: TextStyle(
-                                      fontFamily: AppConsts.expoArabic,
-                                      fontSize: 12.sp,
-                                      fontWeight: FontWeight.bold,
-                                      color: !cubit.isHighlightWordByWord
-                                          ? Colors.white
-                                          : textColor.withValues(alpha: 0.7),
+                                  Flexible(
+                                    child: Text(
+                                      'مقسم آيات (تظليل آية)',
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontFamily: AppConsts.expoArabic,
+                                        fontSize: 12.sp,
+                                        fontWeight: FontWeight.bold,
+                                        color: !cubit.isHighlightWordByWord
+                                            ? Colors.white
+                                            : textColor.withValues(alpha: 0.7),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -334,10 +366,6 @@ class ReciterDropdown extends StatelessWidget {
                       itemBuilder: (context, index) {
                         final reciterItem = filteredReciters[index];
                         final isSelected = reciterItem.id == activeModel.id;
-                        final hasWbw =
-                            reciterItem.highlightSupport ==
-                            ReciterHighlightSupport.wordByWord;
-
                         return InkWell(
                           onTap: () {
                             cubit.selectReciter(reciterItem);
@@ -418,36 +446,6 @@ class ReciterDropdown extends StatelessWidget {
                                                 color: textColor.withValues(
                                                   alpha: 0.7,
                                                 ),
-                                              ),
-                                            ),
-                                          ),
-                                          Container(
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: 6.w,
-                                              vertical: 1.5.h,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: hasWbw
-                                                  ? const Color(0xFF4CAF50)
-                                                      .withValues(alpha: 0.15)
-                                                  : const Color(0xFFD0A871)
-                                                      .withValues(alpha: 0.15),
-                                              borderRadius:
-                                                  BorderRadius.circular(4.r),
-                                            ),
-                                            child: Text(
-                                              hasWbw
-                                                  ? '🔤 تظليل كلمة بكلمة وآيات'
-                                                  : (reciterItem.hasSegments
-                                                        ? '📖 تظليل بالآيات'
-                                                        : '🎧 تلاوة السورة'),
-                                              style: TextStyle(
-                                                fontFamily: AppConsts.cairo,
-                                                fontSize: 9.5.sp,
-                                                fontWeight: FontWeight.bold,
-                                                color: hasWbw
-                                                    ? const Color(0xFF4CAF50)
-                                                    : const Color(0xFFD0A871),
                                               ),
                                             ),
                                           ),

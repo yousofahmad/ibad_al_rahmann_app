@@ -73,6 +73,11 @@ class _WirdQuranWidgetState extends State<WirdQuranWidget>
   }
 
   void _toggleMenu() {
+    final playerCubit = context.read<VersePlayerCubit>();
+    if (playerCubit.hasAudioSession) {
+      playerCubit.toggleUiOnly();
+      return;
+    }
     setState(() {
       _showMenu = !_showMenu;
       _showOverlays = !_showMenu;
@@ -97,33 +102,47 @@ class _WirdQuranWidgetState extends State<WirdQuranWidget>
     return MultiBlocListener(
       listeners: [
         BlocListener<VersePlayerCubit, VersePlayerState>(
-          listenWhen: (previous, current) => previous.showed != current.showed && current.showed,
+          listenWhen: (previous, current) =>
+              previous.showed != current.showed && current.showed,
           listener: (context, playerState) {
             if (_showOverlays) {
               setState(() {
                 _showMenu = true;
                 _showOverlays = false;
-                SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+                SystemChrome.setEnabledSystemUIMode(
+                  SystemUiMode.immersiveSticky,
+                );
               });
             }
           },
         ),
         BlocListener<QuranCubit, QuranState>(
           listener: (context, state) {
-        if (!_hasInitializedWirdPage && state.currentPage != null) {
-          _hasInitializedWirdPage = true;
-          final start = state.wirdStartPage ?? widget.targetStartPage ?? 1;
-          final int relative = (state.currentPage! - (start - 1)).clamp(
-            0,
-            _itemCount - 1,
-          );
-          _currentIndex = state.currentPage!;
-          if (_controller.hasClients) {
-            _controller.jumpToPage(relative);
-          }
-        }
-      },
-      ),
+            final pageIndex = state.currentPage;
+            if (pageIndex == null || _itemCount <= 0) return;
+            final start = state.wirdStartPage ?? widget.targetStartPage ?? 1;
+            final end = state.targetEndPage ?? widget.targetEndPage ?? start;
+            // An audio session may continue beyond a wird, but its reader must
+            // never navigate outside the configured wird/Kahf page range.
+            if (pageIndex < start - 1 || pageIndex >= end) return;
+            if (!_hasInitializedWirdPage || pageIndex != _currentIndex) {
+              _hasInitializedWirdPage = true;
+              _currentIndex = pageIndex;
+              final relative = pageIndex - (start - 1);
+              if (!state.isAutoScrolling && _controller.hasClients) {
+                _controller.jumpToPage(relative);
+              } else if (state.isAutoScrolling &&
+                  _autoScrollController.hasClients) {
+                _autoScrollController.jumpTo(
+                  (relative * _cachedPageHeight).clamp(
+                    0.0,
+                    _autoScrollController.position.maxScrollExtent,
+                  ),
+                );
+              }
+            }
+          },
+        ),
       ],
       child: BlocBuilder<QuranCubit, QuranState>(
         builder: (context, state) {

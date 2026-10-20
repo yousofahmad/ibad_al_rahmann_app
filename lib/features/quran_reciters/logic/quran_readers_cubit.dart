@@ -4,42 +4,83 @@ import '../data/models/reciter_model.dart';
 
 part 'quran_readers_state.dart';
 
+enum QuranReciterFilter { wordByWord, verseOnly, surah }
+
 class QuranReadersCubit extends Cubit<QuranReadersState> {
   QuranReadersCubit() : super(QuranReadersInitial()) {
     getQuranReaders();
   }
-  var searchController = TextEditingController();
+  final searchController = TextEditingController();
+  QuranReciterFilter selectedFilter = QuranReciterFilter.surah;
+  List<ReciterAudioModel> reciters = [];
 
-  void onSearch(String? value) {
-    if (value != null && value.trim().isNotEmpty) {
-      List<ReciterAudioModel> searchReciters = reciters
-          .where(
-            (e) =>
-                e.name.contains(value) ||
-                e.style.contains(value) ||
-                e.category.contains(value),
-          )
-          .toList();
-      emit(QuranReadersSuccess(reciters: searchReciters));
-    } else {
-      emit(QuranReadersSuccess(reciters: reciters));
-    }
+  /// Pure filtering logic, independent of the remote reciter source.
+  static List<ReciterAudioModel> filterReciters({
+    required List<ReciterAudioModel> reciters,
+    required QuranReciterFilter filter,
+    String query = '',
+  }) {
+    final normalizedQuery = query.trim().toLowerCase();
+    return reciters.where((reciter) {
+      final supportsFilter = switch (filter) {
+        QuranReciterFilter.wordByWord =>
+          reciter.highlightSupport == ReciterHighlightSupport.wordByWord,
+        QuranReciterFilter.verseOnly =>
+          reciter.highlightSupport == ReciterHighlightSupport.wordByWord ||
+              reciter.highlightSupport == ReciterHighlightSupport.verseOnly,
+        // All reciters expose a complete-surah recording.
+        QuranReciterFilter.surah => true,
+      };
+      if (!supportsFilter) return false;
+      if (normalizedQuery.isEmpty) return true;
+      return reciter.name.toLowerCase().contains(normalizedQuery) ||
+          reciter.style.toLowerCase().contains(normalizedQuery) ||
+          reciter.category.toLowerCase().contains(normalizedQuery);
+    }).toList();
   }
 
-  List<ReciterAudioModel> reciters = [];
+  void onSearch(String? value) {
+    _emitFiltered();
+  }
+
+  void selectFilter(QuranReciterFilter filter) {
+    if (selectedFilter == filter) return;
+    selectedFilter = filter;
+    _emitFiltered();
+  }
+
+  void _emitFiltered() {
+    if (isClosed) return;
+    emit(
+      QuranReadersSuccess(
+        reciters: filterReciters(
+          reciters: reciters,
+          filter: selectedFilter,
+          query: searchController.text,
+        ),
+      ),
+    );
+  }
 
   Future<void> getQuranReaders() async {
     emit(QuranReadersLoading());
     try {
       reciters = List.from(ReciterAudioHelper.availableReciters);
-      emit(QuranReadersSuccess(reciters: reciters));
+      _emitFiltered();
 
       await ReciterAudioHelper.fetchRemoteReciters();
+      if (isClosed) return;
       reciters = List.from(ReciterAudioHelper.availableReciters);
-      emit(QuranReadersSuccess(reciters: reciters));
+      _emitFiltered();
     } catch (e) {
       reciters = List.from(ReciterAudioHelper.defaultReciters);
-      emit(QuranReadersSuccess(reciters: reciters));
+      _emitFiltered();
     }
+  }
+
+  @override
+  Future<void> close() {
+    searchController.dispose();
+    return super.close();
   }
 }

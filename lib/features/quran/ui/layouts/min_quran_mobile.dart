@@ -1,6 +1,7 @@
 import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cubit.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:ibad_al_rahmann/core/services/intro_service.dart';
 
@@ -55,7 +56,7 @@ class _MinQuranMobileState extends State<MinQuranMobile> {
       color: Theme.of(context).scaffoldBackgroundColor,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        // Single tap does nothing in Min mode as requested
+        onTap: () => context.read<VersePlayerCubit>().toggleUiOnly(),
         onDoubleTap: () => context.read<QuranCubit>().changeLayout(),
         child: Column(
           children: [

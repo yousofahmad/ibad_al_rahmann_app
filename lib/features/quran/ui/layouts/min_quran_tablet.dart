@@ -2,6 +2,7 @@ import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scrol
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cubit.dart';
 import 'package:ibad_al_rahmann/core/services/intro_service.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
@@ -68,6 +69,8 @@ class _MinQuranTabletState extends State<MinQuranTablet> {
               ),
               Expanded(
                 child: _TapListener(
+                  onSingleTap: () =>
+                      context.read<VersePlayerCubit>().toggleUiOnly(),
                   onDoubleTap: () => context.read<QuranCubit>().changeLayout(),
                   child: PageView.builder(
                     physics: const EasyPageScrollPhysics(),
@@ -191,9 +194,10 @@ class _MinQuranTabletState extends State<MinQuranTablet> {
 /// interfere with the [PageView] horizontal gesture arena.
 class _TapListener extends StatefulWidget {
   final Widget child;
+  final VoidCallback? onSingleTap;
   final VoidCallback? onDoubleTap;
 
-  const _TapListener({required this.child, this.onDoubleTap});
+  const _TapListener({required this.child, this.onSingleTap, this.onDoubleTap});
 
   @override
   State<_TapListener> createState() => _TapListenerState();
@@ -201,6 +205,7 @@ class _TapListener extends StatefulWidget {
 
 class _TapListenerState extends State<_TapListener> {
   Offset? _downPos;
+  DateTime? _downTime;
   DateTime? _lastTap;
   Timer? _timer;
 
@@ -218,12 +223,24 @@ class _TapListenerState extends State<_TapListener> {
   Widget build(BuildContext context) {
     return Listener(
       behavior: HitTestBehavior.translucent,
-      onPointerDown: (e) => _downPos = e.localPosition,
+      onPointerDown: (e) {
+        _downPos = e.localPosition;
+        _downTime = DateTime.now();
+      },
       onPointerUp: (e) {
         if (_downPos == null) return;
         final delta = (e.localPosition - _downPos!).distance;
+        final downTime = _downTime;
         _downPos = null;
+        _downTime = null;
         if (delta > _maxDelta) return;
+        if (downTime != null &&
+            DateTime.now().difference(downTime) >=
+                const Duration(milliseconds: 500)) {
+          _timer?.cancel();
+          _lastTap = null;
+          return;
+        }
 
         final now = DateTime.now();
         if (_lastTap != null && now.difference(_lastTap!) < _window) {
@@ -234,9 +251,7 @@ class _TapListenerState extends State<_TapListener> {
           _lastTap = now;
           _timer?.cancel();
           _timer = Timer(_delay, () {
-            if (mounted) {
-              /* single-tap – no action in min mode */
-            }
+            if (mounted) widget.onSingleTap?.call();
           });
         }
       },

@@ -1,4 +1,4 @@
-﻿import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
+import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -31,13 +31,15 @@ class _MushafScreenState extends State<MushafScreen>
   bool _isPaused = false;
   bool _showMenu = false;
   double _cachedScreenHeight = 0; // cached to avoid MediaQuery every frame
+  Offset? _pointerDownPosition;
+  DateTime? _pointerDownTime;
 
   @override
   void initState() {
     super.initState();
     _scrollTicker = createTicker(_onTick);
     WakelockPlus.enable();
-    _currentIndex = context.read<QuranCubit>().state.currentPage ?? 1;
+    _currentIndex = (context.read<QuranCubit>().state.currentPage ?? 0) + 1;
     _pageController = PageController(initialPage: _currentIndex - 1);
     // Cache screen height once — safe to do in initState via WidgetsBinding
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -70,7 +72,7 @@ class _MushafScreenState extends State<MushafScreen>
         final newIndex = (newOffset / pageHeight).round() + 1;
         if (newIndex != _currentIndex && newIndex > 0 && newIndex <= 604) {
           _currentIndex = newIndex;
-          context.read<QuranCubit>().onQuranPageChanged(_currentIndex);
+          context.read<QuranCubit>().onQuranPageChanged(_currentIndex - 1);
         }
       }
     }
@@ -105,8 +107,18 @@ class _MushafScreenState extends State<MushafScreen>
     _cachedScreenHeight = screenHeight;
 
     return BlocListener<QuranCubit, QuranState>(
-      listenWhen: (p, c) => p.isAutoScrolling != c.isAutoScrolling,
+      listenWhen: (p, c) =>
+          p.isAutoScrolling != c.isAutoScrolling ||
+          p.currentPage != c.currentPage,
       listener: (context, state) {
+        if (state.currentPage != null &&
+            state.currentPage! + 1 != _currentIndex &&
+            !state.isAutoScrolling) {
+          _currentIndex = state.currentPage! + 1;
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(state.currentPage!);
+          }
+        }
         if (state.isAutoScrolling) {
           _isPaused = false;
           _showMenu = false;
@@ -135,20 +147,34 @@ class _MushafScreenState extends State<MushafScreen>
                   Expanded(
                     child: Listener(
                       behavior: HitTestBehavior.translucent,
-                      onPointerDown: (_) {
+                      onPointerDown: (event) {
+                        _pointerDownPosition = event.localPosition;
+                        _pointerDownTime = DateTime.now();
                         if (isAutoScrolling && !_isPaused) {
                           setState(() {
                             _isPaused = true;
                           });
                         }
                       },
-                      onPointerUp: (_) {
-                        final vpCubit = context.read<VersePlayerCubit>();
-                        if (vpCubit.state.showed) {
-                          vpCubit.hideUiOnly();
+                      onPointerCancel: (_) {
+                        _pointerDownPosition = null;
+                        _pointerDownTime = null;
+                      },
+                      onPointerUp: (event) {
+                        final origin = _pointerDownPosition;
+                        final started = _pointerDownTime;
+                        _pointerDownPosition = null;
+                        _pointerDownTime = null;
+                        if (origin == null ||
+                            started == null ||
+                            (event.localPosition - origin).distance > 10 ||
+                            DateTime.now().difference(started) >=
+                                const Duration(milliseconds: 500)) {
                           return;
-                        } else if (vpCubit.isPlaying) {
-                          vpCubit.showPlayer();
+                        }
+                        final vpCubit = context.read<VersePlayerCubit>();
+                        if (vpCubit.hasAudioSession) {
+                          vpCubit.toggleUiOnly();
                           return;
                         }
                         setState(() {
@@ -178,7 +204,7 @@ class _MushafScreenState extends State<MushafScreen>
                               onPageChanged: (idx) {
                                 _currentIndex = idx + 1;
                                 context.read<QuranCubit>().onQuranPageChanged(
-                                  _currentIndex,
+                                  _currentIndex - 1,
                                 );
                               },
                               itemBuilder: (context, index) {
@@ -344,4 +370,3 @@ class _MushafScreenState extends State<MushafScreen>
     );
   }
 }
-

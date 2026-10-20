@@ -5,12 +5,14 @@ sealed class VersePlayerState {
   final bool loading;
   final VerseModel? currentVerse;
   final int? activeWordIndex;
+  final String? errorMessage;
 
   VersePlayerState({
     required this.showed,
     this.loading = false,
     this.currentVerse,
     this.activeWordIndex,
+    this.errorMessage,
   });
 }
 
@@ -20,5 +22,6 @@ final class VersePlayerInitial extends VersePlayerState {
     super.loading = false,
     super.currentVerse,
     super.activeWordIndex,
+    super.errorMessage,
   });
 }

@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
@@ -10,60 +10,100 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:quran/quran.dart';
 import 'package:quran/surahs_tashkeel.dart';
-
 part 'verse_player_state.dart';
 
 class VersePlayerCubit extends Cubit<VersePlayerState> {
-  VersePlayerCubit() : super(VersePlayerInitial(showed: false)) {
+  VersePlayerCubit({
+    AudioPlayer? audioPlayer,
+    Future<Map<String, VerseTiming>> Function(ReciterAudioModel)? timingLoader,
+    this.loadTimeout = const Duration(seconds: 20),
+    this.autoHideDelay = const Duration(seconds: 4),
+  }) : player = audioPlayer ?? AudioPlayer(),
+       _timingLoader = timingLoader ?? ReciterAudioHelper.getSegments,
+       super(VersePlayerInitial(showed: false)) {
     init();
+    verseListener();
   }
-  AudioPlayer player = AudioPlayer();
 
+  final AudioPlayer player;
+  final Future<Map<String, VerseTiming>> Function(ReciterAudioModel)
+  _timingLoader;
+  final Duration loadTimeout;
+  final Duration autoHideDelay;
   VerseModel? currnetVerse;
-
   StreamSubscription<PlayerState>? playerStateSubscription;
   StreamSubscription<Duration>? positionSubscription;
-
   String? reciter;
   double playbackSpeed = 1.0;
   bool isLooping = false;
-  bool autoPlayNext = true;
-  Timer? _hideTimer;
-
-  
-  bool get isPlaying => player.playing;
-
-  void hideUiOnly() {
-    _hideTimer?.cancel();
-    emit(VersePlayerInitial(showed: false, loading: state.loading, currentVerse: currnetVerse, activeWordIndex: state.activeWordIndex));
-  }
-
-  void toggleUiOnly() {
-    if (state.showed) {
-      hideUiOnly();
-    } else {
-      showPlayer();
-    }
-  }
-
-  void showPlayer() {
-    _hideTimer?.cancel();
-    if (currnetVerse != null) {
-      emit(VersePlayerInitial(showed: true, loading: state.loading, currentVerse: currnetVerse, activeWordIndex: state.activeWordIndex));
-    }
-  }
-
-  void _startHideTimer() {
-    _hideTimer?.cancel();
-    _hideTimer = Timer(const Duration(seconds: 4), () {
-      if (player.playing && currnetVerse != null) {
-        emit(VersePlayerInitial(showed: false, loading: state.loading, currentVerse: currnetVerse, activeWordIndex: state.activeWordIndex));
-      }
-    });
-  }
+  bool autoPlayNext = false;
   bool isHighlightWordByWord =
       CacheHelper.prefs.getBool('verse_player_highlight_wbw') ?? true;
   ReciterAudioModel? currentReciterModel;
+  Timer? _hideTimer;
+  bool _hasAudioSession = false;
+  bool _initialAutoHidePending = false;
+  int _loadGeneration = 0;
+  bool _sourceReady = false;
+  bool _isChangingVerse = false;
+  List<WordSegment> _wordSegments = const [];
+
+  bool get isPlaying => player.playing;
+  bool get hasAudioSession => _hasAudioSession;
+
+  void _emitPlayback({
+    bool? showed,
+    bool? loading,
+    int? word,
+    bool updateWord = false,
+    String? error,
+    bool clearError = false,
+  }) {
+    if (isClosed) return;
+    emit(
+      VersePlayerInitial(
+        showed: showed ?? state.showed,
+        loading: loading ?? state.loading,
+        currentVerse: currnetVerse,
+        activeWordIndex: updateWord ? word : state.activeWordIndex,
+        errorMessage: clearError ? null : error ?? state.errorMessage,
+      ),
+    );
+  }
+
+  void hideUiOnly() {
+    _initialAutoHidePending = false;
+    _hideTimer?.cancel();
+    _emitPlayback(showed: false);
+  }
+
+  void toggleUiOnly() {
+    if (!hasAudioSession) return;
+    state.showed ? hideUiOnly() : showPlayer();
+  }
+
+  void showPlayer() {
+    _initialAutoHidePending = false;
+    _hideTimer?.cancel();
+    if (currnetVerse != null) _emitPlayback(showed: true);
+  }
+
+  // Only the initial playback of a session may hide automatically. A manual
+  // tap pins visibility until the next tap, regardless of buffering/verse changes.
+  void _startHideTimer() {
+    if (!_initialAutoHidePending ||
+        _hideTimer != null ||
+        !player.playing ||
+        player.processingState != ProcessingState.ready) {
+      return;
+    }
+    _hideTimer = Timer(autoHideDelay, () {
+      _hideTimer = null;
+      if (isClosed || !_initialAutoHidePending || !hasAudioSession) return;
+      _initialAutoHidePending = false;
+      _emitPlayback(showed: false);
+    });
+  }
 
   static const Map<String, String> defaultReciters = {
     'ar.alafasy': 'مشاري راشد العفاسي',
@@ -141,109 +181,106 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
     String reciterId,
     ReciterAudioModel? currentReciterModel,
   ) {
-    final folder = currentReciterModel?.everyAyahFolder ?? reciterFolders[reciterId] ?? 'Alafasy_128kbps';
+    final modelFolder = currentReciterModel?.everyAyahFolder;
+    final folder = modelFolder != null && modelFolder.isNotEmpty
+        ? modelFolder
+        : reciterFolders[reciterId];
+    if (folder == null) throw StateError('لا يوجد مصدر آيات لهذا القارئ');
     final s = surahNumber.toString().padLeft(3, '0');
     final v = verseNumber.toString().padLeft(3, '0');
     return 'https://everyayah.com/data/$folder/$s$v.mp3';
   }
 
-  Map<String, String> get reciters => defaultReciters;
+  static const _legacyIds = {
+    'ar.alafasy': 'mishari_alafasy',
+    'ar.minshawi': 'minshawi_murattal',
+    'ar.minshawimujawwad': 'minshawi_mujawwad',
+    'ar.abdulbasitmurattal': 'abdulbasit_murattal',
+    'ar.abdulbasitmujawwad': 'abdulbasit_mujawwad',
+    'ar.husary': 'mahmoud_husary_murattal',
+    'ar.husarymuallim': 'husary_muallim',
+    'ar.saoodshuraym': 'shuraim',
+    'ar.abdurrahmaansudais': 'sudais',
+    'ar.mahermuaiqly': 'muaiqly',
+    'ar.yasseraddossari': 'dosari',
+    'ar.saadalghamdi': 'ghamdi',
+    'ar.muhammadjibreel': 'jibreel',
+    'ar.muhammadayyoub': 'ayyoob',
+    'ar.hudhaify': 'huthaify',
+    'ar.abdullahbasfar': 'basfar',
+    'ar.faresabbad': 'fares_abbad',
+    'ar.shaatree': 'shatri',
+    'ar.banna': 'banna',
+    'ar.tablawi': 'tablawi',
+    'ar.nasserqatami': 'qatami',
+    'ar.ali_jaber': 'ali_jaber',
+    'ar.aljuhany': 'juhani',
+    'ar.mustafaismail': 'mustafa_ismail',
+    'ar.salahbudair': 'budair',
+    'ar.salahbukhatir': 'bukhatir',
+    'ar.abdullahmatroud': 'matroud',
+  };
 
-  void init() async {
+  ReciterAudioModel? _resolveReciter(String id) {
+    final mapped = _legacyIds[id] ?? id;
+    for (final model in ReciterAudioHelper.availableReciters) {
+      if (model.id == mapped) return model;
+    }
+    return null;
+  }
+
+  Map<String, String> get reciters => defaultReciters;
+  static List<ReciterAudioModel> get allReciters =>
+      ReciterAudioHelper.availableReciters;
+
+  void init() {
     reciter =
-        CacheHelper.prefs.getString('verse_player_reciter') ?? CacheHelper.prefs.getString('reciter') ?? defaultReciters.keys.first;
+        CacheHelper.prefs.getString('verse_player_reciter') ??
+        CacheHelper.prefs.getString('reciter') ??
+        defaultReciters.keys.first;
     autoPlayNext = CacheHelper.prefs.getBool('verse_player_auto_play') ?? false;
-    currentReciterModel = ReciterAudioHelper.getReciterById(reciter!);
+    currentReciterModel = _resolveReciter(reciter!);
   }
 
   void changeReciter(String value) {
     reciter = value;
+    currentReciterModel = _resolveReciter(value);
     CacheHelper.prefs.setString('verse_player_reciter', value);
-    emit(
-      VersePlayerInitial(
-        showed: state.showed,
-        loading: state.loading,
-        currentVerse: currnetVerse,
-      ),
-    );
-    initVerse(autoPlay: player.playing);
+    if (currnetVerse != null) unawaited(initVerse(autoPlay: player.playing));
   }
-
-  void changePlaybackSpeed(double speed) {
-    playbackSpeed = speed;
-    player.setSpeed(speed);
-    emit(
-      VersePlayerInitial(
-        showed: state.showed,
-        loading: state.loading,
-        currentVerse: currnetVerse,
-      ),
-    );
-  }
-
-  void toggleLoop() {
-    isLooping = !isLooping;
-    player.setLoopMode(isLooping ? LoopMode.one : LoopMode.off);
-    emit(
-      VersePlayerInitial(
-        showed: state.showed,
-        loading: state.loading,
-        currentVerse: currnetVerse,
-      ),
-    );
-  }
-
-  static List<ReciterAudioModel> get allReciters =>
-      ReciterAudioHelper.defaultReciters;
 
   void selectReciter(ReciterAudioModel model) {
     reciter = model.id;
     currentReciterModel = model;
     CacheHelper.prefs.setString('verse_player_reciter', model.id);
-    if (currnetVerse != null) {
-      initVerse(autoPlay: player.playing);
-    }
+    if (currnetVerse != null) unawaited(initVerse(autoPlay: player.playing));
+  }
+
+  void changePlaybackSpeed(double speed) {
+    playbackSpeed = speed;
+    unawaited(player.setSpeed(speed));
+    _emitPlayback();
+  }
+
+  void toggleLoop() {
+    isLooping = !isLooping;
+    unawaited(player.setLoopMode(isLooping ? LoopMode.one : LoopMode.off));
+    _emitPlayback();
   }
 
   void setHighlightMode(bool wordByWord) {
     isHighlightWordByWord = wordByWord;
     CacheHelper.prefs.setBool('verse_player_highlight_wbw', wordByWord);
-    emit(
-      VersePlayerInitial(
-        showed: state.showed,
-        loading: state.loading,
-        currentVerse: currnetVerse,
-        activeWordIndex: isHighlightWordByWord ? state.activeWordIndex : null,
-      ),
-    );
+    _updatePosition(player.position);
+    _emitPlayback();
   }
 
-  void toggleHighlightMode() {
-    isHighlightWordByWord = !isHighlightWordByWord;
-    CacheHelper.prefs.setBool(
-      'verse_player_highlight_wbw',
-      isHighlightWordByWord,
-    );
-    emit(
-      VersePlayerInitial(
-        showed: state.showed,
-        loading: state.loading,
-        currentVerse: currnetVerse,
-        activeWordIndex: state.activeWordIndex,
-      ),
-    );
-  }
+  void toggleHighlightMode() => setHighlightMode(!isHighlightWordByWord);
 
   void toggleAutoPlayNext() {
     autoPlayNext = !autoPlayNext;
     CacheHelper.prefs.setBool('verse_player_auto_play', autoPlayNext);
-    emit(
-      VersePlayerInitial(
-        showed: state.showed,
-        loading: state.loading,
-        currentVerse: currnetVerse,
-      ),
-    );
+    _emitPlayback();
   }
 
   void setVerse({
@@ -253,6 +290,12 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
     required String verse,
     String? label,
   }) {
+    // Invalidate late metadata and positions from the previous verse immediately.
+    _loadGeneration++;
+    positionSubscription?.cancel();
+    positionSubscription = null;
+    _wordSegments = const [];
+    _sourceReady = false;
     currnetVerse = VerseModel(
       surahNumber: surahNumber,
       verseNumber: verseNumber,
@@ -260,265 +303,201 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
       fontFamily: fontFamily,
       label: label,
     );
-    // Emit state so the highlight shows in the UI immediately
-    emit(
-      VersePlayerInitial(
-        showed: state.showed,
-        loading: false,
-        currentVerse: currnetVerse,
-      ),
-    );
+    _emitPlayback(loading: false, updateWord: true, clearError: true);
   }
 
-  bool _isInitializingVerse = false;
-
   Future<void> initVerse({bool autoPlay = false}) async {
-    if (_isInitializingVerse) return;
-    _isInitializingVerse = true;
+    final verse = currnetVerse;
+    if (verse == null || isClosed) return;
+    final generation = ++_loadGeneration;
+    final model = currentReciterModel;
+    final activeReciter = reciter ?? defaultReciters.keys.first;
+    final newSession = !_hasAudioSession;
+    _hasAudioSession = true;
+    if (newSession) _initialAutoHidePending = true;
+    _sourceReady = false;
+    _wordSegments = const [];
+    await positionSubscription?.cancel();
+    positionSubscription = null;
+    if (!_isCurrent(generation)) return;
+    _emitPlayback(
+      showed: newSession ? true : null,
+      loading: true,
+      updateWord: true,
+      clearError: true,
+    );
     try {
-      if (currnetVerse != null) {
-        if (player.playing) {
-          await player.stop();
+      await player.stop();
+      if (!_isCurrent(generation)) return;
+      VerseTiming? timing;
+      // ZIP metadata contains the authoritative per-ayah audio URL. Its timing
+      // must be used with that exact recording, not another reciter/CDN take.
+      if (model?.zipFileName != null) {
+        final timings = await _timingLoader(model!).timeout(loadTimeout);
+        if (!_isCurrent(generation)) return;
+        timing = timings['${verse.surahNumber}:${verse.verseNumber}'];
+        if (timing?.audioUrl == null || timing!.audioUrl!.isEmpty) {
+          throw StateError('تعذر العثور على تسجيل الآية لهذا القارئ');
         }
-
-        final activeReciter = reciter ?? defaultReciters.keys.first;
-
-        // Compute direct EveryAyah CDN audio URL immediately (0ms delay)
-        final ayahUrl = getAyahAudioUrl(
-          currnetVerse!.surahNumber,
-          currnetVerse!.verseNumber,
-          activeReciter,
-          currentReciterModel,
-        );
-
-        emit(
-          VersePlayerInitial(
-            showed: true,
-            loading: true,
-            currentVerse: currnetVerse,
-            activeWordIndex: state.activeWordIndex,
-          ),
-        );
-
-        try {
-          await player.setAudioSource(
+      }
+      final ayahUrl =
+          timing?.audioUrl ??
+          getAyahAudioUrl(
+            verse.surahNumber,
+            verse.verseNumber,
+            activeReciter,
+            model,
+          );
+      await player
+          .setAudioSource(
             AudioSource.uri(
               Uri.parse(ayahUrl),
               tag: MediaItem(
                 id: ayahUrl,
-                title:
-                    'سورة ${surahArabicTashkel[currnetVerse!.surahNumber - 1]}',
-                artist: 'الآية ${currnetVerse!.verseNumber.toArabicNums}',
-                album: defaultReciters[activeReciter] ?? 'القارئ',
+                title: 'سورة ${surahArabicTashkel[verse.surahNumber - 1]}',
+                artist: 'الآية ${verse.verseNumber.toArabicNums}',
+                album:
+                    model?.name ?? defaultReciters[activeReciter] ?? 'القارئ',
               ),
             ),
             preload: true,
-          );
-
-          await player.setSpeed(playbackSpeed);
-          await player.setLoopMode(isLooping ? LoopMode.one : LoopMode.off);
-          verseListener();
-
-          if (autoPlay) {
-            player.play();
-            _startHideTimer();
-          }
-
-          emit(
-          VersePlayerInitial(
-            showed: true,
-            loading: false,
-            currentVerse: currnetVerse,
-            activeWordIndex: state.activeWordIndex,
-          ),
-        );
-
-          // Fetch segments asynchronously in background for word-by-word highlight without delaying audio
-          _loadSegmentsAsync(
-            activeReciter,
-            currnetVerse!.surahNumber,
-            currnetVerse!.verseNumber,
-          );
-        } catch (e) {
-          debugPrint('Error setting verse audio source: $e');
-          emit(
-          VersePlayerInitial(
-            showed: true,
-            loading: false,
-            currentVerse: currnetVerse,
-            activeWordIndex: state.activeWordIndex,
-          ),
-        );
-        }
+          )
+          .timeout(loadTimeout);
+      if (!_isCurrent(generation)) return;
+      await player.setSpeed(playbackSpeed);
+      await player.setLoopMode(isLooping ? LoopMode.one : LoopMode.off);
+      if (!_isCurrent(generation)) return;
+      _sourceReady = true;
+      _emitPlayback(loading: false, clearError: true);
+      if (timing != null) {
+        _listenToSegments(timing, generation);
+      } else if (model != null && model.hasSegments) {
+        unawaited(_loadSegmentsAsync(model, verse, generation));
       }
-    } finally {
-      _isInitializingVerse = false;
+      if (autoPlay) _play(generation);
+    } catch (e) {
+      if (!_isCurrent(generation)) return;
+      debugPrint('Error setting verse audio source: $e');
+      // Abort a timed-out native load so it cannot start later on its own.
+      await player.stop();
+      if (!_isCurrent(generation)) return;
+      _emitPlayback(
+        loading: false,
+        error: 'تعذر تحميل التلاوة. اضغط تشغيل للمحاولة مرة أخرى.',
+      );
     }
   }
 
-  void _loadSegmentsAsync(
-    String activeReciter,
-    int surahNum,
-    int verseNum,
+  bool _isCurrent(int generation) => !isClosed && generation == _loadGeneration;
+
+  Future<void> _loadSegmentsAsync(
+    ReciterAudioModel model,
+    VerseModel verse,
+    int generation,
   ) async {
     try {
-      final recitersList = await ReciterAudioHelper.getReciters();
-      final Map<String, String> everyAyahToReciterModelId = {
-        'ar.alafasy': 'mishari_alafasy',
-        'ar.minshawi': 'minshawi_murattal',
-        'ar.abdulbasitmurattal': 'abdulbasit_murattal',
-        'ar.abdulbasitmujawwad': 'abdulbasit_mujawwad',
-        'ar.husary': 'mahmoud_husary_murattal',
-        'ar.husarymuallim': 'husary_muallim',
-        'ar.saoodshuraym': 'shuraim',
-        'ar.abdurrahmaansudais': 'sudais',
-        'ar.mahermuaiqly': 'muaiqly',
-        'ar.yasseraddossari': 'dosari',
-        'ar.saadalghamdi': 'ghamdi',
-        'ar.muhammadjibreel': 'jibreel',
-        'ar.muhammadayyoub': 'ayyoob',
-        'ar.hudhaify': 'huthaify',
-        'ar.abdullahbasfar': 'basfar',
-        'ar.faresabbad': 'fares_abbad',
-        'ar.shaatree': 'shatri',
-        'ar.banna': 'banna',
-        'ar.tablawi': 'tablawi',
-        'ar.nasserqatami': 'qatami',
-        'ar.ali_jaber': 'ali_jaber',
-        'ar.aljuhany': 'juhani',
-        'ar.mustafaismail': 'mustafa_ismail',
-        'ar.salahbudair': 'budair',
-        'ar.salahbukhatir': 'bukhatir',
-        'ar.abdullahmatroud': 'matroud',
-      };
+      final timings = await _timingLoader(model).timeout(loadTimeout);
+      if (!_isCurrent(generation)) return;
+      final timing = timings['${verse.surahNumber}:${verse.verseNumber}'];
+      if (timing != null) _listenToSegments(timing, generation);
+    } catch (e) {
+      debugPrint('Word timing unavailable: $e');
+    }
+  }
 
-      final mappedId =
-          everyAyahToReciterModelId[activeReciter] ?? activeReciter;
+  void _listenToSegments(VerseTiming timing, int generation) {
+    if (!_isCurrent(generation)) return;
+    _wordSegments = timing.segments;
+    _updatePosition(player.position);
+    positionSubscription?.cancel();
+    positionSubscription = player.positionStream.listen((position) {
+      if (_isCurrent(generation)) _updatePosition(position);
+    });
+  }
 
-      final reciterModel = recitersList.firstWhere(
-        (r) => r.id == mappedId,
-        orElse: () =>
-            ReciterAudioModel(id: '', name: '', style: '', folderName: ''),
-      );
-      currentReciterModel = reciterModel;
-
-      if (reciterModel.id.isNotEmpty || reciterModel.folderName.isNotEmpty) {
-        final segmentsMap = await ReciterAudioHelper.getSegments(reciterModel);
-        final key = '$surahNum:$verseNum';
-        if (segmentsMap.containsKey(key)) {
-          final timing = segmentsMap[key]!;
-          final wordSegments = timing.segments;
-
-          if (wordSegments.isNotEmpty &&
-              currnetVerse?.surahNumber == surahNum &&
-              currnetVerse?.verseNumber == verseNum) {
-            positionSubscription?.cancel();
-            positionSubscription = player.positionStream.listen((pos) {
-              if (currnetVerse == null) return;
-              final ms = pos.inMilliseconds;
-              int? currentWord;
-              if (isHighlightWordByWord) {
-                int offset = 0;
-                if (wordSegments.isNotEmpty && wordSegments.first.wordIndex == 0) {
-                  offset = 1; // Map 0-based index to 1-based index (db format)
-                }
-                for (final seg in wordSegments) {
-                  if (ms >= seg.startMs && ms <= seg.endMs) {
-                    currentWord = seg.wordIndex + offset;
-                    break;
-                  }
-                }
-              }
-              if (currentWord != state.activeWordIndex) {
-                emit(
-                  VersePlayerInitial(
-                    showed: true,
-                    loading: state.loading,
-                    currentVerse: currnetVerse,
-                    activeWordIndex: currentWord,
-                  ),
-                );
-              }
-            });
-          }
+  void _updatePosition(Duration position) {
+    int? word;
+    if (isHighlightWordByWord) {
+      final offset =
+          _wordSegments.isNotEmpty && _wordSegments.first.wordIndex == 0
+          ? 1
+          : 0;
+      final ms = position.inMilliseconds;
+      for (final segment in _wordSegments) {
+        if (ms >= segment.startMs && ms < segment.endMs) {
+          word = segment.wordIndex + offset;
+          break;
         }
       }
-    } catch (_) {}
+    }
+    if (word != state.activeWordIndex) {
+      _emitPlayback(word: word, updateWord: true);
+    }
+  }
+
+  void _play(int generation) {
+    unawaited(
+      player.play().catchError((Object e) {
+        if (_isCurrent(generation)) {
+          _emitPlayback(
+            loading: false,
+            error: 'تعذر تشغيل التلاوة. حاول مرة أخرى.',
+          );
+        }
+      }),
+    );
   }
 
   void verseListener() {
     playerStateSubscription?.cancel();
     playerStateSubscription = player.playerStateStream.listen((playerState) {
-      if (playerState.playing) {
+      if (isClosed || !hasAudioSession) return;
+      final processing = playerState.processingState;
+      if (processing == ProcessingState.ready && playerState.playing) {
         _startHideTimer();
-      } else {
-        _hideTimer?.cancel();
       }
-      if (playerState.processingState == ProcessingState.completed) {
+      if (processing == ProcessingState.completed && _sourceReady) {
+        _sourceReady =
+            false; // Consume completion once, before the next async load.
         if (autoPlayNext && !isLooping) {
-          playNextVerse();
+          unawaited(playNextVerse());
         } else {
-          player.seek(Duration.zero);
-          player.pause();
-          emit(
-          VersePlayerInitial(
-            showed: true,
-            loading: false,
-            currentVerse: currnetVerse,
-            activeWordIndex: state.activeWordIndex,
-          ),
-        );
+          unawaited(player.pause());
+          unawaited(player.seek(Duration.zero));
+          _sourceReady = true;
+          _emitPlayback(loading: false);
         }
-      } else if (playerState.processingState == ProcessingState.buffering ||
-          playerState.processingState == ProcessingState.loading) {
-        emit(
-          VersePlayerInitial(
-            showed: true,
-            loading: true,
-            currentVerse: currnetVerse,
-            activeWordIndex: state.activeWordIndex,
-          ),
-        );
-      } else if (playerState.processingState == ProcessingState.ready) {
-        emit(
-          VersePlayerInitial(
-            showed: true,
-            loading: false,
-            currentVerse: currnetVerse,
-            activeWordIndex: state.activeWordIndex,
-          ),
-        );
+      } else if (processing == ProcessingState.buffering ||
+          processing == ProcessingState.loading) {
+        _emitPlayback(loading: true);
+      } else if (processing == ProcessingState.ready) {
+        _emitPlayback(loading: false);
+      } else {
+        _emitPlayback();
       }
     });
   }
 
-  bool _isChangingVerse = false;
-
   Future<void> playNextVerse() async {
-    if (_isChangingVerse) return;
-    if (currnetVerse == null) return;
+    if (_isChangingVerse || currnetVerse == null) return;
     _isChangingVerse = true;
     try {
-      final totalVersesInSurah = getVerseCount(currnetVerse!.surahNumber);
-      int nextSNum = currnetVerse!.surahNumber;
-      int nextVNum = currnetVerse!.verseNumber + 1;
-      if (nextVNum > totalVersesInSurah) {
-        if (nextSNum < 114) {
-          nextSNum += 1;
-          nextVNum = 1;
-        } else {
+      var surah = currnetVerse!.surahNumber;
+      var verse = currnetVerse!.verseNumber + 1;
+      if (verse > getVerseCount(surah)) {
+        if (surah == 114) {
+          await player.pause();
+          _emitPlayback(loading: false);
           return;
         }
+        surah++;
+        verse = 1;
       }
-      final nextText = getVerse(nextSNum, nextVNum);
-      final nextPg = getPageNumber(nextSNum, nextVNum);
-      final nextFont = 'page';
-
       setVerse(
-        surahNumber: nextSNum,
-        verseNumber: nextVNum,
-        fontFamily: nextFont,
-        verse: nextText,
+        surahNumber: surah,
+        verseNumber: verse,
+        fontFamily: 'UthmanicHafs',
+        verse: getVerse(surah, verse),
       );
       await initVerse(autoPlay: true);
     } finally {
@@ -527,29 +506,21 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   }
 
   Future<void> playPreviousVerse() async {
-    if (_isChangingVerse) return;
-    if (currnetVerse == null) return;
+    if (_isChangingVerse || currnetVerse == null) return;
     _isChangingVerse = true;
     try {
-      int prevSNum = currnetVerse!.surahNumber;
-      int prevVNum = currnetVerse!.verseNumber - 1;
-      if (prevVNum < 1) {
-        if (prevSNum > 1) {
-          prevSNum -= 1;
-          prevVNum = getVerseCount(prevSNum);
-        } else {
-          return;
-        }
+      var surah = currnetVerse!.surahNumber;
+      var verse = currnetVerse!.verseNumber - 1;
+      if (verse < 1) {
+        if (surah == 1) return;
+        surah--;
+        verse = getVerseCount(surah);
       }
-      final prevText = getVerse(prevSNum, prevVNum);
-      final prevPg = getPageNumber(prevSNum, prevVNum);
-      final prevFont = 'page';
-
       setVerse(
-        surahNumber: prevSNum,
-        verseNumber: prevVNum,
-        fontFamily: prevFont,
-        verse: prevText,
+        surahNumber: surah,
+        verseNumber: verse,
+        fontFamily: 'UthmanicHafs',
+        verse: getVerse(surah, verse),
       );
       await initVerse(autoPlay: true);
     } finally {
@@ -558,35 +529,37 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   }
 
   void handlePlayPause() {
-    if (!state.loading) {
-      if (player.playing) {
-        player.pause();
-      } else {
-        player.play();
-      }
-      // Re-emit state to trigger UI update for the play/pause icon
-      emit(
-          VersePlayerInitial(
-            showed: true,
-            loading: false,
-            currentVerse: currnetVerse,
-            activeWordIndex: state.activeWordIndex,
-          ),
-        );
+    if (state.loading || currnetVerse == null) return;
+    if (!_sourceReady || state.errorMessage != null) {
+      unawaited(initVerse(autoPlay: true));
+    } else if (player.playing) {
+      unawaited(player.pause());
+    } else {
+      _play(_loadGeneration);
     }
+    _emitPlayback();
   }
 
-  void show() {
-    emit(VersePlayerInitial(showed: true, currentVerse: currnetVerse));
-  }
+  void show() => showPlayer();
 
   void hide() {
+    _loadGeneration++;
+    _hideTimer?.cancel();
+    _hideTimer = null;
+    _hasAudioSession = false;
+    _initialAutoHidePending = false;
+    _sourceReady = false;
+    _wordSegments = const [];
+    positionSubscription?.cancel();
+    positionSubscription = null;
     currnetVerse = null;
-    playerStateSubscription?.cancel();
-    if (player.playing) {
-      player.stop();
-    }
-    emit(VersePlayerInitial(showed: false, currentVerse: null));
+    unawaited(player.stop());
+    _emitPlayback(
+      showed: false,
+      loading: false,
+      updateWord: true,
+      clearError: true,
+    );
   }
 
   /// Toggle bookmark for current verse with optional label
@@ -606,13 +579,7 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
       );
 
       // Emit state to refresh UI icons immediately
-      emit(
-        VersePlayerInitial(
-          showed: state.showed,
-          loading: state.loading,
-          currentVerse: currnetVerse,
-        ),
-      );
+      _emitPlayback();
 
       return isBookmarked;
     }
@@ -639,12 +606,12 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
 
   @override
   Future<void> close() async {
-    playerStateSubscription?.cancel();
-    positionSubscription?.cancel();
+    _loadGeneration++;
+    _hideTimer?.cancel();
+    await playerStateSubscription?.cancel();
+    await positionSubscription?.cancel();
     await player.stop();
     await player.dispose();
     return super.close();
   }
 }
-
-

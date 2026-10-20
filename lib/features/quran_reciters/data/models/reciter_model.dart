@@ -221,7 +221,8 @@ class ReciterAudioHelper {
       name: 'أحمد النفيس',
       style: 'مرتل',
       folderName: 'surah-recitation-ahmad-alnufais',
-      everyAyahFolder: 'Ahmed_ibn_Ali_al-Ajamy_128kbps_kotSimple',
+      // This recording is hosted by Tarteel, not EveryAyah.
+      // Resolve its exact per-ayah URL from the bundled ZIP metadata.
       hasSegments: true,
       zipFileName: 'ayah-recitation-alnufais.json.zip',
       segmentsFileName: 'segments.json',
@@ -680,8 +681,8 @@ class ReciterAudioHelper {
     final folder = reciter.everyAyahFolder.isNotEmpty
         ? reciter.everyAyahFolder
         : (reciter.folderName.isNotEmpty
-            ? reciter.folderName
-            : 'Alafasy_128kbps');
+              ? reciter.folderName
+              : 'Alafasy_128kbps');
     final s = surahNumber.toString().padLeft(3, '0');
     final v = verseNumber.toString().padLeft(3, '0');
     return 'https://everyayah.com/data/$folder/$s$v.mp3';

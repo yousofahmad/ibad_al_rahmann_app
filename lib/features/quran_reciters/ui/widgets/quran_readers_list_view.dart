@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 
 import '../../data/models/reciter_model.dart';
+import 'reciter_filter_widget.dart';
 import 'reciter_widget.dart';
 import 'reciters_search_bar.dart';
 
@@ -18,6 +19,7 @@ class ReadersBody extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
           child: const RecitersSearchBar(),
         ),
+        const ReciterFilterWidget(),
         Expanded(child: ReadersListView(reciters: reciters)),
       ],
     );

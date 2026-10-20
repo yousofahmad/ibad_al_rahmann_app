@@ -87,85 +87,26 @@ class ReciterWidget extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     SizedBox(height: 6.h),
-                    Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8.w,
-                            vertical: 2.h,
-                          ),
-                          decoration: BoxDecoration(
-                            color: primaryColor.withValues(
-                              alpha: isDark ? 0.2 : 0.1,
-                            ),
-                            borderRadius: BorderRadius.circular(6.r),
-                          ),
-                          child: Text(
-                            reciter.style,
-                            style: TextStyle(
-                              fontFamily: AppConsts.cairo,
-                              color: primaryColor,
-                              fontSize: 10.5.sp,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 8.w,
+                        vertical: 2.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(
+                          alpha: isDark ? 0.2 : 0.1,
                         ),
-                        SizedBox(width: 6.w),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8.w,
-                            vertical: 2.h,
-                          ),
-                          decoration: BoxDecoration(
-                            color: reciter.hasSegments
-                                ? primaryColor.withValues(
-                                    alpha: isDark ? 0.25 : 0.15,
-                                  )
-                                : (isDark
-                                      ? Colors.white10
-                                      : Colors.black.withValues(alpha: 0.05)),
-                            borderRadius: BorderRadius.circular(6.r),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                reciter.highlightSupport ==
-                                        ReciterHighlightSupport.wordByWord
-                                    ? Icons.spellcheck_rounded
-                                    : (reciter.hasSegments
-                                        ? Icons.auto_stories_rounded
-                                        : Icons.library_music_rounded),
-                                size: 11.sp,
-                                color: reciter.hasSegments
-                                    ? primaryColor
-                                    : (isDark
-                                          ? Colors.white70
-                                          : Colors.black54),
-                              ),
-                              SizedBox(width: 4.w),
-                              Text(
-                                reciter.highlightSupport ==
-                                        ReciterHighlightSupport.wordByWord
-                                    ? 'مقسم كلمات وآيات'
-                                    : (reciter.hasSegments
-                                        ? 'أصوات مقسمة آيات'
-                                        : 'سورة كاملة'),
-                                style: TextStyle(
-                                  fontFamily: AppConsts.cairo,
-                                  color: reciter.hasSegments
-                                      ? primaryColor
-                                      : (isDark
-                                            ? Colors.white70
-                                            : Colors.black54),
-                                  fontSize: 9.5.sp,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
+                        borderRadius: BorderRadius.circular(6.r),
+                      ),
+                      child: Text(
+                        reciter.style,
+                        style: TextStyle(
+                          fontFamily: AppConsts.cairo,
+                          color: primaryColor,
+                          fontSize: 10.5.sp,
+                          fontWeight: FontWeight.bold,
                         ),
-                      ],
+                      ),
                     ),
                   ],
                 ),

@@ -72,8 +72,9 @@ class _TabletSurahVersesWidgetState extends State<TabletSurahVersesWidget> {
     if (playingVerse != null &&
         playingVerse.surahNumber == word.suraNumber &&
         playingVerse.verseNumber == word.ayahNumber) {
-      if (cubit.isHighlightWordByWord && activeWordIndex != null) {
-        return word.position == activeWordIndex;
+      if (cubit.isHighlightWordByWord) {
+        // No timing index means the player is between words; keep the page clear.
+        return activeWordIndex != null && word.position == activeWordIndex;
       }
       return true;
     }
@@ -189,7 +190,9 @@ class _TabletSurahVersesWidgetState extends State<TabletSurahVersesWidget> {
                     final isHighlighted = _isHighlighted(word);
                     return GestureDetector(
                       onLongPress: () {
-                        if (word.suraNumber == null ||
+                        // Do not replace an existing (including paused/hidden) session.
+                        if (cubit.hasAudioSession ||
+                            word.suraNumber == null ||
                             word.ayahNumber == null) {
                           return;
                         }

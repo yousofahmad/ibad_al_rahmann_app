@@ -148,6 +148,9 @@ class _QuranScreenState extends State<QuranScreen> {
             final quranCubit = context.read<QuranCubit>();
             if (quranCubit.state.currentPage != pageIndex) {
               quranCubit.jumpToPage(pageIndex);
+              // jumpToPage moves the repository controller but does not emit;
+              // emit the zero-based index so every local PageController follows.
+              quranCubit.onQuranPageChanged(pageIndex);
             }
           }
         },

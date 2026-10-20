@@ -223,7 +223,10 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
     VersePlayerCubit playerCubit,
     QuranWord word,
   ) async {
-    if (word.suraNumber == null ||
+    // An active verse audio session owns taps until it is explicitly ended.
+    // This also covers paused/hidden player UI; do not open another verse menu.
+    if (playerCubit.hasAudioSession ||
+        word.suraNumber == null ||
         word.ayahNumber == null ||
         word.suraNumber == 0 ||
         word.ayahNumber == 0) {
@@ -734,14 +737,17 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                                 currentWAyah == navHighlightAyah);
 
                         // Is this individual word currently playing in Word-by-Word mode?
-                        final bool isWordActive = isPlayingThisAyah &&
+                        final bool isWordActive =
+                            isPlayingThisAyah &&
                             isWbwMode &&
                             activePlaybackWordIndex != null &&
                             word.position == activePlaybackWordIndex;
 
                         // When in Word-by-Word mode with valid word timing, do NOT highlight whole verse
-                        final bool isVerseHighlighted = isPlayingThisAyah &&
-                            (!isWbwMode || activePlaybackWordIndex == null);
+                        // In word-by-word mode, a missing timing index is a
+                        // separator/transition, not permission to paint the whole ayah.
+                        final bool isVerseHighlighted =
+                            isPlayingThisAyah && !isWbwMode;
 
                         final bool isMarkerHighlighted =
                             (isVerseHighlighted || isSelectedOrNav);
@@ -810,7 +816,23 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                           if (!isVisible) {
                             marker = Opacity(opacity: 0.0, child: marker);
                           }
-                          rowChildren.add(marker);
+                          // The ayah marker replaces the final word widget, so
+                          // give it the same tap/long-press semantics as words.
+                          rowChildren.add(
+                            GestureDetector(
+                              behavior: HitTestBehavior.translucent,
+                              onLongPress: () {
+                                if (isVisible) {
+                                  _onWordLongPressed(
+                                    context,
+                                    context.read<VersePlayerCubit>(),
+                                    word,
+                                  );
+                                }
+                              },
+                              child: marker,
+                            ),
+                          );
                         } else {
                           if (word.text.trim().isNotEmpty) {
                             rowChildren.add(
@@ -828,8 +850,8 @@ class _WbwPageWidgetState extends State<WbwPageWidget>
                                 child: () {
                                   final bool showHighlight =
                                       (isWordActive ||
-                                       isVerseHighlighted ||
-                                       isSelectedOrNav) &&
+                                          isVerseHighlighted ||
+                                          isSelectedOrNav) &&
                                       isVisible;
 
                                   final Color highlightColor = isWordActive

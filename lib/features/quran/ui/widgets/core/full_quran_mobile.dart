@@ -257,7 +257,12 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
               children: [
                 _TapListener(
                   onSingleTap: () {
-                    if (state.isAutoScrolling) {
+                    final playerCubit = context.read<VersePlayerCubit>();
+                    // During an audio session, a short tap only toggles its UI;
+                    // otherwise retain the existing mushaf/auto-scroll menus.
+                    if (playerCubit.hasAudioSession) {
+                      playerCubit.toggleUiOnly();
+                    } else if (state.isAutoScrolling) {
                       context.read<QuranCubit>().setAutoScrollPaused(true);
                       setState(() => _showAutoScrollMenu = true);
                       SystemChrome.setEnabledSystemUIMode(
@@ -377,6 +382,7 @@ class _TapListener extends StatefulWidget {
 
 class _TapListenerState extends State<_TapListener> {
   Offset? _downPosition;
+  DateTime? _downTime;
   DateTime? _lastTapTime;
   Timer? _singleTapTimer;
 
@@ -392,6 +398,7 @@ class _TapListenerState extends State<_TapListener> {
 
   void _onPointerDown(PointerDownEvent e) {
     _downPosition = e.localPosition;
+    _downTime = DateTime.now();
   }
 
   void _onPointerUp(PointerUpEvent e) {
@@ -401,7 +408,16 @@ class _TapListenerState extends State<_TapListener> {
       _downPosition = null;
       return;
     }
+    final downTime = _downTime;
     _downPosition = null;
+    _downTime = null;
+    if (downTime != null &&
+        DateTime.now().difference(downTime) >=
+            const Duration(milliseconds: 500)) {
+      _singleTapTimer?.cancel();
+      _lastTapTime = null;
+      return;
+    }
 
     final now = DateTime.now();
     if (_lastTapTime != null &&

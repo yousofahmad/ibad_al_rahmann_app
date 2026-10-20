@@ -1,4 +1,4 @@
-﻿import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
+import 'package:ibad_al_rahmann/features/quran/ui/widgets/scroll/easy_page_scroll_physics.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -34,7 +34,7 @@ class _WbwMushafScreenState extends State<WbwMushafScreen> {
   void initState() {
     super.initState();
     WakelockPlus.enable();
-    _currentIndex = context.read<QuranCubit>().state.currentPage ?? 1;
+    _currentIndex = (context.read<QuranCubit>().state.currentPage ?? 0) + 1;
     _pageController = PageController(initialPage: _currentIndex - 1);
 
     SystemChrome.setPreferredOrientations([
@@ -76,7 +76,7 @@ class _WbwMushafScreenState extends State<WbwMushafScreen> {
               1;
           if (newIndex != _currentIndex && newIndex > 0 && newIndex <= 604) {
             _currentIndex = newIndex;
-            context.read<QuranCubit>().onQuranPageChanged(_currentIndex);
+            context.read<QuranCubit>().onQuranPageChanged(_currentIndex - 1);
           }
         } else {
           // Reached the end, stop auto-scroll
@@ -107,8 +107,18 @@ class _WbwMushafScreenState extends State<WbwMushafScreen> {
       body: SafeArea(
         top: true,
         child: BlocListener<QuranCubit, QuranState>(
-          listenWhen: (p, c) => p.isAutoScrolling != c.isAutoScrolling,
+          listenWhen: (p, c) =>
+              p.isAutoScrolling != c.isAutoScrolling ||
+              p.currentPage != c.currentPage,
           listener: (context, state) {
+            if (state.currentPage != null &&
+                state.currentPage! + 1 != _currentIndex &&
+                !state.isAutoScrolling) {
+              _currentIndex = state.currentPage! + 1;
+              if (_pageController.hasClients) {
+                _pageController.jumpToPage(state.currentPage!);
+              }
+            }
             if (state.isAutoScrolling) {
               _isPaused = false;
               // Dispose old controller and create fresh one at current page
@@ -137,18 +147,15 @@ class _WbwMushafScreenState extends State<WbwMushafScreen> {
                   Expanded(
                     child: _TapListener(
                       onSingleTap: () {
-                          if (!isAutoScrolling) {
-                            final vpCubit = context.read<VersePlayerCubit>();
-                            if (vpCubit.state.showed) {
-                              vpCubit.hideUiOnly();
-                              return;
-                            } else if (vpCubit.isPlaying) {
-                              vpCubit.showPlayer();
-                              return;
-                            }
-                            setState(() => _showMenu = !_showMenu);
+                        if (!isAutoScrolling) {
+                          final vpCubit = context.read<VersePlayerCubit>();
+                          if (vpCubit.hasAudioSession) {
+                            vpCubit.toggleUiOnly();
+                            return;
                           }
-                        },
+                          setState(() => _showMenu = !_showMenu);
+                        }
+                      },
                       onDoubleTap: () =>
                           context.read<QuranCubit>().changeLayout(),
                       onPointerDown: () {
@@ -195,7 +202,7 @@ class _WbwMushafScreenState extends State<WbwMushafScreen> {
                                 _currentIndex = idx + 1;
                                 _showMenu = false;
                                 context.read<QuranCubit>().onQuranPageChanged(
-                                  _currentIndex,
+                                  _currentIndex - 1,
                                 );
                               },
                               itemBuilder: (context, index) {
@@ -323,6 +330,7 @@ class _TapListener extends StatefulWidget {
 
 class _TapListenerState extends State<_TapListener> {
   Offset? _downPosition;
+  DateTime? _downTime;
   DateTime? _lastTapTime;
   Timer? _singleTapTimer;
 
@@ -338,6 +346,7 @@ class _TapListenerState extends State<_TapListener> {
 
   void _onPointerDown(PointerDownEvent e) {
     _downPosition = e.localPosition;
+    _downTime = DateTime.now();
     widget.onPointerDown?.call();
   }
 
@@ -348,7 +357,16 @@ class _TapListenerState extends State<_TapListener> {
       _downPosition = null;
       return;
     }
+    final downTime = _downTime;
     _downPosition = null;
+    _downTime = null;
+    if (downTime != null &&
+        DateTime.now().difference(downTime) >=
+            const Duration(milliseconds: 500)) {
+      _singleTapTimer?.cancel();
+      _lastTapTime = null;
+      return;
+    }
 
     final now = DateTime.now();
     if (_lastTapTime != null &&
@@ -375,5 +393,3 @@ class _TapListenerState extends State<_TapListener> {
     );
   }
 }
-
-
