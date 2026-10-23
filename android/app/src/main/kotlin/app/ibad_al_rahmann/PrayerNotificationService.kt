@@ -21,6 +21,9 @@ import android.net.Uri
 import android.os.PowerManager
 import java.io.File
 import android.content.ContentResolver
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicLong
 
 class PrayerNotificationService : Service() {
 
@@ -29,11 +32,14 @@ class PrayerNotificationService : Service() {
     private var flipToMuteManager: FlipToMuteManager? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var audioFocusRequest: Any? = null
+    private val syncExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    private val syncGeneration = AtomicLong(0L)
+    private var isForegroundPromoted = false
     
     private val refreshHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val refreshRunnable = object : Runnable {
         override fun run() {
-            syncFromSharedPrefs()
+            enqueueSync()
             refreshHandler.postDelayed(this, 15 * 60 * 1000)
         }
     }
@@ -52,6 +58,7 @@ class PrayerNotificationService : Service() {
             } else {
                 startForeground(id, notification)
             }
+            isForegroundPromoted = true
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -60,8 +67,11 @@ class PrayerNotificationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action ?: "SYNC"
 
-        if (action == "STOP_PRAYER_NOTIFICATION" || (action == "SYNC" && !isPersistentNotificationEnabled())) {
+        if (action == "STOP_PRAYER_NOTIFICATION" ||
+            ((action == "SYNC" || action == "UPDATE_PRAYER_NOTIFICATION") && !isPersistentNotificationEnabled())) {
+            syncGeneration.incrementAndGet()
             refreshHandler.removeCallbacks(refreshRunnable)
+            cancelNextUpdateAlarm()
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(777)
             try {
@@ -72,6 +82,7 @@ class PrayerNotificationService : Service() {
                     stopForeground(true)
                 }
             } catch (e: Exception) {}
+            isForegroundPromoted = false
             stopSelf(startId)
             return START_NOT_STICKY
         }
@@ -83,18 +94,12 @@ class PrayerNotificationService : Service() {
             }
             "UPDATE_PRAYER_NOTIFICATION" -> handleUpdateIntent(intent!!)
             else -> {
-                // Offload heavy prayer-time calculation to a background thread.
-                // syncFromSharedPrefs calls NativePrayerManager.calculatePrayerTimes()
-                // twice — running it on the main service thread caused the persistent
-                // bar lag / UI freeze seen on every app launch.
-                val capturedStartId = startId
-                Thread {
-                    try {
-                        syncFromSharedPrefs(capturedStartId)
-                    } catch (e: Exception) {
-                        NativeLogger.log(this, "syncFromSharedPrefs error: ${e.message}")
-                    }
-                }.start()
+                // Promote before native prayer calculations; do not spend the FGS
+                // start window waiting for calculatePrayerTimes().
+                if (!isForegroundPromoted) {
+                    startForegroundSafe(777, buildPersistentNotification("--:--", "--:--", "--:--", "--:--", "--:--", "انتظر", "", "", -1, 0L, false))
+                }
+                enqueueSync(startId)
             }
         }
 
@@ -176,15 +181,8 @@ class PrayerNotificationService : Service() {
                 
                 flipToMuteManager?.startListening()
                 
-                // Offload heavy prayer calculation and widget update to background thread
-                // so it doesn't freeze the main thread or cause audio buffer underrun/stutter at start!
-                Thread {
-                    try {
-                        syncFromSharedPrefs()
-                    } catch (e: Exception) {
-                        NativeLogger.log(this@PrayerNotificationService, "syncFromSharedPrefs background error: ${e.message}")
-                    }
-                }.start()
+                // Serialize heavy prayer calculation away from the service main thread.
+                enqueueSync()
                 
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -522,6 +520,7 @@ class PrayerNotificationService : Service() {
     }
 
     private fun handleUpdateIntent(intent: Intent) {
+        if (!isPersistentNotificationEnabled()) return
         val fajr = intent.getStringExtra("fajr") ?: "--:--"
         val dhuhr = intent.getStringExtra("dhuhr") ?: "--:--"
         val asr = intent.getStringExtra("asr") ?: "--:--"
@@ -543,17 +542,18 @@ class PrayerNotificationService : Service() {
         }
 
         val notification = buildPersistentNotification(fajr, dhuhr, asr, maghrib, isha, nextName, countdown, hijri, currentPrayerIndex, nextPrayerEpoch, isCountUp)
-        startForegroundSafe(777, notification)
-        updateAllWidgets()
-        scheduleNextUpdate(currentPrayerIndex, nextPrayerEpoch, isCountUp)
+        val generation = syncGeneration.get()
+        refreshHandler.post {
+            if (generation != syncGeneration.get() || !isPersistentNotificationEnabled()) return@post
+            startForegroundSafe(777, notification)
+            updateAllWidgets()
+            scheduleNextUpdate(currentPrayerIndex, nextPrayerEpoch, isCountUp)
+        }
     }
 
-    private fun syncFromSharedPrefs(startId: Int = -1) {
+    private fun syncFromSharedPrefs(startId: Int = -1, expectedGeneration: Long = syncGeneration.get()) {
+        if (expectedGeneration != syncGeneration.get()) return
         if (!isPersistentNotificationEnabled()) {
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                stopForeground(true)
-                if (startId != -1) stopSelf(startId) else stopSelf()
-            }, 1500)
             return
         }
 
@@ -645,6 +645,7 @@ class PrayerNotificationService : Service() {
         val fmt = java.text.SimpleDateFormat(if (is24H) "HH:mm" else "hh:mm a", java.util.Locale(if (is24H) "en" else "ar"))
 
         NativeLogger.log(this, "syncFromSharedPrefs: hijri=$hijriStr next=$targetName epoch=$targetEpoch countUp=$isCountingUp")
+        if (expectedGeneration != syncGeneration.get()) return
         val notification = buildPersistentNotification(
             fmt.format(java.util.Date(fajr)),
             fmt.format(java.util.Date(dhuhr)),
@@ -654,9 +655,12 @@ class PrayerNotificationService : Service() {
             statusName, "", hijriStr, activeIndex, targetEpoch, isCountingUp
         )
         
-        startForegroundSafe(777, notification)
-        scheduleNextUpdate(activeIndex, targetEpoch, isCountingUp)
-        updateAllWidgets()
+        refreshHandler.post {
+            if (expectedGeneration != syncGeneration.get() || !isPersistentNotificationEnabled()) return@post
+            startForegroundSafe(777, notification)
+            scheduleNextUpdate(activeIndex, targetEpoch, isCountingUp)
+            updateAllWidgets()
+        }
     }
 
     private fun updateAllWidgets() {
@@ -693,11 +697,41 @@ class PrayerNotificationService : Service() {
 
         if (delay > 0) {
             val intent = Intent(this, PrayerNotificationService::class.java).apply { action = "SYNC" }
-            val pi = PendingIntent.getForegroundService(this, 9995, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            val pi = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                PendingIntent.getForegroundService(this, 9995, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            } else {
+                @Suppress("DEPRECATION")
+                PendingIntent.getService(this, 9995, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            }
             val am = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + delay + 1000, pi)
             else am.setExact(android.app.AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + delay + 1000, pi)
         }
+    }
+
+    private fun enqueueSync(startId: Int = -1) {
+        val generation = syncGeneration.get()
+        try {
+            syncExecutor.execute {
+                if (generation != syncGeneration.get()) return@execute
+                try { syncFromSharedPrefs(startId, generation) }
+                catch (e: Exception) { NativeLogger.log(this, "syncFromSharedPrefs error: ${e.message}") }
+            }
+        } catch (_: java.util.concurrent.RejectedExecutionException) {}
+    }
+
+    private fun cancelNextUpdateAlarm() {
+        try {
+            val intent = Intent(this, PrayerNotificationService::class.java).apply { action = "SYNC" }
+            val pi = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                PendingIntent.getForegroundService(this, 9995, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            else {
+                @Suppress("DEPRECATION")
+                PendingIntent.getService(this, 9995, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            }
+            (getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager).cancel(pi)
+            pi.cancel()
+        } catch (_: Exception) {}
     }
 
     private fun buildPersistentNotification(fajr: String, dhuhr: String, asr: String, maghrib: String, isha: String, nextName: String, countdown: String, hijri: String, activeIndex: Int, nextPrayerEpoch: Long, isCountUp: Boolean): Notification {
@@ -787,6 +821,9 @@ class PrayerNotificationService : Service() {
     }
 
     override fun onDestroy() {
+        syncGeneration.incrementAndGet()
+        syncExecutor.shutdownNow()
+        cancelNextUpdateAlarm()
         stopAudio()
         audioVolumeManager.restoreState() // Safety guarantee
         refreshHandler.removeCallbacks(refreshRunnable)

@@ -7,6 +7,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:ibad_al_rahmann/services/backup_service.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
+import 'package:ibad_al_rahmann/services/prayer_notification_platform_channel.dart';
 import 'package:ibad_al_rahmann/services/remote_config_service.dart';
 import 'package:ibad_al_rahmann/screens/muezzin_selection_screen.dart';
 import 'package:ibad_al_rahmann/screens/prayer_alarms_screen.dart';
@@ -711,26 +712,34 @@ class _SettingsScreenState extends State<SettingsScreen>
                     value: _persistentNotification,
                     activeThumbColor: const Color(0xFFD0A871),
                     onChanged: (val) async {
+                      if (_isPersistentSwitchLoading) return;
                       setState(() => _isPersistentSwitchLoading = true);
-
-                      // Yield to let the UI draw the loading indicator
-                      await Future.delayed(const Duration(milliseconds: 50));
-
-                      final prefs = CacheHelper.prefs;
-                      await prefs.setBool(
-                        'persistent_notification_enabled',
-                        val,
-                      );
-                      await prefs.setBool(
-                        'flutter.persistent_notification_enabled',
-                        val,
-                      );
-                      setState(() => _persistentNotification = val);
-
-                      await _prayerService.scheduleNotifications();
-
-                      if (mounted) {
-                        setState(() => _isPersistentSwitchLoading = false);
+                      try {
+                        await PrayerNotificationServiceHelper
+                            .setEnabled(val)
+                            .timeout(const Duration(seconds: 12));
+                      } catch (e) {
+                        debugPrint('Persistent notification toggle failed: $e');
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'تعذر تحديث الإشعار الثابت، حاول مرة أخرى',
+                              ),
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) {
+                          setState(() {
+                            _persistentNotification =
+                                CacheHelper.prefs.getBool(
+                                  'persistent_notification_enabled',
+                                ) ??
+                                true;
+                            _isPersistentSwitchLoading = false;
+                          });
+                        }
                       }
                     },
                   ),

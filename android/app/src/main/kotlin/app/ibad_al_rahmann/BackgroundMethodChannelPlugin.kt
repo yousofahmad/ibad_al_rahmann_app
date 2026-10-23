@@ -253,8 +253,15 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
                     val intent = Intent(context, PrayerNotificationService::class.java).apply {
                         action = "STOP_PRAYER_NOTIFICATION"
                     }
-                    try { androidx.core.content.ContextCompat.startForegroundService(context, intent) } catch (e: Exception) { e.printStackTrace() }
-                    result.success(null)
+                    // STOP must not create/promote a foreground service just to stop it.
+                    // The running service handles cancellation of its refresh alarm.
+                    try {
+                        context.startService(intent)
+                        result.success(null)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        result.error("NOTIFICATION_ERROR", e.message, null)
+                    }
                 }
                 "getLaunchPayload" -> {
                     result.success(MainActivity.getAndClearLaunchPayload())

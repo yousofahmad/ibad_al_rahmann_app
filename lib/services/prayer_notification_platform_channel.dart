@@ -1,4 +1,6 @@
 import 'package:flutter/services.dart';
+import 'package:home_widget/home_widget.dart';
+import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class PrayerNotificationServiceHelper {
   static const MethodChannel _channel = MethodChannel(
@@ -6,6 +8,30 @@ class PrayerNotificationServiceHelper {
   );
 
   static bool _hasLoggedError = false;
+
+  /// Toggle only the persistent bar; never rebuild the alarm schedule.
+  /// Unlike best-effort background refreshes, settings must surface failures
+  /// and must not leave the switch waiting forever for a platform response.
+  static Future<void> setEnabled(bool enabled) async {
+    final saved = await CacheHelper.prefs.setBool(
+      'persistent_notification_enabled',
+      enabled,
+    );
+    if (!saved) {
+      throw StateError('Could not save persistent notification preference');
+    }
+    // WidgetUpdateHelper also reads this flag. Sync it before the command so
+    // a widget refresh cannot resurrect a disabled bar.
+    await HomeWidget.saveWidgetData<bool>(
+      'persistent_notification_enabled',
+      enabled,
+    );
+    await _channel
+        .invokeMethod<void>(
+          enabled ? 'updatePrayerNotification' : 'stopPrayerNotification',
+        )
+        .timeout(const Duration(seconds: 10));
+  }
 
   /// Start or update the persistent prayer notification
   static Future<void> updateNotification({
