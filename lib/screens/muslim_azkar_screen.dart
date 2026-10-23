@@ -238,6 +238,7 @@ class _AzkarAlertsSheetState extends State<_AzkarAlertsSheet> {
   // State
   String _morningMode = 'sound'; // 'sound' | 'silent_notif' | 'none'
   String _eveningMode = 'sound';
+  bool _ruqyahEnabled = false;
 
   TimeOfDay _morningTime = const TimeOfDay(hour: 6, minute: 0);
   TimeOfDay _eveningTime = const TimeOfDay(hour: 17, minute: 0);
@@ -250,7 +251,10 @@ class _AzkarAlertsSheetState extends State<_AzkarAlertsSheet> {
 
   Future<void> _loadPrefs() async {
     final prefs = CacheHelper.prefs;
+    final ruqyahEnabled = prefs.getBool('azkar_ruqyah_enabled') ?? false;
+    if (!mounted) return;
     setState(() {
+      _ruqyahEnabled = ruqyahEnabled;
       final morningLegacy = prefs.getBool('notif_azkar_morning') ?? true;
       _morningMode =
           prefs.getString('azkar_morning_mode') ??
@@ -285,9 +289,10 @@ class _AzkarAlertsSheetState extends State<_AzkarAlertsSheet> {
       'time_azkar_evening',
       "${_eveningTime.hour}:${_eveningTime.minute}",
     );
+    await prefs.setBool('azkar_ruqyah_enabled', _ruqyahEnabled);
 
     // Reschedule
-    PrayerService().scheduleNotifications();
+    await PrayerService().scheduleNotifications();
   }
 
   @override
@@ -321,6 +326,30 @@ class _AzkarAlertsSheetState extends State<_AzkarAlertsSheet> {
             (v) => setState(() => _eveningMode = v),
             _eveningTime,
             (t) => setState(() => _eveningTime = t),
+          ),
+          Divider(height: 30.h),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            activeThumbColor: const Color(0xFFD0A871),
+            title: Text(
+              "تذكير الرقية صباحًا ومساءً",
+              style: TextStyle(
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black,
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            subtitle: Text(
+              "إشعار صامت في أوقات الأذكار المحددة، مستقل عن تفعيل أذكار الصباح والمساء",
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 11.sp,
+                fontFamily: 'Cairo',
+              ),
+            ),
+            value: _ruqyahEnabled,
+            onChanged: (value) => setState(() => _ruqyahEnabled = value),
           ),
 
           SizedBox(height: 30.h),

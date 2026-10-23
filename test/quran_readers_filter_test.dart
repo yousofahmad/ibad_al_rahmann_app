@@ -26,6 +26,29 @@ void main() {
       folderName: 'surah',
       hasSegments: false,
     ),
+    ReciterAudioModel(
+      id: 'ayah-only',
+      name: 'قارئ آية فقط',
+      style: 'مرتل',
+      folderName: '',
+      hasSegments: true,
+    ),
+    ReciterAudioModel(
+      id: 'words-and-ayah',
+      name: 'قارئ كلمات وآيات فقط',
+      style: 'مرتل',
+      folderName: '',
+      hasSegments: true,
+      zipFileName: 'words-only.zip',
+    ),
+    ReciterAudioModel(
+      id: 'ayah-audio-only',
+      name: 'قارئ آيات بلا تظليل',
+      style: 'مرتل',
+      folderName: '',
+      everyAyahFolder: 'verse-recordings',
+      hasSegments: false,
+    ),
   ];
 
   List<String> filter(QuranReciterFilter mode, [String query = '']) =>
@@ -38,11 +61,29 @@ void main() {
   test(
     'capability filters only include reciters supporting the selected option',
     () {
-      expect(filter(QuranReciterFilter.wordByWord), ['words']);
-      expect(filter(QuranReciterFilter.verseOnly), ['words', 'verses']);
+      expect(filter(QuranReciterFilter.wordByWord), [
+        'words',
+        'words-and-ayah',
+      ]);
+      expect(filter(QuranReciterFilter.verseOnly), [
+        'words',
+        'verses',
+        'ayah-only',
+        'words-and-ayah',
+        'ayah-audio-only',
+      ]);
       expect(filter(QuranReciterFilter.surah), ['words', 'verses', 'surah']);
     },
   );
+
+  test('catalog readers with EveryAyah but no timings support ayah audio', () {
+    final kalbani = ReciterAudioHelper.defaultReciters.firstWhere(
+      (reciter) => reciter.id == 'kalbani',
+    );
+    expect(kalbani.supportsWordByWord, isFalse);
+    expect(kalbani.supportsAyahByAyah, isTrue);
+    expect(kalbani.supportsFullSurah, isTrue);
+  });
 
   test(
     'search is intersected with capability and matches name, style, and category',

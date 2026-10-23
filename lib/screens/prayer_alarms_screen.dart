@@ -59,8 +59,7 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
   Future<void> _loadPrefs() async {
     _prefs = CacheHelper.prefs;
     setState(() {
-      _prayerSilenceEnabled =
-          _prefs.getBool('prayer_silence_enabled') ?? false;
+      _prayerSilenceEnabled = _prefs.getBool('prayer_silence_enabled') ?? false;
       _silenceBeforeMinutes =
           _prefs.getInt('prayer_silence_before_minutes') ?? 5;
       _silenceAfterMinutes =
@@ -87,7 +86,8 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
       }
       _isLoading = false;
     });
-    if (_prayerSilenceEnabled && defaultTargetPlatform == TargetPlatform.android) {
+    if (_prayerSilenceEnabled &&
+        defaultTargetPlatform == TargetPlatform.android) {
       await PrayerSilencePlatformChannel.reschedule();
     }
   }
@@ -187,6 +187,7 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
             MuezzinSelectionScreen(prefsKey: prefsKey, title: title),
       ),
     );
+    if (!mounted) return;
     setState(() {}); // Refresh to show new sound name
     PrayerService().scheduleNotificationsDebounced();
   }
@@ -616,8 +617,8 @@ class _PrayerAlarmsScreenState extends State<PrayerAlarmsScreen> {
                 goldColor: _gold,
                 onChanged: (v) {
                   _adjustments[key] = v;
-                  _prefs.setInt('adjust_$key', v);
-                  PrayerService().scheduleNotificationsDebounced();
+                  _hasChanges = true;
+                  PrayerService().saveAdjustment(key, v);
                 },
               ),
             ),

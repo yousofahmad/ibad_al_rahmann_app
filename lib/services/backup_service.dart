@@ -19,6 +19,7 @@ import 'package:ibad_al_rahmann/services/notification_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/services/app_logger.dart';
+import 'package:ibad_al_rahmann/services/backup_payload_validator.dart';
 
 @pragma('vm:entry-point')
 Future<void> driveAutoSyncTask() async {
@@ -354,8 +355,10 @@ class BackupService {
     double startProgress = 0.5,
   }) async {
     try {
-      if (backupData['version'] == null) {
-        debugPrint('Restore: ❌ invalid backup — missing version');
+      // Validate every section before writing preferences or clearing Hive.
+      // A malformed bookmark used to clear all local bookmarks first.
+      if (!BackupPayloadValidator.isValid(backupData)) {
+        debugPrint('Restore: ❌ invalid backup payload');
         return false;
       }
       debugPrint(

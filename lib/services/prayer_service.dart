@@ -5,12 +5,11 @@ import 'dart:async';
 import 'package:adhan/adhan.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'notification_service.dart';
+import 'notification_schedule_runner.dart';
+import 'notification_schedule_helpers.dart';
 import 'home_widget_service.dart';
-
 import 'package:home_widget/home_widget.dart';
-
 import 'prayer_notification_platform_channel.dart';
 
 import 'package:ibad_al_rahmann/features/locations/models/city_profile.dart';
@@ -33,6 +32,7 @@ import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/core/helpers/app_formatters.dart';
 
 import 'hijri_source_service.dart';
+import 'egyptian_hijri_calendar.dart';
 
 @pragma('vm:entry-point')
 Future<void> backgroundWidgetUpdateCallback() async {
@@ -45,12 +45,25 @@ Future<void> backgroundWidgetUpdateCallback() async {
   try {
     debugPrint("Background Task: Running Midnight Refresh...");
     await CacheHelper.init();
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
+    // Official data must be ready before background scheduling decisions.
+    try {
+      await EgyptianHijriCalendar.instance.initialize();
+    } catch (e) {
+      debugPrint(
+        'Official Egyptian Hijri calendar unavailable in background: $e',
       );
     }
-    await RemoteConfigService.init();
+    // Firebase/Remote Config are optional; local notifications must continue.
+    try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      }
+      await RemoteConfigService.init();
+    } catch (e) {
+      debugPrint('Optional Firebase/Remote Config unavailable: $e');
+    }
     HijriCalendar.setLocal('ar');
     Intl.defaultLocale = 'ar';
 
@@ -449,26 +462,24 @@ class PrayerService extends ChangeNotifier {
     await prefs.setInt('offset_Maghrib', effectiveAdjustments['Maghrib'] ?? 0);
     await prefs.setInt('offset_Isha', effectiveAdjustments['Isha'] ?? 0);
     await prefs.setInt('hijri_offset', hijriOffset);
+    // Publish the civil-date Hijri contract before any native calculation.
+    await cacheHijriDatesForNative(hijriOffset);
   }
 
-  bool _isScheduling = false;
+  final _notificationScheduleRunner = NotificationScheduleRunner();
 
   Future<void> scheduleNotifications({bool isUserAction = true}) async {
-    if (_isScheduling) return;
-    _isScheduling = true;
-    try {
+    await _notificationScheduleRunner.run((userAction) async {
       await _syncNativeEngineConfig();
       final times = getPrayerTimes();
       if (times != null) {
         await NotificationService.schedulePrayerNotifications(
           times,
-          isUserAction: isUserAction,
+          isUserAction: userAction,
         );
         await updatePersistentElements();
       }
-    } finally {
-      _isScheduling = false;
-    }
+    }, isUserAction: isUserAction);
   }
 
   static const String _ltr = '\u200E';
@@ -489,7 +500,7 @@ class PrayerService extends ChangeNotifier {
     if (nextPrayer != Prayer.none) {
       nextTime = times.timeForPrayer(nextPrayer);
     } else {
-      final tomorrow = now.add(const Duration(days: 1));
+      final tomorrow = NotificationScheduleHelpers.addCivilDays(now, 1);
       final tomorrowTimes = getPrayerTimesForDate(tomorrow);
       if (tomorrowTimes != null) {
         nextTime = tomorrowTimes.fajr;
@@ -508,7 +519,7 @@ class PrayerService extends ChangeNotifier {
     if (currentPrayer != Prayer.none) {
       currentTime = times.timeForPrayer(currentPrayer);
     } else {
-      final yesterday = now.subtract(const Duration(days: 1));
+      final yesterday = NotificationScheduleHelpers.addCivilDays(now, -1);
       final yesterdayTimes = getPrayerTimesForDate(yesterday);
       currentTime = yesterdayTimes?.isha;
     }
@@ -687,7 +698,7 @@ class PrayerService extends ChangeNotifier {
       Future.delayed(const Duration(milliseconds: 500), () async {
         Map<String, dynamic> thirtyDays = {};
         for (int i = 0; i < 30; i++) {
-          DateTime d = now.add(Duration(days: i));
+          DateTime d = NotificationScheduleHelpers.addCivilDays(now, i);
           var t = getPrayerTimesForDate(d);
           if (t != null) {
             String dateKey = DateFormat('yyyy-MM-dd', 'en').format(d);
@@ -766,36 +777,7 @@ class PrayerService extends ChangeNotifier {
     }
   }
 
-  CalculationMethod _getMethodFromKey(String key) {
-    switch (key) {
-      case 'egypt':
-        return CalculationMethod.egyptian;
-      case 'makkah':
-        return CalculationMethod.umm_al_qura;
-      case 'karachi':
-        return CalculationMethod.karachi;
-      case 'dubai':
-        return CalculationMethod.dubai;
-      case 'kuwait':
-        return CalculationMethod.kuwait;
-      case 'qatar':
-        return CalculationMethod.qatar;
-      case 'moonsighting':
-        return CalculationMethod.moon_sighting_committee;
-      case 'singapore':
-        return CalculationMethod.singapore;
-      case 'turkey':
-        return CalculationMethod.turkey;
-      case 'tehran':
-        return CalculationMethod.tehran;
-      case 'isna':
-        return CalculationMethod.north_america;
-      case 'mwl':
-        return CalculationMethod.muslim_world_league;
-      default:
-        return CalculationMethod.egyptian;
-    }
-  }
+  CalculationMethod _getMethodFromKey(String key) => _methodFromKeyStatic(key);
 
   Future<void> updateLocation() async {
     await _getLocation();
@@ -838,6 +820,30 @@ class PrayerService extends ChangeNotifier {
     }
   }
 
+  PrayerTimes _buildPrayerTimesWithRamadanIsha(
+    Coordinates coordinates,
+    DateTime date,
+    CalculationParameters params,
+  ) {
+    final base = PrayerTimes(
+      coordinates,
+      DateComponents(date.year, date.month, date.day),
+      params,
+    );
+    if (_ramadanIshaDelayMode > 0 && isRamadanNightForDate(date)) {
+      final desiredIsha = base.maghrib.add(
+        Duration(minutes: _ramadanIshaDelayMode),
+      );
+      params.adjustments.isha += desiredIsha.difference(base.isha).inMinutes;
+      return PrayerTimes(
+        coordinates,
+        DateComponents(date.year, date.month, date.day),
+        params,
+      );
+    }
+    return base;
+  }
+
   PrayerTimes? getPrayerTimes() {
     if (_activeCity != null) {
       final coords = Coordinates(_activeCity!.latitude, _activeCity!.longitude);
@@ -853,11 +859,7 @@ class PrayerService extends ChangeNotifier {
       params.adjustments.maghrib = _activeCity!.offsets['Maghrib'] ?? 0;
       params.adjustments.isha = _activeCity!.offsets['Isha'] ?? 0;
       final now = DateTime.now();
-      return PrayerTimes(
-        coords,
-        DateComponents(now.year, now.month, now.day),
-        params,
-      );
+      return _buildPrayerTimesWithRamadanIsha(coords, now, params);
     }
     if (_coordinates == null) return null;
     final params = _method.getParameters();
@@ -869,11 +871,7 @@ class PrayerService extends ChangeNotifier {
     params.adjustments.maghrib = _adjustments['Maghrib'] ?? 0;
     params.adjustments.isha = _adjustments['Isha'] ?? 0;
     final now = DateTime.now();
-    return PrayerTimes(
-      _coordinates!,
-      DateComponents(now.year, now.month, now.day),
-      params,
-    );
+    return _buildPrayerTimesWithRamadanIsha(_coordinates!, now, params);
   }
 
   PrayerTimes? getPrayerTimesForDate(DateTime date) {
@@ -890,11 +888,7 @@ class PrayerService extends ChangeNotifier {
       params.adjustments.asr = _activeCity!.offsets['Asr'] ?? 0;
       params.adjustments.maghrib = _activeCity!.offsets['Maghrib'] ?? 0;
       params.adjustments.isha = _activeCity!.offsets['Isha'] ?? 0;
-      return PrayerTimes(
-        coords,
-        DateComponents(date.year, date.month, date.day),
-        params,
-      );
+      return _buildPrayerTimesWithRamadanIsha(coords, date, params);
     }
     if (_coordinates == null) return null;
     final params = _method.getParameters();
@@ -905,51 +899,115 @@ class PrayerService extends ChangeNotifier {
     params.adjustments.asr = _adjustments['Asr'] ?? 0;
     params.adjustments.maghrib = _adjustments['Maghrib'] ?? 0;
     params.adjustments.isha = _adjustments['Isha'] ?? 0;
-    return PrayerTimes(
-      _coordinates!,
-      DateComponents(date.year, date.month, date.day),
-      params,
-    );
+    return _buildPrayerTimesWithRamadanIsha(_coordinates!, date, params);
   }
 
   static Future<PrayerTimes?> getPrayerTimesForDateStatic(DateTime date) async {
     final prefs = CacheHelper.prefs;
-    String? activeCityId = prefs.getString(keyActiveCityId);
-    if (activeCityId != null) {
-      String? jsonStr = prefs.getString(keySavedCities);
-      if (jsonStr != null) {
-        try {
-          List<dynamic> list = jsonDecode(jsonStr);
-          var cities = list.map((e) => CityProfile.fromJson(e)).toList();
-          var activeCity = cities.firstWhere((c) => c.id == activeCityId);
-          final coords = Coordinates(activeCity.latitude, activeCity.longitude);
-          CalculationMethod methodEnum = CalculationMethod.egyptian;
-          final params = methodEnum.getParameters();
-          params.madhab = activeCity.madhab == 'hanafi'
-              ? Madhab.hanafi
-              : Madhab.shafi;
-          params.adjustments.fajr = activeCity.offsets['Fajr'] ?? 0;
-          params.adjustments.sunrise = activeCity.offsets['Sunrise'] ?? 0;
-          params.adjustments.dhuhr = activeCity.offsets['Dhuhr'] ?? 0;
-          params.adjustments.asr = activeCity.offsets['Asr'] ?? 0;
-          params.adjustments.maghrib = activeCity.offsets['Maghrib'] ?? 0;
-          params.adjustments.isha = activeCity.offsets['Isha'] ?? 0;
-          return PrayerTimes(
-            coords,
-            DateComponents(date.year, date.month, date.day),
-            params,
-          );
-        } catch (_) {}
-      }
+    CityProfile? activeCity;
+    final activeCityId = prefs.getString(keyActiveCityId);
+    final jsonStr = prefs.getString(keySavedCities);
+    if (activeCityId != null && jsonStr != null) {
+      try {
+        final cities = (jsonDecode(jsonStr) as List)
+            .map((e) => CityProfile.fromJson(e as Map<String, dynamic>))
+            .toList();
+        activeCity = cities.firstWhere((c) => c.id == activeCityId);
+      } catch (_) {}
     }
-    double lat = prefs.getDouble('last_lat') ?? 30.0444;
-    double lng = prefs.getDouble('last_lng') ?? 31.2357;
-    final params = CalculationMethod.egyptian.getParameters();
-    return PrayerTimes(
-      Coordinates(lat, lng),
+
+    final coords = activeCity == null
+        ? Coordinates(
+            prefs.getDouble('last_lat') ??
+                prefs.getDouble('latitude') ??
+                30.0444,
+            prefs.getDouble('last_lng') ??
+                prefs.getDouble('longitude') ??
+                31.2357,
+          )
+        : Coordinates(activeCity.latitude, activeCity.longitude);
+    final methodKey =
+        activeCity?.calculationMethod ?? prefs.getString(keyMethod) ?? 'egypt';
+    final params = _methodFromKeyStatic(methodKey).getParameters();
+    final madhabKey =
+        activeCity?.madhab ?? prefs.getString(keyMadhab) ?? 'shafi';
+    params.madhab = madhabKey.trim().toLowerCase() == 'hanafi'
+        ? Madhab.hanafi
+        : Madhab.shafi;
+    final offsets =
+        activeCity?.offsets ??
+        {
+          for (final prayer in [
+            'Fajr',
+            'Sunrise',
+            'Dhuhr',
+            'Asr',
+            'Maghrib',
+            'Isha',
+          ])
+            prayer: prefs.getInt('$keyAdjustPrefix$prayer') ?? 0,
+        };
+    params.adjustments.fajr = offsets['Fajr'] ?? 0;
+    params.adjustments.sunrise = offsets['Sunrise'] ?? 0;
+    params.adjustments.dhuhr = offsets['Dhuhr'] ?? 0;
+    params.adjustments.asr = offsets['Asr'] ?? 0;
+    params.adjustments.maghrib = offsets['Maghrib'] ?? 0;
+    params.adjustments.isha = offsets['Isha'] ?? 0;
+    final base = PrayerTimes(
+      coords,
       DateComponents(date.year, date.month, date.day),
       params,
     );
+    final ramadanDelay = prefs.getInt(keyRamadanCycle) ?? 0;
+    if (ramadanDelay > 0 && isRamadanNightForDate(date)) {
+      params.adjustments.isha += base.maghrib
+          .add(Duration(minutes: ramadanDelay))
+          .difference(base.isha)
+          .inMinutes;
+      return PrayerTimes(
+        coords,
+        DateComponents(date.year, date.month, date.day),
+        params,
+      );
+    }
+    return base;
+  }
+
+  static CalculationMethod _methodFromKeyStatic(String key) {
+    switch (key.trim().toLowerCase()) {
+      case 'makkah':
+      case 'umm_al_qura':
+      case 'ummal_qura':
+      case 'ummalqura':
+        return CalculationMethod.umm_al_qura;
+      case 'karachi':
+        return CalculationMethod.karachi;
+      case 'dubai':
+        return CalculationMethod.dubai;
+      case 'kuwait':
+        return CalculationMethod.kuwait;
+      case 'qatar':
+        return CalculationMethod.qatar;
+      case 'moonsighting':
+      case 'moon_sighting_committee':
+        return CalculationMethod.moon_sighting_committee;
+      case 'singapore':
+        return CalculationMethod.singapore;
+      case 'turkey':
+        return CalculationMethod.turkey;
+      case 'tehran':
+        return CalculationMethod.tehran;
+      case 'isna':
+      case 'north_america':
+        return CalculationMethod.north_america;
+      case 'mwl':
+      case 'muslim_world_league':
+        return CalculationMethod.muslim_world_league;
+      case 'egypt':
+      case 'egyptian':
+      default:
+        return CalculationMethod.egyptian;
+    }
   }
 
   Prayer? getNextPrayer() {
@@ -984,9 +1042,15 @@ class PrayerService extends ChangeNotifier {
 
   Future<void> saveAdjustment(String prayer, int minutes) async {
     final prefs = CacheHelper.prefs;
-    await prefs.setInt('$keyAdjustPrefix$prayer', minutes);
-    _adjustments[prayer] = minutes;
-    scheduleNotificationsDebounced(isUserAction: true);
+    if (_activeCity != null) {
+      _activeCity!.offsets[prayer] = minutes;
+      await _saveCities();
+    } else {
+      await prefs.setInt('$keyAdjustPrefix$prayer', minutes);
+      _adjustments[prayer] = minutes;
+    }
+    notifyListeners();
+    await scheduleNotificationsDebounced(isUserAction: true);
   }
 
   Future<void> saveRamadanIshaDelay(int mode) async {
@@ -1087,34 +1151,20 @@ class PrayerService extends ChangeNotifier {
 
   Future<List<ExtendedPrayer>> getExtendedPrayers({DateTime? date}) async {
     final targetDate = date ?? DateTime.now();
-    if (_coordinates == null) return [];
-    final params = _method.getParameters();
-    params.madhab = _madhab;
-    final times = PrayerTimes(
-      _coordinates!,
-      DateComponents(targetDate.year, targetDate.month, targetDate.day),
-      params,
+    final times = getPrayerTimesForDate(targetDate);
+    final nextDayTimes = getPrayerTimesForDate(
+      NotificationScheduleHelpers.addCivilDays(targetDate, 1),
     );
-    final nextDayTimes = PrayerTimes(
-      _coordinates!,
-      DateComponents(
-        targetDate.add(const Duration(days: 1)).year,
-        targetDate.add(const Duration(days: 1)).month,
-        targetDate.add(const Duration(days: 1)).day,
-      ),
-      params,
-    );
+    if (times == null || nextDayTimes == null) return [];
 
-    DateTime fajr = _applyOffset(times.fajr, 'Fajr');
-    DateTime sunrise = _applyOffset(times.sunrise, 'Sunrise');
-    DateTime dhuhr = _applyOffset(times.dhuhr, 'Dhuhr');
-    DateTime asr = _applyOffset(times.asr, 'Asr');
-    DateTime maghrib = _applyOffset(times.maghrib, 'Maghrib');
-    DateTime isha = _ramadanIshaDelayMode > 0
-        ? maghrib.add(Duration(minutes: _ramadanIshaDelayMode))
-        : _applyOffset(times.isha, 'Isha');
+    DateTime fajr = times.fajr;
+    DateTime sunrise = times.sunrise;
+    DateTime dhuhr = times.dhuhr;
+    DateTime asr = times.asr;
+    DateTime maghrib = times.maghrib;
+    DateTime isha = times.isha;
     DateTime duha = sunrise.add(const Duration(minutes: 15));
-    DateTime nextFajr = _applyOffset(nextDayTimes.fajr, 'Fajr');
+    DateTime nextFajr = nextDayTimes.fajr;
     Duration nightDuration = nextFajr.difference(maghrib);
     DateTime midnight = maghrib.add(
       Duration(seconds: (nightDuration.inSeconds / 2).round()),
@@ -1180,8 +1230,37 @@ class PrayerService extends ChangeNotifier {
     ];
   }
 
-  DateTime _applyOffset(DateTime original, String key) {
-    return original.add(Duration(minutes: _adjustments[key] ?? 0));
+  /// The Islamic night starts at Maghrib of the preceding civil fasting date.
+  /// Fajr/iftar still use the civil fasting date itself.
+  static bool isRamadanNightForDate(DateTime date) {
+    final next = getNotificationHijriForDate(
+      NotificationScheduleHelpers.addCivilDays(date, 1),
+    );
+    if (next != null) return next.hMonth == 9;
+    // A lunar month cannot finish before 29. This infers only the night,
+    // never an unconfirmed 29/30-day month boundary or a new fasting date.
+    final current = getNotificationHijriForDate(date);
+    return current != null && current.hMonth == 9 && current.hDay < 29;
+  }
+
+  /// Strict source used by notification/Ramadan decisions.
+  /// Egyptian dates come only from the official civil-date snapshot; missing
+  /// rows stay null rather than being fabricated by a conversion library.
+  static HijriCalendar? getNotificationHijriForDate(DateTime date) {
+    if (isEgyptianSystem) {
+      final official = EgyptianHijriCalendar.instance.lookup(date);
+      if (official == null) return null;
+      return HijriCalendar()
+        ..hDay = official.hDay
+        ..hMonth = official.hMonth
+        ..hYear = official.hYear;
+    }
+    return getHijriWithOffset(
+      RemoteConfigService.globalHijriOffset +
+          (CacheHelper.prefs.getInt(keyHijriOffset) ?? 0) +
+          (CacheHelper.prefs.getInt(keyLocalHijriDelta) ?? 0),
+      date,
+    );
   }
 
   static HijriCalendar getHijriWithOffset(int remoteOffset, [DateTime? date]) {
@@ -1202,7 +1281,10 @@ class PrayerService extends ChangeNotifier {
         ? localOffset
         : (isEgyptian ? remoteOffset : remoteOffset + manualAdjustment);
 
-    DateTime effectiveDate = baseDate.add(Duration(days: offsetDays));
+    DateTime effectiveDate = NotificationScheduleHelpers.addCivilDays(
+      baseDate,
+      offsetDays,
+    );
 
     final h = HijriCalendar.fromDate(effectiveDate);
     final hijriStr = "\u200F${h.hDay} ${h.longMonthName} ${h.hYear}\u200F";
@@ -1276,7 +1358,10 @@ class PrayerService extends ChangeNotifier {
 
   static DateTime hijriToGregorianDate(int year, int month, int day) {
     final calculated = HijriCalendar().hijriToGregorian(year, month, day);
-    return calculated.subtract(Duration(days: effectiveHijriDayAdjustment));
+    return NotificationScheduleHelpers.addCivilDays(
+      calculated,
+      -effectiveHijriDayAdjustment,
+    );
   }
 
   Future<void> setHijriSystem(String system) async {
@@ -1323,18 +1408,21 @@ class PrayerService extends ChangeNotifier {
       now.day,
     ).millisecondsSinceEpoch;
     await prefs.setInt('hijri_cache_start_epoch', todayStart);
-    for (int i = 0; i < 30; i++) {
-      final targetDate = now.add(Duration(days: i));
-      final hDate = getHijriWithOffset(offset, targetDate);
-      final hijriStr =
-          "\u200F${hDate.hDay} ${hDate.longMonthName} ${hDate.hYear}\u200F";
-      const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-      const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-      String localized = hijriStr;
-      for (int k = 0; k < english.length; k++) {
-        localized = localized.replaceAll(english[k], arabic[k]);
+    // Native look-ahead needs 30 days; one extra boundary cushion is retained.
+    for (int i = 0; i < 33; i++) {
+      final targetDate = DateTime(now.year, now.month, now.day + i);
+      final hDate = getNotificationHijriForDate(targetDate);
+      final key =
+          'notification_hijri_${EgyptianHijriCalendar.civilKey(targetDate)}';
+      if (hDate == null) {
+        await prefs.remove(key);
+      } else {
+        // Stable numeric contract consumed by NativePrayerManager.
+        await prefs.setString(
+          key,
+          '${hDate.hDay},${hDate.hMonth},${hDate.hYear}',
+        );
       }
-      await prefs.setString('hijri_date_$i', localized);
     }
   }
 }

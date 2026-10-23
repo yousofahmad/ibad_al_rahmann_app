@@ -5,6 +5,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import java.util.Date
 
 /**
@@ -28,10 +30,13 @@ object NativePrayerScheduler {
     private val PRAYER_NAMES_AR = arrayOf("الفجر", "الظهر", "العصر", "المغرب", "العشاء")
     private val PRAYER_NAMES_EN = arrayOf("Fajr", "Dhuhr", "Asr", "Maghrib", "Isha")
 
-    // Debounce: prevent storm of concurrent scheduleToday calls (e.g. on app open)
+    // Coalescing debounce: never discard a settings change. The delayed call reads
+    // SharedPreferences at execution time, so it always schedules the latest config.
     @Volatile private var lastScheduleMs = 0L
     private const val DEBOUNCE_MS = 12_000L // 12 seconds minimum between calls
     private val scheduleLock = Any()
+    private val debounceHandler = Handler(Looper.getMainLooper())
+    private var pendingRefresh: Runnable? = null
 
     /**
      * Main entry point. Reads user settings from FlutterSharedPreferences,
@@ -39,27 +44,28 @@ object NativePrayerScheduler {
      * all alarms using setAlarmClock(). Safe to call repeatedly —
      * FLAG_UPDATE_CURRENT replaces existing alarms without creating duplicates.
      *
-     * Debounced: rapid consecutive calls within 12s are ignored to prevent the
-     * scheduling storm that causes app freezes and double notifications.
+     * Rapid calls within 12s are coalesced into one delayed refresh rather than
+     * ignored; this is important when a user changes settings immediately after
+     * granting notification/service permission.
      */
     fun scheduleToday(context: Context) {
         val now = System.currentTimeMillis()
         synchronized(scheduleLock) {
             if (now - lastScheduleMs < DEBOUNCE_MS) {
-                NativeLogger.log(context, "scheduleToday: debounced (${now - lastScheduleMs}ms since last call, min=${DEBOUNCE_MS}ms)")
-                try {
-                    PrayerSilenceScheduler.schedule(context)
-                } catch (e: Exception) {
-                    NativeLogger.log(context, "PrayerSilence reschedule after debounce failed: ${e.message}")
+                val delay = (DEBOUNCE_MS - (now - lastScheduleMs)).coerceAtLeast(1L)
+                pendingRefresh?.let { debounceHandler.removeCallbacks(it) }
+                val retry = Runnable {
+                    synchronized(scheduleLock) { pendingRefresh = null }
+                    scheduleToday(context)
                 }
-                try {
-                    PrayerRelativeAlarmScheduler.cancel(context)
-                } catch (e: Exception) {
-                    NativeLogger.log(context, "Legacy PrayerRelativeAlarm cancellation failed: ${e.message}")
-                }
+                pendingRefresh = retry
+                debounceHandler.postDelayed(retry, delay)
+                NativeLogger.log(context, "scheduleToday: coalesced latest request (${delay}ms delay)")
                 return
             }
             lastScheduleMs = now
+            pendingRefresh?.let { debounceHandler.removeCallbacks(it) }
+            pendingRefresh = null
         }
         _scheduleTodayInternal(context)
     }
@@ -78,6 +84,10 @@ object NativePrayerScheduler {
         val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val now          = System.currentTimeMillis()
+        val tomorrowDate = java.util.Calendar.getInstance().apply {
+            timeInMillis = now
+            add(java.util.Calendar.DAY_OF_YEAR, 1)
+        }.time
 
         var todayEpochs: LongArray? = null
         var tomorrowFajrEpoch: Long? = null
@@ -98,7 +108,7 @@ object NativePrayerScheduler {
                     todayTimes.isha.time,
                     todayTimes.sunrise.time
                 )
-                val tomorrowTimes = NativePrayerManager.calculatePrayerTimes(context, Date(now + 86_400_000L))
+                val tomorrowTimes = NativePrayerManager.calculatePrayerTimes(context, tomorrowDate)
                 if (tomorrowTimes != null) {
                     tomorrowFajrEpoch = tomorrowTimes.fajr.time
                 }
@@ -121,7 +131,7 @@ object NativePrayerScheduler {
             }
         }
         if (tomorrowFajrEpoch == null) {
-            val tomEpochs = getEpochsFromCache(context, Date(now + 86_400_000L))
+            val tomEpochs = getEpochsFromCache(context, tomorrowDate)
             if (tomEpochs != null) tomorrowFajrEpoch = tomEpochs[0]
         }
 
@@ -137,7 +147,7 @@ object NativePrayerScheduler {
 
         // Pre-calculate tomorrow's epochs — used as fallback when today's prayer already passed
         val tomorrowEpochsFallback: LongArray? = try {
-            val tomDate = java.util.Date(now + 86_400_000L)
+            val tomDate = tomorrowDate
             val tomTimes = NativePrayerManager.calculatePrayerTimes(context, tomDate)
             if (tomTimes != null) longArrayOf(
                 tomTimes.fajr.time, tomTimes.dhuhr.time, tomTimes.asr.time,
@@ -333,7 +343,7 @@ object NativePrayerScheduler {
                     scheduledCount++
                 } else {
                     // Today's shurooq already passed → schedule tomorrow's using cache
-                    val tomorrowDate = Date(now + 86_400_000L)
+                    val tomorrowDate = tomorrowDate
                     val tomorrowEpochs = getEpochsFromCache(context, tomorrowDate)
                     val tomorrowSunriseMs = if (tomorrowEpochs != null && tomorrowEpochs.size >= 6)
                         (tomorrowEpochs[5] / 60_000L) * 60_000L else null
@@ -389,7 +399,7 @@ object NativePrayerScheduler {
                     scheduledCount++
                 } else {
                     // Today's Duha already passed → schedule tomorrow's Duha
-                    val tomorrowDate = Date(now + 86_400_000L)
+                    val tomorrowDate = tomorrowDate
                     val tomorrowEpochs = getEpochsFromCache(context, tomorrowDate)
                     val tomorrowSunriseMs = if (tomorrowEpochs != null && tomorrowEpochs.size >= 6) (tomorrowEpochs[5] / 60_000L) * 60_000L else null
                     if (tomorrowSunriseMs != null) {

@@ -8,6 +8,7 @@ import 'package:ibad_al_rahmann/screens/qada_list_screen.dart';
 
 import 'fiqh_screen.dart';
 import 'qadaa_settings_screen.dart';
+import '../qadaa_input_sanitizer.dart';
 
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
@@ -53,18 +54,30 @@ class _QadaaScreenState extends State<QadaaScreen> {
     }
 
     setState(() {
-      fajr = prefs.getInt('qadaa_fajr') ?? 0;
-      dhuhr = prefs.getInt('qadaa_dhuhr') ?? 0;
-      asr = prefs.getInt('qadaa_asr') ?? 0;
-      maghrib = prefs.getInt('qadaa_maghrib') ?? 0;
-      isha = prefs.getInt('qadaa_isha') ?? 0;
+      fajr = QadaaInputSanitizer.nonNegativeCount(prefs.getInt('qadaa_fajr'));
+      dhuhr = QadaaInputSanitizer.nonNegativeCount(prefs.getInt('qadaa_dhuhr'));
+      asr = QadaaInputSanitizer.nonNegativeCount(prefs.getInt('qadaa_asr'));
+      maghrib = QadaaInputSanitizer.nonNegativeCount(
+        prefs.getInt('qadaa_maghrib'),
+      );
+      isha = QadaaInputSanitizer.nonNegativeCount(prefs.getInt('qadaa_isha'));
 
       // Load max counts, default to current counts if not found
-      maxFajr = prefs.getInt('qadaa_max_fajr') ?? fajr;
-      maxDhuhr = prefs.getInt('qadaa_max_dhuhr') ?? dhuhr;
-      maxAsr = prefs.getInt('qadaa_max_asr') ?? asr;
-      maxMaghrib = prefs.getInt('qadaa_max_maghrib') ?? maghrib;
-      maxIsha = prefs.getInt('qadaa_max_isha') ?? isha;
+      maxFajr = QadaaInputSanitizer.nonNegativeCount(
+        prefs.getInt('qadaa_max_fajr'),
+      );
+      maxDhuhr = QadaaInputSanitizer.nonNegativeCount(
+        prefs.getInt('qadaa_max_dhuhr'),
+      );
+      maxAsr = QadaaInputSanitizer.nonNegativeCount(
+        prefs.getInt('qadaa_max_asr'),
+      );
+      maxMaghrib = QadaaInputSanitizer.nonNegativeCount(
+        prefs.getInt('qadaa_max_maghrib'),
+      );
+      maxIsha = QadaaInputSanitizer.nonNegativeCount(
+        prefs.getInt('qadaa_max_isha'),
+      );
 
       // Ensure max >= current
       if (maxFajr < fajr) maxFajr = fajr;
@@ -136,8 +149,7 @@ class _QadaaScreenState extends State<QadaaScreen> {
   int get totalMaxPrayers => maxFajr + maxDhuhr + maxAsr + maxMaghrib + maxIsha;
 
   double get totalProgress {
-    if (totalMaxPrayers == 0) return 1.0;
-    return 1.0 - (totalMissedPrayers / totalMaxPrayers);
+    return QadaaInputSanitizer.progress(totalMissedPrayers, totalMaxPrayers);
   }
 
   @override
@@ -518,7 +530,7 @@ class _QadaaScreenState extends State<QadaaScreen> {
     Function(int) onUpdate,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    double progress = (max == 0) ? 1.0 : (1.0 - (count / max));
+    final progress = QadaaInputSanitizer.progress(count, max);
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 8.w),
@@ -584,8 +596,9 @@ class _QadaaScreenState extends State<QadaaScreen> {
                     if (name == "الفجر" && fajr > maxFajr) maxFajr = fajr;
                     if (name == "الظهر" && dhuhr > maxDhuhr) maxDhuhr = dhuhr;
                     if (name == "العصر" && asr > maxAsr) maxAsr = asr;
-                    if (name == "المغرب" && maghrib > maxMaghrib)
+                    if (name == "المغرب" && maghrib > maxMaghrib) {
                       maxMaghrib = maghrib;
+                    }
                     if (name == "العشاء" && isha > maxIsha) maxIsha = isha;
                   });
                   _saveData();

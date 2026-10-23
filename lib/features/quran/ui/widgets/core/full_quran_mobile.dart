@@ -175,6 +175,9 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
 
   @override
   Widget build(BuildContext context) {
+    final hasAudioSession = context.select(
+      (VersePlayerCubit cubit) => cubit.hasAudioSession,
+    );
     return BlocConsumer<QuranCubit, QuranState>(
       listener: (context, state) {
         if (state.currentPage != null && state.currentPage != _currentIndex) {
@@ -261,6 +264,7 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
                     // During an audio session, a short tap only toggles its UI;
                     // otherwise retain the existing mushaf/auto-scroll menus.
                     if (playerCubit.hasAudioSession) {
+                      setState(() => _showOverlays = false);
                       playerCubit.toggleUiOnly();
                     } else if (state.isAutoScrolling) {
                       context.read<QuranCubit>().setAutoScrollPaused(true);
@@ -324,7 +328,7 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
                           },
                         ),
                 ),
-                if (_showOverlays && !state.isAutoScrolling)
+                if (_showOverlays && !state.isAutoScrolling && !hasAudioSession)
                   Positioned(
                     top: 0,
                     left: 0,

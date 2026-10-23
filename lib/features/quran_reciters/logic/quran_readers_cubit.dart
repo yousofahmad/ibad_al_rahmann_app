@@ -23,13 +23,15 @@ class QuranReadersCubit extends Cubit<QuranReadersState> {
     final normalizedQuery = query.trim().toLowerCase();
     return reciters.where((reciter) {
       final supportsFilter = switch (filter) {
-        QuranReciterFilter.wordByWord =>
-          reciter.highlightSupport == ReciterHighlightSupport.wordByWord,
-        QuranReciterFilter.verseOnly =>
-          reciter.highlightSupport == ReciterHighlightSupport.wordByWord ||
-              reciter.highlightSupport == ReciterHighlightSupport.verseOnly,
-        // All reciters expose a complete-surah recording.
-        QuranReciterFilter.surah => true,
+        QuranReciterFilter.wordByWord => reciter.supportsMode(
+          ReciterAudioMode.wordByWord,
+        ),
+        QuranReciterFilter.verseOnly => reciter.supportsMode(
+          ReciterAudioMode.ayahByAyah,
+        ),
+        QuranReciterFilter.surah => reciter.supportsMode(
+          ReciterAudioMode.fullSurah,
+        ),
       };
       if (!supportsFilter) return false;
       if (normalizedQuery.isEmpty) return true;

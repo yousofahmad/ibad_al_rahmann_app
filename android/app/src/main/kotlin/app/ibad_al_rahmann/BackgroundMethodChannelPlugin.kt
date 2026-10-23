@@ -117,11 +117,12 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
                     val audioPath = call.argument<String>("audioPath")
                     val intervalMinutes = call.argument<Int>("intervalMinutes") ?: 0
                     val allowedDays = call.argument<String>("allowed_days")
+                    val seasonEndEpoch = call.argument<Long>("season_end_epoch")
                     
                     val customSoundName = call.argument<String>("custom_sound_name")
                     val prefs = context.getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE)
                     val editor = prefs.edit()
-                    MainActivity.scheduleAlarmInternal(context, editor, id, year, month, day, hour, minute, soundName, title, body, payload, false, audioPath, intervalMinutes, customSoundName, allowedDays)
+                    MainActivity.scheduleAlarmInternal(context, editor, id, year, month, day, hour, minute, soundName, title, body, payload, false, audioPath, intervalMinutes, customSoundName, allowedDays, seasonEndEpoch)
                     editor.apply()
                     result.success("Scheduled")
                 }
@@ -145,8 +146,9 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
                             val intervalMinutes = alarm["intervalMinutes"] as? Int ?: 0
                             val customSoundName = alarm["custom_sound_name"] as? String
                             val allowedDays = alarm["allowed_days"] as? String
+                            val seasonEndEpoch = (alarm["season_end_epoch"] as? Number)?.toLong()
                             
-                            MainActivity.scheduleAlarmInternal(context, editor, id, year, month, day, hour, minute, soundName, title, body, payload, false, audioPath, intervalMinutes, customSoundName, allowedDays)
+                            MainActivity.scheduleAlarmInternal(context, editor, id, year, month, day, hour, minute, soundName, title, body, payload, false, audioPath, intervalMinutes, customSoundName, allowedDays, seasonEndEpoch)
                         }
                         editor.apply()
                     }

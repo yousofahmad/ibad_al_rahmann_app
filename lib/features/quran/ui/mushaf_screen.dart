@@ -102,6 +102,9 @@ class _MushafScreenState extends State<MushafScreen>
 
   @override
   Widget build(BuildContext context) {
+    final hasAudioSession = context.select(
+      (VersePlayerCubit cubit) => cubit.hasAudioSession,
+    );
     final isAutoScrolling = context.watch<QuranCubit>().state.isAutoScrolling;
     final screenHeight = MediaQuery.of(context).size.height;
     _cachedScreenHeight = screenHeight;
@@ -174,6 +177,7 @@ class _MushafScreenState extends State<MushafScreen>
                         }
                         final vpCubit = context.read<VersePlayerCubit>();
                         if (vpCubit.hasAudioSession) {
+                          setState(() => _showMenu = false);
                           vpCubit.toggleUiOnly();
                           return;
                         }
@@ -217,7 +221,7 @@ class _MushafScreenState extends State<MushafScreen>
                 ],
               ),
 
-              if (_showMenu && !isAutoScrolling)
+              if (_showMenu && !isAutoScrolling && !hasAudioSession)
                 Positioned(
                   top: 10,
                   left: 0,

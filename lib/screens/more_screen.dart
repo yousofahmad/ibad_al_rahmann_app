@@ -67,7 +67,7 @@ class _MoreScreenState extends State<MoreScreen> {
         children: [
           _buildMenuButton(
             context: context,
-            title: "دليل مميزات التطبيق 🌟",
+            title: "دليل مميزات التطبيق",
             icon: Icons.explore_rounded,
             onTap: () => Navigator.push(
               context,
@@ -165,9 +165,9 @@ class _MoreScreenState extends State<MoreScreen> {
     double? imageSize,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? const Color(0xFF000000) : Colors.white;
+    final cardColor = Theme.of(context).colorScheme.surface;
     final borderColor = isDark ? Colors.white10 : Colors.grey.withAlpha(50);
-    final textColor = isDark ? Colors.white : Colors.black;
+    final textColor = Theme.of(context).colorScheme.onSurface;
     final double size = imageSize ?? 30.w;
 
     return Container(
@@ -211,7 +211,11 @@ class _MoreScreenState extends State<MoreScreen> {
                           fit: BoxFit.contain,
                         )
                 else if (icon != null)
-                  Icon(icon, color: const Color(0xFFD0A871), size: 30.w)
+                  Icon(
+                    icon,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 30.w,
+                  )
                 else if (iconWidget != null)
                   iconWidget,
                 SizedBox(width: 20.w),
@@ -225,7 +229,11 @@ class _MoreScreenState extends State<MoreScreen> {
                   ),
                 ),
                 const Spacer(),
-                Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 20.w),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  size: 20.w,
+                ),
               ],
             ),
           ),

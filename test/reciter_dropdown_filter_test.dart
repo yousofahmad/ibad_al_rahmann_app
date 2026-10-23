@@ -42,25 +42,47 @@ void main() {
   test('filters unsupported capabilities without capability badges', () {
     final all = [wordByWord, verseOnly, surahOnly];
 
-    expect(
-      ReciterDropdown.filterReciters(reciters: all, wordByWord: true),
-      [wordByWord],
-    );
-    expect(
-      ReciterDropdown.filterReciters(reciters: all, wordByWord: false),
-      [wordByWord, verseOnly],
-    );
+    expect(ReciterDropdown.filterReciters(reciters: all, wordByWord: true), [
+      wordByWord,
+    ]);
+    expect(ReciterDropdown.filterReciters(reciters: all, wordByWord: false), [
+      wordByWord,
+      verseOnly,
+    ]);
   });
 
-  test('keeps category and search filters in addition to capability filtering', () {
-    expect(
-      ReciterDropdown.filterReciters(
-        reciters: [wordByWord, verseOnly, surahOnly],
-        wordByWord: false,
-        category: 'أئمة الحرمين الشريفين',
-        searchQuery: 'الآيات',
-      ),
-      [verseOnly],
-    );
-  });
+  test(
+    'keeps category and search filters in addition to capability filtering',
+    () {
+      expect(
+        ReciterDropdown.filterReciters(
+          reciters: [wordByWord, verseOnly, surahOnly],
+          wordByWord: false,
+          category: 'أئمة الحرمين الشريفين',
+          searchQuery: 'الآيات',
+        ),
+        [verseOnly],
+      );
+    },
+  );
+
+  test(
+    'supports explicit full-surah mode independently of highlighting modes',
+    () {
+      expect(
+        ReciterDropdown.filterReciters(
+          reciters: [wordByWord, verseOnly, surahOnly],
+          mode: ReciterAudioMode.fullSurah,
+        ),
+        [wordByWord, verseOnly, surahOnly],
+      );
+      expect(
+        ReciterDropdown.filterReciters(
+          reciters: [wordByWord, verseOnly, surahOnly],
+          mode: ReciterAudioMode.wordByWord,
+        ),
+        [wordByWord],
+      );
+    },
+  );
 }

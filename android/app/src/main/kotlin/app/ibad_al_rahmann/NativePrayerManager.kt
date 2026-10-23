@@ -39,22 +39,26 @@ object NativePrayerManager {
         // Strictly use saved coordinates, never attempt to 'search' for location here.
         if (lat == 0.0 && lng == 0.0) return null
 
-        val methodStr = prefs.getString("flutter.calculation_method", "EGYPTIAN") ?: "EGYPTIAN"
-        val params = when (methodStr) {
-            "KARACHI" -> CalculationMethod.KARACHI.parameters
-            "UMM_AL_QURA" -> CalculationMethod.UMM_AL_QURA.parameters
-            "MUSLIM_WORLD_LEAGUE" -> CalculationMethod.MUSLIM_WORLD_LEAGUE.parameters
-            "EGYPTIAN" -> CalculationMethod.EGYPTIAN.parameters
-            "NORTH_AMERICA" -> CalculationMethod.NORTH_AMERICA.parameters
-            "KUWAIT" -> CalculationMethod.KUWAIT.parameters
-            "QATAR" -> CalculationMethod.QATAR.parameters
-            "SINGAPORE" -> CalculationMethod.SINGAPORE.parameters
-            "DUBAI" -> CalculationMethod.DUBAI.parameters
-            else -> CalculationMethod.EGYPTIAN.parameters
+        val methodStr = (prefs.getString("flutter.calculation_method", "egypt") ?: "egypt")
+            .trim().uppercase(Locale.ROOT)
+        val methodName = when (methodStr) {
+            "MAKKAH", "UMMAL_QURA", "UMMALQURA", "UMM_AL_QURA" -> "UMM_AL_QURA"
+            "MWL", "MUSLIM_WORLD_LEAGUE" -> "MUSLIM_WORLD_LEAGUE"
+            "ISNA", "NORTH_AMERICA" -> "NORTH_AMERICA"
+            "MOONSIGHTING", "MOON_SIGHTING_COMMITTEE" -> "MOON_SIGHTING_COMMITTEE"
+            "KARACHI", "KUWAIT", "QATAR", "SINGAPORE", "DUBAI", "TURKEY", "TEHRAN" -> methodStr
+            else -> "EGYPTIAN"
+        }
+        val params = try {
+            CalculationMethod.valueOf(methodName).parameters
+        } catch (_: IllegalArgumentException) {
+            // Let NativePrayerScheduler use Flutter's effective 30-day cache;
+            // silently substituting Egyptian timings would be incorrect.
+            return null
         }
 
         val madhabStr = prefs.getString("flutter.madhab", "SHAFI") ?: "SHAFI"
-        params.madhab = if (madhabStr == "HANAFI") Madhab.HANAFI else Madhab.SHAFI
+        params.madhab = if (madhabStr.trim().equals("HANAFI", ignoreCase = true)) Madhab.HANAFI else Madhab.SHAFI
 
         fun getSafeInt(key: String, default: Int): Int {
             return when (val v = prefs.all[key]) {
@@ -75,8 +79,63 @@ object NativePrayerManager {
 
         val coordinates = Coordinates(lat, lng)
         val components = DateComponents.from(date)
-        
-        return PrayerTimes(coordinates, components, params)
+        val baseTimes = PrayerTimes(coordinates, components, params)
+
+        // The UI option is a Ramadan-only Isha time: Maghrib + N minutes.
+        // Convert that absolute target into Adhan's relative Isha adjustment.
+        val ramadanDelay = getSafeInt("flutter.ramadan_isha_delay", 0)
+        if (ramadanDelay > 0 && isRamadan(context, date)) {
+            val desiredIsha = baseTimes.maghrib.time + ramadanDelay * 60_000L
+            params.adjustments.isha +=
+                ((desiredIsha - baseTimes.isha.time) / 60_000L).toInt()
+            return PrayerTimes(coordinates, components, params)
+        }
+        return baseTimes
+    }
+
+    private fun isRamadan(context: Context, date: Date): Boolean {
+        val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        val isEgyptian = prefs.getString("flutter.hijri_system", "umm_alqura") == "egyptian"
+        // Isha belongs to the Islamic night of the following fasting date.
+        val nightDate = Calendar.getInstance().apply {
+            time = date
+            add(Calendar.DAY_OF_YEAR, 1)
+        }.time
+        val key = "flutter.notification_hijri_" +
+            java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(nightDate)
+        // The snapshot already includes the selected source and manual offsets.
+        val month = prefs.getString(key, null)?.split(',')?.getOrNull(1)?.toIntOrNull()
+        if (month != null && month in 1..12) return month == 9
+        // Egyptian mode is strict: missing official data is not Umm al-Qura.
+        if (isEgyptian) {
+            val todayKey = "flutter.notification_hijri_" +
+                java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
+            val today = prefs.getString(todayKey, null)?.split(',')
+            val day = today?.getOrNull(0)?.toIntOrNull()
+            return today?.getOrNull(1)?.toIntOrNull() == 9 && day != null && day in 1..28
+        }
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.N) return false
+        return try {
+            val calendar = android.icu.util.IslamicCalendar()
+            calendar.calculationType =
+                android.icu.util.IslamicCalendar.CalculationType.ISLAMIC_UMALQURA
+            fun integer(key: String): Int = when (val value = prefs.all[key]) {
+                is Number -> value.toInt()
+                is String -> value.toIntOrNull() ?: 0
+                else -> 0
+            }
+            val libraryOffset = if (prefs.contains("flutter.hijri_offset_manual") || prefs.contains("flutter.hijri_local_delta")) {
+                integer("flutter.hijri_offset_manual") + integer("flutter.hijri_local_delta") + integer("flutter.global_hijri_offset")
+            } else integer("flutter.hijri_offset")
+            val adjusted = Calendar.getInstance().apply {
+                time = nightDate
+                add(Calendar.DAY_OF_YEAR, libraryOffset + integer("flutter.manual_day_adjustment"))
+            }
+            calendar.time = adjusted.time
+            calendar.get(android.icu.util.IslamicCalendar.MONTH) + 1 == 9
+        } catch (_: Exception) {
+            false
+        }
     }
 
     fun getHijriDate(context: Context, date: Date = Date()): String {

@@ -30,6 +30,7 @@ import 'services/app_logger.dart';
 import 'core/di/di.dart';
 import 'core/helpers/tafsir_helper.dart';
 import 'core/helpers/app_migration_helper.dart';
+import 'core/helpers/navigation_payload.dart';
 import 'core/theme/theme_manager/theme_cubit.dart';
 
 import 'package:flutter_native_splash/flutter_native_splash.dart';
@@ -42,6 +43,8 @@ import 'package:ibad_al_rahmann/features/wird/ui/wird_dashboard_screen.dart';
 import 'package:ibad_al_rahmann/features/wird/ui/isolated_wird_screen.dart';
 import 'package:ibad_al_rahmann/screens/fasting_days_screen.dart';
 import 'package:ibad_al_rahmann/screens/prayer_times_screen.dart';
+import 'package:ibad_al_rahmann/features/qadaa/ui/qadaa_screen.dart';
+import 'package:ibad_al_rahmann/screens/ramadan_screen.dart';
 
 import 'package:intl/date_symbol_data_local.dart';
 import 'quran_app.dart';
@@ -264,18 +267,27 @@ Future<void> _runBackgroundInits() async {
 }
 
 /// Public so that SplashScreen can call it directly on cold start.
-Future<void> handleGlobalNavigation(String payload) async {
+Future<void> handleGlobalNavigation(
+  String payload, {
+  int retryCount = 0,
+}) async {
   NotificationService.nativeLog(
     'handleGlobalNavigation: payload=$payload, state=${navigatorKey.currentState != null ? "ready" : "null"}',
   );
 
   // Use currentState directly — more reliable than context lookup mid-transition
   if (navigatorKey.currentState == null) {
+    if (retryCount >= 10) {
+      NotificationService.nativeLog(
+        'handleGlobalNavigation: navigator unavailable after bounded retries',
+      );
+      return;
+    }
     NotificationService.nativeLog(
-      'handleGlobalNavigation: state null, retrying in 500ms',
+      'handleGlobalNavigation: state null, retrying in 500ms ($retryCount/10)',
     );
     Future.delayed(const Duration(milliseconds: 500), () {
-      handleGlobalNavigation(payload);
+      handleGlobalNavigation(payload, retryCount: retryCount + 1);
     });
     return;
   }
@@ -337,6 +349,13 @@ Future<void> handleGlobalNavigation(String payload) async {
     case 'salawat':
       nav.push(MaterialPageRoute(builder: (_) => const TasbeehScreen()));
       break;
+    case 'qadaa':
+      nav.push(MaterialPageRoute(builder: (_) => const QadaaScreen()));
+      break;
+    case 'ramadan':
+    case 'eid':
+      nav.push(MaterialPageRoute(builder: (_) => const RamadanScreen()));
+      break;
     case 'prayer':
     case 'prayer_times':
       nav.push(MaterialPageRoute(builder: (_) => const PrayerTimesScreen()));
@@ -349,22 +368,22 @@ Future<void> handleGlobalNavigation(String payload) async {
         // The khatma ID itself may contain underscores (e.g. a timestamp like 1783413467488),
         // so we split from the right: last 3 segments are wirdIdx, startPage, endPage.
         final parts = payload.substring('khatma_'.length).split('_');
-        if (parts.length >= 4) {
-          final endPage = int.tryParse(parts.last) ?? 604;
-          final startPage = int.tryParse(parts[parts.length - 2]) ?? 1;
-          final wirdIdx = int.tryParse(parts[parts.length - 3]) ?? 0;
-          final khatmaId = parts.sublist(0, parts.length - 3).join('_');
+        final parsed = KhatmaNavigationPayload.parse(payload);
+        if (parts.length >= 4 && parsed != null) {
           nav.push(
             MaterialPageRoute(
               builder: (_) => IsolatedWirdScreen(
                 isWirdMode: true,
-                khatmaId: khatmaId,
-                wirdIndex: wirdIdx,
-                targetStartPage: startPage,
-                targetEndPage: endPage,
+                khatmaId: parsed.khatmaId,
+                wirdIndex: parsed.wirdIndex,
+                targetStartPage: parsed.targetStartPage,
+                targetEndPage: parsed.targetEndPage,
               ),
             ),
           );
+        } else if (parts.length >= 4) {
+          // Do not turn malformed/huge page values into a misleading route.
+          nav.popUntil((route) => route.isFirst);
         } else {
           // Fallback for old-format payloads without page info
           final khatmaId = parts.join('_');

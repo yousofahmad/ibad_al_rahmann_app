@@ -233,6 +233,7 @@ class PortraitVersePlayer extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 constraints: BoxConstraints.tight(Size(28.w, 28.w)),
                 onPressed: () => cubit.hide(),
+                tooltip: 'إيقاف التلاوة وإغلاق المشغل',
                 icon: Icon(
                   Icons.close_rounded,
                   size: 18.sp,
@@ -454,6 +455,7 @@ class LandscapeVersePlayer extends StatelessWidget {
           SizedBox(width: 8.w),
           IconButton(
             onPressed: () => cubit.hide(),
+            tooltip: 'إيقاف التلاوة وإغلاق المشغل',
             icon: Icon(Icons.close_rounded, color: Colors.white, size: 20.sp),
           ),
         ],

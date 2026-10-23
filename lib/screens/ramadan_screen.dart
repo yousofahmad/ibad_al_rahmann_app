@@ -38,6 +38,7 @@ class _RamadanScreenState extends State<RamadanScreen> {
   int _suhoorDays = 0x7F;
   int _eidFitrTakbeerInterval = 15;
   int _eidFitrMinutesAfterSunrise = 30;
+  TimeOfDay? _eidFitrTime;
   int _qadaCount = 0;
   int _ishaDelayMode = 0;
 
@@ -106,6 +107,7 @@ class _RamadanScreenState extends State<RamadanScreen> {
     for (int i = 1; i <= 30; i++) {
       if (prefs.getBool('qada_${year}_$i') ?? false) missed++;
     }
+    if (!mounted) return;
     setState(() {
       _iftarAlarm = prefs.getBool('iftar_alarm') ?? false;
       _suhoorAlarm = prefs.getBool('suhoor_alarm') ?? false;
@@ -123,6 +125,11 @@ class _RamadanScreenState extends State<RamadanScreen> {
       _eidFitrTakbeerInterval = prefs.getInt('eid_fitr_takbeer_interval') ?? 15;
       _eidFitrMinutesAfterSunrise =
           prefs.getInt('eid_prayer_minutes_after_sunrise') ?? 30;
+      final hour = prefs.getInt('eid_fitr_hour');
+      final minute = prefs.getInt('eid_fitr_minute');
+      _eidFitrTime = hour != null && minute != null
+          ? TimeOfDay(hour: hour, minute: minute)
+          : null;
       _qadaCount = missed;
       _ishaDelayMode = PrayerService().ramadanIshaDelayMode;
     });
@@ -133,7 +140,28 @@ class _RamadanScreenState extends State<RamadanScreen> {
     if (val is bool) await prefs.setBool(key, val);
     if (val is int) await prefs.setInt(key, val);
     if (val is String) await prefs.setString(key, val);
-    PrayerService().scheduleNotifications();
+    PrayerService().scheduleNotificationsDebounced();
+  }
+
+  Future<void> _pickEidTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _eidFitrTime ?? const TimeOfDay(hour: 6, minute: 30),
+    );
+    if (!mounted || picked == null) return;
+    setState(() => _eidFitrTime = picked);
+    final prefs = CacheHelper.prefs;
+    await prefs.setInt('eid_fitr_hour', picked.hour);
+    await prefs.setInt('eid_fitr_minute', picked.minute);
+    PrayerService().scheduleNotificationsDebounced();
+  }
+
+  Future<void> _resetEidTime() async {
+    setState(() => _eidFitrTime = null);
+    final prefs = CacheHelper.prefs;
+    await prefs.remove('eid_fitr_hour');
+    await prefs.remove('eid_fitr_minute');
+    PrayerService().scheduleNotificationsDebounced();
   }
 
   @override
@@ -404,23 +432,44 @@ class _RamadanScreenState extends State<RamadanScreen> {
             _expandableCard(
               icon: Icons.celebration_outlined,
               title: 'منبه صلاة العيد',
-              subtitle: '$_eidFitrMinutesAfterSunrise دقيقة بعد الشروق',
+              subtitle: _eidFitrTime != null
+                  ? 'وقت التنبيه: ${_eidFitrTime!.format(context)}'
+                  : '$_eidFitrMinutesAfterSunrise دقيقة بعد الشروق',
               value: _eidFitr,
               onToggle: (v) {
                 setState(() => _eidFitr = v);
                 _save('eid_fitr_alarm', v);
               },
               expanded: _eidFitr,
-              child: _minutesPicker(
-                label: 'الدقائق بعد الشروق',
-                value: _eidFitrMinutesAfterSunrise,
-                min: 10,
-                max: 90,
-                step: 10,
-                onChanged: (v) {
-                  setState(() => _eidFitrMinutesAfterSunrise = v);
-                  _save('eid_prayer_minutes_after_sunrise', v);
-                },
+              child: Column(
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.access_time, color: _gold),
+                    title: const Text('تحديد وقت صلاة العيد'),
+                    trailing: Text(
+                      _eidFitrTime?.format(context) ?? 'اختر الوقت',
+                    ),
+                    onTap: _pickEidTime,
+                  ),
+                  if (_eidFitrTime == null)
+                    _minutesPicker(
+                      label: 'الدقائق بعد الشروق',
+                      value: _eidFitrMinutesAfterSunrise,
+                      min: 10,
+                      max: 90,
+                      step: 10,
+                      onChanged: (v) {
+                        setState(() => _eidFitrMinutesAfterSunrise = v);
+                        _save('eid_prayer_minutes_after_sunrise', v);
+                      },
+                    )
+                  else
+                    TextButton(
+                      onPressed: _resetEidTime,
+                      child: const Text('العودة للحساب التلقائي (حسب الشروق)'),
+                    ),
+                ],
               ),
             ),
             SizedBox(height: 10.h),

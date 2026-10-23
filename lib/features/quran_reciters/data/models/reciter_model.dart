@@ -15,6 +15,9 @@ enum ReciterHighlightSupport {
   none, // سورة كاملة بدون تظليل
 }
 
+/// The audio modes exposed by the reciter selectors.
+enum ReciterAudioMode { wordByWord, ayahByAyah, fullSurah }
+
 class WordSegment {
   final int wordIndex;
   final int startMs;
@@ -186,6 +189,23 @@ class ReciterAudioModel {
     }
     return ReciterHighlightSupport.verseOnly;
   }
+
+  bool get supportsWordByWord =>
+      highlightSupport == ReciterHighlightSupport.wordByWord;
+
+  /// Per-ayah metadata or an EveryAyah source supports individual verses,
+  /// even when this reciter has no synchronized highlighting metadata.
+  bool get supportsAyahByAyah =>
+      hasSegments || everyAyahFolder.trim().isNotEmpty;
+
+  /// A non-empty source folder identifies a complete-surah recording.
+  bool get supportsFullSurah => folderName.trim().isNotEmpty;
+
+  bool supportsMode(ReciterAudioMode mode) => switch (mode) {
+    ReciterAudioMode.wordByWord => supportsWordByWord,
+    ReciterAudioMode.ayahByAyah => supportsAyahByAyah,
+    ReciterAudioMode.fullSurah => supportsFullSurah,
+  };
 
   Map<String, dynamic> toJson() => {
     'id': id,

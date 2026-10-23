@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:intl/intl.dart' as intl;
-import 'package:hijri/hijri_calendar.dart';
 
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import '../qadaa_input_sanitizer.dart';
 
 class QadaaSettingsScreen extends StatefulWidget {
   final VoidCallback? onSettingsChanged;
@@ -65,18 +65,18 @@ class _QadaaSettingsScreenState extends State<QadaaSettingsScreen> {
       _dailyPrayerReminder =
           prefs.getBool('qadaa_daily_prayer_reminder') ?? false;
       final timeStr = prefs.getString('qadaa_daily_prayer_time');
-      if (timeStr != null && timeStr.contains(':')) {
-        final parts = timeStr.split(':');
-        _prayerReminderTime = TimeOfDay(
-          hour: int.parse(parts[0]),
-          minute: int.parse(parts[1]),
-        );
-      }
+      final parsedTime = QadaaInputSanitizer.parseTime(timeStr);
+      _prayerReminderTime = parsedTime == null
+          ? null
+          : TimeOfDay(hour: parsedTime.hour, minute: parsedTime.minute);
       _fastingReminderFrequency =
           prefs.getString('qadaa_fasting_reminder_freq') ?? 'إيقاف';
-      _fastingStartMonth =
-          prefs.getInt('qadaa_fasting_reminder_start_month') ?? 7;
-      _fastingReminderDay = prefs.getInt('qadaa_fasting_reminder_day') ?? 7;
+      _fastingStartMonth = QadaaInputSanitizer.month(
+        prefs.getInt('qadaa_fasting_reminder_start_month'),
+      );
+      _fastingReminderDay = QadaaInputSanitizer.weekDay(
+        prefs.getInt('qadaa_fasting_reminder_day'),
+      );
     });
   }
 

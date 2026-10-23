@@ -75,6 +75,7 @@ class _WirdQuranWidgetState extends State<WirdQuranWidget>
   void _toggleMenu() {
     final playerCubit = context.read<VersePlayerCubit>();
     if (playerCubit.hasAudioSession) {
+      setState(() => _showMenu = false);
       playerCubit.toggleUiOnly();
       return;
     }
@@ -97,6 +98,9 @@ class _WirdQuranWidgetState extends State<WirdQuranWidget>
 
   @override
   Widget build(BuildContext context) {
+    final hasAudioSession = context.select(
+      (VersePlayerCubit cubit) => cubit.hasAudioSession,
+    );
     _cachedPageHeight = MediaQuery.of(context).size.height * 0.9;
 
     return MultiBlocListener(
@@ -107,7 +111,7 @@ class _WirdQuranWidgetState extends State<WirdQuranWidget>
           listener: (context, playerState) {
             if (_showOverlays) {
               setState(() {
-                _showMenu = true;
+                _showMenu = false;
                 _showOverlays = false;
                 SystemChrome.setEnabledSystemUIMode(
                   SystemUiMode.immersiveSticky,
@@ -534,7 +538,7 @@ class _WirdQuranWidgetState extends State<WirdQuranWidget>
                       ],
                     ),
                     // Single Tap Menu (PageActionBar)
-                    if (_showMenu)
+                    if (_showMenu && !hasAudioSession)
                       Positioned.fill(
                         child: GestureDetector(
                           onTap: _toggleMenu,
@@ -542,7 +546,7 @@ class _WirdQuranWidgetState extends State<WirdQuranWidget>
                           child: Container(color: Colors.transparent),
                         ),
                       ),
-                    if (_showMenu)
+                    if (_showMenu && !hasAudioSession)
                       SafeArea(
                         child: PageActionBar(
                           pageNumber: _currentIndex + 1,

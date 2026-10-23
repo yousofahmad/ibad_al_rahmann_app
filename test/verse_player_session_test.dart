@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:archive/archive.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cubit.dart';
+import 'package:ibad_al_rahmann/features/quran/ui/widgets/audio/verse_player.dart';
 import 'package:ibad_al_rahmann/features/quran_reciters/data/models/reciter_model.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -243,6 +247,111 @@ void main() {
     expect(player.playing, isFalse);
     await cubit.close();
   });
+
+  test(
+    'hiding controls keeps audio; explicit close stops and clears session',
+    () async {
+      final player = TestAudioPlayer();
+      final cubit = build(player);
+      cubit.toggleAutoPlayNext();
+      await cubit.initVerse(autoPlay: true);
+      cubit.hideUiOnly();
+      expect(player.playing, isTrue);
+      expect(cubit.hasAudioSession, isTrue);
+
+      cubit.hide();
+      await Future<void>.delayed(Duration.zero);
+      expect(player.playing, isFalse);
+      expect(player.processingState, ProcessingState.idle);
+      expect(cubit.hasAudioSession, isFalse);
+      expect(cubit.currnetVerse, isNull);
+      expect(cubit.state.showed, isFalse);
+      expect(cubit.state.activeWordIndex, isNull);
+      // A late completion must not advance or resurrect the closed session.
+      player.sendState(ProcessingState.completed);
+      cubit.toggleUiOnly();
+      await Future<void>.delayed(Duration.zero);
+      expect(cubit.currnetVerse, isNull);
+      expect(cubit.state.showed, isFalse);
+      expect(player.playing, isFalse);
+      await cubit.close();
+    },
+  );
+
+  for (final pendingSource in [false, true]) {
+    test(
+      'close cancels pending ${pendingSource ? 'source' : 'metadata'} autoplay',
+      () async {
+        final metadata = Completer<Map<String, VerseTiming>>();
+        final player = TestAudioPlayer();
+        if (pendingSource) player.pendingLoad = Completer<Duration?>();
+        final cubit = build(
+          player,
+          loader: (_) => pendingSource
+              ? Future.value({'1:1': timing(1)})
+              : metadata.future,
+        );
+        final loading = cubit.initVerse(autoPlay: true);
+        await Future<void>.delayed(Duration.zero);
+        expect(cubit.state.loading, isTrue);
+        cubit.hide();
+        if (pendingSource) {
+          player.pendingLoad!.complete(const Duration(seconds: 10));
+        } else {
+          metadata.complete({'1:1': timing(1)});
+        }
+        await loading;
+        expect(player.playing, isFalse);
+        expect(cubit.hasAudioSession, isFalse);
+        expect(cubit.currnetVerse, isNull);
+        expect(cubit.state.showed, isFalse);
+        expect(cubit.state.loading, isFalse);
+        await cubit.close();
+      },
+    );
+  }
+
+  for (final landscape in [false, true]) {
+    testWidgets(
+      '${landscape ? 'landscape' : 'portrait'} close button stops audio',
+      (tester) async {
+        tester.view.physicalSize = landscape
+            ? const Size(1600, 900)
+            : const Size(900, 1400);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final player = TestAudioPlayer();
+        final cubit = build(player);
+        await tester.runAsync(() => cubit.initVerse(autoPlay: true));
+        cubit.showPlayer();
+        await tester.pumpWidget(
+          ScreenUtilInit(
+            designSize: const Size(800, 1200),
+            builder: (_, _) => MaterialApp(
+              home: BlocProvider.value(
+                value: cubit,
+                child: const Scaffold(body: Center(child: VersePlayer())),
+              ),
+            ),
+          ),
+        );
+        expect(
+          find.byType(landscape ? LandscapeVersePlayer : PortraitVersePlayer),
+          findsOneWidget,
+        );
+        await tester.tap(find.byTooltip('إيقاف التلاوة وإغلاق المشغل'));
+        await tester.pump(const Duration(milliseconds: 350));
+        expect(player.playing, isFalse);
+        expect(cubit.hasAudioSession, isFalse);
+        expect(cubit.state.showed, isFalse);
+        expect(cubit.currnetVerse, isNull);
+        await tester.pumpWidget(const SizedBox());
+        await tester.runAsync(cubit.close);
+      },
+    );
+  }
+
   test(
     'bundled Nufais recording metadata contains the correct per-ayah source',
     () async {

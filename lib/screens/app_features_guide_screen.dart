@@ -20,6 +20,14 @@ import 'package:ibad_al_rahmann/features/wird/ui/khatm_quran_duaa_screen.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/quran_screen.dart';
 import 'package:ibad_al_rahmann/screens/prayer_focus_screen.dart';
 import 'package:ibad_al_rahmann/screens/alarms_screen.dart';
+import 'package:ibad_al_rahmann/screens/prayer_alarms_screen.dart';
+import 'package:ibad_al_rahmann/screens/ramadan_screen.dart';
+import 'package:ibad_al_rahmann/screens/qada_list_screen.dart';
+import 'package:ibad_al_rahmann/screens/ruqyah_screen.dart';
+import 'package:ibad_al_rahmann/screens/hijri_confirmation_screen.dart';
+import 'package:ibad_al_rahmann/features/qadaa/ui/qadaa_screen.dart';
+import 'package:ibad_al_rahmann/features/locations/ui/locations_list_screen.dart';
+import 'package:ibad_al_rahmann/features/qiblah/qiblah_screen.dart';
 
 class AppFeaturesGuideScreen extends StatefulWidget {
   const AppFeaturesGuideScreen({super.key});
@@ -37,27 +45,35 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
 
   final List<String> _categories = [
     'الكل',
-    '🕌 الصلوات والأذان',
-    '📖 المصحف والتفاسير',
-    '📿 الورد والختمات',
-    '🤲 الأذكار وحصن المسلم',
-    '📊 حاسب نفسك',
-    '🌙 الصيام والسنن',
-    '⚙️ التخصيص والمزامنة',
+    'الصلوات والأذان',
+    'المصحف والتفاسير',
+    'الورد والختمات',
+    'الأذكار وحصن المسلم',
+    'حاسب نفسك',
+    'الصيام والسنن',
+    'التخصيص والمزامنة',
+    'القبلة والموقع',
+    'رمضان والعيد',
+    'القضاء والفقه',
+    'الرقية الشرعية',
+    'التنبيهات',
+    'التقويم الهجري',
+    'المدن والمواقع',
   ];
 
   late final List<_FeatureItem> _features = [
     // 1. الصلوات والأذان
     _FeatureItem(
-      category: '🕌 الصلوات والأذان',
+      category: 'الصلوات والأذان',
       title: 'نافذة "صلاتي" الذكية للتنبيه بالصلوات',
-      badge: 'ميزة حصرية ⭐',
+      badge: 'متاحة',
       badgeColor: const Color(0xFFE65100),
       icon: Icons.alarm_on_rounded,
       iconColor: const Color(0xFFD0A871),
       description:
           'نافذة منبثقة تفاعلية تظهر فوق التطبيقات وشاشة القفل فور دخول وقت الصلاة، تتيح لك تسجيل أداء الصلاة بضغطة واحدة (في وقتها أو بعد وقتها)، أو تأجيل التنبيه، مع حساب نقاط الصلاة والإنجاز تلقائياً في الخلفية.',
-      locationPath: 'الشاشة الرئيسية > بطاقة صلاتي / الإعدادات > إعدادات الأذان والتنبيهات',
+      locationPath:
+          'الشاشة الرئيسية > بطاقة صلاتي / الإعدادات > إعدادات الأذان والتنبيهات',
       actionTitle: 'فتح شاشة صلاتي',
       onAction: (ctx) => Navigator.push(
         ctx,
@@ -65,9 +81,9 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
     _FeatureItem(
-      category: '🕌 الصلوات والأذان',
+      category: 'الصلوات والأذان',
       title: 'إحصائيات الصلوات والستريك الشهري',
-      badge: 'تحفيز مستمر 🔥',
+      badge: 'متابعة',
       badgeColor: const Color(0xFFD32F2F),
       icon: Icons.insights_rounded,
       iconColor: const Color(0xFF00897B),
@@ -81,9 +97,9 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
     _FeatureItem(
-      category: '🕌 الصلوات والأذان',
+      category: 'الصلوات والأذان',
       title: 'تقويم ومواقيت الصلوات والثلث الأخير',
-      badge: 'دقة تامة 🧭',
+      badge: 'مواقيت',
       badgeColor: const Color(0xFF1976D2),
       icon: Icons.calendar_month_rounded,
       iconColor: const Color(0xFF0288D1),
@@ -99,15 +115,17 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
 
     // 2. المصحف والتفاسير
     _FeatureItem(
-      category: '📖 المصحف والتفاسير',
-      title: 'المكتبة الصوتية الشاملة (41 قارئاً) وتظليل الكلمات والآيات',
-      badge: 'استماع وتدبر 🎧',
+      category: 'المصحف والتفاسير',
+      title:
+          'المكتبة الصوتية الشاملة (41 قارئاً) وتشغيل الصوت وتظليل الكلمات والآيات',
+      badge: 'صوتيات',
       badgeColor: const Color(0xFF2E7D32),
       icon: Icons.audiotrack_rounded,
       iconColor: const Color(0xFF00897B),
       description:
-          'مشغل قرآني متطور يضم أكثر من 40 قارئاً من كبار قراء العالم الإسلامي بمختلف الروايات، مع تظليل الكلمات والآيات المتزامن بالمللي ثانية، وسرعات استماع متعددة، والتحميل الكامل للاستماع بدون إنترنت.',
-      locationPath: 'المصحف الشريف > الضغط على أي آية > مشغل الصوت / أو من شاشة القراء',
+          'مشغل قرآني متطور يضم أكثر من 40 قارئاً من كبار قراء العالم الإسلامي بمختلف الروايات، مع تشغيل الصوت وتظليل الكلمات والآيات المتزامن بالمللي ثانية، وسرعات استماع متعددة، والتحميل الكامل للاستماع بدون إنترنت.',
+      locationPath:
+          'المصحف الشريف > الضغط على أي آية > مشغل الصوت / أو من شاشة القراء',
       actionTitle: 'فتح مكتبة القراء',
       onAction: (ctx) => Navigator.push(
         ctx,
@@ -115,14 +133,14 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
     _FeatureItem(
-      category: '📖 المصحف والتفاسير',
+      category: 'المصحف والتفاسير',
       title: 'تفاسير القرآن المعتمدة أوفلاين (ابن كثير والطبري)',
-      badge: 'موسوعة علمية 📚',
+      badge: 'موسوعة علمية ',
       badgeColor: const Color(0xFF5C6BC0),
       icon: Icons.auto_stories_rounded,
       iconColor: const Color(0xFF3F51B5),
       description:
-          'إمكانية تنزيل وقراءة تفسير ابن كثير وتفسير الطبري والتفسير الميسر والسعدي بالكامل بدون اتصال بالإنترنت، مع التبديل الفوري بين كتب التفسير بنقرة واحدة على أي آية.',
+          'إمكانية تنزيل وقراءة التفاسير المتاحة داخل المصحف بدون اتصال بالإنترنت، مع التبديل الفوري بين كتب التفسير بنقرة واحدة على أي آية.',
       locationPath: 'المصحف الشريف > الضغط على الآية > التفسير والمعاني',
       actionTitle: 'فتح المصحف والتفاسير',
       onAction: (ctx) => Navigator.push(
@@ -131,9 +149,9 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
     _FeatureItem(
-      category: '📖 المصحف والتفاسير',
+      category: 'المصحف والتفاسير',
       title: 'التبديل بين الوضع المكبر والمصغر وعلامات الأحزاب',
-      badge: 'راحة القراءة 👓',
+      badge: 'راحة القراءة ',
       badgeColor: const Color(0xFF00838F),
       icon: Icons.zoom_in_rounded,
       iconColor: const Color(0xFF00ACC1),
@@ -149,15 +167,16 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
 
     // 3. الورد والختمات
     _FeatureItem(
-      category: '📿 الورد والختمات',
+      category: 'الورد والختمات',
       title: 'نظام الختمات والورد القرآني اليومي',
-      badge: 'ختم القرآن 📖',
+      badge: 'ختم القرآن ',
       badgeColor: const Color(0xFFD0A871),
       icon: Icons.menu_book_rounded,
       iconColor: const Color(0xFFD0A871),
       description:
           'إنشاء ختمات متعددة (ختمة شهرية، تدبر، سنوية) مع تحديد وتيرة الورد، وحفظ تقدم الصفحات تلقائياً، وإمكانية تدوين الملاحظات والفوائد على الآيات، ومشاركة إنجاز الورد كصورة أو نص، ودعاء ختم القرآن.',
-      locationPath: 'الشاشة الرئيسية > قسم القرآن والورد / أو المزيد > الورد القرآني',
+      locationPath:
+          'الشاشة الرئيسية > قسم القرآن والورد / أو المزيد > الورد القرآني',
       actionTitle: 'فتح شاشة الختمات',
       onAction: (ctx) => Navigator.push(
         ctx,
@@ -165,9 +184,9 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
     _FeatureItem(
-      category: '📿 الورد والختمات',
+      category: 'الورد والختمات',
       title: 'قارئ الورد بصفحات المصحف الأصيلة (15 سطراً)',
-      badge: 'جديد ✨',
+      badge: 'جديد ',
       badgeColor: const Color(0xFF00897B),
       icon: Icons.chrome_reader_mode_rounded,
       iconColor: const Color(0xFF00897B),
@@ -181,14 +200,14 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
     _FeatureItem(
-      category: '📿 الورد والختمات',
+      category: 'الورد والختمات',
       title: 'دعاء ختم القرآن المأثور وبطاقات المشاركة',
-      badge: 'مأثور وموثوق 📜',
+      badge: 'مأثور وموثوق ',
       badgeColor: const Color(0xFFD0A871),
       icon: Icons.auto_stories_rounded,
       iconColor: const Color(0xFFD0A871),
       description:
-          'دعاء ختم القرآن الكريم المأثور والمستحب من كتاب الأذكار للإمام النووي، مع إمكانية تكبير وتصغير الخط، ومشاركة النص كاملاً، أو تصدير الدعاء كبطاقة إسلامية فاخرة بثيمات متعددة عالية الدقة وحفظها في المعرض.',
+          'دعاء ختم القرآن الكريم المأثور والمستحب من كتاب الأذكار للإمام النووي، مع إمكانية تكبير وتصغير الخط، ومشاركة النص كاملاً، أو تصدير الدعاء كبطاقة إسلامية فاخرة بثيمات متعددة جاهزة للمشاركة وحفظها في المعرض.',
       locationPath: 'الورد القرآني > دعاء ختم القرآن',
       actionTitle: 'فتح دعاء ختم القرآن',
       onAction: (ctx) => Navigator.push(
@@ -199,9 +218,9 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
 
     // 4. الأذكار وحصن المسلم
     _FeatureItem(
-      category: '🤲 الأذكار وحصن المسلم',
+      category: 'الأذكار وحصن المسلم',
       title: 'أذكار الصباح والمساء والستريك التلقائي',
-      badge: 'حصن يومي ☀️',
+      badge: 'حصن يومي ',
       badgeColor: const Color(0xFFF57F17),
       icon: Icons.wb_sunny_rounded,
       iconColor: const Color(0xFFF57F17),
@@ -215,14 +234,14 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
     _FeatureItem(
-      category: '🤲 الأذكار وحصن المسلم',
+      category: 'الأذكار وحصن المسلم',
       title: 'حصن المسلم الشامل مع البحث الفوري',
-      badge: 'أدعية وأذكار 🛡️',
+      badge: 'أدعية وأذكار ',
       badgeColor: const Color(0xFF43A047),
       icon: Icons.shield_rounded,
       iconColor: const Color(0xFF43A047),
       description:
-          'موسوعة أدعية حصن المسلم مقسمة حسب الأبواب والمناسبات، مع محرك بحث ذكي فوري يبحث في عناوين ونصوص الأدعية، وإمكانية تفضيل الأدعية ومشاركتها كبطاقات.',
+          'موسوعة أدعية حصن المسلم مقسمة حسب الأبواب والمناسبات، مع بحث في عناوين ونصوص الأدعية، وإمكانية تفضيل الأدعية ومشاركتها كبطاقات.',
       locationPath: 'الشاشة الرئيسية > بطاقة حصن المسلم',
       actionTitle: 'فتح حصن المسلم',
       onAction: (ctx) => Navigator.push(
@@ -231,9 +250,9 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
     _FeatureItem(
-      category: '🤲 الأذكار وحصن المسلم',
+      category: 'الأذكار وحصن المسلم',
       title: 'الأربعون النووية مع الشرح والفوائد',
-      badge: 'سنة نبوية 📜',
+      badge: 'سنة نبوية ',
       badgeColor: const Color(0xFF6D4C41),
       icon: Icons.library_books_rounded,
       iconColor: const Color(0xFF8D6E63),
@@ -247,9 +266,9 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
     _FeatureItem(
-      category: '🤲 الأذكار وحصن المسلم',
+      category: 'الأذكار وحصن المسلم',
       title: 'المسبحة الإلكترونية التفاعلية',
-      badge: 'تسبيح وذكر 📿',
+      badge: 'تسبيح وذكر ',
       badgeColor: const Color(0xFF00897B),
       icon: Icons.fingerprint_rounded,
       iconColor: const Color(0xFF00897B),
@@ -265,9 +284,9 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
 
     // 5. حاسب نفسك
     _FeatureItem(
-      category: '📊 حاسب نفسك',
+      category: 'حاسب نفسك',
       title: 'حاسب نفسك والمزامنة التلقائية مع صلاتي',
-      badge: 'مراقبة الذات 📈',
+      badge: 'مراقبة الذات ',
       badgeColor: const Color(0xFFD0A871),
       icon: Icons.checklist_rounded,
       iconColor: const Color(0xFFD0A871),
@@ -283,14 +302,14 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
 
     // 6. الصيام والسنن
     _FeatureItem(
-      category: '🌙 الصيام والسنن',
+      category: 'الصيام والسنن',
       title: 'أيام الصيام وبطاقات ستوري واتساب (9:16)',
-      badge: 'جديد ومميز 🌟',
+      badge: 'متاحة',
       badgeColor: const Color(0xFFE65100),
       icon: Icons.stay_current_portrait_rounded,
       iconColor: const Color(0xFFD0A871),
       description:
-          'جدول شهري بأيام صيام التطوع (الاثنين والخميس، الأيام البيض، عاشوراء، عرفة، وغيرها) مع إمكانية تصدير بطاقات ستوري واتساب 9:16 بدقة 4K فائقة الوضوح وبألوان داكنة وفاتحة فاخرة وإرفاق 29 نية مباركة لصيام التطوع.',
+          'جدول شهري بأيام صيام التطوع (الاثنين والخميس، الأيام البيض، عاشوراء، عرفة، وغيرها) مع إمكانية تصدير بطاقات ستوري واتساب 9:16 بمقاس مناسب للمشاركة وبألوان داكنة وفاتحة فاخرة وإرفاق 29 نية مباركة لصيام التطوع.',
       locationPath: 'المزيد > أيام الصيام',
       actionTitle: 'فتح أيام الصيام',
       onAction: (ctx) => Navigator.push(
@@ -299,9 +318,9 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
     _FeatureItem(
-      category: '🌙 الصيام والسنن',
+      category: 'الصيام والسنن',
       title: 'سجل الصيام وقضاء الفوائت',
-      badge: 'متابعة الصيام 📅',
+      badge: 'متابعة الصيام ',
       badgeColor: const Color(0xFF00897B),
       icon: Icons.event_available_rounded,
       iconColor: const Color(0xFF00897B),
@@ -315,9 +334,9 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
     _FeatureItem(
-      category: '🌙 الصيام والسنن',
+      category: 'الصيام والسنن',
       title: 'المناسبات الإسلامية والتقويم الهجري',
-      badge: 'أعياد ومناسبات 🌙',
+      badge: 'أعياد ومناسبات ',
       badgeColor: const Color(0xFF5C6BC0),
       icon: Icons.celebration_rounded,
       iconColor: const Color(0xFF5C6BC0),
@@ -331,11 +350,144 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
 
-    // 7. التخصيص والمزامنة
+    // ميزات الصيام الموسمية والقضاء
     _FeatureItem(
-      category: '⚙️ التخصيص والمزامنة',
+      category: 'رمضان والعيد',
+      title: 'لوحة رمضان وتنبيهات العيد',
+      badge: 'رمضان والعيد',
+      badgeColor: const Color(0xFF00897B),
+      icon: Icons.nightlight_round,
+      iconColor: const Color(0xFF00897B),
+      description:
+          'لوحة عملية لرمضان تعرض بطاقات الإفطار والسحور، وتتيح ضبط تنبيهات مرتبطة بهما، مع أدوات مخصصة لصلاة العيد وتذكيراتها.',
+      locationPath: 'المزيد > رمضان',
+      actionTitle: 'فتح لوحة رمضان',
+      onAction: (ctx) => Navigator.push(
+        ctx,
+        MaterialPageRoute(builder: (_) => const RamadanScreen()),
+      ),
+    ),
+    _FeatureItem(
+      category: 'القضاء والفقه',
+      title: 'متابعة قضاء الصيام والصلوات',
+      badge: 'قضاء',
+      badgeColor: const Color(0xFF6D4C41),
+      icon: Icons.assignment_turned_in_rounded,
+      iconColor: const Color(0xFF6D4C41),
+      description:
+          'تسجيل ما عليك من قضاء الصيام والصلوات ومتابعة المتبقي، مع إعدادات الفقه المرتبطة بالحساب دون ادعاء إصدار فتوى.',
+      locationPath: 'المزيد > القضاء',
+      actionTitle: 'فتح متابعة القضاء',
+      onAction: (ctx) => Navigator.push(
+        ctx,
+        MaterialPageRoute(builder: (_) => const QadaaScreen()),
+      ),
+    ),
+    _FeatureItem(
+      category: 'القضاء والفقه',
+      title: 'سجل أيام قضاء الصيام',
+      badge: 'سجل القضاء',
+      badgeColor: const Color(0xFF00897B),
+      icon: Icons.event_note_rounded,
+      iconColor: const Color(0xFF00897B),
+      description:
+          'عرض سجل أيام القضاء المرتبطة ببطاقات رمضان وتحديثها من شاشة واحدة.',
+      locationPath: 'رمضان > أيام القضاء',
+      actionTitle: 'فتح سجل القضاء',
+      onAction: (ctx) => Navigator.push(
+        ctx,
+        MaterialPageRoute(builder: (_) => const QadaListScreen()),
+      ),
+    ),
+    _FeatureItem(
+      category: 'الرقية الشرعية',
+      title: 'الرقية الشرعية من النصوص المضمنة',
+      badge: 'رقية',
+      badgeColor: const Color(0xFF2E7D32),
+      icon: Icons.menu_book_rounded,
+      iconColor: const Color(0xFF2E7D32),
+      description:
+          'قراءة نصوص الرقية الشرعية المضمنة في التطبيق ونسخ النص عند الحاجة، دون نسب فوائد علاجية أو وعود طبية.',
+      locationPath: 'المزيد > الرقية الشرعية',
+      actionTitle: 'فتح الرقية الشرعية',
+      onAction: (ctx) => Navigator.push(
+        ctx,
+        MaterialPageRoute(builder: (_) => const RuqyahScreen()),
+      ),
+    ),
+    // تنبيهات الصلاة والتقويم والمواقع
+    _FeatureItem(
+      category: 'التنبيهات',
+      title: 'تخصيص تنبيهات الأذان والصلاة',
+      badge: 'تنبيهات الصلاة',
+      badgeColor: const Color(0xFFE65100),
+      icon: Icons.notifications_active_rounded,
+      iconColor: const Color(0xFFE65100),
+      description:
+          'تشغيل أو إيقاف تنبيهات الصلوات وتخصيص مدة الصمت وخيارات الأذان لكل صلاة من إعدادات التنبيهات.',
+      locationPath: 'الإعدادات > تنبيهات الصلاة',
+      actionTitle: 'فتح تنبيهات الصلاة',
+      onAction: (ctx) => Navigator.push(
+        ctx,
+        MaterialPageRoute(builder: (_) => const PrayerAlarmsScreen()),
+      ),
+    ),
+    _FeatureItem(
+      category: 'التقويم الهجري',
+      title: 'التاريخ الهجري المصري ومراجعة المصدر',
+      badge: 'مصدر رسمي',
+      badgeColor: const Color(0xFFC2185B),
+      icon: Icons.fact_check_rounded,
+      iconColor: const Color(0xFFC2185B),
+      description:
+          'مراجعة التاريخ الهجري المصري وتأكيده عند اختلاف المصادر، مع مزامنة البيانات من المصادر الرسمية المتاحة في التطبيق.',
+      locationPath: 'الإعدادات > النظام الهجري المعتمد',
+      actionTitle: 'مراجعة التاريخ الهجري',
+      onAction: (ctx) => Navigator.push(
+        ctx,
+        MaterialPageRoute(builder: (_) => const HijriConfirmationScreen()),
+      ),
+    ),
+    _FeatureItem(
+      category: 'المدن والمواقع',
+      title: 'إدارة مدن متعددة لمواقيت الصلاة',
+      badge: 'مواقع متعددة',
+      badgeColor: const Color(0xFF1976D2),
+      icon: Icons.location_city_rounded,
+      iconColor: const Color(0xFF1976D2),
+      description:
+          'إضافة أكثر من مدينة وحفظ إعدادات كل مدينة وطريقة الحساب والفروق الزمنية لاستخدام مواقيت مناسبة لكل موقع.',
+      locationPath: 'الإعدادات > المدن والمواقع',
+      actionTitle: 'إدارة المدن والمواقع',
+      onAction: (ctx) => Navigator.push(
+        ctx,
+        MaterialPageRoute(builder: (_) => const LocationsListScreen()),
+      ),
+    ),
+
+    // 7. القبلة والموقع
+    _FeatureItem(
+      category: 'القبلة والموقع',
+      title: 'بوصلة القبلة',
+      badge: 'اتجاه القبلة',
+      badgeColor: const Color(0xFF1976D2),
+      icon: Icons.explore_rounded,
+      iconColor: const Color(0xFF1976D2),
+      description:
+          'تحديد اتجاه القبلة باستخدام بوصلة الجهاز مع إرشادات لتحسين دقة القراءة عند الحاجة إلى معايرة الجهاز.',
+      locationPath: 'الشاشة الرئيسية > أداة القبلة',
+      actionTitle: 'فتح بوصلة القبلة',
+      onAction: (ctx) => Navigator.push(
+        ctx,
+        MaterialPageRoute(builder: (_) => const QiblahScreen()),
+      ),
+    ),
+
+    // 8. التخصيص والمزامنة
+    _FeatureItem(
+      category: 'التخصيص والمزامنة',
       title: 'الصلاة على النبي ﷺ عند فتح قفل الشاشة',
-      badge: 'بركة اليوم 💚',
+      badge: 'بركة اليوم ',
       badgeColor: const Color(0xFF2E7D32),
       icon: Icons.screen_lock_portrait_rounded,
       iconColor: const Color(0xFF43A047),
@@ -349,9 +501,9 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
     _FeatureItem(
-      category: '⚙️ التخصيص والمزامنة',
+      category: 'التخصيص والمزامنة',
       title: 'النسخ الاحتياطي والمزامنة السحابية مع Google Drive',
-      badge: 'أمان بياناتك ☁️',
+      badge: 'أمان بياناتك ',
       badgeColor: const Color(0xFF1976D2),
       icon: Icons.cloud_sync_rounded,
       iconColor: const Color(0xFF1976D2),
@@ -365,9 +517,9 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
     _FeatureItem(
-      category: '⚙️ التخصيص والمزامنة',
+      category: 'التخصيص والمزامنة',
       title: 'تثبيت ومزامنة التاريخ الهجري المصري وهيئة المساحة',
-      badge: 'دقة شرعية 🇪🇬',
+      badge: 'دقة شرعية',
       badgeColor: const Color(0xFFC2185B),
       icon: Icons.calendar_today_rounded,
       iconColor: const Color(0xFFE91E63),
@@ -381,9 +533,9 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
     _FeatureItem(
-      category: '⚙️ التخصيص والمزامنة',
+      category: 'التخصيص والمزامنة',
       title: 'بطاقات المشاركة الإسلامية الجاهزة',
-      badge: 'نشر الخير 🖼️',
+      badge: 'نشر الخير ',
       badgeColor: const Color(0xFF7B1FA2),
       icon: Icons.grid_view_rounded,
       iconColor: const Color(0xFF9C27B0),
@@ -397,9 +549,9 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
       ),
     ),
     _FeatureItem(
-      category: '⚙️ التخصيص والمزامنة',
+      category: 'التخصيص والمزامنة',
       title: 'مبادرة "وقت لله"',
-      badge: 'جلسة تدبر ⏳',
+      badge: 'جلسة تدبر',
       badgeColor: const Color(0xFFD0A871),
       icon: Icons.hourglass_top_rounded,
       iconColor: const Color(0xFFD0A871),
@@ -416,10 +568,12 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
 
   List<_FeatureItem> get _filteredFeatures {
     return _features.where((item) {
-      final matchesCategory = _selectedCategory == 'الكل' || item.category == _selectedCategory;
+      final matchesCategory =
+          _selectedCategory == 'الكل' || item.category == _selectedCategory;
       final query = _searchQuery.trim().toLowerCase();
       if (query.isEmpty) return matchesCategory;
-      final matchesSearch = item.title.toLowerCase().contains(query) ||
+      final matchesSearch =
+          item.title.toLowerCase().contains(query) ||
           item.description.toLowerCase().contains(query) ||
           item.locationPath.toLowerCase().contains(query);
       return matchesCategory && matchesSearch;
@@ -436,8 +590,8 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
-    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1C1A18);
+    final cardBg = Theme.of(context).colorScheme.surface;
+    final textColor = Theme.of(context).colorScheme.onSurface;
 
     return Scaffold(
       backgroundColor: scaffoldBg,
@@ -473,7 +627,10 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
                 end: Alignment.bottomLeft,
               ),
               borderRadius: BorderRadius.circular(18.r),
-              border: Border.all(color: goldColor.withValues(alpha: 0.3), width: 1.5),
+              border: Border.all(
+                color: goldColor.withValues(alpha: 0.3),
+                width: 1.5,
+              ),
             ),
             child: Row(
               children: [
@@ -483,7 +640,11 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
                     color: goldColor.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.lightbulb_rounded, color: goldColor, size: 26.sp),
+                  child: Icon(
+                    Icons.lightbulb_rounded,
+                    color: goldColor,
+                    size: 26.sp,
+                  ),
                 ),
                 SizedBox(width: 14.w),
                 Expanded(
@@ -491,7 +652,7 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "أسرار ومميزات عباد الرحمن",
+                        "مميزات عباد الرحمن",
                         style: TextStyle(
                           fontFamily: AppConsts.expoArabic,
                           fontSize: 14.sp,
@@ -501,11 +662,13 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
                       ),
                       SizedBox(height: 2.h),
                       Text(
-                        "استكشف كافة الإمكانيات المتاحة وطريقة الوصول إليها بسهولة واستمتع بتجربة إيمانية متكاملة.",
+                        "استكشف كافة الإمكانيات المتاحة وطريقة الوصول إليها بسهولة وتعرّف على المميزات المتاحة وطريقة الوصول إليها.",
                         style: TextStyle(
                           fontFamily: AppConsts.cairo,
                           fontSize: 11.sp,
-                          color: isDark ? Colors.white70 : Colors.black87,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.72),
                           height: 1.4,
                         ),
                       ),
@@ -541,7 +704,10 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
                     : null,
                 filled: true,
                 fillColor: cardBg,
-                contentPadding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 16.w),
+                contentPadding: EdgeInsets.symmetric(
+                  vertical: 10.h,
+                  horizontal: 16.w,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14.r),
                   borderSide: BorderSide(
@@ -579,7 +745,9 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
                     style: TextStyle(
                       fontFamily: AppConsts.cairo,
                       fontSize: 11.sp,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w500,
                       color: isSelected
                           ? Colors.black
                           : (isDark ? Colors.white70 : Colors.black87),
@@ -589,9 +757,13 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
                   selectedColor: goldColor,
                   backgroundColor: cardBg,
                   side: BorderSide(
-                    color: isSelected ? goldColor : (isDark ? Colors.white12 : Colors.black12),
+                    color: isSelected
+                        ? goldColor
+                        : (isDark ? Colors.white12 : Colors.black12),
                   ),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20.r),
+                  ),
                   onSelected: (val) {
                     if (val) setState(() => _selectedCategory = cat);
                   },
@@ -609,7 +781,11 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.search_off_rounded, size: 48.sp, color: Colors.grey),
+                        Icon(
+                          Icons.search_off_rounded,
+                          size: 48.sp,
+                          color: Colors.grey,
+                        ),
                         SizedBox(height: 12.h),
                         Text(
                           "لم يتم العثور على ميزات مطابقة للبحث",
@@ -696,9 +872,13 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
                           ),
                           if (item.badge != null)
                             Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 8.w,
+                                vertical: 3.h,
+                              ),
                               decoration: BoxDecoration(
-                                color: (item.badgeColor ?? goldColor).withValues(alpha: 0.15),
+                                color: (item.badgeColor ?? goldColor)
+                                    .withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(8.r),
                               ),
                               child: Text(
@@ -744,7 +924,7 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
 
             SizedBox(height: 12.h),
 
-            // Location Box: "📍 أين تجدها في التطبيق؟"
+            // Location Box: أين تجدها في التطبيق
             Container(
               width: double.infinity,
               padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
@@ -762,7 +942,7 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
                   Icon(Icons.near_me_rounded, size: 14.sp, color: goldColor),
                   SizedBox(width: 8.w),
                   Text(
-                    "المسار: ",
+                    "المكان: ",
                     style: TextStyle(
                       fontFamily: AppConsts.cairo,
                       fontSize: 11.sp,
@@ -777,7 +957,7 @@ class _AppFeaturesGuideScreenState extends State<AppFeaturesGuideScreen> {
                         fontFamily: AppConsts.cairo,
                         fontSize: 11.sp,
                         fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : Colors.black87,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),

@@ -13,14 +13,21 @@ class SurahAudioModel {
   });
 
   factory SurahAudioModel.fromJson(Map<String, dynamic> json) {
-    final sNum = (json['surah_number'] ?? json['chapter_id'] ?? 1) as int;
+    final rawSurahNumber = json['surah_number'] ?? json['chapter_id'];
+    final sNum = rawSurahNumber is num
+        ? rawSurahNumber.toInt()
+        : int.tryParse(rawSurahNumber?.toString() ?? '') ?? 1;
+    final rawDuration = json['duration'];
+    final durationSec = rawDuration is num
+        ? rawDuration.toInt()
+        : int.tryParse(rawDuration?.toString() ?? '') ?? 0;
     return SurahAudioModel(
       url: json['audio_url']?.toString() ?? '',
       name: sNum >= 1 && sNum <= quranSurahs.length
           ? quranSurahs[sNum - 1]
           : 'سورة',
       surahNumber: sNum,
-      durationSec: (json['duration'] as num?)?.toInt() ?? 0,
+      durationSec: durationSec,
     );
   }
 }

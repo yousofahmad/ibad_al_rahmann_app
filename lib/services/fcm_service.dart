@@ -1,47 +1,78 @@
+import 'dart:async';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
-/// Top-level handler required by FCM for background messages.
+import 'notification_service.dart';
+
+/// Notification messages in the background are displayed by Firebase/Android.
+/// Do not display them again here, which would create duplicate notifications.
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('FCM background message: ${message.messageId}');
 }
 
 class FCMService {
-  static final _messaging = FirebaseMessaging.instance;
+  static FirebaseMessaging get _messaging => FirebaseMessaging.instance;
+  static bool _initialized = false;
+  static StreamSubscription<RemoteMessage>? _foregroundSubscription;
+  static StreamSubscription<RemoteMessage>? _openedSubscription;
+
+  static String _payload(RemoteMessage message) {
+    final payload = message.data['payload'];
+    return payload is String && payload.isNotEmpty ? payload : 'home';
+  }
+
+  static void _openMessage(RemoteMessage message) {
+    NotificationService.onNotificationTap.value = null;
+    NotificationService.onNotificationTap.value = _payload(message);
+  }
+
+  /// Kept separate from Firebase initialization so local rendering is testable.
+  static Future<void> handleForegroundMessage(RemoteMessage message) async {
+    final title = message.notification?.title ?? message.data['title'];
+    final body = message.notification?.body ?? message.data['body'];
+    if ((title is! String || title.trim().isEmpty) &&
+        (body is! String || body.trim().isEmpty)) {
+      return;
+    }
+    await NotificationService.showImmediateNotification(
+      title: title is String && title.trim().isNotEmpty ? title : 'عباد الرحمن',
+      body: body is String ? body : '',
+      payload: _payload(message),
+      soundName: 'default',
+    );
+  }
 
   static Future<void> init() async {
+    if (_initialized) return;
+    _initialized = true;
     try {
-      // Register background handler early
       FirebaseMessaging.onBackgroundMessage(
         _firebaseMessagingBackgroundHandler,
       );
-
-      // Only request permission if the app is actually in the foreground/active.
-      // If the screen is locked, this might fail or show nothing.
       final settings = await _messaging
           .requestPermission(alert: true, badge: true, sound: true)
           .timeout(
             const Duration(seconds: 5),
-            onTimeout: () {
-              debugPrint('FCM: Permission request timed out.');
-              return _messaging.getNotificationSettings();
-            },
+            onTimeout: () => _messaging.getNotificationSettings(),
           );
-
       debugPrint('FCM permission: ${settings.authorizationStatus}');
-
-      // Foreground message listener
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        debugPrint('FCM foreground message: ${message.messageId}');
+      _foregroundSubscription = FirebaseMessaging.onMessage.listen((message) {
+        unawaited(handleForegroundMessage(message));
       });
-
-      // Subscribe to global topic
+      _openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
+        _openMessage,
+      );
+      final initial = await _messaging.getInitialMessage();
+      if (initial != null) _openMessage(initial);
       await _messaging.subscribeToTopic('all_users').catchError((_) {});
-
-      final token = await _messaging.getToken().catchError((_) => null);
-      if (token != null && kDebugMode) debugPrint('FCM token: $token');
     } catch (e) {
+      await _foregroundSubscription?.cancel();
+      await _openedSubscription?.cancel();
+      _foregroundSubscription = null;
+      _openedSubscription = null;
+      _initialized = false;
       debugPrint('FCM Init Error: $e');
     }
   }

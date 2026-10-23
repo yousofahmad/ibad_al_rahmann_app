@@ -13,16 +13,19 @@ class ReciterDropdown extends StatelessWidget {
   @visibleForTesting
   static List<ReciterAudioModel> filterReciters({
     required Iterable<ReciterAudioModel> reciters,
-    required bool wordByWord,
+    bool? wordByWord,
+    ReciterAudioMode? mode,
     String? category,
     String searchQuery = '',
   }) {
     final query = searchQuery.trim().toLowerCase();
+    final selectedMode =
+        mode ??
+        (wordByWord == true
+            ? ReciterAudioMode.wordByWord
+            : ReciterAudioMode.ayahByAyah);
     return reciters.where((r) {
-      final supportsMode = wordByWord
-          ? r.highlightSupport == ReciterHighlightSupport.wordByWord
-          : r.highlightSupport != ReciterHighlightSupport.none;
-      if (!supportsMode) return false;
+      if (!r.supportsMode(selectedMode)) return false;
       if (category != null && category != 'الكل' && r.category != category) {
         return false;
       }
@@ -42,6 +45,9 @@ class ReciterDropdown extends StatelessWidget {
         ReciterAudioHelper.getReciterById(cubit.reciter ?? 'mishari_alafasy');
     String searchQuery = '';
     String? selectedCategory;
+    var selectedMode = cubit.isHighlightWordByWord
+        ? ReciterAudioMode.wordByWord
+        : ReciterAudioMode.ayahByAyah;
 
     final allReciters = VersePlayerCubit.allReciters;
     final categories = [
@@ -67,7 +73,7 @@ class ReciterDropdown extends StatelessWidget {
 
             final filteredReciters = ReciterDropdown.filterReciters(
               reciters: allReciters,
-              wordByWord: cubit.isHighlightWordByWord,
+              mode: selectedMode,
               category: selectedCategory,
               searchQuery: searchQuery,
             );
@@ -156,6 +162,7 @@ class ReciterDropdown extends StatelessWidget {
                           child: InkWell(
                             onTap: () {
                               cubit.setHighlightMode(true);
+                              selectedMode = ReciterAudioMode.wordByWord;
                               setModalState(() {});
                             },
                             borderRadius: BorderRadius.circular(12.r),
@@ -203,6 +210,7 @@ class ReciterDropdown extends StatelessWidget {
                           child: InkWell(
                             onTap: () {
                               cubit.setHighlightMode(false);
+                              selectedMode = ReciterAudioMode.ayahByAyah;
                               setModalState(() {});
                             },
                             borderRadius: BorderRadius.circular(12.r),

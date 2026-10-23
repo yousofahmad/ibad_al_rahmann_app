@@ -12,13 +12,15 @@ import '../../data/surah_list.dart';
 part 'quran_player_state.dart';
 
 class QuranPlayerCubit extends Cubit<QuranPlayerState> {
-  QuranPlayerCubit() : super(QuranPlayerInitial()) {
+  QuranPlayerCubit({AudioPlayer? audioPlayer})
+    : player = audioPlayer ?? AudioPlayer(),
+      super(QuranPlayerInitial()) {
     _initPlayerListener();
     _positionSubscription = player.positionStream.listen(
       _updateActivePlaybackPosition,
     );
   }
-  final player = AudioPlayer();
+  final AudioPlayer player;
   StreamSubscription<PlayerState>? _playerStateSubscription;
   StreamSubscription<Duration>? _positionSubscription;
   Duration sliderPosition = Duration.zero;
@@ -31,10 +33,14 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
   double currentSpeed = 1.0;
   bool isLooping = false;
   bool autoPlayNext = true;
+  int _playbackRequestId = 0;
+  Future<void> _playbackQueue = Future<void>.value();
+  bool _isLoadingSource = false;
 
   void _initPlayerListener() {
     _playerStateSubscription?.cancel();
     _playerStateSubscription = player.playerStateStream.listen((state) {
+      if (isClosed) return;
       if (state.processingState == ProcessingState.completed) {
         AppLogger.log("QuranAudio", "Surah $selectedSurah playback completed");
         if (!isLooping &&
@@ -82,7 +88,8 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
         return offlinePath;
       }
       final surahs = await ReciterAudioHelper.getSurahs(reciter!);
-      if (surahs.containsKey(surahNum)) {
+      if (surahs.containsKey(surahNum) &&
+          surahs[surahNum]!.audioUrl.trim().isNotEmpty) {
         final url = surahs[surahNum]!.audioUrl;
         AppLogger.log(
           "QuranAudio",
@@ -113,9 +120,11 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
       await playSurah(nextSurah);
     } catch (e) {
       AppLogger.log("QuranAudio", "playNextSurah error: $e");
-      emit(
-        QuranPlayerFailure(errMessage: 'حدث خطأ أثناء تشغيل السورة التالية'),
-      );
+      if (!isClosed) {
+        emit(
+          QuranPlayerFailure(errMessage: 'حدث خطأ أثناء تشغيل السورة التالية'),
+        );
+      }
     }
   }
 
@@ -131,20 +140,42 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
       await playSurah(previousSurah);
     } catch (e) {
       AppLogger.log("QuranAudio", "playPreviousSurah error: $e");
-      emit(
-        QuranPlayerFailure(errMessage: 'حدث خطأ أثناء تشغيل السورة السابقة'),
-      );
+      if (!isClosed) {
+        emit(
+          QuranPlayerFailure(errMessage: 'حدث خطأ أثناء تشغيل السورة السابقة'),
+        );
+      }
     }
   }
 
-  Future<bool> init(int surahNum) async {
+  Future<bool> init(int surahNum, {int? requestId}) {
+    if (requestId != null) return _loadSurah(surahNum, requestId);
+    final id = ++_playbackRequestId;
+    final operation = _playbackQueue.then((_) => _loadSurah(surahNum, id));
+    _playbackQueue = operation.then<void>((_) {}).catchError((_) {});
+    return operation;
+  }
+
+  int? _loadedSurah;
+
+  Future<bool> _loadSurah(int surahNum, int activeRequestId) async {
+    if (isClosed || activeRequestId != _playbackRequestId) return false;
+    _loadedSurah = null;
     currentReciterName = reciter?.name;
+    _isLoadingSource = true;
     try {
       selectedSurah = surahNum;
       currentSegments = {};
       activeVerseNumber = null;
       activeWordIndex = null;
       final url = await getSurahUrl(surahNum);
+      if (isClosed || activeRequestId != _playbackRequestId) return false;
+      if (url.trim().isEmpty) {
+        if (!isClosed && activeRequestId == _playbackRequestId) {
+          emit(QuranPlayerFailure(errMessage: 'تعذر العثور على ملف الصوت'));
+        }
+        return false;
+      }
 
       final surahTitle = (surahNum >= 1 && surahNum <= quranSurahs.length)
           ? quranSurahs[surahNum - 1]
@@ -180,25 +211,36 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
         );
       }
 
+      if (isClosed || activeRequestId != _playbackRequestId) return false;
+      _loadedSurah = surahNum;
+
       // Load segments asynchronously in background without blocking audio playback
       if (reciter != null && reciter!.hasSegments) {
-        _loadSegmentsBackground(reciter!);
+        _loadSegmentsBackground(reciter!, activeRequestId);
       }
 
       emit(QuranBottomSheetShowed());
       return true;
     } catch (e) {
       AppLogger.log("QuranAudio", "init error for surah $surahNum: $e");
-      emit(QuranPlayerFailure(errMessage: 'تعذر تحميل ملف الصوت'));
+      if (!isClosed && activeRequestId == _playbackRequestId) {
+        emit(QuranPlayerFailure(errMessage: 'تعذر تحميل ملف الصوت'));
+      }
       return false;
+    } finally {
+      _isLoadingSource = false;
     }
   }
 
-  void _loadSegmentsBackground(ReciterAudioModel reciterModel) async {
+  void _loadSegmentsBackground(
+    ReciterAudioModel reciterModel,
+    int requestId,
+  ) async {
     try {
       final segments = await ReciterAudioHelper.getSegments(
         reciterModel,
       ).timeout(const Duration(seconds: 8));
+      if (isClosed || requestId != _playbackRequestId) return;
       currentSegments = segments;
       _updateActivePlaybackPosition(player.position);
       AppLogger.log(
@@ -287,30 +329,48 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
       }
       player.play();
     }
-    emit(QuranBottomSheetShowed());
+    if (!isClosed) emit(QuranBottomSheetShowed());
   }
 
-  Future<void> playSurah(int surah) async {
-    AppLogger.log("QuranAudio", "playSurah: $surah requested (current: $selectedSurah, playing: ${player.playing})");
-    if (selectedSurah == surah) {
+  Future<void> playSurah(int surah) {
+    final requestId = ++_playbackRequestId;
+    final operation = _playbackQueue.then((_) => _playSurah(surah, requestId));
+    _playbackQueue = operation.catchError((_) {});
+    return operation;
+  }
+
+  Future<void> _playSurah(int surah, int requestId) async {
+    if (isClosed || requestId != _playbackRequestId) return;
+    AppLogger.log(
+      "QuranAudio",
+      "playSurah: $surah requested (current: $selectedSurah, playing: ${player.playing})",
+    );
+    if (selectedSurah == surah && _loadedSurah == surah) {
+      if (_isLoadingSource) return;
       handlePlayPause();
       return;
     }
 
     if (player.playing) {
       await player.stop();
+      if (isClosed || requestId != _playbackRequestId) return;
       sliderPosition = Duration.zero;
     }
 
+    if (isClosed || requestId != _playbackRequestId) return;
     selectedSurah = surah;
-    emit(QuranBottomSheetShowed());
+    if (!isClosed) emit(QuranBottomSheetShowed());
 
-    final success = await init(surah);
-    if (!success) {
+    final success = await init(surah, requestId: requestId);
+    if (!success || isClosed || requestId != _playbackRequestId) {
       return;
     }
 
-    await player.play();
+    unawaited(
+      player.play().catchError((error) {
+        AppLogger.log("QuranAudio", "play error for surah $surah: $error");
+      }),
+    );
   }
 
   void seekToVerse(int verseNumber) {
@@ -348,6 +408,7 @@ class QuranPlayerCubit extends Cubit<QuranPlayerState> {
   @override
   Future<void> close() async {
     AppLogger.log("QuranAudio", "Closing QuranPlayerCubit");
+    ++_playbackRequestId;
     _playerStateSubscription?.cancel();
     _positionSubscription?.cancel();
     await player.stop();

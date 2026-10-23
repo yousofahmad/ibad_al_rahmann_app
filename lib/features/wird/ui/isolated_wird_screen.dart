@@ -215,7 +215,13 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen>
     });
   }
 
-  void _toggleMenu() {
+  void _toggleMenu(BuildContext context) {
+    final playerCubit = context.read<VersePlayerCubit>();
+    if (playerCubit.hasAudioSession) {
+      setState(() => _showMenu = false);
+      playerCubit.toggleUiOnly();
+      return;
+    }
     setState(() {
       _showMenu = !_showMenu;
     });
@@ -252,6 +258,9 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen>
         },
         child: Builder(
           builder: (context) {
+            final hasAudioSession = context.select(
+              (VersePlayerCubit cubit) => cubit.hasAudioSession,
+            );
             final quranState = context.watch<QuranCubit>().state;
             final paperColorState = quranState.isKahfMode
                 ? quranState.kahfPaperColor
@@ -328,7 +337,7 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen>
                             Positioned.fill(
                               child: GestureDetector(
                                 behavior: HitTestBehavior.opaque,
-                                onTap: _toggleMenu,
+                                onTap: () => _toggleMenu(context),
                                 onDoubleTap: () {
                                   _localQuranCubit.changeLayout();
                                 },
@@ -783,15 +792,15 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen>
                             ),
 
                             // Single Tap Menu (PageActionBar)
-                            if (_showMenu)
+                            if (_showMenu && !hasAudioSession)
                               Positioned.fill(
                                 child: GestureDetector(
-                                  onTap: _toggleMenu,
+                                  onTap: () => _toggleMenu(context),
                                   behavior: HitTestBehavior.translucent,
                                   child: Container(color: Colors.transparent),
                                 ),
                               ),
-                            if (_showMenu)
+                            if (_showMenu && !hasAudioSession)
                               SafeArea(
                                 child: Padding(
                                   padding: const EdgeInsets.only(top: 8),
@@ -799,7 +808,7 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen>
                                     pageNumber:
                                         (widget.targetStartPage +
                                         _currentIndex),
-                                    onDismiss: _toggleMenu,
+                                    onDismiss: () => _toggleMenu(context),
                                   ),
                                 ),
                               ),

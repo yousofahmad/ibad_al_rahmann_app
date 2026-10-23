@@ -88,6 +88,9 @@ class _WbwMushafScreenState extends State<WbwMushafScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hasAudioSession = context.select(
+      (VersePlayerCubit cubit) => cubit.hasAudioSession,
+    );
     final isDark = context.watch<ThemeCubit>().state.mode == ThemeMode.dark;
     final paperColor = isDark ? Colors.black : Colors.white;
     final isAutoScrolling = context.watch<QuranCubit>().state.isAutoScrolling;
@@ -150,6 +153,7 @@ class _WbwMushafScreenState extends State<WbwMushafScreen> {
                         if (!isAutoScrolling) {
                           final vpCubit = context.read<VersePlayerCubit>();
                           if (vpCubit.hasAudioSession) {
+                            setState(() => _showMenu = false);
                             vpCubit.toggleUiOnly();
                             return;
                           }
@@ -224,7 +228,7 @@ class _WbwMushafScreenState extends State<WbwMushafScreen> {
               ),
 
               // ─── Single-tap menu (Fix 2: always at top in normal Mushaf) ───
-              if (_showMenu && !isAutoScrolling)
+              if (_showMenu && !isAutoScrolling && !hasAudioSession)
                 Positioned(
                   top: 10,
                   left: 0,

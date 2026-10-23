@@ -61,14 +61,14 @@ class MainActivity: AudioServiceFragmentActivity() {
             }
         }
 
-        fun scheduleAlarm(context: Context, id: Int, year: Int, month: Int, day: Int, hour: Int, minute: Int, soundName: String, title: String?, body: String?, payload: String?, isRepeating: Boolean, audioPath: String?, intervalMinutes: Int = 0, customSoundName: String? = null) {
+        fun scheduleAlarm(context: Context, id: Int, year: Int, month: Int, day: Int, hour: Int, minute: Int, soundName: String, title: String?, body: String?, payload: String?, isRepeating: Boolean, audioPath: String?, intervalMinutes: Int = 0, customSoundName: String? = null, allowedDays: String? = null, seasonEndEpoch: Long? = null) {
             val prefs = context.getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE)
             val editor = prefs.edit()
-            scheduleAlarmInternal(context, editor, id, year, month, day, hour, minute, soundName, title, body, payload, isRepeating, audioPath, intervalMinutes, customSoundName)
+            scheduleAlarmInternal(context, editor, id, year, month, day, hour, minute, soundName, title, body, payload, isRepeating, audioPath, intervalMinutes, customSoundName, allowedDays, seasonEndEpoch)
             editor.apply()
         }
 
-        fun scheduleAlarmInternal(context: Context, editor: android.content.SharedPreferences.Editor, id: Int, year: Int, month: Int, day: Int, hour: Int, minute: Int, soundName: String, title: String?, body: String?, payload: String?, isRepeating: Boolean, audioPath: String?, intervalMinutes: Int = 0, customSoundName: String? = null, allowedDays: String? = null) {
+        fun scheduleAlarmInternal(context: Context, editor: android.content.SharedPreferences.Editor, id: Int, year: Int, month: Int, day: Int, hour: Int, minute: Int, soundName: String, title: String?, body: String?, payload: String?, isRepeating: Boolean, audioPath: String?, intervalMinutes: Int = 0, customSoundName: String? = null, allowedDays: String? = null, seasonEndEpoch: Long? = null) {
             // CRITICAL: Cancel existing alarm with this ID before scheduling a new one to prevent stacking
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val cancelIntent = Intent(context, AlarmReceiver::class.java)
@@ -94,6 +94,7 @@ class MainActivity: AudioServiceFragmentActivity() {
             editor.putBoolean("alarm_${id}_active", true)
             editor.putInt("alarm_${id}_interval", intervalMinutes)
             if (allowedDays != null) editor.putString("alarm_${id}_allowed_days", allowedDays)
+            if (seasonEndEpoch != null) editor.putLong("alarm_${id}_season_end", seasonEndEpoch) else editor.remove("alarm_${id}_season_end")
             
             // Persist custom sound so boot-reschedule can restore it
             if (customSoundName != null)
@@ -112,6 +113,7 @@ class MainActivity: AudioServiceFragmentActivity() {
                 putExtra("audio_path", audioPath)
                 putExtra("interval_minutes", intervalMinutes)
                 if (allowedDays != null) putExtra("allowed_days", allowedDays)
+                if (seasonEndEpoch != null) putExtra("season_end_epoch", seasonEndEpoch)
                 if (title != null) putExtra("title", title)
                 if (body != null) putExtra("body", body)
                 if (payload != null) putExtra("payload", payload)

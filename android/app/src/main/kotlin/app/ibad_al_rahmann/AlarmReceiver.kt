@@ -55,6 +55,13 @@ class AlarmReceiver : BroadcastReceiver() {
         }
 
         val alarmId = intent.getIntExtra("alarm_id", 0)
+        val seasonEndEpoch = intent.getLongExtra("season_end_epoch", 0L)
+        if (seasonEndEpoch > 0L && System.currentTimeMillis() >= seasonEndEpoch) {
+            val prefs = context.getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("alarm_${alarmId}_active", false).apply()
+            NativeLogger.log(context, "Seasonal alarm $alarmId expired at $seasonEndEpoch")
+            return
+        }
 
         if (intent.getBooleanExtra(PrayerRelativeAlarmScheduler.EXTRA_MARKER, false)) {
             try {
@@ -316,7 +323,7 @@ class AlarmReceiver : BroadcastReceiver() {
             var finalSoundName = soundName
             var finalPayload = payload
             var finalCustomSoundName = customSoundName
-            if (alarmId == 950 || alarmId in 8000..9500) {
+            if (alarmId in 8000..8999) {
                 finalPayload = "salawat"
             }
 
@@ -332,7 +339,7 @@ class AlarmReceiver : BroadcastReceiver() {
         var chainSoundName = soundName
         var chainPayload = payload
         var chainCustomSoundName = customSoundName
-        if (alarmId == 950 || alarmId in 8000..9500) {
+        if (alarmId in 8000..8999) {
             chainPayload = "salawat"
         }
 
@@ -458,8 +465,10 @@ class AlarmReceiver : BroadcastReceiver() {
                     val year = getSafeInt(prefs, "alarm_${id}_year", -1)
                     val month = getSafeInt(prefs, "alarm_${id}_month", -1)
                     val day = getSafeInt(prefs, "alarm_${id}_day", -1)
+                    val allowedDays = prefs.getString("alarm_${id}_allowed_days", null)
+                    val seasonEnd = prefs.getLong("alarm_${id}_season_end", 0L).takeIf { it > 0L }
 
-                    MainActivity.scheduleAlarm(context, id, year, month, day, hour, minute, soundName, title, body, payload, false, audioPath, interval, customSound)
+                    MainActivity.scheduleAlarm(context, id, year, month, day, hour, minute, soundName, title, body, payload, false, audioPath, interval, customSound, allowedDays, seasonEnd)
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -468,15 +477,10 @@ class AlarmReceiver : BroadcastReceiver() {
     }
 
     private fun handleAlarmChaining(context: Context, intent: Intent, alarmId: Int, soundName: String, title: String, body: String, payload: String, audioPath: String?) {
-        if (alarmId == 1 || alarmId == 3) {
-            // Morning Azkar (1) -> Ruqyah (2), Evening Azkar (3) -> Ruqyah (4)
-            showNotification(context, alarmId + 1, "🛡️ الرقية الشرعية", "حصن نفسك الآن بالرقية الشرعية", "ruqyah", "ruqyah", null)
-        }
-
         val prefs = context.getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE)
         // ... (rest of the method unchanged)
 
-        if (alarmId in 5..8) {
+        if (alarmId in 6..8) {
             val isActive = prefs.getBoolean("alarm_${alarmId}_active", true)
             if (!isActive) return
             val hour = intent.getIntExtra("hour", 0)
@@ -488,7 +492,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 hour, minute, soundName, title, body, payload, false, audioPath, 0
             )
             return
-        } else if (alarmId < 1000 && alarmId !in 100..105 && alarmId !in 9..11 && alarmId != 732 && alarmId != 736) {
+        } else if (alarmId < 1000 && alarmId != 950 && alarmId !in 100..105 && alarmId !in 9..11 && alarmId != 732 && alarmId != 736) {
             val isActive = prefs.getBoolean("alarm_${alarmId}_active", true)
             if (!isActive) return
 
@@ -496,7 +500,7 @@ class AlarmReceiver : BroadcastReceiver() {
             val minute = intent.getIntExtra("minute", 0)
             val interval = intent.getIntExtra("interval_minutes", 0)
             MainActivity.scheduleAlarm(context, alarmId, -1, -1, -1, hour, minute, soundName, title, body, payload, true, audioPath, interval)
-        } else if (alarmId in 8000..8999 || alarmId in 9000..9199) {
+        } else if (alarmId == 950 || alarmId in 8000..8999 || alarmId in 9000..9199) {
             val isActive = prefs.getBoolean("alarm_${alarmId}_active", true)
             if (!isActive) return
 
@@ -553,7 +557,10 @@ class AlarmReceiver : BroadcastReceiver() {
                     context, alarmId,
                     cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH),
                     cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE),
-                    soundName, title, body, payload, false, audioPath, interval
+                    soundName, title, body, payload, false, audioPath, interval,
+                    intent.getStringExtra("custom_sound_name"),
+                    intent.getStringExtra("allowed_days"),
+                    intent.getLongExtra("season_end_epoch", 0L).takeIf { it > 0L }
                 )
             }
         }

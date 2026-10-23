@@ -256,7 +256,10 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
       // Ramadan / Eid
       _iftar = _prefs.getBool('iftar_alarm') ?? false;
       _suhoor = _prefs.getBool('suhoor_alarm') ?? false;
-      _eidFitr = _prefs.getBool('eid_fitr_alarm') ?? false;
+      _eidFitr =
+          _prefs.getBool('eid_fitr_alarm') ??
+          _prefs.getBool('eid_alarm') ??
+          false;
       _eidFitrTakbeer = _prefs.getBool('eid_fitr_takbeer') ?? false;
       _iftarMode = _prefs.getString('iftar_mode') ?? 'ramadan';
       _suhoorMode = _prefs.getString('suhoor_mode') ?? 'ramadan';
@@ -271,12 +274,14 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
 
       final fitrHour = _prefs.getInt('eid_fitr_hour');
       final fitrMin = _prefs.getInt('eid_fitr_minute');
+      _eidFitrTime = null;
       if (fitrHour != null && fitrMin != null) {
         _eidFitrTime = TimeOfDay(hour: fitrHour, minute: fitrMin);
       }
 
       final adhaHour = _prefs.getInt('eid_adha_hour');
       final adhaMin = _prefs.getInt('eid_adha_minute');
+      _eidAdhaTime = null;
       if (adhaHour != null && adhaMin != null) {
         _eidAdhaTime = TimeOfDay(hour: adhaHour, minute: adhaMin);
       }
@@ -309,6 +314,7 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
       },
     );
 
+    if (!mounted) return;
     if (picked != null) {
       setState(() {
         if (isAdha) {
@@ -492,8 +498,8 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
             onToggle: (v) async {
               final newMode = v ? 'sound' : 'none';
               setState(() => _qiyamMode = newMode);
-              await _saveMode('qiyam_mode_notif', 'notif_qiyam', newMode);
               await _prefs.setString('adhan_mode_Last_third', newMode);
+              await _saveMode('qiyam_mode_notif', 'notif_qiyam', newMode);
             },
             expanded: _qiyamMode != 'none',
             child: Row(
@@ -509,8 +515,8 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
                 const Spacer(),
                 _modeToggle(_qiyamMode, (v) async {
                   setState(() => _qiyamMode = v);
-                  await _saveMode('qiyam_mode_notif', 'notif_qiyam', v);
                   await _prefs.setString('adhan_mode_Last_third', v);
+                  await _saveMode('qiyam_mode_notif', 'notif_qiyam', v);
                 }),
               ],
             ),
@@ -839,10 +845,10 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
                   ),
                 if (_eidAdhaTime != null)
                   TextButton(
-                    onPressed: () {
+                    onPressed: () async {
                       setState(() => _eidAdhaTime = null);
-                      _prefs.remove('eid_adha_hour');
-                      _prefs.remove('eid_adha_minute');
+                      await _prefs.remove('eid_adha_hour');
+                      await _prefs.remove('eid_adha_minute');
                       PrayerService().scheduleNotificationsDebounced();
                     },
                     child: const Text(
@@ -966,10 +972,10 @@ class _AlarmsScreenState extends State<AlarmsScreen> {
                   ),
                 if (_eidFitrTime != null)
                   TextButton(
-                    onPressed: () {
+                    onPressed: () async {
                       setState(() => _eidFitrTime = null);
-                      _prefs.remove('eid_fitr_hour');
-                      _prefs.remove('eid_fitr_minute');
+                      await _prefs.remove('eid_fitr_hour');
+                      await _prefs.remove('eid_fitr_minute');
                       PrayerService().scheduleNotificationsDebounced();
                     },
                     child: const Text(

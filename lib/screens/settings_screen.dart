@@ -89,8 +89,9 @@ class _SettingsScreenState extends State<SettingsScreen>
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("خطأ: $e")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("خطأ: $e")));
     }
   }
 
@@ -590,7 +591,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           // 1. General
           _buildSectionHeader("عام"),
           _buildListTile(
-            "دليل مميزات التطبيق 🌟",
+            "دليل مميزات التطبيق",
             "استكشف جميع المميزات وطرق الوصول إليها وشرح كل ميزة",
             Icons.explore_rounded,
             onTap: () => Navigator.push(
@@ -639,27 +640,6 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ),
               );
             },
-          ),
-
-          // 2.5 Quran
-          _buildSectionHeader("القرآن الكريم"),
-          _buildListTile(
-            "نوع تظليل الآيات",
-            "تظليل كلمة بكلمة أو تظليل الآية كاملة",
-            Icons.highlight_alt_rounded,
-            trailing: Switch(
-              value:
-                  CacheHelper.prefs.getBool('verse_player_highlight_wbw') ??
-                  true,
-              activeTrackColor: const Color(0xFFD0A871),
-              onChanged: (value) async {
-                await CacheHelper.prefs.setBool(
-                  'verse_player_highlight_wbw',
-                  value,
-                );
-                setState(() {});
-              },
-            ),
           ),
 
           // 3. Account / Location
@@ -715,9 +695,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                       if (_isPersistentSwitchLoading) return;
                       setState(() => _isPersistentSwitchLoading = true);
                       try {
-                        await PrayerNotificationServiceHelper
-                            .setEnabled(val)
-                            .timeout(const Duration(seconds: 12));
+                        await PrayerNotificationServiceHelper.setEnabled(
+                          val,
+                        ).timeout(const Duration(seconds: 12));
                       } catch (e) {
                         debugPrint('Persistent notification toggle failed: $e');
                         if (context.mounted) {
@@ -1215,8 +1195,9 @@ class _SettingsScreenState extends State<SettingsScreen>
               } catch (e) {
                 if (context.mounted) AppLoadingDialog.hide(context);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(SnackBar(content: Text('خطأ: $e')));
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
                 }
               }
             },
@@ -1237,8 +1218,9 @@ class _SettingsScreenState extends State<SettingsScreen>
               } catch (e) {
                 if (context.mounted) AppLoadingDialog.hide(context);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(SnackBar(content: Text('خطأ: $e')));
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
                 }
               }
             },
@@ -1295,7 +1277,12 @@ class _SettingsScreenState extends State<SettingsScreen>
                   SizedBox(height: 10.h),
                   Text(
                     "التحديثات الأخيرة:",
-                    style: TextStyle(fontSize: 14.sp, fontFamily: 'Cairo', fontWeight: FontWeight.bold, color: const Color(0xFFD0A871)),
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFFD0A871),
+                    ),
                   ),
                   SizedBox(height: 5.h),
                   Text(
@@ -1304,7 +1291,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                     "• توزيع أوراد الختمة على الصلوات تلقائياً.\n"
                     "• تحسين شاشة (حاسب نفسك) ومنطق الختمة.\n"
                     "• حذف إشعارات الصلوات الفارغة وتنظيفها.",
-                    style: TextStyle(fontSize: 13.sp, fontFamily: 'Cairo', height: 1.5),
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      fontFamily: 'Cairo',
+                      height: 1.5,
+                    ),
                   ),
                 ],
               );
