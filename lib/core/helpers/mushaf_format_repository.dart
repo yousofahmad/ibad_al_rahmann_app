@@ -17,6 +17,12 @@ import 'mushaf_pagination.dart';
 
 const _githubResourceRoot =
     'https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-features/source/import-qul-resources/';
+const _releasePackageUrls = <String, String>{
+  'qpc_v2_1421':
+      'https://github.com/yousofahmad/ibad-alrahman-features/releases/download/qpc-layouts-v1/qpc_v2_1421.zip',
+  'qpc_v4_tajweed_1441':
+      'https://github.com/yousofahmad/ibad-alrahman-features/releases/download/qpc-layouts-v1/qpc_v4_tajweed_1441.zip',
+};
 
 class MushafFormat {
   final String id;
@@ -766,5 +772,6 @@ bool _isAllowedPackageUrl(String id, String? value) {
   if (value == null) return false;
   final relative = 'mushaf/formats/$id.zip';
   if (value == relative) return true;
-  return value == '$_githubResourceRoot$relative';
+  return value == '$_githubResourceRoot$relative' ||
+      value == _releasePackageUrls[id];
 }

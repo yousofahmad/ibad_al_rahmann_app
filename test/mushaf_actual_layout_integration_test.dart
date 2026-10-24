@@ -12,6 +12,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 const _run = bool.fromEnvironment('IBAD_RUN_LOCAL_RESOURCE_TESTS');
 const _root = String.fromEnvironment('IBAD_LOCAL_RESOURCE_ROOT');
 const _ids = <String>['qpc_v2_1421', 'qpc_v4_tajweed_1441'];
+const _releaseUrls = <String, String>{
+  'qpc_v2_1421':
+      'https://github.com/yousofahmad/ibad-alrahman-features/releases/download/qpc-layouts-v1/qpc_v2_1421.zip',
+  'qpc_v4_tajweed_1441':
+      'https://github.com/yousofahmad/ibad-alrahman-features/releases/download/qpc-layouts-v1/qpc_v4_tajweed_1441.zip',
+};
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -23,12 +29,22 @@ void main() {
       expect(catalog, isNotNull);
       final packages = (catalog!['formats'] as List).whereType<Map>().toList();
       expect(packages.map((e) => e['id']), containsAll(_ids));
+      final localFormats = packages.map((item) {
+        final local = Map<String, dynamic>.from(item);
+        local['package_url'] = 'mushaf/formats/${local['id']}.zip';
+        return local;
+      }).toList();
 
       final documents = await Directory.systemTemp.createTemp('mushaf_actual_');
       addTearDown(() async {
         if (await documents.exists()) await documents.delete(recursive: true);
       });
-      SharedPreferences.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({
+        'mushaf_catalog_json': jsonEncode({
+          'schema_version': 1,
+          'formats': localFormats,
+        }),
+      });
       final prefs = await SharedPreferences.getInstance();
       final repository = MushafFormatRepository(
         preferences: prefs,
@@ -36,18 +52,17 @@ void main() {
         resourceRepository: root,
       );
       await repository.initialize();
-      await repository.refreshCatalog();
       expect(repository.current, MushafFormat.builtin);
 
       for (final id in _ids) {
         final raw = Map<String, dynamic>.from(
           packages.singleWhere((item) => item['id'] == id),
         );
-        expect(raw['package_url'], 'mushaf/formats/$id.zip');
+        expect(raw['package_url'], _releaseUrls[id]);
         expect(raw['pagination_matches_builtin'], isFalse);
         expect(raw['word_alignment_matches_builtin'], isTrue);
         expect(raw['navigation_index_file'], 'pagination.json');
-        final bytes = await root.readBytes(raw['package_url'] as String);
+        final bytes = await root.readBytes('mushaf/formats/$id.zip');
         expect(bytes, isNotNull);
         expect(sha256.convert(bytes!).toString(), raw['sha256']);
         final archive = ZipDecoder().decodeBytes(bytes);
