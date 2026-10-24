@@ -8,6 +8,8 @@ import 'package:ibad_al_rahmann/features/quran/data/services/bookmark_service.da
 import 'package:ibad_al_rahmann/features/quran/ui/widgets/bookmark_widget/bookmarks_dialog.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/quran_hizb_data.dart';
+import 'package:ibad_al_rahmann/features/quran/ui/optional_mushaf_hizb_data.dart';
+import 'package:ibad_al_rahmann/core/helpers/mushaf_pagination.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/widgets/menus/single_tap_menu.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -92,7 +94,9 @@ class MobileMinQuranBottomSection extends StatelessWidget {
             },
             builder: (context, state) {
               final pageNum = state.currentPage ?? 1;
-              final hizbLabel = QuranHizbData.activeLabelForPage(pageNum);
+              final hizbLabel = MushafPagination.isBuiltin
+                  ? QuranHizbData.activeLabelForPage(pageNum)
+                  : OptionalMushafHizbData.activeLabelForPage(pageNum);
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [

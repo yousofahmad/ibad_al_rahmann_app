@@ -3,6 +3,7 @@ import 'package:quran/quran.dart';
 import '../data/db_helper.dart';
 import '../data/quran_word.dart';
 import '../../../core/helpers/fonts_helper.dart';
+import '../../../core/helpers/mushaf_pagination.dart';
 
 enum ShareMode { image, text }
 
@@ -63,7 +64,7 @@ class ShareProvider extends ChangeNotifier {
     try {
       final pages = <int>{};
       for (int v = _fromVerse; v <= _toVerse; v++) {
-        pages.add(getPageNumber(surahNumber, v));
+        pages.add(MushafPagination.pageForAyah(surahNumber, v));
       }
 
       // Load all pages and fonts in parallel

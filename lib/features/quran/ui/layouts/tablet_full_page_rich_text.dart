@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../core/helpers/fonts_helper.dart';
-import '../widgets/core/wbw_page_widget.dart';
+import '../widgets/core/selected_mushaf_page_widget.dart';
 
 /// Tablet-optimized layout for full-screen Quran page display.
-/// Uses WbwPageWidget which handles its own header, page number,
+/// Uses SelectedMushafPageWidget which handles its own header, page number,
 /// and content width adaptation for tablets internally.
 class TabletFullPageRichText extends StatefulWidget {
   const TabletFullPageRichText({
@@ -52,7 +52,7 @@ class _TabletFullPageRichTextState extends State<TabletFullPageRichText> {
       child: Column(
         children: [
           Expanded(
-            child: WbwPageWidget(
+            child: SelectedMushafPageWidget(
               pageNumber: widget.pageNumber,
               paperColorOverride: widget.paperColorOverride,
             ),

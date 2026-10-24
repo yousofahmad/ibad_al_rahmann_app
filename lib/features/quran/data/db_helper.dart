@@ -6,22 +6,25 @@ import 'package:sqflite/sqflite.dart';
 import 'dart:collection';
 import 'quran_word.dart';
 import 'models/page_line.dart';
+import '../../../core/helpers/mushaf_format_repository.dart';
 
 class QuranWbwDbHelper {
   static final QuranWbwDbHelper instance = QuranWbwDbHelper._init();
   static Database? _database;
+  final Map<String, Database> _formatDatabases = {};
+  String get _formatKey => MushafFormatRepository.instance.current.id;
 
   QuranWbwDbHelper._init();
 
   bool _isPreloading = false;
   final int _maxCachePages = 100;
 
-  final LinkedHashMap<int, List<PageLine>> _pageLinesCache =
-      LinkedHashMap<int, List<PageLine>>();
-  final LinkedHashMap<int, List<QuranWord>> _pageWordsCache =
-      LinkedHashMap<int, List<QuranWord>>();
+  final LinkedHashMap<String, List<PageLine>> _pageLinesCache =
+      LinkedHashMap<String, List<PageLine>>();
+  final LinkedHashMap<String, List<QuranWord>> _pageWordsCache =
+      LinkedHashMap<String, List<QuranWord>>();
   final Map<String, String> _verseGlyphsCache =
-      {}; // key: 'surah_ayah', value: joined glyphs
+      {}; // key: 'format_surah_ayah', value: joined glyphs
 
   void _updateLru<K, V>(LinkedHashMap<K, V> cache, K key, V value, int max) {
     if (cache.containsKey(key)) {
@@ -33,18 +36,20 @@ class QuranWbwDbHelper {
   }
 
   List<PageLine>? getPageLinesSync(int pageNumber) {
-    if (_pageLinesCache.containsKey(pageNumber)) {
-      final val = _pageLinesCache.remove(pageNumber)!;
-      _pageLinesCache[pageNumber] = val;
+    final key = '$_formatKey:$pageNumber';
+    if (_pageLinesCache.containsKey(key)) {
+      final val = _pageLinesCache.remove(key)!;
+      _pageLinesCache[key] = val;
       return val;
     }
     return null;
   }
 
   List<QuranWord>? getPageWordsSync(int pageNumber) {
-    if (_pageWordsCache.containsKey(pageNumber)) {
-      final val = _pageWordsCache.remove(pageNumber)!;
-      _pageWordsCache[pageNumber] = val;
+    final key = '$_formatKey:$pageNumber';
+    if (_pageWordsCache.containsKey(key)) {
+      final val = _pageWordsCache.remove(key)!;
+      _pageWordsCache[key] = val;
       return val;
     }
     return null;
@@ -52,7 +57,7 @@ class QuranWbwDbHelper {
 
   /// Get cached glyphs for a verse synchronously
   String? getVerseGlyphsSync(int surah, int ayah) =>
-      _verseGlyphsCache['${surah}_$ayah'];
+      _verseGlyphsCache['${_formatKey}_${surah}_$ayah'];
 
   void preloadAllPagesInBackground() async {
     if (_isPreloading) return;
@@ -71,7 +76,7 @@ class QuranWbwDbHelper {
   /// TODO(H2): Monitor memory consumption of _verseGlyphsCache on low-RAM (<=1GB) devices; consider offloading to background isolate or LRU cache if RAM pressure occurs.
   Future<void> cacheAllVersesGlyphs() async {
     try {
-      final db = await instance.database;
+      final db = await database;
       for (int s = 1; s <= 114; s++) {
         final List<Map<String, dynamic>> surahWords = await db.rawQuery(
           'SELECT text, ayah FROM words WHERE surah = ? ORDER BY id ASC',
@@ -85,7 +90,7 @@ class QuranWbwDbHelper {
         }
 
         ayahGrouping.forEach((ayah, words) {
-          _verseGlyphsCache['${s}_$ayah'] = words.join(' ');
+          _verseGlyphsCache['${_formatKey}_${s}_$ayah'] = words.join(' ');
         });
 
         // Yield to main thread every surah to keep UI perfectly smooth
@@ -97,9 +102,31 @@ class QuranWbwDbHelper {
   }
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDB();
-    return _database!;
+    final manager = MushafFormatRepository.instance;
+    // Preserve the original built-in path exactly: it must not initialize the
+    // optional format repository or touch its documents/cache files.
+    if (manager.current.isBuiltin) {
+      if (_database != null) return _database!;
+      _database = await _initDB();
+      return _database!;
+    }
+    await manager.initialize();
+    final wordsPath = manager.getActiveWordsDatabasePath;
+    final layoutPath = manager.getActiveLayoutDatabasePath;
+    if (wordsPath == null || layoutPath == null) {
+      if (_database != null) return _database!;
+      _database = await _initDB();
+      return _database!;
+    }
+    final key = manager.current.id;
+    final existing = _formatDatabases[key];
+    if (existing != null) return existing;
+    final db = await openDatabase(wordsPath, readOnly: true);
+    await db.execute(
+      "ATTACH DATABASE '${layoutPath.replaceAll("'", "''")}' AS map_db",
+    );
+    _formatDatabases[key] = db;
+    return db;
   }
 
   Future<void> _copyDbAssetIfMissing(String dbPath, String fileName) async {
@@ -196,7 +223,7 @@ class QuranWbwDbHelper {
       return cached;
     }
     try {
-      final db = await instance.database;
+      final db = await database;
 
       const query = '''
         SELECT 
@@ -233,7 +260,12 @@ class QuranWbwDbHelper {
           position: _toInt(map['word_position']),
         );
       }).toList();
-      _updateLru(_pageWordsCache, pageNumber, result, _maxCachePages);
+      _updateLru(
+        _pageWordsCache,
+        '$_formatKey:$pageNumber',
+        result,
+        _maxCachePages,
+      );
       return result;
     } catch (e) {
       // debugPrint('🔴 Error in getPageWords($pageNumber): $e');
@@ -247,7 +279,7 @@ class QuranWbwDbHelper {
       return cached;
     }
     try {
-      final db = await instance.database;
+      final db = await database;
       const query = '''
         SELECT 
           page_number, 
@@ -265,7 +297,12 @@ class QuranWbwDbHelper {
         pageNumber,
       ]);
       final result = maps.map((map) => PageLine.fromJson(map)).toList();
-      _updateLru(_pageLinesCache, pageNumber, result, _maxCachePages);
+      _updateLru(
+        _pageLinesCache,
+        '$_formatKey:$pageNumber',
+        result,
+        _maxCachePages,
+      );
       return result;
     } catch (e) {
       // debugPrint('🔴 Error in getPageLines($pageNumber): $e');
@@ -279,7 +316,7 @@ class QuranWbwDbHelper {
     int verseNumber,
   ) async {
     try {
-      final db = await instance.database;
+      final db = await database;
       const query = '''
         SELECT 
           id as word_id, 
@@ -319,7 +356,7 @@ class QuranWbwDbHelper {
     int lastWordId,
   ) async {
     try {
-      final db = await instance.database;
+      final db = await database;
       const query = '''
         SELECT 
           id as word_id, 

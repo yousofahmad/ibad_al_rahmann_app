@@ -11,7 +11,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'mobile_min_quran_bottom_section.dart';
 import 'mobile_quran_top_bar.dart';
-import '../widgets/core/wbw_page_widget.dart';
+import '../widgets/core/selected_mushaf_page_widget.dart';
 
 class MinQuranMobile extends StatefulWidget {
   const MinQuranMobile({super.key, this.currentPage});
@@ -105,7 +105,7 @@ class _MinQuranMobileState extends State<MinQuranMobile> {
                           ],
                         ),
                         clipBehavior: Clip.antiAlias,
-                        child: WbwPageWidget(
+                        child: SelectedMushafPageWidget(
                           pageNumber: index + 1,
                           showHeader: false,
                           showPageNumber: false,

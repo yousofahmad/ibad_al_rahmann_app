@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../widgets/core/wbw_page_widget.dart';
+import '../widgets/core/selected_mushaf_page_widget.dart';
 
 class MobileFullPageRichText extends StatelessWidget {
   const MobileFullPageRichText({
@@ -14,7 +14,7 @@ class MobileFullPageRichText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // استخدمنا نفس الويدجت الجبارة بتاعة مصحف الورد اللي شغالة بدون أي أخطاء
-    return WbwPageWidget(
+    return SelectedMushafPageWidget(
       pageNumber: pageNumber,
       isZoomEnabled: true, // تفعيل الزووم زي الورد
       showHeader: true, // عرض اسم السورة والجزء فوق

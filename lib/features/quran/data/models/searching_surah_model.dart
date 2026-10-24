@@ -1,4 +1,5 @@
-import 'package:quran/quran.dart';
+import 'package:quran/quran.dart' show getPlaceOfRevelation, getJuzNumber;
+import 'package:ibad_al_rahmann/core/helpers/mushaf_pagination.dart';
 
 class SearchingSurahModel {
   final String name, place;
@@ -19,7 +20,7 @@ class SearchingSurahModel {
       name: map['arabic'],
       place: getPlaceOfRevelation(surahNumber) == 'Makkah' ? 'مكية' : 'مدنية',
       surahNumber: surahNumber,
-      firstPage: getPageNumber(surahNumber, 1),
+      firstPage: MushafPagination.pageForAyah(surahNumber, 1),
       juzNumber: getJuzNumber(surahNumber, 1),
     );
   }

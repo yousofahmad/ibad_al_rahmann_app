@@ -70,6 +70,19 @@ class AppLogger {
     _flushTimer = Timer(const Duration(seconds: 2), _flushBuffer);
   }
 
+  /// يكتب حدثًا بمفاتيح واضحة لتسهيل تتبع الجدولة والتنفيذ والنتائج.
+  static void logEvent(
+    String tag,
+    String event, [
+    Map<String, Object?> fields = const {},
+  ]) {
+    final details = fields.entries
+        .where((entry) => entry.value != null)
+        .map((entry) => '${entry.key}=${entry.value}')
+        .join(' ');
+    log(tag, 'event=$event${details.isEmpty ? '' : ' $details'}');
+  }
+
   static Future<void> _flushBuffer() async {
     if (_buffer.isEmpty) return;
     final content = _buffer.toString();

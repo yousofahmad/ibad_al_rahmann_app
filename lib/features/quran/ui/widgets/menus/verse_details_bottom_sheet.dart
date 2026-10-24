@@ -13,6 +13,7 @@ import 'package:ibad_al_rahmann/core/theme/app_styles.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/data/models/selected_verse_model.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cubit.dart';
+import 'tafsir_language_selector.dart';
 
 class VerseDetailsBottomSheet extends StatefulWidget {
   const VerseDetailsBottomSheet({
@@ -36,51 +37,73 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
   final Map<String, double> _downloadProgress = {};
   final Map<String, bool> _isDownloading = {};
   bool _isLoadingTafsir = false;
+  int _tafsirLoadGeneration = 0;
+
+  VerseModel get _activeVerse =>
+      context.read<VersePlayerCubit>().state.currentVerse ??
+      widget.currentVerse;
 
   @override
   void initState() {
     super.initState();
     _selectedBookId = TafsirHelper.getSelectedBookId();
+    _lastLoadedSurah = widget.currentVerse.surahNumber;
+    _loadTafsirForSelected(widget.currentVerse);
     _checkAllDownloads();
   }
 
   Future<void> _checkAllDownloads() async {
     await TafsirHelper.fetchRemoteBooks();
-    final books = TafsirHelper.availableBooks;
-    for (var b in books) {
-      final downloaded = await TafsirHelper.isBookDownloaded(b.id);
-      if (mounted) {
-        setState(() {
-          _downloadedStatus[b.id] = downloaded;
-        });
-      }
+    if (!mounted) return;
+    final books = List<TafsirBook>.from(TafsirHelper.availableBooks);
+    final statuses = <String, bool>{};
+    for (final book in books) {
+      statuses[book.id] = await TafsirHelper.isBookDownloaded(book.id);
     }
-    await _loadTafsirForSelected(widget.currentVerse);
+    if (!mounted) return;
+    setState(() {
+      _downloadedStatus.addAll(statuses);
+      if (!books.any((book) => book.id == _selectedBookId)) {
+        // An offline catalog miss must not erase the saved preference.
+        _selectedBookId = 'muyassar';
+      }
+    });
+    await _loadTafsirForSelected(_activeVerse);
   }
 
   Future<void> _loadTafsirForSelected(VerseModel verse) async {
+    if (!mounted) return;
+    final generation = ++_tafsirLoadGeneration;
+    final bookId = _selectedBookId;
     setState(() => _isLoadingTafsir = true);
-    final isDownloaded = await TafsirHelper.isBookDownloaded(_selectedBookId);
-    if (isDownloaded || _selectedBookId == 'muyassar') {
-      await TafsirHelper.loadSurahTafsir(_selectedBookId, verse.surahNumber);
+    final isDownloaded = await TafsirHelper.isBookDownloaded(bookId);
+    if (isDownloaded || bookId == 'muyassar') {
+      await TafsirHelper.loadSurahTafsir(bookId, verse.surahNumber);
     }
-    if (mounted) {
+    if (mounted &&
+        generation == _tafsirLoadGeneration &&
+        bookId == _selectedBookId) {
       setState(() {
-        _downloadedStatus[_selectedBookId] = isDownloaded;
+        _downloadedStatus[bookId] = isDownloaded;
         _isLoadingTafsir = false;
       });
     }
   }
+
+  Future<void> _handleGroupSelection(TafsirBookGroup group) =>
+      _handleBookSelection(TafsirHelper.preferredBookForGroup(group));
 
   Future<void> _handleBookSelection(TafsirBook book) async {
     setState(() {
       _selectedBookId = book.id;
     });
     await TafsirHelper.setSelectedBookId(book.id);
-    await _loadTafsirForSelected(widget.currentVerse);
+    if (!mounted || _selectedBookId != book.id) return;
+    await _loadTafsirForSelected(_activeVerse);
   }
 
   Future<void> _startDownload(TafsirBook book) async {
+    if (_isDownloading[book.id] == true) return;
     setState(() {
       _isDownloading[book.id] = true;
       _downloadProgress[book.id] = 0.0;
@@ -105,12 +128,12 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
           });
           if (mounted) {
             if (success) {
-              await _loadTafsirForSelected(widget.currentVerse);
+              await _loadTafsirForSelected(_activeVerse);
               if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    'تم تحميل ${book.name} بنجاح!',
+                    'تم تحميل ${book.name} (${book.languageLabel}) بنجاح!',
                     style: const TextStyle(fontFamily: AppConsts.expoArabic),
                   ),
                   backgroundColor: const Color(0xFF00897B),
@@ -146,7 +169,9 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
         widget.currentVerse;
     if (_lastLoadedSurah != activeVerse.surahNumber) {
       _lastLoadedSurah = activeVerse.surahNumber;
-      _loadTafsirForSelected(activeVerse);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadTafsirForSelected(_activeVerse);
+      });
     }
     final translation = getVerseTranslation(
       activeVerse.surahNumber,
@@ -169,6 +194,10 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
     final currentBook = books.firstWhere(
       (b) => b.id == _selectedBookId,
       orElse: () => TafsirHelper.defaultBooks.first,
+    );
+    final groups = TafsirHelper.availableBookGroups;
+    final currentGroup = groups.firstWhere(
+      (group) => group.id == currentBook.familyId,
     );
     final bool isCurrentDownloaded =
         _downloadedStatus[currentBook.id] ?? currentBook.isBuiltIn;
@@ -322,21 +351,25 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                   ),
                   SizedBox(height: 8.h),
 
-                  // Tafseer Books Choice Chips
+                  // One chip per tafsir family, never one per language.
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     reverse: true, // RTL order
                     child: Row(
-                      children: books.map((book) {
-                        final isSelected = book.id == _selectedBookId;
-                        final isDownloaded =
-                            _downloadedStatus[book.id] ?? book.isBuiltIn;
-                        final isDown = _isDownloading[book.id] == true;
+                      children: groups.map((group) {
+                        final isSelected = group.id == currentGroup.id;
+                        final isDownloaded = group.variants.any(
+                          (book) =>
+                              _downloadedStatus[book.id] ?? book.isBuiltIn,
+                        );
+                        final isDown = group.variants.any(
+                          (book) => _isDownloading[book.id] == true,
+                        );
 
                         return Padding(
                           padding: EdgeInsets.only(left: 8.w),
                           child: InkWell(
-                            onTap: () => _handleBookSelection(book),
+                            onTap: () => _handleGroupSelection(group),
                             borderRadius: BorderRadius.circular(12.r),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
@@ -386,7 +419,7 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                                     SizedBox(width: 4.w),
                                   ],
                                   Text(
-                                    book.name,
+                                    group.name,
                                     style: TextStyle(
                                       fontFamily: AppConsts.expoArabic,
                                       fontSize: 12.sp,
@@ -407,6 +440,13 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                     ),
                   ),
                   SizedBox(height: 14.h),
+                  TafsirLanguageSelector(
+                    group: currentGroup,
+                    selectedBookId: currentBook.id,
+                    downloadedStatus: _downloadedStatus,
+                    onChanged: _handleBookSelection,
+                  ),
+                  SizedBox(height: 14.h),
 
                   // Tafseer Content or Download Card
                   if (isCurrentDownloaded) ...[
@@ -422,8 +462,12 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                         tafsirText.isNotEmpty
                             ? tafsirText
                             : 'لا يتوفر نص تفسير لهذه الآية.',
-                        textAlign: TextAlign.right,
-                        textDirection: TextDirection.rtl,
+                        textAlign: currentBook.isRtl
+                            ? TextAlign.right
+                            : TextAlign.left,
+                        textDirection: currentBook.isRtl
+                            ? TextDirection.rtl
+                            : TextDirection.ltr,
                         style: TextStyle(
                           fontFamily: AppConsts.cairo,
                           fontSize: 14.5.sp,
@@ -545,7 +589,7 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                                   size: 20,
                                 ),
                                 label: Text(
-                                  'تحميل ${currentBook.name}',
+                                  'تحميل ${currentBook.languageLabel}',
                                   style: TextStyle(
                                     fontFamily: AppConsts.expoArabic,
                                     fontSize: 13.5.sp,

@@ -379,6 +379,156 @@ void main() {
   );
 
   test(
+    'paired surah metadata clips the exact ayah and highlights relative to the clip',
+    () async {
+      final player = TestAudioPlayer();
+      final model = ReciterAudioModel(
+        id: 'paired_test',
+        name: 'paired',
+        style: 'مرتل',
+        folderName: 'paired-test',
+        everyAyahFolder: 'EveryAyah',
+        hasSegments: true,
+        segmentsFileName: 'segments.json',
+      );
+      final cubit = VersePlayerCubit(
+        audioPlayer: player,
+        surahLoader: (_) async => (
+          <int, SurahAudioItem>{
+            1: SurahAudioItem(
+              surahNumber: 1,
+              audioUrl: 'https://example.test/surah.mp3',
+              durationSec: 0,
+            ),
+          },
+          <String, VerseTiming>{
+            '1:1': VerseTiming(
+              surahNumber: 1,
+              verseNumber: 1,
+              timestampFrom: 1000,
+              timestampTo: 3000,
+              durationMs: 2000,
+              segments: [WordSegment(wordIndex: 1, startMs: 1200, endMs: 1500)],
+            ),
+          },
+        ),
+        autoHideDelay: const Duration(milliseconds: 20),
+      );
+      cubit.selectReciter(model);
+      cubit.setVerse(
+        surahNumber: 1,
+        verseNumber: 1,
+        fontFamily: 'UthmanicHafs',
+        verse: 'بسم الله',
+      );
+      await cubit.initVerse(autoPlay: true);
+      final source = player.source as ClippingAudioSource;
+      expect(source.child.uri.toString(), 'https://example.test/surah.mp3');
+      expect(source.start, const Duration(milliseconds: 1000));
+      expect(source.end, const Duration(milliseconds: 3000));
+      player.sendPosition(250);
+      expect(cubit.state.activeWordIndex, 1);
+      await cubit.close();
+    },
+  );
+
+  test(
+    'invalid paired bounds fall back without attaching paired timing',
+    () async {
+      final player = TestAudioPlayer();
+      final model = ReciterAudioModel(
+        id: 'paired_invalid',
+        name: 'paired',
+        style: 'مرتل',
+        folderName: 'paired-invalid',
+        everyAyahFolder: 'EveryAyah',
+        hasSegments: true,
+        segmentsFileName: 'segments.json',
+      );
+      final cubit = VersePlayerCubit(
+        audioPlayer: player,
+        surahLoader: (_) async => (
+          <int, SurahAudioItem>{
+            1: SurahAudioItem(
+              surahNumber: 1,
+              audioUrl: 'https://example.test/surah.mp3',
+              durationSec: 0,
+            ),
+          },
+          <String, VerseTiming>{
+            '1:1': VerseTiming(
+              surahNumber: 1,
+              verseNumber: 1,
+              timestampFrom: 3000,
+              timestampTo: 1000,
+              durationMs: 0,
+              segments: [WordSegment(wordIndex: 1, startMs: 0, endMs: 500)],
+            ),
+          },
+        ),
+      );
+      cubit.selectReciter(model);
+      cubit.setVerse(
+        surahNumber: 1,
+        verseNumber: 1,
+        fontFamily: 'UthmanicHafs',
+        verse: 'بسم الله',
+      );
+      await cubit.initVerse();
+      expect(player.source, isA<UriAudioSource>());
+      await cubit.close();
+    },
+  );
+
+  for (final matchesRecording in [true, false]) {
+    test(
+      'asynchronous timing requires exact recording match: $matchesRecording',
+      () async {
+        final player = TestAudioPlayer();
+        final metadata = Completer<Map<String, VerseTiming>>();
+        final model = ReciterAudioModel(
+          id: 'recording_match_$matchesRecording',
+          name: 'Fixture',
+          style: 'مرتل',
+          folderName: 'fixture-recording',
+          everyAyahFolder: 'FixtureRecording',
+          hasSegments: true,
+        );
+        final cubit = VersePlayerCubit(
+          audioPlayer: player,
+          timingLoader: (_) => metadata.future,
+        );
+        cubit.selectReciter(model);
+        cubit.setVerse(
+          surahNumber: 1,
+          verseNumber: 1,
+          fontFamily: 'UthmanicHafs',
+          verse: 'بسم الله',
+        );
+        await cubit.initVerse();
+        final playingUrl = (player.source as UriAudioSource).uri.toString();
+        metadata.complete({
+          '1:1': VerseTiming(
+            surahNumber: 1,
+            verseNumber: 1,
+            audioUrl: matchesRecording
+                ? playingUrl
+                : '$playingUrl?different_take=1',
+            timestampFrom: 0,
+            timestampTo: 1000,
+            durationMs: 1000,
+            segments: [WordSegment(wordIndex: 1, startMs: 100, endMs: 500)],
+          ),
+        });
+        await Future<void>.delayed(Duration.zero);
+        player.sendPosition(250);
+        expect(cubit.state.activeWordIndex, matchesRecording ? 1 : null);
+        await cubit.close();
+      },
+    );
+  }
+
+  test(
     'continuous completion advances once and never reopens manually hidden controls',
     () async {
       final player = TestAudioPlayer();

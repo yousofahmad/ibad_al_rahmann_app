@@ -15,7 +15,7 @@ import 'package:ibad_al_rahmann/features/wird/services/wird_completion_service.d
 
 import '../../../../../core/app_constants.dart';
 import '../menus/single_tap_menu.dart';
-import 'wbw_page_widget.dart';
+import 'selected_mushaf_page_widget.dart';
 
 class WirdQuranWidget extends StatefulWidget {
   final int? targetStartPage;
@@ -300,7 +300,7 @@ class _WirdQuranWidgetState extends State<WirdQuranWidget>
                                   itemBuilder: (context, relativeIndex) {
                                     final realPageIndex =
                                         relativeIndex + (start - 1);
-                                    return WbwPageWidget(
+                                    return SelectedMushafPageWidget(
                                       pageNumber: realPageIndex + 1,
                                       isZoomEnabled: true,
                                       showHeader: isFullLayout,
@@ -330,7 +330,7 @@ class _WirdQuranWidgetState extends State<WirdQuranWidget>
                                     final realPageIndex = index + (start - 1);
                                     return SizedBox(
                                       height: _cachedPageHeight,
-                                      child: WbwPageWidget(
+                                      child: SelectedMushafPageWidget(
                                         key: ValueKey(
                                           'vertical_${realPageIndex + 1}',
                                         ),

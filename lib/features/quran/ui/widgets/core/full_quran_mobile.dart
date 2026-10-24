@@ -12,7 +12,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../menus/single_tap_menu.dart';
 import '../scroll/auto_scroll_control_overlay.dart';
 
-import './wbw_page_widget.dart';
+import './selected_mushaf_page_widget.dart';
 
 class FullQuranWidget extends StatefulWidget {
   const FullQuranWidget({super.key, this.currentPage});
@@ -290,7 +290,7 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
                           itemBuilder: (context, index) {
                             return SizedBox(
                               height: _cachedPageHeight,
-                              child: WbwPageWidget(
+                              child: SelectedMushafPageWidget(
                                 pageNumber: index + 1,
                                 isZoomEnabled: false,
                                 textColorOverride: textColor,
@@ -318,7 +318,7 @@ class _FullQuranWidgetState extends State<FullQuranWidget>
                             }
                           },
                           itemBuilder: (context, index) {
-                            return WbwPageWidget(
+                            return SelectedMushafPageWidget(
                               pageNumber: index + 1,
                               isZoomEnabled: true,
                               textColorOverride: textColor,

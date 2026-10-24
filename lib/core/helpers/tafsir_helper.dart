@@ -8,48 +8,81 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
+import 'feature_resource_repository.dart';
+import 'tafsir_catalog.dart';
+import 'tafsir_content_parser.dart';
 
-class TafsirBook {
-  final String id;
-  final String name;
-  final String author;
-  final bool isBuiltIn;
-  final String? url;
-  final String? size;
+export 'tafsir_catalog.dart';
 
-  const TafsirBook({
-    required this.id,
-    required this.name,
-    required this.author,
-    this.isBuiltIn = false,
-    this.url,
-    this.size,
-  });
+/// Decodes an archive without Flutter state or filesystem access.
+///
+/// The returned map contains JSON strings for all 114 cache files and scalar
+/// parser statistics, making it safe to send through [compute].
+Map<String, dynamic> prepareDownloadedArchive(List<int> bytes) {
+  dynamic root;
+  if (bytes.length >= 4 && bytes[0] == 0x50 && bytes[1] == 0x4b) {
+    final archive = ZipDecoder().decodeBytes(bytes);
+    ArchiveFile? jsonFile;
+    for (final file in archive) {
+      if (file.isFile && file.name.toLowerCase().endsWith('.json')) {
+        jsonFile = file;
+        break;
+      }
+    }
+    if (jsonFile == null) {
+      throw const FormatException('archive_missing_json');
+    }
+    root = json.decode(utf8.decode(jsonFile.content as List<int>));
+  } else {
+    root = json.decode(utf8.decode(bytes));
+  }
+  if (root is! Map) throw const FormatException('invalid_json_root');
 
-  factory TafsirBook.fromJson(Map<String, dynamic> json) {
-    return TafsirBook(
-      id: json['id']?.toString() ?? '',
-      name: json['name']?.toString() ?? '',
-      author: json['author']?.toString() ?? '',
-      isBuiltIn: json['is_builtin'] == true,
-      url: json['url']?.toString(),
-      size: json['size']?.toString(),
-    );
+  final parsed = TafsirContentParser.parseWithStats(root);
+  final data = parsed['data'] as Map<int, List<Map<String, dynamic>>>;
+  final stats = Map<String, int>.from(parsed['stats'] as Map);
+  if ((stats['nonEmptyAyahs'] ?? 0) == 0) {
+    throw const FormatException('empty_tafsir_content');
   }
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'author': author,
-    'is_builtin': isBuiltIn,
-    if (url != null) 'url': url,
-    if (size != null) 'size': size,
-  };
+  final files = <String, String>{};
+  for (var surah = 1; surah <= 114; surah++) {
+    final ayahs = data[surah] ?? const <Map<String, dynamic>>[];
+    files['$surah'] = json.encode({
+      'ayahs': [
+        for (final item in ayahs)
+          <String, dynamic>{
+            'ayah': item['ayah'],
+            'text': TafsirHelper.cleanTafsirText(item['text'] as String),
+          },
+      ],
+    });
+  }
+  stats['readableAyahs'] = stats['nonEmptyAyahs'] ?? 0;
+  return <String, dynamic>{'files': files, 'stats': stats};
+}
+
+Map<String, dynamic> decodeCachedSurah(String content) {
+  final decoded = json.decode(content);
+  if (decoded is! Map || decoded['ayahs'] is! List) {
+    throw const FormatException('invalid_surah_cache');
+  }
+  final result = <String, dynamic>{};
+  for (final item in decoded['ayahs'] as List) {
+    if (item is Map) {
+      final ayah = int.tryParse(item['ayah']?.toString() ?? '');
+      if (ayah != null && ayah > 0) {
+        result['$ayah'] = item['text']?.toString() ?? '';
+      }
+    }
+  }
+  return result;
 }
 
 class TafsirHelper {
   static const String _repoBaseUrl =
-      "https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-features/main/";
+      "https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-features/source/import-qul-resources/";
 
   static const List<TafsirBook> defaultBooks = [
     TafsirBook(
@@ -57,6 +90,8 @@ class TafsirHelper {
       name: 'التفسير الميسر',
       author: 'نخبة من العلماء (مجمع الملك فهد)',
       isBuiltIn: true,
+      languageCode: 'ar',
+      edition: 'نسخة التطبيق',
       size: '2.8 MB',
     ),
     TafsirBook(
@@ -64,6 +99,10 @@ class TafsirHelper {
       name: 'تفسير ابن كثير',
       author: 'الإمام ابن كثير (تفسير القرآن العظيم)',
       isBuiltIn: false,
+      groupId: 'ibn_katheer',
+      groupName: 'تفسير ابن كثير',
+      languageCode: 'ar',
+      sourceId: 22,
       url: 'tafseer/ar-tafsir-ibn-kathir.zip',
       size: '5.3 MB',
     ),
@@ -72,6 +111,10 @@ class TafsirHelper {
       name: 'تفسير الطبري',
       author: 'الإمام الطبري (جامع البيان عن تأويل آي القرآن)',
       isBuiltIn: false,
+      groupId: 'tabari',
+      groupName: 'تفسير الطبري',
+      languageCode: 'ar',
+      sourceId: 37,
       url: 'tafseer/ar-tafsir-al-tabari.zip',
       size: '8.2 MB',
     ),
@@ -81,8 +124,35 @@ class TafsirHelper {
   // Cache format: _cache['${bookId}_$surahNumber'] = { verseNumber: tafsirText }
   static final Map<String, Map<int, String>> _cache = {};
   static final Map<String, String> _muyassarCache = {};
+  static const _catalogCacheKey = 'tafsir_catalog_cache_v1';
+  static Future<void>? _catalogRequest;
+  static final Set<String> _activeDownloads = {};
 
   static List<TafsirBook> get availableBooks => _availableBooks;
+  static List<TafsirBookGroup> get availableBookGroups =>
+      TafsirCatalog.groupBooks(_availableBooks);
+
+  static TafsirBook preferredBookForGroup(TafsirBookGroup group) {
+    var saved = CacheHelper.prefs.getString(
+      'selected_tafsir_variant_${group.id}',
+    );
+    if (saved == null) {
+      for (final alias in TafsirCatalog.canonicalGroupIds.entries) {
+        if (alias.value != group.id) continue;
+        saved = CacheHelper.prefs.getString(
+          'selected_tafsir_variant_${alias.key}',
+        );
+        if (saved != null) break;
+      }
+    }
+    return group.variants.firstWhere(
+      (book) => book.id == saved,
+      orElse: () => group.variants.firstWhere(
+        (book) => book.languageCode == 'ar',
+        orElse: () => group.variants.first,
+      ),
+    );
+  }
 
   static String getSelectedBookId() {
     return CacheHelper.prefs.getString('selected_tafsir_book_id') ?? 'muyassar';
@@ -91,6 +161,15 @@ class TafsirHelper {
   static Future<void> setSelectedBookId(String id) async {
     if (!RegExp(r'^[A-Za-z0-9_-]{1,64}$').hasMatch(id)) return;
     await CacheHelper.prefs.setString('selected_tafsir_book_id', id);
+    for (final book in _availableBooks) {
+      if (book.id == id) {
+        await CacheHelper.prefs.setString(
+          'selected_tafsir_variant_${book.familyId}',
+          id,
+        );
+        break;
+      }
+    }
   }
 
   static Future<Directory> _getBookDirectory(String bookId) async {
@@ -152,12 +231,19 @@ class TafsirHelper {
     }
 
     // Only accept repository files under the app's trusted feature repository.
-    final isTrustedRepo =
+    final isTrustedRepoBase =
         segments.length >= 4 &&
         segments[0] == 'yousofahmad' &&
-        segments[1] == 'ibad-alrahman-features' &&
-        segments[2] == 'main' &&
-        segments[3] == 'tafseer';
+        segments[1] == 'ibad-alrahman-features';
+    final isMainRepoPath =
+        isTrustedRepoBase && segments[2] == 'main' && segments[3] == 'tafseer';
+    final isImportBranchRepoPath =
+        segments.length >= 5 &&
+        isTrustedRepoBase &&
+        segments[2] == 'source' &&
+        segments[3] == 'import-qul-resources' &&
+        segments[4] == 'tafseer';
+    final isTrustedRepo = isMainRepoPath || isImportBranchRepoPath;
     if (uri.host.toLowerCase() == 'raw.githubusercontent.com' &&
         isTrustedRepo &&
         !uri.hasQuery) {
@@ -165,13 +251,20 @@ class TafsirHelper {
     }
 
     // Convert only canonical blob URLs from the same trusted repository.
-    final isTrustedBlob =
+    final isTrustedBlobBase =
         segments.length >= 5 &&
         segments[0] == 'yousofahmad' &&
         segments[1] == 'ibad-alrahman-features' &&
-        segments[2] == 'blob' &&
-        segments[3] == 'main' &&
-        segments[4] == 'tafseer';
+        segments[2] == 'blob';
+    final isMainBlobPath =
+        isTrustedBlobBase && segments[3] == 'main' && segments[4] == 'tafseer';
+    final isImportBranchBlobPath =
+        segments.length >= 6 &&
+        isTrustedBlobBase &&
+        segments[3] == 'source' &&
+        segments[4] == 'import-qul-resources' &&
+        segments[5] == 'tafseer';
+    final isTrustedBlob = isMainBlobPath || isImportBranchBlobPath;
     if (uri.host.toLowerCase() == 'github.com' &&
         isTrustedBlob &&
         !uri.hasQuery) {
@@ -183,55 +276,175 @@ class TafsirHelper {
     throw const FormatException('Untrusted tafsir download host or path');
   }
 
-  static Future<void> fetchRemoteBooks() async {
-    try {
-      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 5)));
+  static Future<void> fetchRemoteBooks({Dio? client}) =>
+      _catalogRequest ??= _fetchRemoteBooks(client).whenComplete(() {
+        _catalogRequest = null;
+      });
 
-      // 1. Try master app_config.json first
+  static Future<void> _fetchRemoteBooks(Dio? client) async {
+    final started = DateTime.now().toUtc();
+    final watch = Stopwatch()..start();
+    var outcome = 'offline_fallback';
+    AppLogger.logEvent('Tafsir', 'catalog_started', {
+      'source': 'features_repository',
+      'trigger': 'verse_details',
+      'actual_start': started.toIso8601String(),
+    });
+    try {
       try {
-        const configUrl = '${_repoBaseUrl}app_config.json';
-        final response = await dio.get(configUrl);
-        if (response.statusCode == 200) {
+        final cached = CacheHelper.prefs.getString(_catalogCacheKey);
+        if (cached != null) {
+          final items = json.decode(cached);
+          if (items is List) _mergeBooks(items);
+        }
+      } catch (error) {
+        AppLogger.logEvent('Tafsir', 'catalog_cache_failed', {
+          'reason': error.runtimeType.toString(),
+        });
+      }
+      final local = FeatureResourceRepository.configured;
+      if (local.enabled) {
+        final preferred = await local.readJson(
+          'qul_local/app_config.local.json',
+        );
+        final manifest = preferred ?? await local.readJson('app_config.json');
+        final localItems = manifest == null
+            ? null
+            : manifest['tafseer_books'] is List
+            ? manifest['tafseer_books'] as List
+            : manifest['tafsir_books'] is List
+            ? manifest['tafsir_books'] as List
+            : manifest['books'] is List
+            ? manifest['books'] as List
+            : null;
+        final localTafsirCatalog = await local.readJson(
+          'tafseer/tafseer_index.json',
+        );
+        final localCatalogItems = localTafsirCatalog?['tafseer_books'];
+        var loadedLocalCatalog = false;
+        if (localItems != null && localItems.isNotEmpty) {
+          _mergeBooks(localItems);
+          loadedLocalCatalog = true;
+        }
+        if (localCatalogItems is List && localCatalogItems.isNotEmpty) {
+          _mergeBooks(localCatalogItems);
+          loadedLocalCatalog = true;
+        }
+        if (loadedLocalCatalog) {
+          await CacheHelper.prefs.setString(
+            _catalogCacheKey,
+            json.encode(_availableBooks.map((book) => book.toJson()).toList()),
+          );
+          outcome = 'local_success';
+          return;
+        }
+        if (manifest != null && !loadedLocalCatalog) {
+          AppLogger.logEvent('Tafsir', 'local_catalog_invalid', {
+            'source': 'local_manifest',
+            'reason': 'missing_books',
+          });
+        }
+      }
+      final dio =
+          client ??
+          Dio(
+            BaseOptions(
+              connectTimeout: const Duration(seconds: 5),
+              receiveTimeout: const Duration(seconds: 10),
+            ),
+          );
+      const catalogs = ['app_config.json', 'tafseer/tafseer_index.json'];
+      var loadedRemoteCatalog = false;
+      for (var attempt = 0; attempt < catalogs.length; attempt++) {
+        final attemptWatch = Stopwatch()..start();
+        final source = attempt == 0 ? 'app_config' : 'tafsir_index';
+        try {
+          final response = await dio.get('$_repoBaseUrl${catalogs[attempt]}');
           final data = response.data is String
               ? json.decode(response.data)
               : response.data;
-          if (data is Map && data['tafseer_books'] is List) {
-            _mergeBooks(data['tafseer_books'] as List);
-            return;
+          final items = data is List
+              ? data
+              : data is Map && data['tafseer_books'] is List
+              ? data['tafseer_books'] as List
+              : null;
+          AppLogger.logEvent('Tafsir', 'catalog_attempt_finished', {
+            'source': source,
+            'attempt': attempt + 1,
+            'http_status': response.statusCode,
+            'duration_ms': attemptWatch.elapsedMilliseconds,
+            'outcome': items == null ? 'invalid_format' : 'success',
+          });
+          if (response.statusCode == 200 && items != null) {
+            if (items.isNotEmpty) {
+              _mergeBooks(items);
+              loadedRemoteCatalog = true;
+            }
+            outcome = loadedRemoteCatalog ? 'success' : 'invalid_format';
           }
-        }
-      } catch (_) {}
-
-      // 2. Fallback to tafseer/tafseer_index.json
-      const indexUrl = '${_repoBaseUrl}tafseer/tafseer_index.json';
-      final response = await dio.get(indexUrl);
-      if (response.statusCode == 200) {
-        final data = response.data is String
-            ? json.decode(response.data)
-            : response.data;
-        if (data is List) {
-          _mergeBooks(data);
+        } catch (error) {
+          AppLogger.logEvent('Tafsir', 'catalog_attempt_failed', {
+            'source': source,
+            'attempt': attempt + 1,
+            'duration_ms': attemptWatch.elapsedMilliseconds,
+            'http_status': error is DioException
+                ? error.response?.statusCode
+                : null,
+            'reason': error.runtimeType.toString(),
+            'retry': attempt + 1 < catalogs.length ? 'fallback_index' : 'none',
+          });
         }
       }
-    } catch (_) {
-      // Offline or file not present, keep default books safely
+      if (loadedRemoteCatalog) {
+        await CacheHelper.prefs.setString(
+          _catalogCacheKey,
+          json.encode(_availableBooks.map((book) => book.toJson()).toList()),
+        );
+        outcome = 'success';
+        return;
+      }
+    } catch (error) {
+      AppLogger.logEvent('Tafsir', 'catalog_failed', {
+        'reason': error.runtimeType.toString(),
+      });
+    } finally {
+      AppLogger.logEvent('Tafsir', 'catalog_finished', {
+        'source': 'features_repository',
+        'actual_start': started.toIso8601String(),
+        'actual_finish': DateTime.now().toUtc().toIso8601String(),
+        'duration_ms': watch.elapsedMilliseconds,
+        'outcome': outcome,
+        'variants': _availableBooks.length,
+        'groups': availableBookGroups.length,
+      });
     }
   }
 
   static void _mergeBooks(List items) {
-    for (var item in items) {
-      if (item is Map<String, dynamic> || item is Map) {
-        final map = Map<String, dynamic>.from(item as Map);
-        final book = TafsirBook.fromJson(map);
-        if (!RegExp(r'^[A-Za-z0-9_-]{1,64}$').hasMatch(book.id)) continue;
-        final existingIdx = _availableBooks.indexWhere((b) => b.id == book.id);
-        if (existingIdx >= 0) {
-          if (!_availableBooks[existingIdx].isBuiltIn) {
-            _availableBooks[existingIdx] = book;
+    for (final sourceMap in TafsirCatalog.flattenItems(items)) {
+      if (!TafsirCatalog.isUsableCatalogItem(sourceMap)) continue;
+      final map = TafsirCatalog.normalizeCatalogItem(sourceMap);
+      final id = map['id']?.toString();
+      final existingIdx = _availableBooks.indexWhere((book) => book.id == id);
+      final book = TafsirBook.fromJson({
+        if (existingIdx >= 0) ..._availableBooks[existingIdx].toJson(),
+        ...map,
+      });
+      if (existingIdx >= 0) {
+        final existing = _availableBooks[existingIdx];
+        if (!existing.isBuiltIn) {
+          final merged = <String, dynamic>{...book.toJson()};
+          if (existing.name.trim().isNotEmpty) {
+            merged['name'] = existing.name;
           }
-        } else {
-          _availableBooks.add(book);
+          if (existing.author.trim().isNotEmpty) {
+            merged['author'] = existing.author;
+          }
+          if (existing.size != null) merged['size'] = existing.size;
+          _availableBooks[existingIdx] = TafsirBook.fromJson(merged);
         }
+      } else if (!TafsirCatalog.hasDuplicateSource(book, _availableBooks)) {
+        _availableBooks.add(book);
       }
     }
   }
@@ -345,52 +558,81 @@ class TafsirHelper {
     final cacheKey = '${bookId}_$surahNumber';
     if (_cache.containsKey(cacheKey) && _cache[cacheKey]!.isNotEmpty) return;
 
+    final started = DateTime.now().toUtc();
+    final watch = Stopwatch()..start();
+    var outcome = 'not_installed';
+    AppLogger.logEvent('Tafsir', 'cache_load_started', {
+      'source': 'tafsir_cache',
+      'trigger': 'verse_details',
+      'book': bookId,
+      'surah': surahNumber,
+      'actual_start': started.toIso8601String(),
+    });
     try {
       final bookDir = await _getBookDirectory(bookId);
-      final file = File('${bookDir.path}/$surahNumber.json');
+      if (!await File('${bookDir.path}/.complete').exists()) return;
+      final loaded = <int>{};
+      final raw = <String, dynamic>{};
 
-      if (await file.exists()) {
-        final content = await file.readAsString();
-        final dynamic jsonResponse = json.decode(content);
-        if (jsonResponse is Map && jsonResponse.containsKey('ayahs')) {
-          final list = jsonResponse['ayahs'] as List;
-          final surahMap = <int, String>{};
-          for (var item in list) {
-            if (item is Map) {
-              final aNum = int.tryParse(item['ayah']?.toString() ?? '') ?? 0;
-              final text = item['text']?.toString() ?? '';
-              if (aNum > 0) {
-                surahMap[aNum] = text;
-              }
+      Future<void> loadReferenced(int surah) async {
+        if (surah < 1 || surah > 114 || !loaded.add(surah)) return;
+        final file = File('${bookDir.path}/$surah.json');
+        if (!await file.exists()) return;
+        try {
+          final decoded = await compute(
+            decodeCachedSurah,
+            await file.readAsString(),
+          );
+          for (final entry in decoded.entries) {
+            raw['$surah:${entry.key}'] = entry.value;
+          }
+          for (final text in decoded.values.cast<String>()) {
+            final match = RegExp(
+              r'^([0-9]+):([0-9]+)$',
+            ).firstMatch(text.trim());
+            if (match != null) {
+              await loadReferenced(int.tryParse(match.group(1)!) ?? 0);
             }
           }
-
-          // Dynamic pointer resolution: only resolve same-surah pointers
-          // (e.g. "2:9" → "2:8" within surah 2). Cross-surah pointers are left as-is.
-          final pointerRegex = RegExp(r'^\d+:\d+$');
-          for (var entry in surahMap.entries.toList()) {
-            final t = entry.value.trim();
-            if (pointerRegex.hasMatch(t)) {
-              final pParts = t.split(':');
-              final pSurah = int.tryParse(pParts[0]) ?? 0;
-              final targetAyahNum = int.tryParse(pParts[1]) ?? 0;
-              // Only resolve if same surah
-              if (pSurah == surahNumber &&
-                  surahMap.containsKey(targetAyahNum) &&
-                  !pointerRegex.hasMatch(surahMap[targetAyahNum]!.trim())) {
-                surahMap[entry.key] = surahMap[targetAyahNum]!;
-              } else if (pSurah != surahNumber) {
-                // Cross-surah pointer: clear the text
-                surahMap[entry.key] = '';
-              }
-            }
-          }
-
-          _cache[cacheKey] = surahMap;
+        } catch (_) {
+          // A missing or damaged referenced file must not discard valid text
+          // already read from another surah in this book.
         }
       }
+
+      await loadReferenced(surahNumber);
+      if (raw.isEmpty) {
+        outcome = 'no_data';
+        return;
+      }
+      final normalized = await compute(parseTafsirContent, raw);
+      for (final entry in normalized.entries) {
+        _cache['${bookId}_${entry.key}'] = <int, String>{
+          for (final ayah in entry.value)
+            ayah['ayah'] as int: ayah['text'] as String,
+        };
+      }
+      outcome = 'loaded';
     } catch (e) {
-      debugPrint('Error loading surah tafsir $bookId - Surah $surahNumber: $e');
+      outcome = 'failed';
+      AppLogger.logEvent('Tafsir', 'cache_load_failed', {
+        'source': 'tafsir_cache',
+        'trigger': 'verse_details',
+        'book': bookId,
+        'surah': surahNumber,
+        'reason': e.runtimeType.toString(),
+      });
+    } finally {
+      AppLogger.logEvent('Tafsir', 'cache_load_finished', {
+        'source': 'tafsir_cache',
+        'trigger': 'verse_details',
+        'book': bookId,
+        'surah': surahNumber,
+        'actual_start': started.toIso8601String(),
+        'actual_finish': DateTime.now().toUtc().toIso8601String(),
+        'duration_ms': watch.elapsedMilliseconds,
+        'outcome': outcome,
+      });
     }
   }
 
@@ -408,21 +650,14 @@ class TafsirHelper {
     final cacheKey = '${targetId}_$surahNumber';
     final surahMap = _cache[cacheKey];
     if (surahMap != null && surahMap.containsKey(verseNumber)) {
-      var text = surahMap[verseNumber] ?? '';
-      if (RegExp(r'^\d+:\d+$').hasMatch(text.trim())) {
-        final targetAyahNum = int.tryParse(text.trim().split(':')[1]) ?? 0;
-        if (surahMap.containsKey(targetAyahNum) &&
-            !RegExp(r'^\d+:\d+$').hasMatch(surahMap[targetAyahNum]!.trim())) {
-          text = surahMap[targetAyahNum]!;
-        }
-      }
-      return TafsirExtractor.extractAyah(text, verseNumber);
+      final text = surahMap[verseNumber] ?? '';
+      return RegExp(r'^\d+:\d+$').hasMatch(text.trim()) ? '' : text;
     }
 
     return '';
   }
 
-  /// Downloads the complete book ZIP from user's GitHub repo and splits it into surahs.
+  /// Imports all per-surah files before marking a downloaded book complete.
   static Future<void> downloadBook(
     TafsirBook book, {
     required void Function(double progress) onProgress,
@@ -434,53 +669,85 @@ class TafsirHelper {
       return;
     }
 
+    if (!_activeDownloads.add(book.id)) {
+      AppLogger.logEvent('Tafsir', 'download_skipped', {
+        'book': book.id,
+        'reason': 'already_running',
+      });
+      onComplete(false, 'تحميل هذه النسخة جارٍ بالفعل.');
+      return;
+    }
+    final started = DateTime.now().toUtc();
+    final watch = Stopwatch()..start();
+    var attempts = 1;
+    var downloadedByteCount = 0;
+    var completed = false;
+    void finish(bool success, String? message, {String? reason}) {
+      if (completed) return;
+      completed = true;
+      AppLogger.logEvent('Tafsir', 'download_finished', {
+        'source': 'configured_tafsir_archive',
+        'book': book.id,
+        'language': book.languageCode,
+        'actual_start': started.toIso8601String(),
+        'actual_finish': DateTime.now().toUtc().toIso8601String(),
+        'duration_ms': watch.elapsedMilliseconds,
+        'outcome': success ? 'success' : 'failed',
+        'bytes': downloadedByteCount,
+        'attempts': attempts,
+        'reason': reason,
+      });
+      onComplete(success, message);
+    }
+
+    AppLogger.logEvent('Tafsir', 'download_started', {
+      'source': 'configured_tafsir_archive',
+      'trigger': 'selected_language',
+      'book': book.id,
+      'language': book.languageCode,
+      'actual_start': started.toIso8601String(),
+    });
     try {
       final bookDir = await _getBookDirectory(book.id);
-      // Clean previous failed attempts or leftover temp files
+      final completeFile = File('${bookDir.path}/.complete');
+      if (await completeFile.exists()) {
+        onProgress(1.0);
+        finish(true, null, reason: 'already_installed');
+        return;
+      }
+
       final tempZipFile = File('${bookDir.path}/download_temp.zip');
       if (await tempZipFile.exists()) {
         try {
           await tempZipFile.delete();
         } catch (_) {}
       }
-      final completeFile = File('${bookDir.path}/.complete');
-      if (await completeFile.exists()) {
-        try {
-          await completeFile.delete();
-        } catch (_) {}
-      }
-
-      final zipUrl = normalizeDownloadUrl(book.url ?? book.id);
-      final dio = Dio(
-        BaseOptions(
-          connectTimeout: const Duration(seconds: 30),
-          receiveTimeout: const Duration(minutes: 5),
-        ),
-      );
 
       onProgress(0.05);
-
-      try {
-        await dio.download(
-          zipUrl,
-          tempZipFile.path,
-          onReceiveProgress: (received, total) {
-            if (total > 0) {
-              onProgress(0.05 + (received / total) * 0.75);
-            }
-          },
+      final localPath = book.url;
+      final localBytes = localPath == null
+          ? null
+          : await FeatureResourceRepository.configured.readBytes(localPath);
+      if (localPath != null &&
+          localPath.startsWith('qul_local/') &&
+          localBytes == null) {
+        throw const FileSystemException('local_resource_missing');
+      }
+      if (localBytes != null) {
+        await tempZipFile.writeAsBytes(localBytes, flush: true);
+        downloadedByteCount = localBytes.length;
+        onProgress(0.80);
+      } else {
+        final zipUrl = normalizeDownloadUrl(book.url ?? book.id);
+        final dio = Dio(
+          BaseOptions(
+            connectTimeout: const Duration(seconds: 30),
+            receiveTimeout: const Duration(minutes: 5),
+          ),
         );
-      } catch (downloadErr) {
-        // Fallback: If URL ended with .json try .zip, and vice-versa
-        String altUrl = '';
-        if (zipUrl.endsWith('.json')) {
-          altUrl = '${zipUrl.substring(0, zipUrl.length - 5)}.zip';
-        } else if (zipUrl.endsWith('.zip')) {
-          altUrl = '${zipUrl.substring(0, zipUrl.length - 4)}.json';
-        }
-        if (altUrl.isNotEmpty) {
+        try {
           await dio.download(
-            altUrl,
+            zipUrl,
             tempZipFile.path,
             onReceiveProgress: (received, total) {
               if (total > 0) {
@@ -488,112 +755,54 @@ class TafsirHelper {
               }
             },
           );
-        } else {
-          rethrow;
+        } catch (downloadErr) {
+          // Fallback: If URL ended with .json try .zip, and vice-versa
+          String altUrl = '';
+          if (zipUrl.endsWith('.json')) {
+            altUrl = '${zipUrl.substring(0, zipUrl.length - 5)}.zip';
+          } else if (zipUrl.endsWith('.zip')) {
+            altUrl = '${zipUrl.substring(0, zipUrl.length - 4)}.json';
+          }
+          if (altUrl.isNotEmpty) {
+            attempts++;
+            AppLogger.logEvent('Tafsir', 'download_retry', {
+              'book': book.id,
+              'attempt': attempts,
+              'reason': downloadErr.runtimeType.toString(),
+              'http_status': downloadErr is DioException
+                  ? downloadErr.response?.statusCode
+                  : null,
+              'strategy': 'alternate_extension',
+              'backoff_ms': 0,
+            });
+            await dio.download(
+              altUrl,
+              tempZipFile.path,
+              onReceiveProgress: (received, total) {
+                if (total > 0) {
+                  onProgress(0.05 + (received / total) * 0.75);
+                }
+              },
+            );
+          } else {
+            rethrow;
+          }
         }
       }
 
       onProgress(0.82);
 
       final downloadedBytes = await tempZipFile.readAsBytes();
-      dynamic rawMap;
-
-      // Check if it is a ZIP file (Magic bytes: 0x50, 0x4B)
-      if (downloadedBytes.length >= 4 &&
-          downloadedBytes[0] == 0x50 &&
-          downloadedBytes[1] == 0x4B) {
-        final archive = ZipDecoder().decodeBytes(downloadedBytes);
-        ArchiveFile? jsonFile;
-        for (final file in archive) {
-          if (file.isFile && file.name.endsWith('.json')) {
-            jsonFile = file;
-            break;
-          }
-        }
-        if (jsonFile == null) {
-          if (await tempZipFile.exists()) await tempZipFile.delete();
-          onComplete(
-            false,
-            'الملف المضغوط لا يحتوي على بيانات التفسير المطلوبة.',
-          );
-          return;
-        }
-        final jsonContent = utf8.decode(jsonFile.content as List<int>);
-        rawMap = json.decode(jsonContent);
-      } else {
-        // Direct JSON file
-        final jsonContent = utf8.decode(downloadedBytes);
-        rawMap = json.decode(jsonContent);
-      }
-
-      if (rawMap is! Map) {
-        if (await tempZipFile.exists()) await tempZipFile.delete();
-        onComplete(false, 'تنسيق ملف التفسير غير متوافق.');
-        return;
-      }
-
+      downloadedByteCount = downloadedBytes.length;
       onProgress(0.92);
-
-      final Map<int, List<Map<String, dynamic>>> surahsAyahs = {};
-      for (int s = 1; s <= 114; s++) {
-        surahsAyahs[s] = [];
+      final prepared = await compute(prepareDownloadedArchive, downloadedBytes);
+      final files = Map<String, String>.from(prepared['files'] as Map);
+      final stats = Map<String, int>.from(prepared['stats'] as Map);
+      if ((stats['readableAyahs'] ?? 0) == 0) {
+        throw const FormatException('empty_tafsir_content');
       }
-
-      rawMap.forEach((key, val) {
-        final parts = key.toString().split(':');
-        if (parts.length == 2) {
-          final sNum = int.tryParse(parts[0]) ?? 0;
-          final aNum = int.tryParse(parts[1]) ?? 0;
-          String text = '';
-          dynamic targetVal = val;
-          // Resolve same-surah pointer references only (e.g. "2:9": "2:8").
-          // Cross-surah pointers are intentionally ignored to prevent showing
-          // another surah's tafsir for a verse that has no dedicated entry.
-          if (targetVal is String) {
-            final pParts = targetVal.split(':');
-            if (pParts.length == 2) {
-              final pSurah = int.tryParse(pParts[0]) ?? 0;
-              // Only resolve if pointer targets same surah
-              if (pSurah == sNum && rawMap.containsKey(targetVal)) {
-                targetVal = rawMap[targetVal];
-              } else {
-                // Cross-surah pointer — store empty so verse shows no tafsir
-                targetVal = null;
-              }
-            }
-          }
-          if (targetVal is Map) {
-            text = targetVal['text']?.toString() ?? '';
-          } else if (targetVal is String) {
-            text = targetVal;
-          }
-          if (sNum >= 1 && sNum <= 114 && aNum > 0) {
-            // Extract the specific ayah text if it is grouped using brackets
-            final regex = RegExp(
-              r'[\{\(\[﴿]' +
-                  aNum.toString() +
-                  r'[\}\)\]﴾](.*?)(?=\s*[\{\(\[﴿]\d+[\}\)\]﴾]|$)',
-              dotAll: true,
-            );
-            final match = regex.firstMatch(text);
-            if (match != null) {
-              text = match.group(0)!.trim();
-            }
-
-            final cleaned = cleanTafsirText(text);
-            surahsAyahs[sNum]?.add({'ayah': aNum, 'text': cleaned});
-          }
-        }
-      });
-
-      for (int s = 1; s <= 114; s++) {
-        final ayahsList = surahsAyahs[s] ?? [];
-        ayahsList.sort(
-          (a, b) => (a['ayah'] as int).compareTo(b['ayah'] as int),
-        );
-        final surahJson = json.encode({'ayahs': ayahsList});
-        final surahFile = File('${bookDir.path}/$s.json');
-        await surahFile.writeAsString(surahJson);
+      for (var s = 1; s <= 114; s++) {
+        await File('${bookDir.path}/$s.json').writeAsString(files['$s']!);
       }
 
       if (await tempZipFile.exists()) {
@@ -601,12 +810,27 @@ class TafsirHelper {
       }
 
       await completeFile.writeAsString('done');
+      _cache.removeWhere((key, _) => key.startsWith('${book.id}_'));
 
       onProgress(1.0);
-      onComplete(true, null);
+      AppLogger.logEvent('Tafsir', 'download_imported', {
+        'source': 'configured_tafsir_archive',
+        'trigger': 'selected_language',
+        'book': book.id,
+        'surahs': 114,
+        'readable_ayahs': stats['readableAyahs'] ?? 0,
+        'resolved_pointers': stats['resolvedPointers'] ?? 0,
+        'invalid_references': stats['invalidReferences'] ?? 0,
+      });
+      finish(true, null, reason: 'imported');
     } catch (e) {
-      debugPrint('downloadBook error: $e');
-      onComplete(false, 'حدث خطأ أثناء تحميل التفسير: $e');
+      finish(
+        false,
+        'حدث خطأ أثناء تحميل التفسير. يرجى المحاولة مرة أخرى.',
+        reason: e.runtimeType.toString(),
+      );
+    } finally {
+      _activeDownloads.remove(book.id);
     }
   }
 

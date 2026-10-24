@@ -1,4 +1,5 @@
 import 'package:ibad_al_rahmann/core/data/quran_audio_index.dart';
+import 'package:ibad_al_rahmann/core/helpers/feature_resource_repository.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,6 +7,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 
 import 'package:archive/archive.dart';
 
@@ -150,6 +152,8 @@ class ReciterAudioModel {
   final String folderName;
   final String everyAyahFolder;
   final bool hasSegments;
+  final bool localOnly;
+  final bool hasSurahAudio;
   final String? zipFileName;
   final String? segmentsFileName;
   final String category;
@@ -161,6 +165,8 @@ class ReciterAudioModel {
     required this.folderName,
     this.everyAyahFolder = '',
     this.hasSegments = true,
+    this.localOnly = false,
+    this.hasSurahAudio = true,
     this.zipFileName,
     this.segmentsFileName,
     this.category = 'مشاهير القراء',
@@ -173,7 +179,9 @@ class ReciterAudioModel {
       style: json['style']?.toString() ?? 'مرتل',
       folderName: json['folder_name']?.toString() ?? '',
       everyAyahFolder: json['every_ayah_folder']?.toString() ?? '',
-      hasSegments: json['has_segments'] ?? true,
+      hasSegments: json['has_segments'] == true,
+      localOnly: json['local_only'] == true,
+      hasSurahAudio: json['has_surah_audio'] != false,
       zipFileName: json['zip_file_name']?.toString(),
       segmentsFileName: json['segments_file_name']?.toString(),
       category: json['category']?.toString() ?? 'مشاهير القراء',
@@ -196,10 +204,10 @@ class ReciterAudioModel {
   /// Per-ayah metadata or an EveryAyah source supports individual verses,
   /// even when this reciter has no synchronized highlighting metadata.
   bool get supportsAyahByAyah =>
-      hasSegments || everyAyahFolder.trim().isNotEmpty;
+      hasSegments || zipFileName != null || everyAyahFolder.trim().isNotEmpty;
 
   /// A non-empty source folder identifies a complete-surah recording.
-  bool get supportsFullSurah => folderName.trim().isNotEmpty;
+  bool get supportsFullSurah => hasSurahAudio && folderName.trim().isNotEmpty;
 
   bool supportsMode(ReciterAudioMode mode) => switch (mode) {
     ReciterAudioMode.wordByWord => supportsWordByWord,
@@ -214,6 +222,8 @@ class ReciterAudioModel {
     'folder_name': folderName,
     'every_ayah_folder': everyAyahFolder,
     'has_segments': hasSegments,
+    if (localOnly) 'local_only': true,
+    if (!hasSurahAudio) 'has_surah_audio': false,
     if (zipFileName != null) 'zip_file_name': zipFileName,
     if (segmentsFileName != null) 'segments_file_name': segmentsFileName,
     'category': category,
@@ -681,10 +691,52 @@ class ReciterAudioHelper {
   );
   static final Map<String, Map<int, SurahAudioItem>> _surahsCache = {};
   static final Map<String, Map<String, VerseTiming>> _segmentsCache = {};
+  @visibleForTesting
+  static Dio Function() dioFactory = () => Dio();
+  static const _localManifestPath = 'qul_local/app_config.local.json';
+  static const _fallbackLocalManifestPath = 'app_config.json';
 
   static List<ReciterAudioModel> get availableReciters => _availableReciters;
   static Future<List<ReciterAudioModel>> getReciters() async =>
       _availableReciters;
+
+  static Future<Map<String, dynamic>?> _readLocalManifest() async {
+    final local = FeatureResourceRepository.configured;
+    if (!local.enabled) return null;
+    return await local.readJson(_localManifestPath) ??
+        await local.readJson(_fallbackLocalManifestPath);
+  }
+
+  static List<ReciterAudioModel> _catalogFrom(Map<String, dynamic>? data) {
+    final raw = data?['audio_reciters'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => ReciterAudioModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  static List<ReciterAudioModel> _mergeLocalCatalog(
+    Iterable<ReciterAudioModel> local,
+  ) {
+    final result = List<ReciterAudioModel>.from(defaultReciters);
+    final knownIds = result.map((r) => r.id).toSet();
+    for (final candidate in local) {
+      if (knownIds.contains(candidate.id) ||
+          !isValidSourceId(candidate.id) ||
+          !(isValidFolderName(candidate.folderName) ||
+              (candidate.localOnly &&
+                  _isEnabledLocalFolder(candidate.folderName)))) {
+        continue;
+      }
+      // The catalog is generated from validated source metadata.  Preserve
+      // its explicit capabilities and direct URL metadata; reducing every
+      // public extra to a no-segments shell silently disables real timings.
+      result.add(candidate);
+      knownIds.add(candidate.id);
+    }
+    return result;
+  }
 
   static ReciterAudioModel getReciterById(String id) {
     return _availableReciters.firstWhere(
@@ -693,22 +745,103 @@ class ReciterAudioHelper {
     );
   }
 
+  static final RegExp _safeSourceId = RegExp(r'^[a-z0-9]+(?:[_-][a-z0-9]+)*$');
+  static final RegExp _safeFolderName = RegExp(
+    r'^(?:surah-recitation-[a-z0-9]+(?:-[a-z0-9]+)*|qul_ayah_[a-f0-9]{12})$',
+  );
+  static final RegExp _safeTemporaryLocalFolder = RegExp(
+    r'^(?:qul_ayah_[a-f0-9]{12}|surah-recitation-[a-z0-9]+(?:-[a-z0-9]+)*(?: \([1-9][0-9]*\))?)$',
+  );
+
+  static bool _isEnabledLocalFolder(String value) =>
+      FeatureResourceRepository.configured.enabled &&
+      _safeTemporaryLocalFolder.hasMatch(value);
+
+  @visibleForTesting
+  static bool isValidSourceId(String value) => _safeSourceId.hasMatch(value);
+
+  @visibleForTesting
+  static bool isValidFolderName(String value) =>
+      _safeFolderName.hasMatch(value);
+
+  /// Keep built-in recording capabilities authoritative. Remote config may
+  /// add a validated source, and its explicit capabilities remain usable.
+  @visibleForTesting
+  static List<ReciterAudioModel> mergeReciters(
+    Iterable<ReciterAudioModel> builtIns,
+    Iterable<ReciterAudioModel> remote,
+  ) {
+    final result = List<ReciterAudioModel>.from(builtIns);
+    final knownIds = result.map((reciter) => reciter.id).toSet();
+    for (final candidate in remote) {
+      if (knownIds.contains(candidate.id) ||
+          !isValidSourceId(candidate.id) ||
+          !isValidFolderName(candidate.folderName)) {
+        continue;
+      }
+      // Imported QUL entries have stable structured source IDs. Generic
+      // remote readers cannot acquire an unverified EveryAyah or timing
+      // source just by declaring has_segments. Timing/audio matching is
+      // additionally validated when the actual source is loaded.
+      final importedQulSource = RegExp(
+        r'^qul_(?:ayah_)?[a-f0-9]{12}$',
+      ).hasMatch(candidate.id);
+      result.add(
+        importedQulSource
+            ? candidate
+            : ReciterAudioModel(
+                id: candidate.id,
+                name: candidate.name,
+                style: candidate.style,
+                folderName: candidate.folderName,
+                hasSegments: false,
+                everyAyahFolder: '',
+              ),
+      );
+      knownIds.add(candidate.id);
+    }
+    return result;
+  }
+
+  static void _validateFolderName(String folderName) {
+    if (!isValidFolderName(folderName) && !_isEnabledLocalFolder(folderName)) {
+      throw ArgumentError.value(
+        folderName,
+        'folderName',
+        'Invalid audio source folder',
+      );
+    }
+  }
+
   static String getAyahAudioUrl(
     int surahNumber,
     int verseNumber,
     ReciterAudioModel reciter,
   ) {
-    final folder = reciter.everyAyahFolder.isNotEmpty
-        ? reciter.everyAyahFolder
-        : (reciter.folderName.isNotEmpty
-              ? reciter.folderName
-              : 'Alafasy_128kbps');
+    final folder = reciter.everyAyahFolder.trim();
+    if (folder.isEmpty) {
+      throw StateError('لا يوجد مصدر آيات موثق لهذا القارئ');
+    }
+    if (!RegExp(r'^[A-Za-z0-9][A-Za-z0-9_-]*$').hasMatch(folder)) {
+      throw ArgumentError('Invalid EveryAyah source folder');
+    }
     final s = surahNumber.toString().padLeft(3, '0');
     final v = verseNumber.toString().padLeft(3, '0');
     return 'https://everyayah.com/data/$folder/$s$v.mp3';
   }
 
   static Future<void> fetchRemoteReciters() async {
+    final started = DateTime.now();
+    AppLogger.logEvent('QuranAudio', 'reciters_fetch_started', {
+      'source': 'app_config',
+      'trigger': 'remote_catalog_load',
+      'start': started.toIso8601String(),
+    });
+    final localManifest = await _readLocalManifest();
+    final localList = _catalogFrom(localManifest);
+    if (localList.isNotEmpty) {
+      _availableReciters = _mergeLocalCatalog(localList);
+    }
     try {
       final dio = Dio(
         BaseOptions(
@@ -728,16 +861,37 @@ class ReciterAudioHelper {
               )
               .toList();
           if (list.isNotEmpty) {
-            _availableReciters = list;
+            _availableReciters = mergeReciters(_availableReciters, list);
           }
         }
       }
+      AppLogger.logEvent('QuranAudio', 'reciters_fetch_finished', {
+        'source': 'app_config',
+        'trigger': 'remote_catalog_load',
+        'start': started.toIso8601String(),
+        'end': DateTime.now().toIso8601String(),
+        'duration': DateTime.now().difference(started).inMilliseconds,
+        'status': 'success',
+        'http_status': response.statusCode,
+        'reciters': _availableReciters.length,
+      });
     } catch (e) {
-      debugPrint("Failed to fetch remote audio reciters: $e");
+      debugPrint('Failed to fetch remote audio reciters: ${e.runtimeType}');
+      AppLogger.logEvent('QuranAudio', 'reciters_fetch_finished', {
+        'source': 'app_config',
+        'trigger': 'remote_catalog_load',
+        'start': started.toIso8601String(),
+        'end': DateTime.now().toIso8601String(),
+        'duration': DateTime.now().difference(started).inMilliseconds,
+        'status': 'failure',
+        'http_status': e is DioException ? e.response?.statusCode : null,
+        'safe_failure_type': e.runtimeType.toString(),
+      });
     }
   }
 
   static Future<String> _getReciterDir(String folderName) async {
+    _validateFolderName(folderName);
     final dir = await getApplicationDocumentsDirectory();
     final reciterDir = Directory('${dir.path}/quran_offline/$folderName');
     if (!await reciterDir.exists()) {
@@ -754,7 +908,22 @@ class ReciterAudioHelper {
       return _surahsCache[reciter.folderName]!;
     }
 
-    if (QuranAudioIndex.surahData.containsKey(reciter.folderName)) {
+    dynamic jsonData;
+    var localSourceRead = false;
+    if (FeatureResourceRepository.configured.enabled) {
+      final bytes = await FeatureResourceRepository.configured.readBytes(
+        'audio/reciters/${reciter.folderName}/surah.json',
+      );
+      if (bytes != null) {
+        try {
+          jsonData = json.decode(utf8.decode(bytes));
+          localSourceRead = true;
+        } catch (_) {}
+      }
+    }
+
+    if (!localSourceRead &&
+        QuranAudioIndex.surahData.containsKey(reciter.folderName)) {
       final data = QuranAudioIndex.surahData[reciter.folderName]!;
       final result = <int, SurahAudioItem>{};
       data.forEach((k, v) {
@@ -768,11 +937,10 @@ class ReciterAudioHelper {
     final localDir = await _getReciterDir(reciter.folderName);
     final localFile = File('$localDir/surah.json');
 
-    dynamic jsonData;
-    if (await localFile.exists()) {
+    if (!localSourceRead && await localFile.exists()) {
       final str = await localFile.readAsString();
       jsonData = json.decode(str);
-    } else {
+    } else if (!localSourceRead && !reciter.localOnly) {
       try {
         final dio = Dio();
         final urls = [
@@ -799,23 +967,41 @@ class ReciterAudioHelper {
     final result = <int, SurahAudioItem>{};
     if (jsonData != null) {
       if (jsonData is Map) {
-        jsonData.forEach((k, v) {
+        for (final entry in jsonData.entries) {
+          final v = entry.value;
           if (v is Map) {
             final item = SurahAudioItem.fromJson(Map<String, dynamic>.from(v));
-            result[item.surahNumber] = item;
+            final url = item.audioUrl;
+            if (url.isNotEmpty) {
+              result[item.surahNumber] = SurahAudioItem(
+                surahNumber: item.surahNumber,
+                audioUrl: url,
+                durationSec: item.durationSec,
+              );
+            }
           }
-        });
+        }
       } else if (jsonData is List) {
         for (var v in jsonData) {
           if (v is Map) {
             final item = SurahAudioItem.fromJson(Map<String, dynamic>.from(v));
-            result[item.surahNumber] = item;
+            final url = item.audioUrl;
+            if (url.isNotEmpty) {
+              result[item.surahNumber] = SurahAudioItem(
+                surahNumber: item.surahNumber,
+                audioUrl: url,
+                durationSec: item.durationSec,
+              );
+            }
           }
         }
       }
     }
 
     _surahsCache[reciter.folderName] = result;
+    if (reciter.localOnly && result.isEmpty) {
+      throw StateError('المصدر المحلي غير متاح حالياً');
+    }
     return result;
   }
 
@@ -823,7 +1009,11 @@ class ReciterAudioHelper {
     ReciterAudioModel reciter,
   ) async {
     // Category D: no timing data available
-    if (!reciter.hasSegments) return {};
+    if (!reciter.hasSegments &&
+        reciter.zipFileName == null &&
+        reciter.segmentsFileName == null) {
+      return {};
+    }
 
     if (_segmentsCache.containsKey(reciter.folderName) &&
         _segmentsCache[reciter.folderName]!.isNotEmpty) {
@@ -835,13 +1025,43 @@ class ReciterAudioHelper {
     final letterFile = File('$localDir/letter_segments.json');
 
     dynamic jsonData;
+    if (FeatureResourceRepository.configured.enabled) {
+      try {
+        final zipBytes = reciter.zipFileName == null
+            ? null
+            : (await FeatureResourceRepository.configured.readBytes(
+                    'audio/reciters/${reciter.folderName}/${reciter.zipFileName}',
+                  ) ??
+                  await FeatureResourceRepository.configured.readBytes(
+                    'audio/reciters/${reciter.zipFileName}',
+                  ));
+        if (zipBytes != null &&
+            zipBytes.length >= 2 &&
+            zipBytes[0] == 0x50 &&
+            zipBytes[1] == 0x4b) {
+          final archive = ZipDecoder().decodeBytes(zipBytes);
+          for (final file in archive) {
+            if (file.isFile && file.name.endsWith('.json')) {
+              jsonData = json.decode(utf8.decode(file.content as List<int>));
+              break;
+            }
+          }
+        }
+        if (jsonData == null && reciter.segmentsFileName != null) {
+          final bytes = await FeatureResourceRepository.configured.readBytes(
+            'audio/reciters/${reciter.folderName}/${reciter.segmentsFileName}',
+          );
+          if (bytes != null) jsonData = json.decode(utf8.decode(bytes));
+        }
+      } catch (_) {}
+    }
 
     // Check locally cached files first
-    if (await segmentsFile.exists()) {
+    if (jsonData == null && await segmentsFile.exists()) {
       jsonData = json.decode(await segmentsFile.readAsString());
-    } else if (await letterFile.exists()) {
+    } else if (jsonData == null && await letterFile.exists()) {
       jsonData = json.decode(await letterFile.readAsString());
-    } else {
+    } else if (jsonData == null && !reciter.localOnly) {
       // 1. Check bundled app assets for instant offline word-by-word timing
       if (reciter.zipFileName != null) {
         try {
@@ -925,15 +1145,24 @@ class ReciterAudioHelper {
 
     final result = <String, VerseTiming>{};
     if (jsonData is Map) {
-      jsonData.forEach((k, v) {
+      for (final entry in jsonData.entries) {
+        final v = entry.value;
         if (v is Map) {
           final timing = VerseTiming.fromJson(
-            k.toString(),
+            entry.key.toString(),
             Map<String, dynamic>.from(v),
           );
-          result['${timing.surahNumber}:${timing.verseNumber}'] = timing;
+          result['${timing.surahNumber}:${timing.verseNumber}'] = VerseTiming(
+            surahNumber: timing.surahNumber,
+            verseNumber: timing.verseNumber,
+            audioUrl: timing.audioUrl,
+            timestampFrom: timing.timestampFrom,
+            timestampTo: timing.timestampTo,
+            durationMs: timing.durationMs,
+            segments: timing.segments,
+          );
         }
-      });
+      }
     }
 
     _segmentsCache[reciter.folderName] = result;
@@ -963,32 +1192,77 @@ class ReciterAudioHelper {
     required void Function(double progress) onProgress,
     required void Function(bool success, String? error) onComplete,
   }) async {
+    final started = DateTime.now().toUtc();
+    final watch = Stopwatch()..start();
+    final uri = Uri.tryParse(remoteUrl);
+    final source = uri?.scheme == 'file' ? 'local_repository' : 'https_audio';
+    var success = false;
+    String? reason;
+    int? status;
+    AppLogger.logEvent('ReciterAudio', 'surah_download_started', {
+      'source': source,
+      'trigger': 'user_download',
+      'surah': surahNumber,
+      'actual_start': started.toIso8601String(),
+      'retry_count': 0,
+    });
     try {
+      if (!isValidFolderName(folderName) ||
+          surahNumber < 1 ||
+          surahNumber > 114 ||
+          uri == null) {
+        throw const FormatException('invalid_audio_source');
+      }
+      final isLocal = uri.scheme == 'file';
+      if (isLocal) {
+        if (!await FeatureResourceRepository.configured.containsFileUri(uri)) {
+          throw StateError('unverified_local_audio');
+        }
+      } else if (uri.scheme != 'https' ||
+          uri.host.isEmpty ||
+          uri.userInfo.isNotEmpty) {
+        throw const FormatException('unsupported_audio_source');
+      }
       final filePath = await getOfflineSurahPath(folderName, surahNumber);
       final tempPath = '$filePath.tmp';
-
-      final dio = Dio();
-      await dio.download(
-        remoteUrl,
-        tempPath,
-        onReceiveProgress: (received, total) {
-          if (total > 0) {
-            onProgress(received / total);
-          }
-        },
-      );
-
-      final tempFile = File(tempPath);
-      if (await tempFile.exists()) {
-        await tempFile.rename(filePath);
-        onComplete(true, null);
+      if (isLocal) {
+        await File.fromUri(uri).copy(tempPath);
+        onProgress(1);
       } else {
-        onComplete(false, 'فشل حفظ الملف الصوتي');
+        await dioFactory().download(
+          remoteUrl,
+          tempPath,
+          onReceiveProgress: (received, total) {
+            if (total > 0) onProgress(received / total);
+          },
+        );
       }
+      final tempFile = File(tempPath);
+      if (!await tempFile.exists() || await tempFile.length() == 0) {
+        throw StateError('empty_audio_download');
+      }
+      await tempFile.rename(filePath);
+      success = true;
     } catch (e) {
-      debugPrint("Error downloading surah $surahNumber for $folderName: $e");
-      onComplete(false, e.toString());
+      reason = e is DioException ? e.type.name : e.runtimeType.toString();
+      status = e is DioException ? e.response?.statusCode : null;
     }
+    AppLogger.logEvent('ReciterAudio', 'surah_download_finished', {
+      'source': source,
+      'trigger': 'user_download',
+      'surah': surahNumber,
+      'actual_start': started.toIso8601String(),
+      'actual_finish': DateTime.now().toUtc().toIso8601String(),
+      'duration_ms': watch.elapsedMilliseconds,
+      'outcome': success ? 'success' : 'failed',
+      'reason': reason ?? 'completed',
+      if (status != null) 'http_status': status,
+      'retry_count': 0,
+    });
+    onComplete(
+      success,
+      success ? null : 'تعذر تنزيل الملف الصوتي، حاول مرة أخرى',
+    );
   }
 
   static Future<void> deleteDownloadedSurah(

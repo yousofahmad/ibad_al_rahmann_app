@@ -10,12 +10,12 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/helpers/extensions/screen_details.dart';
 
 import '../widgets/core/quran_pages_list.dart';
-import '../widgets/core/wbw_page_widget.dart';
+import '../widgets/core/selected_mushaf_page_widget.dart';
 import 'tablet_min_quran_bottom_section.dart';
 import 'tablet_quran_top_bar.dart';
 
 /// Tablet-optimized minimized Quran layout.
-/// Uses the same WbwPageWidget as mobile but with tablet-appropriate
+/// Uses the same SelectedMushafPageWidget as mobile but with tablet-appropriate
 /// spacing, top bar, and bottom section.
 class MinQuranTablet extends StatefulWidget {
   const MinQuranTablet({super.key, this.currentPage});
@@ -110,7 +110,7 @@ class _MinQuranTabletState extends State<MinQuranTablet> {
                           ],
                         ),
                         clipBehavior: Clip.antiAlias,
-                        child: WbwPageWidget(
+                        child: SelectedMushafPageWidget(
                           pageNumber: index + 1,
                           showHeader: false,
                           showPageNumber: false,

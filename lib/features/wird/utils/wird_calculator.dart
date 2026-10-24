@@ -1,4 +1,4 @@
-import 'package:quran/quran.dart' as quran;
+import 'package:ibad_al_rahmann/core/helpers/mushaf_pagination.dart';
 
 enum WirdUnit { page, juz, quarter }
 
@@ -23,39 +23,50 @@ class WirdSession {
 }
 
 class WirdCalculator {
-  /// Juz start pages (Madinah mushaf, 1-indexed)
-  static const List<int> juzStartPages = [
-    1,
-    22,
-    42,
-    62,
-    82,
-    102,
-    122,
-    142,
-    162,
-    182,
-    202,
-    222,
-    242,
-    262,
-    282,
-    302,
-    322,
-    342,
-    362,
-    382,
-    402,
-    422,
-    442,
-    462,
-    482,
-    502,
-    522,
-    542,
-    562,
-    582,
+  /// Canonical start coordinates for Juz 1 through 30.
+  ///
+  /// Pages are deliberately resolved from these coordinates at read time so
+  /// selected Mushaf formats can adapt their Juz boundaries.
+  static const List<List<int>> _juzStartAyahs = [
+    [1, 1],
+    [2, 142],
+    [2, 253],
+    [3, 93],
+    [4, 24],
+    [4, 148],
+    [5, 84],
+    [6, 111],
+    [7, 88],
+    [8, 41],
+    [9, 94],
+    [11, 6],
+    [12, 53],
+    [15, 1],
+    [17, 1],
+    [18, 75],
+    [21, 1],
+    [23, 1],
+    [25, 21],
+    [27, 56],
+    [29, 46],
+    [33, 31],
+    [36, 28],
+    [39, 32],
+    [41, 47],
+    [46, 1],
+    [51, 31],
+    [58, 1],
+    [67, 1],
+    [78, 1],
   ];
+
+  /// Juz start pages for the active Mushaf format (1-indexed).
+  static List<int> get juzStartPages => _juzStartAyahs
+      .map(
+        (coordinate) =>
+            MushafPagination.pageForAyah(coordinate[0], coordinate[1]),
+      )
+      .toList(growable: false);
 
   /// Precise Rub' al-Hizb boundaries from quran-metadata-rub.json
   /// Each entry: [startSurah, startAyah, endSurah, endAyah]
@@ -331,7 +342,10 @@ class WirdCalculator {
   static int getQuarterCount(int startFromPage) {
     int startQIdx = 0;
     for (int i = _rubMarkers.length - 1; i >= 0; i--) {
-      final sp = quran.getPageNumber(_rubMarkers[i][0], _rubMarkers[i][1]);
+      final sp = MushafPagination.pageForAyah(
+        _rubMarkers[i][0],
+        _rubMarkers[i][1],
+      );
       if (startFromPage >= sp) {
         startQIdx = i;
         break;
@@ -342,7 +356,9 @@ class WirdCalculator {
 
   /// Quarter (Rub') start pages — 240 quarters total.
   static List<int> get quarterStartPages {
-    return _rubMarkers.map((m) => quran.getPageNumber(m[0], m[1])).toList();
+    return _rubMarkers
+        .map((m) => MushafPagination.pageForAyah(m[0], m[1]))
+        .toList();
   }
 
   /// Returns a WirdSession with precise boundaries.
@@ -357,12 +373,14 @@ class WirdCalculator {
       int targetJuz = sessionIndex.clamp(0, 29);
 
       int sPage = juzStartPages[targetJuz];
-      int ePage = (targetJuz == 29) ? 604 : juzStartPages[targetJuz + 1] - 1;
+      int ePage = (targetJuz == 29)
+          ? MushafPagination.pageCount
+          : juzStartPages[targetJuz + 1] - 1;
 
-      int startSura = quran.getPageData(sPage).first['surah'] as int;
-      int startAyah = quran.getPageData(sPage).first['start'] as int;
-      int endSura = quran.getPageData(ePage).last['surah'] as int;
-      int endAyah = quran.getPageData(ePage).last['end'] as int;
+      int startSura = MushafPagination.pageData(sPage).first['surah'] as int;
+      int startAyah = MushafPagination.pageData(sPage).first['start'] as int;
+      int endSura = MushafPagination.pageData(ePage).last['surah'] as int;
+      int endAyah = MushafPagination.pageData(ePage).last['end'] as int;
 
       return WirdSession(
         startPage: sPage,
@@ -382,7 +400,10 @@ class WirdCalculator {
       // Find the first rub' index whose start page >= startFromPage
       int startQIdx = 0;
       for (int i = _rubMarkers.length - 1; i >= 0; i--) {
-        final sp = quran.getPageNumber(_rubMarkers[i][0], _rubMarkers[i][1]);
+        final sp = MushafPagination.pageForAyah(
+          _rubMarkers[i][0],
+          _rubMarkers[i][1],
+        );
         if (startFromPage >= sp) {
           startQIdx = i;
           break;
@@ -393,8 +414,8 @@ class WirdCalculator {
       final m = _rubMarkers[targetQ];
 
       // Use EXACT verse boundaries from JSON data
-      int sPage = quran.getPageNumber(m[0], m[1]);
-      int ePage = quran.getPageNumber(m[2], m[3]);
+      int sPage = MushafPagination.pageForAyah(m[0], m[1]);
+      int ePage = MushafPagination.pageForAyah(m[2], m[3]);
       if (ePage < sPage) ePage = sPage;
 
       return WirdSession(
@@ -409,7 +430,7 @@ class WirdCalculator {
     }
 
     // ─── Page-based distribution ───
-    int totalPages = 604 - startFromPage + 1;
+    int totalPages = MushafPagination.pageCount - startFromPage + 1;
     if (totalPages <= 0) totalPages = 1;
 
     if (sessionIndex >= totalSessions) {
@@ -442,13 +463,18 @@ class WirdCalculator {
     int endUnit = startUnit + sessionSizes[sessionIndex] - 1;
 
     if (endUnit < startUnit) endUnit = startUnit;
-    if (startUnit > 604) startUnit = 604;
-    if (endUnit > 604) endUnit = 604;
+    if (startUnit > MushafPagination.pageCount) {
+      startUnit = MushafPagination.pageCount;
+    }
+    if (endUnit > MushafPagination.pageCount) {
+      endUnit = MushafPagination.pageCount;
+    }
 
-    int startSura = quran.getPageData(startUnit).first['surah'] as int;
-    int startAyahVal = quran.getPageData(startUnit).first['start'] as int;
-    int endSura = quran.getPageData(endUnit).last['surah'] as int;
-    int endAyahVal = quran.getPageData(endUnit).last['end'] as int;
+    int startSura = MushafPagination.pageData(startUnit).first['surah'] as int;
+    int startAyahVal =
+        MushafPagination.pageData(startUnit).first['start'] as int;
+    int endSura = MushafPagination.pageData(endUnit).last['surah'] as int;
+    int endAyahVal = MushafPagination.pageData(endUnit).last['end'] as int;
 
     return WirdSession(
       startPage: startUnit,
@@ -462,9 +488,9 @@ class WirdCalculator {
   }
 
   static int getRemainingPages(int startJuz) {
-    if (startJuz <= 1) return 604;
+    if (startJuz <= 1) return MushafPagination.pageCount;
     if (startJuz > 30) return 0;
-    return 604 - juzStartPages[startJuz - 1] + 1;
+    return MushafPagination.pageCount - juzStartPages[startJuz - 1] + 1;
   }
 
   static int getRemainingQuarters(int startJuz) {

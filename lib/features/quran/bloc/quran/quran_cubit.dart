@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import 'package:ibad_al_rahmann/core/helpers/mushaf_format_repository.dart';
+import 'package:ibad_al_rahmann/core/helpers/mushaf_pagination.dart';
 import 'package:ibad_al_rahmann/core/services/intro_service.dart';
 import 'package:ibad_al_rahmann/features/quran/data/repo/quran_repo.dart';
 import 'package:ibad_al_rahmann/features/quran/data/quran_word.dart';
@@ -20,6 +22,7 @@ class QuranCubit extends Cubit<QuranState> {
   final int? targetEndPage;
   final int? wirdIndex;
   final Map<int, List<QuranWord>> pageCache = {};
+  final Map<int, int> _pageCacheRevisions = {};
 
   /// Keys for RepaintBoundary per page – used for HD page capture.
   /// Categorized by context (e.g. 'mushaf', 'wird') to avoid GlobalKey collisions.
@@ -51,7 +54,38 @@ class QuranCubit extends Cubit<QuranState> {
            wirdIndex: wirdIndex,
          ),
        ) {
+    MushafFormatRepository.instance.selectionRevision.addListener(
+      _onMushafFormatChanged,
+    );
     _initializeCache();
+  }
+
+  void _onMushafFormatChanged() {
+    // Capture the reading anchor before consulting the newly activated mapping.
+    // The pagination facade retains the prior mapping for this transition.
+    final oldPage = (state.currentPage ?? 0) + 1;
+    int? surah;
+    int? ayah;
+    if (state.highlightedSurah != null && state.highlightedAyah != null) {
+      surah = state.highlightedSurah;
+      ayah = state.highlightedAyah;
+    } else {
+      final oldData = MushafPagination.previousPageData(oldPage);
+      if (oldData.isNotEmpty) {
+        surah = oldData.first['surah'] as int?;
+        ayah = oldData.first['start'] as int?;
+      }
+    }
+    final newPage = surah != null && ayah != null
+        ? MushafPagination.pageForAyah(surah, ayah)
+        : oldPage.clamp(1, MushafPagination.pageCount);
+    // Keep old entries for callers/tests, but make them ineligible for the new
+    // format so an asynchronous old-format load can never overwrite new data.
+    _pageCacheRevisions
+      ..removeWhere((page, revision) => revision != MushafPagination.revision);
+    if (!isClosed) {
+      emit(state.copyWith(currentPage: newPage - 1));
+    }
   }
 
   int getCurrentJuzNumber({
@@ -73,6 +107,7 @@ class QuranCubit extends Cubit<QuranState> {
 
   /// Initialize cache and load the last page
   Future<void> _initializeCache() async {
+    await MushafFormatRepository.instance.initialize();
     await CacheHelper.init();
     await _loadLastPage();
   }
@@ -132,7 +167,7 @@ class QuranCubit extends Cubit<QuranState> {
 
     if (lastPage != null) {
       final int pageNumber = lastPage + 1;
-      final pageData = getPageData(pageNumber);
+      final pageData = MushafPagination.pageData(pageNumber);
       int juzNum = getCurrentJuzNumber(
         surahNumber: pageData[0]['surah'],
         verseNumber: pageData[0]['start'],
@@ -175,7 +210,10 @@ class QuranCubit extends Cubit<QuranState> {
 
     if (state.isWirdMode && state.khatmaId != null && state.wirdIndex != null) {
       final int startPage = state.wirdStartPage ?? 1;
-      final int relativeIndex = (pageIndex - (startPage - 1)).clamp(0, 604);
+      final int relativeIndex = (pageIndex - (startPage - 1)).clamp(
+        0,
+        MushafPagination.pageCount,
+      );
 
       await CacheHelper.prefs.setInt(
         'wird_${state.khatmaId}_${state.wirdIndex}_current_page',
@@ -253,7 +291,7 @@ class QuranCubit extends Cubit<QuranState> {
     await _repo.onQuranPageChanged(pageIndex);
 
     final pageNumber = pageIndex + 1;
-    final pageData = getPageData(pageNumber);
+    final pageData = MushafPagination.pageData(pageNumber);
     int juzNum = getCurrentJuzNumber(
       surahNumber: pageData[0]['surah'],
       verseNumber: pageData[0]['start'],
@@ -282,30 +320,36 @@ class QuranCubit extends Cubit<QuranState> {
 
   Future<void> _preCacheNeighbors(int pageNumber) async {
     // Current page is already being loaded/shown, pre-cache next and previous
-    if (pageNumber < 604) {
+    if (pageNumber < MushafPagination.pageCount) {
       _cachePage(pageNumber + 1);
     }
     if (pageNumber > 1) {
       _cachePage(pageNumber - 1);
     }
     // Also next-next
-    if (pageNumber < 603) {
+    if (pageNumber < MushafPagination.pageCount - 1) {
       _cachePage(pageNumber + 2);
     }
   }
 
   Future<void> _cachePage(int pageNumber) async {
-    if (pageCache.containsKey(pageNumber)) return;
+    if (pageCache.containsKey(pageNumber) &&
+        _pageCacheRevisions[pageNumber] == MushafPagination.revision)
+      return;
     try {
+      final revision = MushafPagination.revision;
       final words = await _repo.getPageWords(pageNumber);
+      if (revision != MushafPagination.revision) return;
       pageCache[pageNumber] = words;
+      _pageCacheRevisions[pageNumber] = revision;
     } catch (e) {
       // debugPrint('Error pre-caching page $pageNumber: $e');
     }
   }
 
   Future<List<QuranWord>> getOrLoadPageWords(int pageNumber) async {
-    if (pageCache.containsKey(pageNumber)) {
+    if (pageCache.containsKey(pageNumber) &&
+        _pageCacheRevisions[pageNumber] == MushafPagination.revision) {
       return pageCache[pageNumber]!;
     }
     final words = await _repo.getPageWords(pageNumber);
@@ -348,7 +392,7 @@ class QuranCubit extends Cubit<QuranState> {
     // Silent background preloader for perfectly smooth page experience
     QuranWbwDbHelper.instance.preloadAllPagesInBackground();
 
-    final pageData = getPageData(pageIndex + 1);
+    final pageData = MushafPagination.pageData(pageIndex + 1);
     int juzNum = getCurrentJuzNumber(
       surahNumber: pageData[0]['surah'],
       verseNumber: pageData[0]['start'],
@@ -452,5 +496,13 @@ class QuranCubit extends Cubit<QuranState> {
 
   void toggleExporting(bool value) {
     emit(state.copyWith(isExporting: value));
+  }
+
+  @override
+  Future<void> close() {
+    MushafFormatRepository.instance.selectionRevision.removeListener(
+      _onMushafFormatChanged,
+    );
+    return super.close();
   }
 }

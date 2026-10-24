@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/fonts_helper.dart';
+import 'package:ibad_al_rahmann/core/helpers/mushaf_pagination.dart';
 import 'package:ibad_al_rahmann/features/quran/data/db_helper.dart';
-import 'package:quran/quran.dart' as quran;
 
 class DbMushafText extends StatefulWidget {
   final int surahNumber;
@@ -57,7 +57,10 @@ class _DbMushafTextState extends State<DbMushafText> {
       widget.surahNumber,
       widget.verseNumber,
     );
-    _pageNumber = quran.getPageNumber(widget.surahNumber, widget.verseNumber);
+    _pageNumber = MushafPagination.pageForAyah(
+      widget.surahNumber,
+      widget.verseNumber,
+    );
     _fontFamily = FontsHelper.getFontFamily(_pageNumber!);
 
     if (cached != null && FontsHelper.isFontLoaded(_fontFamily!)) {

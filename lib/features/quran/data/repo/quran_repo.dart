@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:quran/quran.dart';
 import 'package:ibad_al_rahmann/features/quran/data/db_helper.dart';
 import 'package:ibad_al_rahmann/features/quran/data/quran_word.dart';
+import 'package:ibad_al_rahmann/core/helpers/mushaf_pagination.dart';
 
 class QuranRepo {
   // Controllers (owned by repo)
@@ -109,7 +109,7 @@ class QuranRepo {
 
   Future<void> navigateToVerse(int surahNumber, int verseNumber) async {
     // Compute target 0-based page for the verse
-    final int page = getPageNumber(surahNumber, verseNumber) - 1;
+    final int page = MushafPagination.pageForAyah(surahNumber, verseNumber) - 1;
 
     _suppressQuranChanged = true;
     _suppressPagesChanged = true;
@@ -138,7 +138,7 @@ class QuranRepo {
   }
 
   Future<void> navigateToSurah(int surahNumber) async {
-    final List<int> surahPages = getSurahPages(surahNumber);
+    final List<int> surahPages = [MushafPagination.pageForAyah(surahNumber, 1)];
     final int page = surahPages.first - 1;
 
     _suppressQuranChanged = true;
@@ -249,7 +249,7 @@ class QuranRepo {
   }
 
   int _getSurahNumByPage(int pageNumber) {
-    final pageData = getPageData(pageNumber)[0];
+    final pageData = MushafPagination.pageData(pageNumber)[0];
     final int page = pageData['surah'];
     return page;
   }

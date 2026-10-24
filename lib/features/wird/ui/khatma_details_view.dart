@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
@@ -25,7 +25,7 @@ import '../../quran/bloc/quran/quran_cubit.dart';
 import '../../quran/bloc/verse_player/verse_player_cubit.dart';
 import '../../quran/data/repo/quran_repo.dart';
 import 'package:toastification/toastification.dart';
-import '../../quran/ui/widgets/core/wbw_page_widget.dart';
+import '../../quran/ui/widgets/core/selected_mushaf_page_widget.dart';
 import '../../../main.dart';
 import 'isolated_wird_screen.dart';
 import 'wird_list_screen.dart';
@@ -813,135 +813,219 @@ class _KhatmaDetailsViewState extends State<KhatmaDetailsView> {
     required bool saveToGallery,
     double quality = 5.0,
   }) async {
-    if (saveToGallery) {
-      try {
-        final hasAccess = await Gal.hasAccess(toAlbum: true);
-        if (!hasAccess) {
-          final granted = await Gal.requestAccess(toAlbum: true);
-          if (!granted) {
-            if (mounted) {
-              _showTopNotification(
-                context,
-                'يرجى إعطاء صلاحية الوصول للصور لحفظ صفحات الورد في المعرض',
-                isError: true,
-              );
-            }
-            return;
-          }
-        }
-      } catch (e) {
-        debugPrint('Gal access check error: $e');
-      }
-    }
-
+    final startedAt = DateTime.now();
+    final stopwatch = Stopwatch()..start();
     final totalPages = (endPage - startPage + 1).clamp(0, 604);
-
-    setState(() {
-      _isExporting = true;
-      _exportCompleted = 0;
-      _exportTotal = totalPages;
+    var outcome = 'failed';
+    var reason = 'unexpected_termination';
+    AppLogger.logEvent('WirdImageExport', 'operation_started', {
+      'trigger': 'user_action',
+      'mode': saveToGallery ? 'save_to_gallery' : 'share',
+      'startPage': startPage,
+      'endPage': endPage,
+      'requestedPages': totalPages,
+      'quality': quality,
+      'startedAt': startedAt.toIso8601String(),
     });
-
-    final wurde = widget.khatma.wirds[wirdIndex];
-    final isPartial = wurde.isPartial;
-    final completer = Completer<List<String>>();
-
-    navigatorKey.currentState!.push(
-      MaterialPageRoute(
-        builder: (_) => MultiBlocProvider(
-          providers: [
-            BlocProvider(create: (context) => QuranCubit(QuranRepo())),
-            BlocProvider(create: (context) => VersePlayerCubit()),
-          ],
-          child: _ExportWirdRenderer(
-            startPage: startPage,
-            endPage: endPage,
-            startSuraNumber: isPartial ? wurde.startSuraNumber : null,
-            startAyah: isPartial ? wurde.startAyah : null,
-            endSuraNumber: isPartial ? wurde.endSuraNumber : null,
-            endAyah: isPartial ? wurde.endAyah : null,
-            quality: quality,
-            onProgress: (completed, total) {
+    try {
+      if (saveToGallery) {
+        try {
+          final hasAccess = await Gal.hasAccess(toAlbum: true);
+          if (!hasAccess) {
+            final granted = await Gal.requestAccess(toAlbum: true);
+            if (!granted) {
+              outcome = 'skipped';
+              reason = 'gallery_permission_denied';
               if (mounted) {
-                setState(() {
-                  _exportCompleted = completed;
-                  _exportTotal = total;
-                });
+                _showTopNotification(
+                  context,
+                  'يرجى إعطاء صلاحية الوصول للصور لحفظ صفحات الورد في المعرض',
+                  isError: true,
+                );
               }
-            },
-            onComplete: (paths) {
-              completer.complete(paths);
-            },
+              return;
+            }
+          }
+        } catch (e) {
+          AppLogger.logEvent(
+            'WirdImageExport',
+            'gallery_permission_check_failed',
+            {'reason': 'exception_${e.runtimeType}'},
+          );
+          debugPrint('Gal access check error type: ${e.runtimeType}');
+        }
+      }
+
+      setState(() {
+        _isExporting = true;
+        _exportCompleted = 0;
+        _exportTotal = totalPages;
+      });
+
+      final wurde = widget.khatma.wirds[wirdIndex];
+      final isPartial = wurde.isPartial;
+      final completer = Completer<List<String>>();
+
+      navigatorKey.currentState!.push(
+        MaterialPageRoute(
+          builder: (_) => MultiBlocProvider(
+            providers: [
+              BlocProvider(create: (context) => QuranCubit(QuranRepo())),
+              BlocProvider(create: (context) => VersePlayerCubit()),
+            ],
+            child: _ExportWirdRenderer(
+              startPage: startPage,
+              endPage: endPage,
+              startSuraNumber: isPartial ? wurde.startSuraNumber : null,
+              startAyah: isPartial ? wurde.startAyah : null,
+              endSuraNumber: isPartial ? wurde.endSuraNumber : null,
+              endAyah: isPartial ? wurde.endAyah : null,
+              quality: quality,
+              onProgress: (completed, total) {
+                if (mounted) {
+                  setState(() {
+                    _exportCompleted = completed;
+                    _exportTotal = total;
+                  });
+                }
+              },
+              onComplete: (paths) {
+                completer.complete(paths);
+              },
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-    final capturedPaths = await completer.future;
+      final capturedPaths = await completer.future;
 
-    if (!mounted) return;
+      if (!mounted) {
+        outcome = 'cancelled';
+        reason = 'view_unmounted_after_capture';
+        return;
+      }
 
-    setState(() => _isExporting = false);
+      setState(() => _isExporting = false);
 
-    if (capturedPaths.isEmpty) {
-      _showTopNotification(context, 'لم يتم التقاط أي صفحة', isError: true);
-      return;
-    }
+      if (capturedPaths.isEmpty) {
+        outcome = 'failed';
+        reason = 'no_pages_captured';
+        _showTopNotification(context, 'لم يتم التقاط أي صفحة', isError: true);
+        return;
+      }
 
-    if (saveToGallery) {
-      try {
-        int savedCount = 0;
-        for (final path in capturedPaths) {
-          try {
-            // Sequential saving with fallback if custom album fails on some Android versions
+      if (saveToGallery) {
+        try {
+          int savedCount = 0;
+          int failedCount = 0;
+          for (var index = 0; index < capturedPaths.length; index++) {
+            final path = capturedPaths[index];
             try {
-              await Gal.putImage(path, album: 'عباد الرحمن');
-            } catch (_) {
-              await Gal.putImage(path);
-            }
-            savedCount++;
+              // Sequential saving with fallback if custom album fails on some Android versions
+              try {
+                await Gal.putImage(path, album: 'عباد الرحمن');
+              } catch (_) {
+                await Gal.putImage(path);
+              }
+              savedCount++;
+              AppLogger.logEvent('WirdImageExport', 'gallery_image_saved', {
+                'imageNumber': index + 1,
+                'totalImages': capturedPaths.length,
+              });
 
-            // Small delay between gal saves
-            await Future.delayed(const Duration(milliseconds: 100));
-          } catch (e) {
-            debugPrint('Failed to save page $path to gallery: $e');
+              // Small delay between gal saves
+              await Future.delayed(const Duration(milliseconds: 100));
+            } catch (e) {
+              failedCount++;
+              AppLogger.logEvent('WirdImageExport', 'gallery_image_failed', {
+                'imageNumber': index + 1,
+                'reason': 'exception_${e.runtimeType}',
+              });
+              debugPrint(
+                'Failed to save exported Wird image type: ${e.runtimeType}',
+              );
+            }
+          }
+          outcome = savedCount == capturedPaths.length
+              ? 'success'
+              : savedCount > 0
+              ? 'partial_success'
+              : 'failed';
+          reason =
+              'saved=$savedCount failed=$failedCount captured=${capturedPaths.length}';
+
+          if (mounted) {
+            _showTopNotification(
+              context,
+              savedCount > 0
+                  ? '✅ تم حفظ $savedCount صفحة في المعرض بنجاح'
+                  : '❌ فشل حفظ الصور في المعرض',
+              isError: savedCount == 0,
+            );
+          }
+        } catch (e) {
+          outcome = 'failed';
+          reason = 'gallery_save_exception_${e.runtimeType}';
+          AppLogger.logEvent('WirdImageExport', 'gallery_save_failed', {
+            'reason': reason,
+            'imageCount': capturedPaths.length,
+          });
+          if (mounted) {
+            _showTopNotification(
+              context,
+              'خطأ عام أثناء الحفظ: $e',
+              isError: true,
+            );
           }
         }
-
-        if (mounted) {
-          _showTopNotification(
-            context,
-            savedCount > 0
-                ? '✅ تم حفظ $savedCount صفحة في المعرض بنجاح'
-                : '❌ فشل حفظ الصور في المعرض',
-            isError: savedCount == 0,
+      } else {
+        try {
+          // ignore: deprecated_member_use
+          await Share.shareXFiles(
+            capturedPaths.map((p) => XFile(p)).toList(),
+            text: 'ورد اليوم — من تطبيق عِبَادُ الرَّحْمَٰن 📖',
           );
-        }
-      } catch (e) {
-        if (mounted) {
-          _showTopNotification(
-            context,
-            'خطأ عام أثناء الحفظ: $e',
-            isError: true,
-          );
-        }
-      }
-    } else {
-      try {
-        // ignore: deprecated_member_use
-        await Share.shareXFiles(
-          capturedPaths.map((p) => XFile(p)).toList(),
-          text: 'ورد اليوم — من تطبيق عِبَادُ الرَّحْمَٰن 📖',
-        );
-      } catch (e) {
-        if (mounted) {
-          _showTopNotification(
-            context,
-            'خطأ أثناء المشاركة: $e',
-            isError: true,
-          );
+          outcome = 'share_sheet_returned';
+          reason = 'share_request_returned_without_error';
+          AppLogger.logEvent('WirdImageExport', 'share_request_returned', {
+            'imageCount': capturedPaths.length,
+          });
+        } catch (e) {
+          outcome = 'failed';
+          reason = 'share_exception_${e.runtimeType}';
+          AppLogger.logEvent('WirdImageExport', 'share_request_failed', {
+            'imageCount': capturedPaths.length,
+            'reason': reason,
+          });
+          if (mounted) {
+            _showTopNotification(
+              context,
+              'خطأ أثناء المشاركة: $e',
+              isError: true,
+            );
+          }
         }
       }
+    } catch (error) {
+      outcome = 'failed';
+      reason = 'exception_${error.runtimeType}';
+      AppLogger.logEvent('WirdImageExport', 'operation_error', {
+        'reason': reason,
+        'mode': saveToGallery ? 'save_to_gallery' : 'share',
+      });
+      rethrow;
+    } finally {
+      AppLogger.logEvent('WirdImageExport', 'operation_finished', {
+        'outcome': outcome,
+        'reason': reason,
+        'mode': saveToGallery ? 'save_to_gallery' : 'share',
+        'startPage': startPage,
+        'endPage': endPage,
+        'requestedPages': totalPages,
+        'startedAt': startedAt.toIso8601String(),
+        'finishedAt': DateTime.now().toIso8601String(),
+        'durationMs': stopwatch.elapsedMilliseconds,
+      });
     }
   }
 
@@ -1289,7 +1373,8 @@ extension _WirdTextShare on _KhatmaDetailsViewState {
                           ),
                           onPressed: () {
                             Clipboard.setData(ClipboardData(text: displayText));
-                            if (ctx.mounted && (ModalRoute.of(ctx)?.isCurrent ?? false)) {
+                            if (ctx.mounted &&
+                                (ModalRoute.of(ctx)?.isCurrent ?? false)) {
                               Navigator.pop(ctx);
                             }
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -1383,7 +1468,18 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
   Future<void> _startCapture() async {
     final cubit = context.read<QuranCubit>();
     final List<String> capturedPaths = [];
+    final captureStartedAt = DateTime.now();
+    final captureStopwatch = Stopwatch()..start();
+    var failedPages = 0;
+    var preloadWarnings = 0;
 
+    AppLogger.logEvent('WirdImageExport', 'capture_started', {
+      'startPage': widget.startPage,
+      'endPage': widget.endPage,
+      'requestedPages': _totalPages,
+      'quality': widget.quality,
+      'startedAt': captureStartedAt.toIso8601String(),
+    });
     AppLogger.log(
       "ExportWird",
       "Starting export for pages ${widget.startPage} to ${widget.endPage} (total: $_totalPages pages, quality: ${widget.quality})",
@@ -1399,7 +1495,15 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
         await QuranWbwDbHelper.instance.getPageLines(p);
         await QuranWbwDbHelper.instance.getPageWords(p);
       } catch (e) {
-        AppLogger.log("ExportWird", "Preload warning for page $p: $e");
+        preloadWarnings++;
+        AppLogger.logEvent('WirdImageExport', 'page_preload_failed', {
+          'page': p,
+          'reason': 'exception_${e.runtimeType}',
+        });
+        AppLogger.log(
+          'ExportWird',
+          'Preload warning for page $p, error type: ${e.runtimeType}',
+        );
       }
     }
 
@@ -1446,6 +1550,7 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
         }
 
         if (boundary == null) {
+          failedPages++;
           AppLogger.log(
             "ExportWird",
             "ERROR: RenderRepaintBoundary not ready for page $p!",
@@ -1462,10 +1567,16 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
           } catch (e) {
             AppLogger.log(
               "ExportWird",
-              "High-res capture failed at ratio ${widget.quality}: $e, retrying with lower ratio...",
+              "High-res capture failed at ratio ${widget.quality}, error type: ${e.runtimeType}; retrying with lower ratio...",
             );
             if (widget.quality > 2.0) {
               image = await boundary.toImage(pixelRatio: 2.0);
+              AppLogger.logEvent('WirdImageExport', 'capture_fallback', {
+                'page': p,
+                'requestedQuality': widget.quality,
+                'fallbackQuality': 2.0,
+                'outcome': 'success',
+              });
             }
           }
 
@@ -1482,23 +1593,40 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
               final file = File(filePath);
               await file.writeAsBytes(buffer);
               capturedPaths.add(filePath);
+              AppLogger.logEvent('WirdImageExport', 'page_captured', {
+                'page': p,
+                'imageBytes': buffer.length,
+                'quality': widget.quality,
+              });
 
               AppLogger.log(
                 "ExportWird",
-                "Successfully saved page $p to $filePath (${buffer.length} bytes)",
+                "Successfully captured page $p (${buffer.length} bytes)",
               );
             } else {
+              failedPages++;
               AppLogger.log(
                 "ExportWird",
                 "ERROR: toByteData returned null for page $p",
               );
             }
+          } else {
+            failedPages++;
+            AppLogger.logEvent('WirdImageExport', 'page_capture_failed', {
+              'page': p,
+              'reason': 'image_capture_returned_null',
+            });
           }
         }
       } catch (e) {
+        failedPages++;
+        AppLogger.logEvent('WirdImageExport', 'page_capture_failed', {
+          'page': p,
+          'reason': 'exception_${e.runtimeType}',
+        });
         AppLogger.log(
-          "ExportWird",
-          "Exception capturing page $p: $e",
+          'ExportWird',
+          'Page capture error on page $p, type: ${e.runtimeType}',
         );
       }
 
@@ -1511,6 +1639,20 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
       "ExportWird",
       "Finished export. Total captured: ${capturedPaths.length} / $_totalPages",
     );
+    AppLogger.logEvent('WirdImageExport', 'capture_finished', {
+      'outcome': failedPages == 0 && capturedPaths.length == _totalPages
+          ? 'success'
+          : capturedPaths.isNotEmpty
+          ? 'partial_success'
+          : 'failed',
+      'capturedPages': capturedPaths.length,
+      'failedPages': failedPages,
+      'preloadWarnings': preloadWarnings,
+      'requestedPages': _totalPages,
+      'startedAt': captureStartedAt.toIso8601String(),
+      'finishedAt': DateTime.now().toIso8601String(),
+      'durationMs': captureStopwatch.elapsedMilliseconds,
+    });
 
     if (mounted && navigatorKey.currentState!.canPop()) {
       navigatorKey.currentState!.pop();
@@ -1549,7 +1691,7 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
               height: MediaQuery.of(context).size.height,
               child: RepaintBoundary(
                 key: _captureKey,
-                child: WbwPageWidget(
+                child: SelectedMushafPageWidget(
                   key: ValueKey('export_page_$_currentPage'),
                   pageNumber: _currentPage,
                   startSuraNumber: widget.startSuraNumber,
@@ -1625,5 +1767,3 @@ class _ExportWirdRendererState extends State<_ExportWirdRenderer> {
     );
   }
 }
-
-

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
+import 'package:ibad_al_rahmann/core/helpers/mushaf_pagination.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/screen_details.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
@@ -137,7 +138,7 @@ class _QuranFehresDialogState extends State<QuranFehresDialog> {
     int activeRub = 0;
     try {
       final cp = currentPage + 1;
-      final pageData = quran.getPageData(cp);
+      final pageData = MushafPagination.pageData(cp);
       if (pageData.isNotEmpty) {
         final currentSurah = pageData[0]['surah'];
         final currentVerse = pageData[0]['start'];
@@ -148,7 +149,7 @@ class _QuranFehresDialogState extends State<QuranFehresDialog> {
         for (int i = 0; i < _rubData.length; i++) {
           final verseKey = _rubData[i]['first_verse_key'] as String;
           final parts = verseKey.split(':');
-          final p = quran.getPageNumber(
+          final p = MushafPagination.pageForAyah(
             int.tryParse(parts[0]) ?? 1,
             int.tryParse(parts[1]) ?? 1,
           );
@@ -159,7 +160,7 @@ class _QuranFehresDialogState extends State<QuranFehresDialog> {
         for (int i = 0; i < _hizbData.length; i++) {
           final verseKey = _hizbData[i]['first_verse_key'] as String;
           final parts = verseKey.split(':');
-          final p = quran.getPageNumber(
+          final p = MushafPagination.pageForAyah(
             int.tryParse(parts[0]) ?? 1,
             int.tryParse(parts[1]) ?? 1,
           );
@@ -283,7 +284,7 @@ class _QuranFehresDialogState extends State<QuranFehresDialog> {
   int _pageForKey(String verseKey) {
     try {
       final parts = _parseVerseKey(verseKey);
-      return quran.getPageNumber(parts[0], parts[1]);
+      return MushafPagination.pageForAyah(parts[0], parts[1]);
     } catch (_) {
       return 1;
     }
@@ -469,7 +470,7 @@ List<_RubEntry> _buildRubEntries(List<Map<String, dynamic>> rubData) {
     int pageNum = 1;
     String verseText = '';
     try {
-      pageNum = quran.getPageNumber(surahNum, verseNum);
+      pageNum = MushafPagination.pageForAyah(surahNum, verseNum);
       final raw = quran.getVerse(surahNum, verseNum, verseEndSymbol: false);
       verseText = _firstWords(raw, wordCount: 8);
     } catch (e) {
@@ -953,7 +954,7 @@ List<_HizbEntry> _buildHizbEntries(List<Map<String, dynamic>> hizbData) {
     int pageNum = 1;
     String verseText = '';
     try {
-      pageNum = quran.getPageNumber(surahNum, verseNum);
+      pageNum = MushafPagination.pageForAyah(surahNum, verseNum);
       final raw = quran.getVerse(surahNum, verseNum, verseEndSymbol: false);
       verseText = _firstWords(raw, wordCount: 8);
     } catch (e) {

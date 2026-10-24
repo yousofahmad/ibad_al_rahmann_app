@@ -11,6 +11,8 @@ import 'package:ibad_al_rahmann/features/quran/data/models/selected_verse_model.
 import 'package:ibad_al_rahmann/features/quran/data/services/bookmark_service.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:quran/quran.dart' as quran;
+import 'package:ibad_al_rahmann/core/helpers/mushaf_pagination.dart';
+import 'package:ibad_al_rahmann/core/helpers/mushaf_format_repository.dart';
 
 class BookmarkItem extends StatefulWidget {
   final VerseModel verse;
@@ -110,18 +112,41 @@ class _BookmarkItemState extends State<BookmarkItem> {
               ],
             ),
             SizedBox(height: 10.h),
-            Text(
-              widget.verse.verse,
-              style: TextStyle(
-                fontSize: 22.sp,
-                fontFamily: widget.verse.fontFamily,
-                color: textColor,
-                height: 1.2,
-              ),
-              textAlign: TextAlign.right,
-              textDirection: TextDirection.rtl,
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
+            Builder(
+              builder: (context) {
+                final page = MushafPagination.pageForAyah(
+                  widget.verse.surahNumber,
+                  widget.verse.verseNumber,
+                );
+                final currentFont = MushafFormatRepository.instance.fontFamily(
+                  page,
+                );
+                final snapshotMatches = FontsHelper.sameFormatFamily(
+                  widget.verse.fontFamily,
+                  currentFont,
+                );
+                final displayVerse = snapshotMatches
+                    ? widget.verse.verse
+                    : quran.getVerse(
+                        widget.verse.surahNumber,
+                        widget.verse.verseNumber,
+                      );
+                return Text(
+                  displayVerse,
+                  style: TextStyle(
+                    fontSize: 22.sp,
+                    fontFamily: snapshotMatches
+                        ? widget.verse.fontFamily
+                        : 'cairo',
+                    color: textColor,
+                    height: 1.2,
+                  ),
+                  textAlign: TextAlign.right,
+                  textDirection: TextDirection.rtl,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                );
+              },
             ),
             SizedBox(height: 16.h),
             Divider(color: Colors.grey.withValues(alpha: 0.2)),
@@ -168,7 +193,7 @@ class _BookmarkItemState extends State<BookmarkItem> {
                     ),
                     SizedBox(width: 6.w),
                     Text(
-                      '| ص ${quran.getPageNumber(widget.verse.surahNumber, widget.verse.verseNumber).toArabicNums}',
+                      '| ص ${MushafPagination.pageForAyah(widget.verse.surahNumber, widget.verse.verseNumber).toArabicNums}',
                       style: TextStyle(
                         fontFamily: AppConsts.cairo,
                         fontSize: 12,

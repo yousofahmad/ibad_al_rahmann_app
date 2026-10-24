@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import 'package:ibad_al_rahmann/core/helpers/optional_mushaf_playback_navigation.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/theme/quran_theme_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
@@ -9,7 +10,7 @@ import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cu
 import 'package:ibad_al_rahmann/features/quran/bloc/search/search_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/data/repo/quran_repo.dart';
 import 'package:ibad_al_rahmann/services/daily_tracker_service.dart';
-import 'package:quran/quran.dart' as quran;
+import 'package:ibad_al_rahmann/core/helpers/mushaf_pagination.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'widgets/core/quran_screen_body.dart';
@@ -139,18 +140,43 @@ class _QuranScreenState extends State<QuranScreen> {
       child: BlocListener<VersePlayerCubit, VersePlayerState>(
         listenWhen: (prev, curr) =>
             prev.currentVerse?.surahNumber != curr.currentVerse?.surahNumber ||
-            prev.currentVerse?.verseNumber != curr.currentVerse?.verseNumber,
+            prev.currentVerse?.verseNumber != curr.currentVerse?.verseNumber ||
+            (!MushafPagination.isBuiltin &&
+                prev.activeWordIndex != curr.activeWordIndex),
         listener: (context, playerState) {
           final verse = playerState.currentVerse;
           if (verse != null) {
-            final pageIndex =
-                quran.getPageNumber(verse.surahNumber, verse.verseNumber) - 1;
             final quranCubit = context.read<QuranCubit>();
-            if (quranCubit.state.currentPage != pageIndex) {
-              quranCubit.jumpToPage(pageIndex);
-              // jumpToPage moves the repository controller but does not emit;
-              // emit the zero-based index so every local PageController follows.
-              quranCubit.onQuranPageChanged(pageIndex);
+            final int? targetPageIndex;
+            if (MushafPagination.isBuiltin) {
+              // Keep the original 1405 behavior exactly verse-based.
+              targetPageIndex =
+                  MushafPagination.pageForAyah(
+                    verse.surahNumber,
+                    verse.verseNumber,
+                  ) -
+                  1;
+            } else {
+              // Optional layouts may split an ayah across pages. Audio timing
+              // uses the same one-based QuranWord.position as the sidecar.
+              targetPageIndex =
+                  OptionalMushafPlaybackNavigation.targetPageIndex(
+                    surah: verse.surahNumber,
+                    ayah: verse.verseNumber,
+                    currentPageIndex: quranCubit.state.currentPage,
+                    oneBasedWordPosition: playerState.activeWordIndex,
+                    followWords: _versePlayerCubit.isHighlightWordByWord,
+                  );
+            }
+            if (targetPageIndex != null &&
+                quranCubit.state.currentPage != targetPageIndex) {
+              final revision = MushafPagination.revision;
+              quranCubit.jumpToPage(targetPageIndex);
+              if (revision == MushafPagination.revision) {
+                // jumpToPage moves the repository controller but does not emit;
+                // emit the zero-based index so every local PageController follows.
+                quranCubit.onQuranPageChanged(targetPageIndex);
+              }
             }
           }
         },

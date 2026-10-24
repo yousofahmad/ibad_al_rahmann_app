@@ -16,7 +16,7 @@ import 'package:ibad_al_rahmann/features/wird/bloc/khatma_cubit.dart';
 import 'package:ibad_al_rahmann/features/wird/services/wird_completion_service.dart';
 import 'package:ibad_al_rahmann/features/wird/ui/khatma_stats_screen.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
-import 'package:ibad_al_rahmann/features/quran/ui/widgets/core/wbw_page_widget.dart';
+import 'package:ibad_al_rahmann/features/quran/ui/widgets/core/selected_mushaf_page_widget.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
@@ -391,7 +391,7 @@ class _IsolatedWirdScreenState extends State<IsolatedWirdScreen>
                                               context,
                                             ).orientation ==
                                             Orientation.landscape;
-                                        return WbwPageWidget(
+                                        return SelectedMushafPageWidget(
                                           pageNumber:
                                               widget.targetStartPage + index,
                                           showHeader: true,

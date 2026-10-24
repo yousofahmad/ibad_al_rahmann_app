@@ -3,7 +3,7 @@ import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/theme.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import '../widgets/core/wbw_page_widget.dart';
+import '../widgets/core/selected_mushaf_page_widget.dart';
 
 class TabletMinPageRichText extends StatefulWidget {
   const TabletMinPageRichText({super.key, required this.pageNumber});
@@ -39,7 +39,7 @@ class _TabletMinPageRichTextState extends State<TabletMinPageRichText> {
                     MediaQuery.sizeOf(context).width *
                     (widget.pageNumber == 1 ? 0.08 : 0.04),
               ),
-              child: WbwPageWidget(
+              child: SelectedMushafPageWidget(
                 pageNumber: widget.pageNumber,
                 showHeader: false,
                 showPageNumber: false,

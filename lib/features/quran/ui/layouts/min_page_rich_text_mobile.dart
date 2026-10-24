@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/fonts_helper.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../widgets/core/wbw_page_widget.dart';
+import '../widgets/core/selected_mushaf_page_widget.dart';
 
 class MobileMinPageRichText extends StatefulWidget {
   const MobileMinPageRichText({super.key, required this.pageNumber});
@@ -70,7 +70,7 @@ class _MobileMinPageRichTextState extends State<MobileMinPageRichText> {
                     : (widget.pageNumber.isEven ? 20.w : 5.w),
               ),
               width: double.infinity, // increase width constraints
-              child: WbwPageWidget(
+              child: SelectedMushafPageWidget(
                 pageNumber: widget.pageNumber,
                 showHeader: false,
                 showPageNumber: false,

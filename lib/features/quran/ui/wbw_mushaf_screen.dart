@@ -7,7 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/theme/theme_manager/theme_cubit.dart';
 
-import 'widgets/core/wbw_page_widget.dart';
+import 'widgets/core/selected_mushaf_page_widget.dart';
 import 'widgets/menus/single_tap_menu.dart';
 import 'layouts/mobile_quran_top_bar.dart';
 import 'layouts/mobile_min_quran_bottom_section.dart';
@@ -184,7 +184,7 @@ class _WbwMushafScreenState extends State<WbwMushafScreen> {
                                   ),
                                   child: SizedBox(
                                     height: MediaQuery.of(context).size.height,
-                                    child: WbwPageWidget(
+                                    child: SelectedMushafPageWidget(
                                       key: ValueKey('vert_${index + 1}'),
                                       pageNumber: index + 1,
                                       isZoomEnabled: false,
@@ -213,7 +213,7 @@ class _WbwMushafScreenState extends State<WbwMushafScreen> {
                                 final isLandscape =
                                     MediaQuery.of(context).orientation ==
                                     Orientation.landscape;
-                                return WbwPageWidget(
+                                return SelectedMushafPageWidget(
                                   key: ValueKey('horz_${index + 1}'),
                                   pageNumber: index + 1,
                                   isZoomEnabled: true,

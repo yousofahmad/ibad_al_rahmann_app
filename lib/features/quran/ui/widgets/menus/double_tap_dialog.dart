@@ -74,8 +74,8 @@ class DoubleTapDialog extends StatelessWidget {
             SizedBox(height: 15.h),
             _buildHintRow(
               Icons.palette_outlined,
-              'تغيير المظهر (⚙️)',
-              'يمكنك تغيير لون الورق، الهوامش، ووضع القراءة الليلي من قائمة الألوان',
+              'الإعدادات',
+              'لمزيد من تنسيقات المصحف اضغط زر الإعدادات، ثم «تنسيق المصحف».',
               textColor,
               subTextColor,
             ),

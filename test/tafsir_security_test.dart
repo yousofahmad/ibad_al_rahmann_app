@@ -6,7 +6,7 @@ void main() {
     test('resolves a repository-relative tafsir file', () {
       expect(
         TafsirHelper.normalizeDownloadUrl('tafseer/book.json'),
-        'https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-features/main/tafseer/book.json',
+        'https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-features/source/import-qul-resources/tafseer/book.json',
       );
     });
 
@@ -17,6 +17,15 @@ void main() {
         ),
         'https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-features/main/tafseer/book.json',
       );
+    });
+
+    test('accepts trusted raw and blob URLs on the imported resource branch', () {
+      const raw =
+          'https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-features/source/import-qul-resources/tafseer/book.json';
+      const blob =
+          'https://github.com/yousofahmad/ibad-alrahman-features/blob/source/import-qul-resources/tafseer/book.json';
+      expect(TafsirHelper.normalizeDownloadUrl(raw), raw);
+      expect(TafsirHelper.normalizeDownloadUrl(blob), raw);
     });
 
     test('accepts a Google Drive file URL on the exact HTTPS host', () {
@@ -34,7 +43,8 @@ void main() {
         throwsFormatException,
       );
       expect(
-        () => TafsirHelper.normalizeDownloadUrl('https://example.com/book.json'),
+        () =>
+            TafsirHelper.normalizeDownloadUrl('https://example.com/book.json'),
         throwsFormatException,
       );
       expect(

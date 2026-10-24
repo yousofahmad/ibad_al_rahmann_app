@@ -6,7 +6,7 @@ import 'package:quran/quran.dart';
 import '../../../../../core/helpers/extensions/screen_details.dart';
 import '../../../../../core/helpers/extensions/theme.dart';
 import '../../../bloc/quran/quran_cubit.dart';
-import './wbw_page_widget.dart';
+import './selected_mushaf_page_widget.dart';
 
 class LandscapeQuranWidget extends StatefulWidget {
   const LandscapeQuranWidget({super.key});
@@ -53,7 +53,10 @@ class _LandscapeQuranWidgetState extends State<LandscapeQuranWidget> {
             context.read<QuranCubit>().onQuranPageChanged(index);
           },
           itemBuilder: (context, index) {
-            return WbwPageWidget(pageNumber: index + 1, isZoomEnabled: true);
+            return SelectedMushafPageWidget(
+              pageNumber: index + 1,
+              isZoomEnabled: true,
+            );
           },
         ),
       ),

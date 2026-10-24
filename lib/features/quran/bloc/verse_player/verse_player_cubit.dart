@@ -1,25 +1,33 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import 'package:ibad_al_rahmann/core/helpers/feature_resource_repository.dart';
 import 'package:ibad_al_rahmann/features/quran/data/models/selected_verse_model.dart';
 import 'package:ibad_al_rahmann/features/quran/data/services/bookmark_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/features/quran_reciters/data/models/reciter_model.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:quran/quran.dart';
 import 'package:quran/surahs_tashkeel.dart';
 part 'verse_player_state.dart';
 
+typedef PairedSurahLoader =
+    Future<(Map<int, SurahAudioItem>, Map<String, VerseTiming>)> Function(
+      ReciterAudioModel reciter,
+    );
+
 class VersePlayerCubit extends Cubit<VersePlayerState> {
   VersePlayerCubit({
     AudioPlayer? audioPlayer,
     Future<Map<String, VerseTiming>> Function(ReciterAudioModel)? timingLoader,
+    PairedSurahLoader? surahLoader,
     this.loadTimeout = const Duration(seconds: 20),
     this.autoHideDelay = const Duration(seconds: 4),
   }) : player = audioPlayer ?? AudioPlayer(),
        _timingLoader = timingLoader ?? ReciterAudioHelper.getSegments,
+       _surahLoader = surahLoader ?? _loadPairedSurahMetadata,
        super(VersePlayerInitial(showed: false)) {
     init();
     verseListener();
@@ -28,6 +36,20 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   final AudioPlayer player;
   final Future<Map<String, VerseTiming>> Function(ReciterAudioModel)
   _timingLoader;
+  final PairedSurahLoader _surahLoader;
+
+  static Future<(Map<int, SurahAudioItem>, Map<String, VerseTiming>)>
+  _loadPairedSurahMetadata(ReciterAudioModel reciter) async {
+    final values = await Future.wait<Object>([
+      ReciterAudioHelper.getSurahs(reciter),
+      ReciterAudioHelper.getSegments(reciter),
+    ]);
+    return (
+      values[0] as Map<int, SurahAudioItem>,
+      values[1] as Map<String, VerseTiming>,
+    );
+  }
+
   final Duration loadTimeout;
   final Duration autoHideDelay;
   VerseModel? currnetVerse;
@@ -44,6 +66,7 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   bool _hasAudioSession = false;
   bool _initialAutoHidePending = false;
   int _loadGeneration = 0;
+  int _clipStartMs = 0;
   bool _sourceReady = false;
   bool _isChangingVerse = false;
   List<WordSegment> _wordSegments = const [];
@@ -295,6 +318,7 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
     positionSubscription?.cancel();
     positionSubscription = null;
     _wordSegments = const [];
+    _clipStartMs = 0;
     _sourceReady = false;
     currnetVerse = VerseModel(
       surahNumber: surahNumber,
@@ -326,10 +350,25 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
       updateWord: true,
       clearError: true,
     );
+    final sourceStarted = DateTime.now().toUtc();
+    final sourceWatch = Stopwatch()..start();
+    var sourceKind = model?.zipFileName != null
+        ? 'per_ayah_archive'
+        : 'ayah_or_surah';
+    String? sourceFailureReason;
+    AppLogger.logEvent('VersePlayer', 'source_load_started', {
+      'source': 'selected_reciter_audio',
+      'trigger': 'ayah_init',
+      'source_kind': sourceKind,
+      'operation': generation,
+      'actual_start': sourceStarted.toIso8601String(),
+    });
     try {
       await player.stop();
       if (!_isCurrent(generation)) return;
       VerseTiming? timing;
+      SurahAudioItem? pairedSurah;
+      var usePairedClip = false;
       // ZIP metadata contains the authoritative per-ayah audio URL. Its timing
       // must be used with that exact recording, not another reciter/CDN take.
       if (model?.zipFileName != null) {
@@ -339,45 +378,122 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
         if (timing?.audioUrl == null || timing!.audioUrl!.isEmpty) {
           throw StateError('تعذر العثور على تسجيل الآية لهذا القارئ');
         }
+      } else if (model != null &&
+          model.hasSegments &&
+          model.segmentsFileName != null) {
+        final started = DateTime.now().toUtc();
+        final watch = Stopwatch()..start();
+        AppLogger.logEvent('VersePlayer', 'paired_source_load_started', {
+          'trigger': 'ayah_init',
+          'source_kind': 'paired_surah_clip',
+          'actual_start': started.toIso8601String(),
+        });
+        try {
+          final paired = await _surahLoader(model).timeout(loadTimeout);
+          if (!_isCurrent(generation)) return;
+          pairedSurah = paired.$1[verse.surahNumber];
+          timing = paired.$2['${verse.surahNumber}:${verse.verseNumber}'];
+          final audioUri = pairedSurah == null
+              ? null
+              : Uri.tryParse(pairedSurah.audioUrl);
+          final approvedSource =
+              audioUri != null &&
+              (model.localOnly
+                  ? await FeatureResourceRepository.configured.containsFileUri(
+                      audioUri,
+                    )
+                  : audioUri.scheme == 'https' &&
+                        audioUri.host.isNotEmpty &&
+                        audioUri.userInfo.isEmpty);
+          if (!_isCurrent(generation)) return;
+          usePairedClip =
+              pairedSurah != null &&
+              pairedSurah.surahNumber == verse.surahNumber &&
+              approvedSource &&
+              timing != null &&
+              timing.surahNumber == verse.surahNumber &&
+              timing.verseNumber == verse.verseNumber &&
+              timing.timestampFrom >= 0 &&
+              timing.timestampTo > timing.timestampFrom;
+          AppLogger.logEvent('VersePlayer', 'paired_source_load_finished', {
+            'trigger': 'ayah_init',
+            'source_kind': 'paired_surah_clip',
+            'actual_start': started.toIso8601String(),
+            'actual_finish': DateTime.now().toUtc().toIso8601String(),
+            'duration_ms': watch.elapsedMilliseconds,
+            'outcome': usePairedClip ? 'verified' : 'fallback_unverified',
+            'reason': usePairedClip
+                ? 'matched_and_bounded'
+                : 'missing_or_invalid_metadata',
+          });
+          if (!usePairedClip) timing = null;
+        } catch (_) {
+          AppLogger.logEvent('VersePlayer', 'paired_source_load_finished', {
+            'trigger': 'ayah_init',
+            'source_kind': 'paired_surah_clip',
+            'actual_start': started.toIso8601String(),
+            'actual_finish': DateTime.now().toUtc().toIso8601String(),
+            'duration_ms': watch.elapsedMilliseconds,
+            'outcome': 'fallback_unverified',
+            'reason': 'metadata_load_failed',
+          });
+        }
       }
-      final ayahUrl =
-          timing?.audioUrl ??
-          getAyahAudioUrl(
-            verse.surahNumber,
-            verse.verseNumber,
-            activeReciter,
-            model,
-          );
-      await player
-          .setAudioSource(
-            AudioSource.uri(
-              Uri.parse(ayahUrl),
-              tag: MediaItem(
-                id: ayahUrl,
-                title: 'سورة ${surahArabicTashkel[verse.surahNumber - 1]}',
-                artist: 'الآية ${verse.verseNumber.toArabicNums}',
-                album:
-                    model?.name ?? defaultReciters[activeReciter] ?? 'القارئ',
+      final ayahUrl = usePairedClip
+          ? pairedSurah!.audioUrl
+          : timing?.audioUrl ??
+                getAyahAudioUrl(
+                  verse.surahNumber,
+                  verse.verseNumber,
+                  activeReciter,
+                  model,
+                );
+      sourceKind = usePairedClip
+          ? 'paired_surah_clip'
+          : model?.zipFileName != null
+          ? 'per_ayah_archive'
+          : 'every_ayah';
+      final tag = MediaItem(
+        id: ayahUrl,
+        title: 'سورة ${surahArabicTashkel[verse.surahNumber - 1]}',
+        artist: 'الآية ${verse.verseNumber.toArabicNums}',
+        album: model?.name ?? defaultReciters[activeReciter] ?? 'القارئ',
+      );
+      final uriSource = AudioSource.uri(Uri.parse(ayahUrl), tag: tag);
+      final source = usePairedClip
+          ? ClippingAudioSource(
+              child: uriSource,
+              start: Duration(milliseconds: timing!.timestampFrom),
+              end: Duration(milliseconds: timing.timestampTo),
+              tag: tag,
+              duration: Duration(
+                milliseconds: timing.timestampTo - timing.timestampFrom,
               ),
-            ),
-            preload: true,
-          )
-          .timeout(loadTimeout);
+            )
+          : uriSource;
+      await player.setAudioSource(source, preload: true).timeout(loadTimeout);
       if (!_isCurrent(generation)) return;
       await player.setSpeed(playbackSpeed);
       await player.setLoopMode(isLooping ? LoopMode.one : LoopMode.off);
       if (!_isCurrent(generation)) return;
       _sourceReady = true;
+      _clipStartMs = usePairedClip ? timing!.timestampFrom : 0;
       _emitPlayback(loading: false, clearError: true);
       if (timing != null) {
-        _listenToSegments(timing, generation);
-      } else if (model != null && model.hasSegments) {
-        unawaited(_loadSegmentsAsync(model, verse, generation));
+        _listenToSegments(timing, generation, clipStartMs: _clipStartMs);
+      } else if (model != null &&
+          model.hasSegments &&
+          model.segmentsFileName == null) {
+        unawaited(_loadSegmentsAsync(model, verse, generation, ayahUrl));
       }
       if (autoPlay) _play(generation);
     } catch (e) {
+      sourceFailureReason = e.runtimeType.toString();
       if (!_isCurrent(generation)) return;
-      debugPrint('Error setting verse audio source: $e');
+      AppLogger.logEvent('VersePlayer', 'source_load_failed', {
+        'trigger': 'ayah_init',
+        'reason': e.runtimeType.toString(),
+      });
       // Abort a timed-out native load so it cannot start later on its own.
       await player.stop();
       if (!_isCurrent(generation)) return;
@@ -385,6 +501,22 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
         loading: false,
         error: 'تعذر تحميل التلاوة. اضغط تشغيل للمحاولة مرة أخرى.',
       );
+    } finally {
+      AppLogger.logEvent('VersePlayer', 'source_load_finished', {
+        'source': 'selected_reciter_audio',
+        'trigger': 'ayah_init',
+        'source_kind': sourceKind,
+        'operation': generation,
+        'actual_start': sourceStarted.toIso8601String(),
+        'actual_finish': DateTime.now().toUtc().toIso8601String(),
+        'duration_ms': sourceWatch.elapsedMilliseconds,
+        'outcome': !_isCurrent(generation)
+            ? 'superseded'
+            : _sourceReady
+            ? 'success'
+            : 'failed',
+        'reason': sourceFailureReason,
+      });
     }
   }
 
@@ -394,20 +526,52 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
     ReciterAudioModel model,
     VerseModel verse,
     int generation,
+    String expectedAudioUrl,
   ) async {
+    final started = DateTime.now().toUtc();
+    final watch = Stopwatch()..start();
+    var outcome = 'unmatched';
+    String? reason;
+    AppLogger.logEvent('VersePlayer', 'timing_load_started', {
+      'source': 'selected_ayah_metadata',
+      'trigger': 'ayah_playback',
+      'actual_start': started.toIso8601String(),
+    });
     try {
       final timings = await _timingLoader(model).timeout(loadTimeout);
-      if (!_isCurrent(generation)) return;
+      if (!_isCurrent(generation)) {
+        outcome = 'superseded';
+        return;
+      }
       final timing = timings['${verse.surahNumber}:${verse.verseNumber}'];
-      if (timing != null) _listenToSegments(timing, generation);
+      if (timing != null && timing.audioUrl == expectedAudioUrl) {
+        _listenToSegments(timing, generation, clipStartMs: _clipStartMs);
+        outcome = 'verified';
+      }
     } catch (e) {
-      debugPrint('Word timing unavailable: $e');
+      outcome = 'failed';
+      reason = e.runtimeType.toString();
+    } finally {
+      AppLogger.logEvent('VersePlayer', 'timing_load_finished', {
+        'source': 'selected_ayah_metadata',
+        'trigger': 'ayah_playback',
+        'actual_start': started.toIso8601String(),
+        'actual_finish': DateTime.now().toUtc().toIso8601String(),
+        'duration_ms': watch.elapsedMilliseconds,
+        'outcome': outcome,
+        'reason': reason,
+      });
     }
   }
 
-  void _listenToSegments(VerseTiming timing, int generation) {
+  void _listenToSegments(
+    VerseTiming timing,
+    int generation, {
+    int clipStartMs = 0,
+  }) {
     if (!_isCurrent(generation)) return;
     _wordSegments = timing.segments;
+    _clipStartMs = clipStartMs;
     _updatePosition(player.position);
     positionSubscription?.cancel();
     positionSubscription = player.positionStream.listen((position) {
@@ -422,7 +586,7 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
           _wordSegments.isNotEmpty && _wordSegments.first.wordIndex == 0
           ? 1
           : 0;
-      final ms = position.inMilliseconds;
+      final ms = position.inMilliseconds + _clipStartMs;
       for (final segment in _wordSegments) {
         if (ms >= segment.startMs && ms < segment.endMs) {
           word = segment.wordIndex + offset;

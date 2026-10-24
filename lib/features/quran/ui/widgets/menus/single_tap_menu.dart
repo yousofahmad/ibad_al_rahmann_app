@@ -10,6 +10,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../bloc/quran/quran_cubit.dart';
 import '../../../bloc/verse_player/verse_player_cubit.dart';
 import '../bookmark_widget/bookmarks_dialog.dart';
+import 'mushaf_format_picker.dart';
+import 'mushaf_settings_panel.dart';
 
 import 'package:ibad_al_rahmann/core/helpers/share_helper.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
@@ -389,7 +391,10 @@ class _PageActionBarState extends State<PageActionBar>
           ),
           backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 6,
+          ),
           actionsPadding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
           title: Row(
             children: [
@@ -436,8 +441,8 @@ class _PageActionBarState extends State<PageActionBar>
                       color: isSelected
                           ? gold.withValues(alpha: 0.12)
                           : (isDark
-                              ? Colors.white.withValues(alpha: 0.04)
-                              : Colors.black.withValues(alpha: 0.03)),
+                                ? Colors.white.withValues(alpha: 0.04)
+                                : Colors.black.withValues(alpha: 0.03)),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: isSelected ? gold : Colors.transparent,
@@ -470,8 +475,8 @@ class _PageActionBarState extends State<PageActionBar>
                                         color: isSelected
                                             ? gold
                                             : (isDark
-                                                ? Colors.white
-                                                : Colors.black87),
+                                                  ? Colors.white
+                                                  : Colors.black87),
                                       ),
                                     ),
                                   ),
@@ -634,6 +639,24 @@ class _PageActionBarState extends State<PageActionBar>
     PageActionBar.showColorPalette(context);
   }
 
+  Future<void> _onOpenSettings() async {
+    if (_isBusy) return;
+    final selection = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      builder: (sheetContext) => MushafSettingsPanel(
+        onSelectionChanged: (value) => Navigator.of(sheetContext).pop(value),
+      ),
+    );
+    if (!mounted || selection == null) return;
+    if (selection == 'colors') {
+      _onOpenColorPalette();
+    } else if (selection == 'format') {
+      widget.onDismiss();
+      MushafFormatPicker.show(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).primaryColor;
@@ -695,6 +718,14 @@ class _PageActionBarState extends State<PageActionBar>
                         icon: Icons.color_lens_rounded,
                         label: 'الألوان',
                         onTap: _onOpenColorPalette,
+                        isEnabled: !_isBusy,
+                        color: onBar,
+                      ),
+                      _divider(onBarSubtle),
+                      _ActionButton(
+                        icon: Icons.settings_outlined,
+                        label: 'الإعدادات',
+                        onTap: _onOpenSettings,
                         isEnabled: !_isBusy,
                         color: onBar,
                       ),
