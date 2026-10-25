@@ -1257,13 +1257,13 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           _buildListTile(
             "عن التطبيق",
-            "الإصدار 1.3.0",
+            "الإصدار 1.2.0+9",
             Icons.info_outline,
             onTap: () {
               showAboutDialog(
                 context: context,
                 applicationName: "عباد الرحمن",
-                applicationVersion: "1.3.0",
+                applicationVersion: "1.2.0+9",
                 applicationIcon: Image.asset(
                   "assets/images/logo.png",
                   width: 50.w,
