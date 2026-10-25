@@ -20,6 +20,28 @@ object NativeLogger {
     private const val TAG  = "IbadAlRahman"
     private const val FILE = "native_prayer_log.txt"
     private const val MAX_SIZE = 400 * 1024L  // 400 KB
+    private val emailPattern = Regex(
+        """\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val bearerPattern = Regex(
+        """\bBearer\s+[A-Za-z0-9._~+/-]+=*""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val secretAssignmentPattern = Regex(
+        """(["']?(?:password|passwd|passcode|token|access[_-]?token|refresh[_-]?token|id[_-]?token|authorization|api[_-]?key|client[_-]?secret|secret|cookie|set[_-]?cookie|auth[_-]?code|code[_-]?verifier)["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^"'&,\s}\]]+)""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val urlCredentialsPattern = Regex(
+        """\bhttps?://[^/@\s:]+:[^/@\s]+@""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    private fun redactSensitiveData(message: String): String = message
+        .replace(emailPattern, "[email redacted]")
+        .replace(bearerPattern, "Bearer [redacted]")
+        .replace(secretAssignmentPattern) { match -> "${match.groupValues[1]}[redacted]" }
+        .replace(urlCredentialsPattern, "https://[redacted]@")
 
     fun log(context: Context, message: String) {
         try {
@@ -27,12 +49,13 @@ object NativeLogger {
             if (prefs.contains("flutter.enable_native_logging") &&
                 !prefs.getBoolean("flutter.enable_native_logging", true)) return
 
-            val sdf  = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US)
+            val safeMessage = redactSensitiveData(message)
+            val sdf  = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
             val time = sdf.format(Date())
-            val line = "[$time] $message"
+            val line = "[$time] $safeMessage"
 
             // 1. LogCat — يظهر في adb logcat وفي Android Studio
-            Log.d(TAG, message)
+            Log.d(TAG, safeMessage)
 
             // 2. ملف على الجهاز — يمكن مشاركته أو قراءته من الإعدادات
             val file = File(context.filesDir, FILE)
@@ -63,7 +86,7 @@ object NativeLogger {
         return try {
             val file = File(context.filesDir, FILE)
             if (!file.exists()) return "Log file is empty."
-            file.readLines().takeLast(lines).joinToString("\n")
+            file.readLines().takeLast(lines).joinToString("\n", transform = ::redactSensitiveData)
         } catch (e: Exception) { "Error reading log: ${e.message}" }
     }
 }

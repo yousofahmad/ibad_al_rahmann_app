@@ -1,7 +1,8 @@
 import 'package:flutter/widgets.dart';
-
 import 'dart:async';
-
+import 'dart:ui';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:adhan/adhan.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,7 +27,7 @@ import 'remote_config_service.dart';
 import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:firebase_core/firebase_core.dart';
 
-import '../../firebase_options.dart';
+import '../firebase_options.dart';
 
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/core/helpers/app_formatters.dart';
@@ -84,6 +85,91 @@ Future<void> backgroundWidgetUpdateCallback() async {
         exact: true,
         wakeup: true,
         rescheduleOnReboot: true,
+      );
+    } catch (_) {}
+  }
+}
+
+@pragma('vm:entry-point')
+Future<void> prayerLocationRefreshCallback() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  DartPluginRegistrant.ensureInitialized();
+  final callbackStartedAt = DateTime.now();
+  PrayerService? service;
+  String? prayerName;
+  DateTime? expectedPrayerAt;
+  try {
+    await AndroidAlarmManager.initialize();
+    await CacheHelper.init();
+    await AppLogger.init();
+    try {
+      await EgyptianHijriCalendar.instance.initialize();
+    } catch (error) {
+      AppLogger.logEvent('PrayerLocationRefresh', 'calendar_init_failed', {
+        'safe_failure_type': error.runtimeType.toString(),
+      });
+    }
+    try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      }
+      await RemoteConfigService.init();
+    } catch (error) {
+      AppLogger.logEvent(
+        'PrayerLocationRefresh',
+        'optional_config_unavailable',
+        {'safe_failure_type': error.runtimeType.toString()},
+      );
+    }
+    HijriCalendar.setLocal('ar');
+    Intl.defaultLocale = 'ar';
+    final prefs = CacheHelper.prefs;
+    prayerName = prefs.getString('prayer_location_refresh_expected_prayer');
+    final expectedMillis = prefs.getInt(
+      'prayer_location_refresh_expected_at_ms',
+    );
+    if (expectedMillis != null) {
+      expectedPrayerAt = DateTime.fromMillisecondsSinceEpoch(expectedMillis);
+    }
+    service = PrayerService();
+    await service._loadSettings();
+    await service._refreshLocationInBackground(
+      trigger: 'before_prayer',
+      expectedPrayerAt: expectedPrayerAt,
+      prayerName: prayerName,
+    );
+    await service._scheduleNextLocationRefresh(
+      trigger: 'scheduled_refresh_completed',
+    );
+    AppLogger.logEvent('PrayerLocationRefresh', 'callback_finished', {
+      'trigger': 'before_prayer',
+      'expected_prayer': prayerName,
+      'expected_prayer_at': expectedPrayerAt?.toIso8601String(),
+      'actual_started_at': callbackStartedAt.toIso8601String(),
+      'actual_finished_at': DateTime.now().toIso8601String(),
+      'duration_ms': DateTime.now()
+          .difference(callbackStartedAt)
+          .inMilliseconds,
+      'outcome': 'completed',
+    });
+  } catch (error) {
+    AppLogger.logEvent('PrayerLocationRefresh', 'callback_failed', {
+      'trigger': 'before_prayer',
+      'expected_prayer': prayerName,
+      'expected_prayer_at': expectedPrayerAt?.toIso8601String(),
+      'actual_started_at': callbackStartedAt.toIso8601String(),
+      'actual_finished_at': DateTime.now().toIso8601String(),
+      'duration_ms': DateTime.now()
+          .difference(callbackStartedAt)
+          .inMilliseconds,
+      'outcome': 'failed',
+      'safe_failure_type': error.runtimeType.toString(),
+    });
+    try {
+      await service?._scheduleNextLocationRefresh(
+        trigger: 'callback_failure_recovery',
       );
     } catch (_) {}
   }
@@ -241,6 +327,9 @@ class PrayerService extends ChangeNotifier {
 
       // Save settings to prefs for native code
       await saveSettingsToPrefs();
+      unawaited(
+        _scheduleNextLocationRefresh(trigger: 'prayer_service_initialized'),
+      );
 
       await Future.delayed(Duration.zero); // Yield
 
@@ -267,28 +356,69 @@ class PrayerService extends ChangeNotifier {
 
     if (lat != null && lng != null) {
       _coordinates = Coordinates(lat, lng);
-      debugPrint('PrayerService: Initialized from cached location: $lat, $lng');
+      AppLogger.logEvent('PrayerLocationRefresh', 'cached_location_loaded', {
+        'source': 'last_known_location',
+        'coordinates_logged': false,
+      });
     } else {
       _coordinates = Coordinates(30.0444, 31.2357);
       prefs.setDouble('last_lat', 30.0444);
       prefs.setDouble('last_lng', 31.2357);
       prefs.setDouble('latitude', 30.0444);
       prefs.setDouble('longitude', 31.2357);
-      debugPrint('PrayerService: No cached location, using default (Cairo)');
+      AppLogger.logEvent(
+        'PrayerLocationRefresh',
+        'location_fallback_selected',
+        {'source': 'default_cairo_coordinates', 'coordinates_logged': false},
+      );
     }
   }
 
-  Future<void> _refreshLocationInBackground() async {
+  Future<void> _refreshLocationInBackground({
+    String trigger = 'app_start',
+    DateTime? expectedPrayerAt,
+    String? prayerName,
+  }) async {
+    final startedAt = DateTime.now();
+    void logFinished(String outcome, {String? reason, String? distanceBucket}) {
+      AppLogger.logEvent('PrayerLocationRefresh', 'attempt_finished', {
+        'trigger': trigger,
+        'expected_prayer': prayerName,
+        'expected_prayer_at': expectedPrayerAt?.toIso8601String(),
+        'actual_started_at': startedAt.toIso8601String(),
+        'actual_finished_at': DateTime.now().toIso8601String(),
+        'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
+        'outcome': outcome,
+        'reason': reason,
+        'distance_bucket': distanceBucket,
+        'coordinates_logged': false,
+      });
+    }
+
+    AppLogger.logEvent('PrayerLocationRefresh', 'attempt_started', {
+      'trigger': trigger,
+      'expected_prayer': prayerName,
+      'expected_prayer_at': expectedPrayerAt?.toIso8601String(),
+      'actual_started_at': startedAt.toIso8601String(),
+      'outcome': 'attempted',
+      'coordinates_logged': false,
+    });
     try {
+      if (_activeCity != null) {
+        logFinished('skipped', reason: 'manual_city_override');
+        return;
+      }
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         await scheduleNotifications(isUserAction: false);
+        logFinished('skipped', reason: 'location_service_disabled');
         return;
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.deniedForever) {
         await scheduleNotifications(isUserAction: false);
+        logFinished('skipped', reason: 'permission_denied_forever');
         return;
       }
 
@@ -317,30 +447,24 @@ class PrayerService extends ChangeNotifier {
       await prefs.setDouble('last_lat', position.latitude);
       await prefs.setDouble('last_lng', position.longitude);
 
-      debugPrint(
-        'PrayerService: Location refreshed in background: ${position.latitude}, ${position.longitude}',
-      );
-
       bool shouldReschedule = true;
+      double? distanceMeters;
       if (oldLat != null && oldLng != null) {
-        double distance = Geolocator.distanceBetween(
+        distanceMeters = Geolocator.distanceBetween(
           oldLat,
           oldLng,
           position.latitude,
           position.longitude,
         );
-        if (distance < 1000) {
+        if (distanceMeters < 1000) {
           shouldReschedule = false;
-          debugPrint(
-            'PrayerService: Location change insignificant ($distance m). Skipping reschedule.',
-          );
         }
       }
 
       if (shouldReschedule) {
         await scheduleNotifications(isUserAction: false);
       } else {
-        updatePersistentElements();
+        await updatePersistentElements();
       }
 
       try {
@@ -359,10 +483,33 @@ class PrayerService extends ChangeNotifier {
             notifyListeners();
           }
         }
-      } catch (_) {}
+      } catch (error) {
+        AppLogger.logEvent(
+          'PrayerLocationRefresh',
+          'reverse_geocoding_failed',
+          {'safe_failure_type': error.runtimeType.toString()},
+        );
+      }
+      logFinished(
+        'success',
+        reason: shouldReschedule
+            ? 'location_updated_rescheduled'
+            : 'location_updated_under_threshold',
+        distanceBucket: distanceMeters == null
+            ? null
+            : _locationDistanceBucket(distanceMeters),
+      );
     } catch (e) {
-      debugPrint('PrayerService: Background location refresh failed: $e');
-      await scheduleNotifications(isUserAction: false);
+      try {
+        await scheduleNotifications(isUserAction: false);
+      } catch (scheduleError) {
+        AppLogger.logEvent(
+          'PrayerLocationRefresh',
+          'fallback_schedule_failed',
+          {'safe_failure_type': scheduleError.runtimeType.toString()},
+        );
+      }
+      logFinished('failed', reason: 'exception_${e.runtimeType}');
     }
   }
 
@@ -414,9 +561,12 @@ class PrayerService extends ChangeNotifier {
         DateTime.now().millisecondsSinceEpoch,
       );
 
-      debugPrint(
-        'PrayerService: Periodic refresh done: ${position.latitude}, ${position.longitude}',
-      );
+      AppLogger.logEvent('PrayerLocationRefresh', 'stale_location_refreshed', {
+        'trigger': 'app_open_stale_check',
+        'age_days_before_update': daysSinceLast,
+        'outcome': 'success',
+        'coordinates_logged': false,
+      });
 
       // Reschedule only if location moved more than 1km
       if (oldLat != null && oldLng != null) {
@@ -430,8 +580,15 @@ class PrayerService extends ChangeNotifier {
       }
     } catch (e) {
       // Non-fatal: keep using cached coordinates
-      debugPrint(
-        'PrayerService: Periodic location refresh failed (using cache): $e',
+      AppLogger.logEvent(
+        'PrayerLocationRefresh',
+        'stale_location_refresh_failed',
+        {
+          'trigger': 'app_open_stale_check',
+          'outcome': 'failed_using_cache',
+          'safe_failure_type': e.runtimeType.toString(),
+          'coordinates_logged': false,
+        },
       );
     }
   }
@@ -480,7 +637,147 @@ class PrayerService extends ChangeNotifier {
         await updatePersistentElements();
       }
     }, isUserAction: isUserAction);
+    unawaited(
+      _scheduleNextLocationRefresh(trigger: 'prayer_notification_schedule'),
+    );
   }
+
+  static const int _prayerLocationRefreshAlarmId = 724618;
+  static const Duration _locationRefreshLeadTime = Duration(minutes: 10);
+
+  Future<void> _scheduleNextLocationRefresh({required String trigger}) async {
+    final requestedAt = DateTime.now();
+    try {
+      if (defaultTargetPlatform != TargetPlatform.android) {
+        AppLogger.logEvent('PrayerLocationRefresh', 'schedule_skipped', {
+          'trigger': trigger,
+          'platform': defaultTargetPlatform.name,
+          'reason': 'android_alarm_manager_unavailable_on_platform',
+          'requested_at': requestedAt.toIso8601String(),
+          'actual_at': DateTime.now().toIso8601String(),
+          'delivery': 'unsupported_platform',
+          'outcome': 'skipped',
+        });
+        return;
+      }
+      if (_activeCity != null) {
+        final cancelled = await AndroidAlarmManager.cancel(
+          _prayerLocationRefreshAlarmId,
+        );
+        AppLogger.logEvent('PrayerLocationRefresh', 'schedule_skipped', {
+          'trigger': trigger,
+          'reason': 'manual_city_override',
+          'actual_at': DateTime.now().toIso8601String(),
+          'cancelled_previous_alarm': cancelled,
+          'outcome': 'skipped',
+        });
+        return;
+      }
+
+      final now = DateTime.now();
+      final todayTimes = getPrayerTimes();
+      if (todayTimes == null) {
+        AppLogger.logEvent('PrayerLocationRefresh', 'schedule_skipped', {
+          'trigger': trigger,
+          'reason': 'prayer_times_unavailable',
+          'requested_at': requestedAt.toIso8601String(),
+          'actual_at': DateTime.now().toIso8601String(),
+          'outcome': 'skipped',
+        });
+        return;
+      }
+
+      final today = <MapEntry<Prayer, DateTime>>[
+        MapEntry(Prayer.fajr, todayTimes.fajr),
+        MapEntry(Prayer.dhuhr, todayTimes.dhuhr),
+        MapEntry(Prayer.asr, todayTimes.asr),
+        MapEntry(Prayer.maghrib, todayTimes.maghrib),
+        MapEntry(Prayer.isha, todayTimes.isha),
+      ];
+      MapEntry<Prayer, DateTime>? nextPrayer;
+      for (final entry in today) {
+        if (entry.value.isAfter(now)) {
+          nextPrayer = entry;
+          break;
+        }
+      }
+      if (nextPrayer == null) {
+        final tomorrow = NotificationScheduleHelpers.addCivilDays(now, 1);
+        final tomorrowTimes = getPrayerTimesForDate(tomorrow);
+        if (tomorrowTimes != null) {
+          nextPrayer = MapEntry(Prayer.fajr, tomorrowTimes.fajr);
+        }
+      }
+      if (nextPrayer == null) {
+        AppLogger.logEvent('PrayerLocationRefresh', 'schedule_failed', {
+          'trigger': trigger,
+          'reason': 'next_prayer_unavailable',
+          'requested_at': requestedAt.toIso8601String(),
+          'actual_at': DateTime.now().toIso8601String(),
+          'outcome': 'failed',
+        });
+        return;
+      }
+
+      final prayerKey = _locationPrayerKey(nextPrayer.key);
+      final expectedAt = nextPrayer.value;
+      final targetBeforePrayer = expectedAt.subtract(_locationRefreshLeadTime);
+      final scheduledAt = targetBeforePrayer.isAfter(now)
+          ? targetBeforePrayer
+          : now.add(const Duration(seconds: 1));
+      final prefs = CacheHelper.prefs;
+      await prefs.setString(
+        'prayer_location_refresh_expected_prayer',
+        prayerKey,
+      );
+      await prefs.setInt(
+        'prayer_location_refresh_expected_at_ms',
+        expectedAt.millisecondsSinceEpoch,
+      );
+      final scheduled = await AndroidAlarmManager.oneShotAt(
+        scheduledAt,
+        _prayerLocationRefreshAlarmId,
+        prayerLocationRefreshCallback,
+        exact: false,
+        wakeup: true,
+        rescheduleOnReboot: true,
+      );
+      AppLogger.logEvent('PrayerLocationRefresh', 'schedule_finished', {
+        'trigger': trigger,
+        'expected_prayer': prayerKey,
+        'expected_prayer_at': expectedAt.toIso8601String(),
+        'requested_at': requestedAt.toIso8601String(),
+        'requested_run_at': scheduledAt.toIso8601String(),
+        'actual_schedule_result_at': DateTime.now().toIso8601String(),
+        'delivery': 'best_effort_inexact_alarm',
+        'outcome': scheduled ? 'scheduled' : 'failed',
+        'reason': scheduled ? null : 'platform_rejected_alarm',
+      });
+    } catch (error) {
+      AppLogger.logEvent('PrayerLocationRefresh', 'schedule_failed', {
+        'trigger': trigger,
+        'requested_at': requestedAt.toIso8601String(),
+        'actual_at': DateTime.now().toIso8601String(),
+        'outcome': 'failed',
+        'safe_failure_type': error.runtimeType.toString(),
+      });
+    }
+  }
+
+  String _locationPrayerKey(Prayer prayer) => switch (prayer) {
+    Prayer.fajr => 'fajr',
+    Prayer.dhuhr => 'dhuhr',
+    Prayer.asr => 'asr',
+    Prayer.maghrib => 'maghrib',
+    Prayer.isha => 'isha',
+    _ => 'unknown',
+  };
+
+  String _locationDistanceBucket(double meters) => meters < 1000
+      ? 'under_1km'
+      : meters < 10000
+      ? '1_10km'
+      : 'over_10km';
 
   static const String _ltr = '\u200E';
 

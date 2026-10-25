@@ -213,12 +213,16 @@ Future<void> _runBackgroundInits() async {
 
   await Future.delayed(const Duration(milliseconds: 500));
   AppLogger.log('BgInit', 'AlarmManager.initialize start');
-  AndroidAlarmManager.initialize().catchError((e) {
-    AppLogger.log('BgInit', 'AlarmManager error: $e');
-    debugPrint('AlarmManager error: $e');
-    return false;
-  });
-  AppLogger.log('BgInit', 'AlarmManager.initialize triggered');
+  final alarmManagerInitialized =
+      await AndroidAlarmManager.initialize().catchError((e) {
+        AppLogger.log('BgInit', 'AlarmManager error: $e');
+        debugPrint('AlarmManager error: $e');
+        return false;
+      });
+  AppLogger.log(
+    'BgInit',
+    'AlarmManager.initialize completed: $alarmManagerInitialized',
+  );
 
   await Future.delayed(const Duration(milliseconds: 500));
   AppLogger.log('BgInit', 'DailyTrackerService.initStatsForToday start');

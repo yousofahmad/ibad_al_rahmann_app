@@ -334,7 +334,7 @@ class PrayerNotificationService : Service() {
         val title = intent.getStringExtra("title") ?: "تنبيه"
         val body = intent.getStringExtra("body") ?: ""
         
-        NativeLogger.log(this, "Notification Fired! Title: $title | Body: $body | AlarmId: $alarmId | Silent: $isSilent")
+        NativeLogger.log(this, "Notification Fired! AlarmId: $alarmId | Silent: $isSilent")
         
         val payload = intent.getStringExtra("target_page") ?: "home"
         val soundName = intent.getStringExtra("sound_name") ?: "default"

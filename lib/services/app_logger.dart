@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 
@@ -22,13 +23,49 @@ class AppLogger {
   static final _buffer = StringBuffer();
   static Timer? _flushTimer;
 
+  static final RegExp _emailPattern = RegExp(
+    r'\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b',
+    caseSensitive: false,
+  );
+  static final RegExp _secretAssignmentPattern = RegExp(
+    r'''(["']?(?:password|passwd|passcode|token|access[_-]?token|refresh[_-]?token|id[_-]?token|authorization|api[_-]?key|client[_-]?secret|secret|cookie|set[_-]?cookie|auth[_-]?code|code[_-]?verifier)["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^"'&,\s}\]]+)''',
+    caseSensitive: false,
+  );
+
   static String _redactSensitiveData(String content) {
-    final emailPattern = RegExp(
-      r'\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b',
-      caseSensitive: false,
+    var safe = content.replaceAll(
+      RegExp(r'\bhttps?://[^/@\s:]+:[^/@\s]+@', caseSensitive: false),
+      'https://[redacted]@',
     );
-    return content.replaceAll(emailPattern, '[email redacted]');
+    safe = safe.replaceAll(_emailPattern, '[email redacted]');
+    safe = safe.replaceAll(
+      RegExp(r'\bBearer\s+[A-Za-z0-9._~+/-]+=*', caseSensitive: false),
+      'Bearer [redacted]',
+    );
+    safe = safe.replaceAllMapped(
+      _secretAssignmentPattern,
+      (match) => '${match.group(1)}[redacted]',
+    );
+    return safe;
   }
+
+  @visibleForTesting
+  static String redactForTesting(String content) =>
+      _redactSensitiveData(content);
+
+  static Future<String> _getInstalledVersionLabel() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final build = info.buildNumber.trim();
+      return build.isEmpty ? info.version : '${info.version}+$build';
+    } catch (_) {
+      return 'unknown';
+    }
+  }
+
+  @visibleForTesting
+  static Future<String> getInstalledVersionLabelForTesting() =>
+      _getInstalledVersionLabel();
 
   static Future<void> init() async {
     if (_initialized) return;
@@ -43,21 +80,23 @@ class AppLogger {
         _buffer.clear();
       }
     } catch (e) {
-      debugPrint('AppLogger.init error: $e');
+      debugPrint('AppLogger.init error type: ${e.runtimeType}');
     }
   }
 
   /// يكتب رسالة في الملف
   static void log(String tag, String message) {
+    final safeTag = _redactSensitiveData(tag);
+    final safeMessage = _redactSensitiveData(message);
     final now = DateTime.now();
     final ts =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:'
         '${now.second.toString().padLeft(2, '0')}.${now.millisecond.toString().padLeft(3, '0')}';
-    final line = '[$ts] [$tag] $message\n';
+    final line = '[$ts] [$safeTag] $safeMessage\n';
 
     // دائماً اطبع في الـ console كذلك
-    debugPrint('LOG [$tag] $message');
+    debugPrint('LOG [$safeTag] $safeMessage');
 
     if (!_initialized) {
       _buffer.write(line);
@@ -104,7 +143,7 @@ class AppLogger {
 
       await file.writeAsString(content, mode: FileMode.append);
     } catch (e) {
-      debugPrint('AppLogger._write error: $e');
+      debugPrint('AppLogger._write error type: ${e.runtimeType}');
     }
   }
 
@@ -126,9 +165,14 @@ class AppLogger {
       final file = _logFile;
       if (file == null || !await file.exists()) return '(اللوغ فارغ)';
       final all = await file.readAsLines();
-      return all.reversed.take(lines).toList().reversed.join('\n');
+      return all.reversed
+          .take(lines)
+          .toList()
+          .reversed
+          .map(_redactSensitiveData)
+          .join('\n');
     } catch (e) {
-      return 'خطأ في قراءة اللوغ: $e';
+      return 'خطأ في قراءة اللوغ (${e.runtimeType})';
     }
   }
 
@@ -177,23 +221,22 @@ class AppLogger {
       final line = lines[i];
       if (line.trim().isEmpty) continue;
 
-      // استخرج الوقت من السطر: [MM-DD HH:mm:ss.mmm]
+      // يستوعب الطابع الحالي [yyyy-MM-dd HH:mm:ss.SSS] والسجلات القديمة.
       DateTime? lineTime;
       final timeMatch = RegExp(
-        r'\[(\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})\]',
+        r'\[(?:(\d{4})-)?(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})\.(\d{3})\]',
       ).firstMatch(line);
       if (timeMatch != null) {
         try {
-          final parts = timeMatch.group(1)!.split(RegExp(r'[ :.]'));
           final now = DateTime.now();
           lineTime = DateTime(
-            now.year,
-            int.parse(parts[0]),
-            int.parse(parts[1]),
-            int.parse(parts[2]),
-            int.parse(parts[3]),
-            int.parse(parts[4]),
-            int.parse(parts[5]),
+            int.parse(timeMatch.group(1) ?? '${now.year}'),
+            int.parse(timeMatch.group(2)!),
+            int.parse(timeMatch.group(3)!),
+            int.parse(timeMatch.group(4)!),
+            int.parse(timeMatch.group(5)!),
+            int.parse(timeMatch.group(6)!),
+            int.parse(timeMatch.group(7)!),
           );
         } catch (_) {}
       }
@@ -226,7 +269,10 @@ class AppLogger {
 
       // 5. هل مكرر (نفس المحتوى بدون الطابع الزمني)؟
       final msgKey = line
-          .replaceAll(RegExp(r'\[\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\]'), '')
+          .replaceAll(
+            RegExp(r'\[(?:(?:\d{4})-)?\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\]'),
+            '',
+          )
           .trim();
       final isDuplicate = !isImportant && seen.contains(msgKey);
 
@@ -253,7 +299,7 @@ class AppLogger {
     try {
       await _logFile?.writeAsString('');
     } catch (e) {
-      debugPrint('AppLogger.clear error: $e');
+      debugPrint('AppLogger.clear error type: ${e.runtimeType}');
     }
   }
 
@@ -261,6 +307,7 @@ class AppLogger {
   static Future<void> shareLog({String? nativeLogContent}) async {
     await _flushBuffer();
     try {
+      final appVersion = await _getInstalledVersionLabel();
       final path = await getLogPath();
       if (path == null) return;
 
@@ -270,6 +317,7 @@ class AppLogger {
       // رأس الملف
       combined += '═══════════ عباد الرحمن — سجل التطبيق ═══════════\n';
       combined += 'الوقت: ${DateTime.now()}\n\n';
+      combined += 'الإصدار المثبت: $appVersion\n\n';
 
       // Flutter logs
       combined += '────── Flutter/Dart Logs ──────\n';
@@ -293,11 +341,11 @@ class AppLogger {
       await Share.shareXFiles(
         [XFile(tempFile.path)],
         subject:
-            'سجل عباد الرحمن — ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}',
-        text: 'سجل التطبيق لتشخيص المشاكل (الإصدار 1.2.0)',
+            'سجل عباد الرحمن v$appVersion — ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}',
+        text: 'سجل التطبيق لتشخيص المشاكل (الإصدار $appVersion)',
       );
     } catch (e) {
-      debugPrint('AppLogger.shareLog error: $e');
+      debugPrint('AppLogger.shareLog error type: ${e.runtimeType}');
     }
   }
 
@@ -307,15 +355,18 @@ class AppLogger {
     String? nativeLogContent,
   }) async {
     try {
+      await _flushBuffer();
+      final appVersion = await _getInstalledVersionLabel();
       final timeStr = DateFormat('yyyy_MM_dd_HHmmss').format(DateTime.now());
       final path = await getLogPath();
       final flutterFile = path != null ? File(path) : null;
 
       String combined = '';
       combined += '═══════════ تقرير تشخيص مشكلة — عباد الرحمن ═══════════\n';
+      combined += 'إصدار التطبيق المثبت: $appVersion\n';
       combined +=
           'تاريخ التقرير: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())}\n';
-      combined += 'إصدار التطبيق: 1.2.0\n';
+      combined += 'إصدار التطبيق: $appVersion\n';
       combined +=
           'نظام التشغيل: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}\n\n';
 
@@ -335,9 +386,9 @@ class AppLogger {
       final tempFile = File('${dir.path}/ibad_issue_report_$timeStr.txt');
       await tempFile.writeAsString(_redactSensitiveData(combined));
 
-      const messageText =
+      final messageText =
           'السلام عليكم ورحمة الله وبركاته،\n'
-          'أود الإبلاغ عن مشكلة في تطبيق عباد الرحمن (الإصدار 1.2.0):\n\n'
+          'أود الإبلاغ عن مشكلة في تطبيق عباد الرحمن (الإصدار $appVersion):\n\n'
           '[يرجى كتابة تفاصيل المشكلة هنا]\n\n'
           '(مرفق ملف سجل التطبيق للتشخيص)';
 
@@ -347,10 +398,12 @@ class AppLogger {
         text: messageText,
       );
     } catch (e) {
-      debugPrint('AppLogger.reportIssue error: $e');
+      debugPrint('AppLogger.reportIssue error type: ${e.runtimeType}');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ أثناء تجهيز التقرير: $e')),
+          SnackBar(
+            content: Text('حدث خطأ أثناء تجهيز التقرير (${e.runtimeType})'),
+          ),
         );
       }
     }

@@ -1,4 +1,4 @@
-﻿package app.ibad_al_rahmann
+package app.ibad_al_rahmann
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -105,6 +105,11 @@ object NativeAzkarScheduler {
      * Called after every reboot / scheduleAzkar call.
      */
     fun scheduleWird(context: Context) {
+        val scheduleStartedAt = System.currentTimeMillis()
+        NativeLogger.log(
+            context,
+            "scheduleWird: START actualStartedAt=${java.time.Instant.ofEpochMilli(scheduleStartedAt)}",
+        )
         val prefs = context.getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE)
         val editor = prefs.edit()
         val now = System.currentTimeMillis()
@@ -148,7 +153,7 @@ object NativeAzkarScheduler {
                 }
 
                 if (!json.optBoolean("enableNotifications", true)) {
-                    NativeLogger.log(context, "scheduleWird: $khatmaKey — notifications disabled, skipping")
+                    NativeLogger.log(context, "scheduleWird: notifications disabled for one entry, skipping")
                     continue
                 }
 
@@ -166,7 +171,7 @@ object NativeAzkarScheduler {
                 val payload      = "khatma_${cleanId}_${clampedIdx}_${startPage}_${endPage}"
                 val pageInfo     = if (currentWird != null) " (ص$startPage–$endPage)" else ""
 
-                NativeLogger.log(context, "scheduleWird: processing '$khatmaName' (type=$notifType, id=$cleanId, idBase=$idBase, payload=$payload)")
+                NativeLogger.log(context, "scheduleWird: processing enabled entry (type=$notifType)")
 
                 val startDateStr = json.optString("startDate", "")
                 val daysSinceStart = getDaysSinceStart(startDateStr)
@@ -211,7 +216,10 @@ object NativeAzkarScheduler {
                             customSoundName = "ibad_al_rahmann_tone"
                         )
                         scheduledCount++
-                        NativeLogger.log(context, "scheduleWird: scheduled daily wird for '$khatmaName' day+$i at $h:$m (id=$scheduledId)")
+                        NativeLogger.log(
+                            context,
+                            "scheduleWird: daily alarm accepted scheduledFor=${java.time.Instant.ofEpochMilli(cal.timeInMillis)}",
+                        )
                     }
                 } else if (notifType == "prayer") {
                     val prayerNames = arrayOf("الفجر", "الظهر", "العصر", "المغرب", "العشاء")
@@ -263,14 +271,17 @@ object NativeAzkarScheduler {
                             scheduledCount++
                         }
                     }
-                    NativeLogger.log(context, "scheduleWird: scheduled prayer-based wird for '$khatmaName'")
+                    NativeLogger.log(context, "scheduleWird: scheduled prayer-based wird for one entry")
                 }
             } catch (e: Exception) {
-                NativeLogger.log(context, "scheduleWird: ERROR processing $khatmaKey — ${e.message}")
+                NativeLogger.log(context, "scheduleWird: ERROR processing entry — ${e.javaClass.simpleName}")
             }
         }
         editor.apply()
-        NativeLogger.log(context, "scheduleWird: DONE. Scheduled $scheduledCount wird alarms total.")
+        NativeLogger.log(
+            context,
+            "scheduleWird: FINISHED scheduledCount=$scheduledCount finishedAt=${java.time.Instant.now()} durationMs=${System.currentTimeMillis() - scheduleStartedAt}",
+        )
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -362,4 +373,3 @@ object NativeAzkarScheduler {
         }
     }
 }
-
