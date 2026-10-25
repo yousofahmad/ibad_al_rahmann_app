@@ -143,6 +143,12 @@ void main() {
           .where((model) => !builtinIds.contains(model.id))
           .toList();
       expect(models, isNotEmpty);
+      final expectedSurahCounts = {
+        for (final item in manifestReciters())
+          if (item['surah_audio_url_count'] is num)
+            item['id'].toString():
+                (item['surah_audio_url_count'] as num).toInt(),
+      };
 
       ReciterAudioModel? ayahOnly;
       for (final model in models) {
@@ -152,6 +158,14 @@ void main() {
         }
         try {
           final surahs = await ReciterAudioHelper.getSurahs(model);
+          final expectedCount = expectedSurahCounts[model.id];
+          if (expectedCount != null) {
+            expect(
+              surahs,
+              hasLength(expectedCount),
+              reason: 'unexpected playable surah count for ${model.id}',
+            );
+          }
           for (final item in surahs.values) {
             expect(item.audioUrl, startsWith('https://'));
             expect(item.audioUrl, isNot(contains('file:')));
@@ -180,6 +194,30 @@ void main() {
         if (timing.audioUrl != null) {
           expect(timing.audioUrl, startsWith('https://'));
           expect(timing.audioUrl, isNot(contains('file:')));
+        }
+      }
+    },
+    skip: skip,
+    timeout: const Timeout(Duration(minutes: 10)),
+  );
+
+  test(
+    'parses every imported QUL timing catalog with HTTPS audio links',
+    () async {
+      await ReciterAudioHelper.fetchRemoteReciters();
+      final models = (await ReciterAudioHelper.getReciters())
+          .where((model) => model.id.startsWith('qul_') && model.hasSegments)
+          .toList();
+      expect(models, isNotEmpty);
+
+      for (final model in models) {
+        final timings = await ReciterAudioHelper.getSegments(model);
+        expect(timings, isNotEmpty, reason: 'missing timings for ${model.id}');
+        for (final timing in timings.values) {
+          if (timing.audioUrl != null) {
+            expect(timing.audioUrl, startsWith('https://'));
+            expect(timing.audioUrl, isNot(contains('file:')));
+          }
         }
       }
     },

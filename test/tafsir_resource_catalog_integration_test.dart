@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import 'package:ibad_al_rahmann/core/helpers/feature_resource_repository.dart';
 import 'package:ibad_al_rahmann/core/helpers/tafsir_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -31,6 +32,19 @@ void main() {
 
       final books = TafsirHelper.availableBooks;
       final byId = {for (final book in books) book.id: book};
+      final index = await FeatureResourceRepository.configured.readJson(
+        'tafseer/tafseer_index.json',
+      );
+      expect(index, isNotNull);
+      final indexedBooks = (index!['tafseer_books'] as List)
+          .whereType<Map>()
+          .toList();
+      expect(indexedBooks, hasLength(105));
+      expect(books.where((book) => !book.isBuiltIn), hasLength(105));
+      expect(
+        byId.keys,
+        containsAll(indexedBooks.map((item) => item['id'].toString())),
+      );
       expect(byId.keys, containsAll(['muyassar', 'ibn_katheer', 'tabari']));
       expect(byId.keys, isNot(contains('qul_tafsir_41')));
       expect(byId.keys, isNot(contains('qul_tafsir_250')));
