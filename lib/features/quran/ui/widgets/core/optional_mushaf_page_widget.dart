@@ -723,6 +723,8 @@ class _OptionalMushafPageWidgetState extends State<OptionalMushafPageWidget>
               final double canvasFontSize = isPage1or2
                   ? (context.isTablet ? 90.0 : 42.0)
                   : 125.0;
+              final bool isUnicodeFont =
+                  _formatRepository.current.fontMode == 'unicode_single';
 
               Widget row = Directionality(
                 textDirection: TextDirection.rtl,
@@ -874,42 +876,49 @@ class _OptionalMushafPageWidgetState extends State<OptionalMushafPageWidget>
                                     );
                                   }
                                 },
-                                child: () {
-                                  final bool showHighlight =
-                                      (isWordActive ||
-                                          isVerseHighlighted ||
-                                          isSelectedOrNav) &&
-                                      isVisible;
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: isUnicodeFont
+                                        ? canvasFontSize * 0.06
+                                        : 0,
+                                  ),
+                                  child: () {
+                                    final bool showHighlight =
+                                        (isWordActive ||
+                                            isVerseHighlighted ||
+                                            isSelectedOrNav) &&
+                                        isVisible;
 
-                                  final Color highlightColor = isWordActive
-                                      ? const Color(0xFFE5A93C).withValues(
-                                          alpha: isDarkPaper ? 0.85 : 0.70,
-                                        )
-                                      : const Color(0xFFE5A93C).withValues(
-                                          alpha: isDarkPaper ? 0.55 : 0.45,
-                                        );
+                                    final Color highlightColor = isWordActive
+                                        ? const Color(0xFFE5A93C).withValues(
+                                            alpha: isDarkPaper ? 0.85 : 0.70,
+                                          )
+                                        : const Color(0xFFE5A93C).withValues(
+                                            alpha: isDarkPaper ? 0.55 : 0.45,
+                                          );
 
-                                  return Container(
-                                    decoration: BoxDecoration(
-                                      color: showHighlight
-                                          ? highlightColor
-                                          : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      word.text,
-                                      style: const TextStyle(height: 1.0)
-                                          .copyWith(
-                                            fontFamily: _fontFamily,
-                                            fontSize: canvasFontSize,
-                                            color: textColor,
-                                            fontWeight: isWordActive
-                                                ? FontWeight.bold
-                                                : FontWeight.normal,
-                                          ),
-                                    ),
-                                  );
-                                }(),
+                                    return Container(
+                                      decoration: BoxDecoration(
+                                        color: showHighlight
+                                            ? highlightColor
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        word.text,
+                                        style: const TextStyle(height: 1.0)
+                                            .copyWith(
+                                              fontFamily: _fontFamily,
+                                              fontSize: canvasFontSize,
+                                              color: textColor,
+                                              fontWeight: isWordActive
+                                                  ? FontWeight.bold
+                                                  : FontWeight.normal,
+                                            ),
+                                      ),
+                                    );
+                                  }(),
+                                ),
                               ),
                             );
                           }

@@ -84,7 +84,7 @@ class FontsHelper {
       return 'QCF_V1';
     }
     final match = RegExp(
-      r'^(IBAD_QPC_V[124](?:_[A-Z0-9]+)*)_P[1-9]\d*$',
+      r'^(IBAD_[A-Z0-9]+(?:_[A-Z0-9]+)*)_P[1-9]\d*$',
     ).firstMatch(family);
     return match?.group(1);
   }

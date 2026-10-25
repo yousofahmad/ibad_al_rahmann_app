@@ -40,6 +40,8 @@ class MushafFormat {
   final bool compatible;
   final String? navigationIndexFile;
   final String? navigationIndexSha256;
+  final String fontMode;
+  final String? licenseSha256;
 
   const MushafFormat({
     required this.id,
@@ -57,7 +59,11 @@ class MushafFormat {
     required this.compatible,
     required this.navigationIndexFile,
     required this.navigationIndexSha256,
+    this.fontMode = 'page_glyph',
+    this.licenseSha256,
   });
+
+  bool get isUnicodeFont => fontMode == 'unicode_single';
 
   static const builtin = MushafFormat(
     id: 'qpc_v1_builtin',
@@ -75,6 +81,8 @@ class MushafFormat {
     compatible: true,
     navigationIndexFile: null,
     navigationIndexSha256: null,
+    fontMode: 'page_glyph',
+    licenseSha256: null,
   );
 
   factory MushafFormat.fromJson(Map<String, dynamic> json) {
@@ -89,6 +97,8 @@ class MushafFormat {
         hash != null && RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(hash);
     final indexFile = json['navigation_index_file']?.toString();
     final indexHash = json['navigation_index_sha256']?.toString();
+    final fontMode = json['font_mode']?.toString() ?? 'page_glyph';
+    final licenseSha256 = json['license_sha256']?.toString();
     final pageSplitMatches = json['pagination_matches_builtin'] == true;
     final wordAlignmentMatches = json['word_alignment_matches_builtin'] == true;
     final validIndexHash =
@@ -98,6 +108,10 @@ class MushafFormat {
     final validNavigation = indexFile == null
         ? pageSplitMatches && wordAlignmentMatches && indexHash == null
         : validIndexHash && wordAlignmentMatches;
+    final validMode = fontMode == 'page_glyph' || fontMode == 'unicode_single';
+    final validLicense =
+        licenseSha256 != null &&
+        RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(licenseSha256);
     return MushafFormat(
       id: id,
       name: json['name']?.toString() ?? id,
@@ -119,9 +133,14 @@ class MushafFormat {
           id != builtin.id &&
           validId &&
           validUrl &&
-          validHash,
+          validHash &&
+          validMode &&
+          (fontMode == 'page_glyph' || validLicense) &&
+          (fontMode != 'unicode_single' || wordAlignmentMatches),
       navigationIndexFile: indexFile,
       navigationIndexSha256: indexHash,
+      fontMode: fontMode,
+      licenseSha256: licenseSha256,
     );
   }
 
@@ -134,7 +153,9 @@ class MushafFormatRepository extends ChangeNotifier {
   static const _selectedKey = 'mushaf_selected_format';
   static const _catalogKey = 'mushaf_catalog_json';
   static const _remoteRoot = _githubResourceRoot;
-  static const _remoteCatalog = '${_remoteRoot}mushaf/catalog.json';
+  // Older clients keep their two page-glyph formats at catalog.json; they
+  // must not be offered a single-font package they cannot install.
+  static const _remoteCatalog = '${_remoteRoot}mushaf/catalog-v2.json';
   static const _maxZipBytes = 200 * 1024 * 1024;
 
   final SharedPreferences? _providedPreferences;
@@ -192,12 +213,19 @@ class MushafFormatRepository extends ChangeNotifier {
       return null;
     }
     final dir = _directory(_current.id);
-    final path = p.join(dir.path, 'fonts', 'p$page.ttf');
+    final path = p.join(
+      dir.path,
+      'fonts',
+      _current.fontMode == 'unicode_single' ? 'quran.otf' : 'p$page.ttf',
+    );
     return File(path).existsSync() ? path : null;
   }
 
-  String fontFamily(int page) =>
-      _current.isBuiltin ? 'QCF_V1_P$page' : '${_fontPrefix(_current)}$page';
+  String fontFamily(int page) => _current.isBuiltin
+      ? 'QCF_V1_P$page'
+      : _current.fontMode == 'unicode_single'
+      ? '${_fontPrefix(_current)}1'
+      : '${_fontPrefix(_current)}$page';
 
   Future<MushafPaginationIndex?> _readPaginationIndex(
     MushafFormat format,
@@ -286,8 +314,9 @@ class MushafFormatRepository extends ChangeNotifier {
     _log('catalog_start', {'source': 'local_or_github'});
     try {
       Map<String, dynamic>? value = await _resources.readJson(
-        'mushaf/catalog.json',
+        'mushaf/catalog-v2.json',
       );
+      value ??= await _resources.readJson('mushaf/catalog.json');
       if (value == null) {
         final response = await _dio.get<String>(
           _remoteCatalog,
@@ -532,12 +561,23 @@ class MushafFormatRepository extends ChangeNotifier {
           manifest['navigation_index_sha256'] != format.navigationIndexSha256) {
         return false;
       }
+      if ((manifest['font_mode']?.toString() ?? 'page_glyph') !=
+              format.fontMode ||
+          (format.fontMode == 'unicode_single' &&
+              (manifest['license_sha256'] != format.licenseSha256 ||
+                  format.licenseSha256 == null))) {
+        return false;
+      }
       final files = <String>[
         'manifest.json',
         'words.sqlite',
         'layout.sqlite',
-        ...List<String>.generate(604, (i) => 'fonts/p${i + 1}.ttf'),
+        if (format.fontMode == 'unicode_single')
+          'fonts/quran.otf'
+        else
+          ...List<String>.generate(604, (i) => 'fonts/p${i + 1}.ttf'),
       ];
+      if (format.fontMode == 'unicode_single') files.add('LICENSE.txt');
       if (format.navigationIndexFile != null) {
         files.add(format.navigationIndexFile!);
       }
@@ -552,6 +592,29 @@ class MushafFormatRepository extends ChangeNotifier {
             await file.length() == 0) {
           return false;
         }
+      }
+      if (format.isUnicodeFont &&
+          sha256
+                  .convert(
+                    await File(p.join(root, 'LICENSE.txt')).readAsBytes(),
+                  )
+                  .toString()
+                  .toLowerCase() !=
+              format.licenseSha256!.toLowerCase()) {
+        return false;
+      }
+      final expectedRelative = <String>{...files, '.complete'};
+      final actualRelative = Directory(root)
+          .listSync(recursive: true, followLinks: false)
+          .whereType<File>()
+          .map(
+            (entity) =>
+                p.relative(entity.path, from: root).replaceAll('\\', '/'),
+          )
+          .toSet();
+      if (actualRelative.length != expectedRelative.length ||
+          !actualRelative.containsAll(expectedRelative)) {
+        return false;
       }
       final indexValid =
           format.navigationIndexFile == null ||
@@ -603,6 +666,13 @@ class MushafFormatRepository extends ChangeNotifier {
           format.id == MushafFormat.builtin.id ||
           !_isAllowedPackageUrl(format.id, format.packageUrl) ||
           !validHash ||
+          (format.fontMode != 'page_glyph' &&
+              format.fontMode != 'unicode_single') ||
+          (format.fontMode == 'unicode_single' &&
+              (format.licenseSha256 == null ||
+                  !RegExp(
+                    r'^[a-fA-F0-9]{64}$',
+                  ).hasMatch(format.licenseSha256!))) ||
           !ids.add(format.id)) {
         return const [MushafFormat.builtin];
       }
@@ -623,6 +693,8 @@ class MushafFormatRepository extends ChangeNotifier {
     'size_bytes': f.sizeBytes,
     'pagination_matches_builtin': f.paginationMatchesBuiltin,
     'word_alignment_matches_builtin': f.wordAlignmentMatchesBuiltin,
+    'font_mode': f.fontMode,
+    if (f.licenseSha256 != null) 'license_sha256': f.licenseSha256,
     if (f.navigationIndexFile != null)
       'navigation_index_file': f.navigationIndexFile,
     if (f.navigationIndexSha256 != null)
@@ -692,8 +764,14 @@ Future<void> _extractAndValidate(Map<String, dynamic> args) async {
     'manifest.json',
     'words.sqlite',
     'layout.sqlite',
-    ...List<String>.generate(604, (i) => 'fonts/p${i + 1}.ttf'),
+    if (format['font_mode'] == 'unicode_single')
+      'fonts/quran.otf'
+    else
+      ...List<String>.generate(604, (i) => 'fonts/p${i + 1}.ttf'),
   };
+  if (format['font_mode'] == 'unicode_single') {
+    expectedNames.add('LICENSE.txt');
+  }
   final declaredIndex = format['navigation_index_file'];
   if (declaredIndex != null) {
     if (declaredIndex != 'pagination.json') {
@@ -715,6 +793,13 @@ Future<void> _extractAndValidate(Map<String, dynamic> args) async {
           (format['pagination_matches_builtin'] == true) ||
       manifest['word_alignment_matches_builtin'] !=
           (format['word_alignment_matches_builtin'] == true) ||
+      (manifest['font_mode']?.toString() ?? 'page_glyph') !=
+          (format['font_mode']?.toString() ?? 'page_glyph') ||
+      (format['font_mode'] == 'unicode_single' &&
+          (format['license_sha256'] is! String ||
+              manifest['license_sha256'] != format['license_sha256'] ||
+              sha256.convert(files['LICENSE.txt']!).toString().toLowerCase() !=
+                  (format['license_sha256'] as String).toLowerCase())) ||
       format['word_alignment_matches_builtin'] != true ||
       (format['pagination_matches_builtin'] != true && declaredIndex == null) ||
       (manifest['navigation_index_file'] != null &&
@@ -740,8 +825,11 @@ Future<void> _extractAndValidate(Map<String, dynamic> args) async {
       throw StateError('Invalid SQLite database');
     }
   }
-  for (var page = 1; page <= 604; page++) {
-    final font = files['fonts/p$page.ttf']!;
+  final fontNames = format['font_mode'] == 'unicode_single'
+      ? <String>['fonts/quran.otf']
+      : List<String>.generate(604, (i) => 'fonts/p${i + 1}.ttf');
+  for (final fontName in fontNames) {
+    final font = files[fontName]!;
     if (font.length < 4 ||
         !((font[0] == 0 && font[1] == 1 && font[2] == 0 && font[3] == 0) ||
             (font[0] == 79 &&
