@@ -49,6 +49,10 @@
 		<false/>
 		<key>UIViewControllerBasedStatusBarAppearance</key>
 		<false/>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>يحتاج التطبيق إلى الوصول لمكتبة الصور لحفظ الفيديوهات التي تنشئها في ألبوم عباد الرحمن.</string>
+		<key>NSPhotoLibraryAddUsageDescription</key>
+		<string>يحتاج التطبيق إلى إضافة الفيديوهات التي تنشئها إلى مكتبة الصور.</string>
 		<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key><false/>

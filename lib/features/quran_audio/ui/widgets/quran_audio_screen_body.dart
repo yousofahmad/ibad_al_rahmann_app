@@ -4,6 +4,7 @@ import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/core/helpers/alert_helper.dart';
 import 'package:ibad_al_rahmann/features/quran_audio/logic/quran_player/quran_player_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran_reciters/data/models/reciter_model.dart';
+import 'package:ibad_al_rahmann/features/quran_video/ui/quran_video_creator_screen.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'bottom_sheet_bloc_builder.dart';
@@ -48,6 +49,18 @@ class QuranAudioScreenBody extends StatelessWidget {
             icon: Icon(Icons.arrow_back_ios_new_rounded, color: primaryColor),
             onPressed: () => Navigator.of(context).pop(),
           ),
+          actions: [
+            IconButton(
+              tooltip: 'إنشاء فيديو قرآن',
+              icon: Icon(Icons.movie_creation_outlined, color: primaryColor),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      QuranVideoCreatorScreen(initialReciter: reciter),
+                ),
+              ),
+            ),
+          ],
         ),
         body: Stack(
           children: [
