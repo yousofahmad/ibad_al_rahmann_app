@@ -5,6 +5,22 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Quran Audio & Reciter Model Tests', () {
+    test(
+      'audio catalog uses the imported resource branch and keeps defaults',
+      () {
+        expect(
+          ReciterAudioHelper.audioCatalogBaseUrlForTesting,
+          'https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-features/source/import-qul-resources/',
+        );
+        expect(
+          ReciterAudioHelper.defaultReciters
+              .map((reciter) => reciter.id)
+              .toSet(),
+          hasLength(41),
+        );
+      },
+    );
+
     test('ReciterAudioModel equality and hashCode work by id', () {
       final r1 = ReciterAudioModel(
         id: 'mishari_alafasy',

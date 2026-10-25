@@ -242,7 +242,10 @@ class ReciterAudioModel {
 
 class ReciterAudioHelper {
   static const String _baseUrl =
-      "https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-features/main/";
+      "https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-features/source/import-qul-resources/";
+
+  @visibleForTesting
+  static String get audioCatalogBaseUrlForTesting => _baseUrl;
 
   static final List<ReciterAudioModel> defaultReciters = [
     // ─── Category A: ZIP + segments.json (Word-by-word support) ─────────────
