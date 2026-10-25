@@ -231,7 +231,7 @@ Future<void> _runBackgroundInits() async {
 
   final prefs = CacheHelper.prefs;
   if (prefs.getBool('auto_sync_drive') == true) {
-    BackupService.scheduleNextAutoSync();
+    await BackupService.scheduleNextAutoSync();
   }
 
   await Future.delayed(const Duration(milliseconds: 500));

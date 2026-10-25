@@ -1112,14 +1112,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 await BackupService.toggleAutoSync(val);
                 setState(() => _autoSyncDrive = val);
                 if (val && mounted) {
-                  final times = await PrayerService.getPrayerTimesForDateStatic(
-                    DateTime.now(),
-                  );
-                  DateTime sTime = times != null
-                      ? times.isha.add(const Duration(hours: 1))
-                      : DateTime.now().add(const Duration(hours: 1));
-                  if (sTime.isBefore(DateTime.now()))
-                    sTime = sTime.add(const Duration(days: 1));
+                  final sTime = await BackupService.getNextAutoSyncTime();
                   final timeStr =
                       "${sTime.hour > 12 ? sTime.hour - 12 : sTime.hour}:${sTime.minute.toString().padLeft(2, '0')} ${sTime.hour >= 12 ? 'م' : 'ص'}";
                   scaffoldMessengerKey.currentState?.showSnackBar(

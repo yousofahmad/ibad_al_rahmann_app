@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -20,13 +21,30 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:ibad_al_rahmann/services/backup_payload_validator.dart';
+import 'package:ibad_al_rahmann/services/backup_sync_schedule.dart';
 
 @pragma('vm:entry-point')
 Future<void> driveAutoSyncTask() async {
+  var success = false;
+  var shouldReportResult = true;
+  int? recoveryAttemptsRemaining;
+  var stage = 'flutter_binding_init';
+  var failureReason = 'not_started';
+  String? scheduledFor;
+  final startedAt = DateTime.now();
+  final stopwatch = Stopwatch()..start();
   try {
     WidgetsFlutterBinding.ensureInitialized();
+    DartPluginRegistrant.ensureInitialized();
+    await AppLogger.init();
+    AppLogger.logEvent('DriveAutoSync', 'task_started', {
+      'startedAt': startedAt.toIso8601String(),
+      'trigger': 'android_alarm_manager_callback',
+    });
+    stage = 'cache_init';
     await CacheHelper.init();
     // تهيئة Hive بالمسار الصحيح لمعالجة الخلفية
+    stage = 'hive_init';
     final dir = await getApplicationDocumentsDirectory();
     Hive.init(dir.path);
     if (!Hive.isAdapterRegistered(0)) {
@@ -34,62 +52,189 @@ Future<void> driveAutoSyncTask() async {
     }
     try {
       await BookmarkService.init();
-    } catch (_) {} // لا توقف لو فشلت المفاتيح — الإعدادات أهم
+    } catch (error) {
+      AppLogger.logEvent('DriveAutoSync', 'subtask_failed', {
+        'stage': 'bookmark_service_init',
+        'reason': 'exception_${error.runtimeType}',
+      });
+    }
     try {
       if (!Hive.isBoxOpen('appDataBox')) await Hive.openBox('appDataBox');
-    } catch (_) {}
-
-    // 1. مزامنة مع مهلة دقيقتين للنت الضعيف
-    final success = await BackupService.syncToDrive(allowUI: false);
+    } catch (error) {
+      AppLogger.logEvent('DriveAutoSync', 'subtask_failed', {
+        'stage': 'hive_box_open',
+        'reason': 'exception_${error.runtimeType}',
+      });
+    }
 
     final prefs = CacheHelper.prefs;
+    if (prefs.getBool('auto_sync_drive') != true) {
+      failureReason = 'automatic_sync_disabled';
+      AppLogger.logEvent('DriveAutoSync', 'task_skipped', {
+        'reason': failureReason,
+        'startedAt': startedAt.toIso8601String(),
+      });
+      shouldReportResult = false;
+      return;
+    }
+    stage = 'attempt_accounting';
+    recoveryAttemptsRemaining = await BackupService.beginAutoSyncAttempt();
+    if (recoveryAttemptsRemaining != null) {
+      debugPrint('Google Drive: Running a post-power-on recovery attempt.');
+    }
+    final scheduledAt = prefs.getString('auto_sync_next_scheduled_for');
+    scheduledFor = scheduledAt;
+    if (scheduledAt != null) {
+      await prefs.setString('last_auto_sync_scheduled_for', scheduledAt);
+    }
+    AppLogger.logEvent('DriveAutoSync', 'scheduled_run_started', {
+      'scheduledFor': scheduledAt,
+      'startedAt': DateTime.now().toIso8601String(),
+      'trigger': recoveryAttemptsRemaining == null
+          ? 'scheduled_or_regular_retry'
+          : 'power_recovery_retry',
+      'recoveryAttemptsRemaining': recoveryAttemptsRemaining,
+    });
+    await prefs.setString(
+      'last_auto_sync_started_at',
+      DateTime.now().toIso8601String(),
+    );
+
+    // 1. مزامنة مع مهلة دقيقتين للنت الضعيف
+    stage = 'sync_to_drive';
+    success = await BackupService.syncToDrive(allowUI: false);
+    failureReason = success ? 'none' : 'sync_to_drive_returned_false';
+
+    stage = 'persist_result';
     await prefs.setString(
       'last_auto_sync_status',
       '${DateTime.now().toIso8601String()}: $success',
     );
-
-    // إشعار تأكيد المزامنة (مهم لتأكيد أن الميزة تعمل)
-    try {
-      final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-      const initializationSettingsAndroid = AndroidInitializationSettings(
-        '@mipmap/launcher_icon',
+    if (success) {
+      await prefs.setString(
+        'last_auto_sync_completed_at',
+        DateTime.now().toIso8601String(),
       );
-      const initializationSettings = InitializationSettings(
-        android: initializationSettingsAndroid,
-      );
-      await flutterLocalNotificationsPlugin.initialize(
-        settings: initializationSettings,
-      );
-
-      final title = success ? "المزامنة التلقائية ✓" : "فشل المزامنة التلقائية";
-      final body = success
-          ? "تمت مزامنة بياناتك مع جوجل درايف بنجاح."
-          : "تعذرت المزامنة، يرجى التحقق من الاتصال أو تسجيل الدخول.";
-
-      await flutterLocalNotificationsPlugin.show(
-        id: 99999,
-        title: title,
-        body: body,
-        notificationDetails: const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'strictly_silent_channel_v8',
-            'التنبيهات الصامتة',
-            importance: Importance.low,
-            priority: Priority.low,
-            silent: true,
-          ),
-        ),
-      );
-    } catch (e) {
-      debugPrint('Drive sync notification error: $e');
     }
-
-    // جدولة المزامنة لليوم التالي بعد العشاء بساعة
-    await BackupService.scheduleNextAutoSync();
-
+    AppLogger.logEvent('DriveAutoSync', 'sync_result', {
+      'outcome': success ? 'success' : 'failure',
+      'reason': failureReason,
+      'scheduledFor': scheduledAt,
+      'startedAt': prefs.getString('last_auto_sync_started_at'),
+      'finishedAt': DateTime.now().toIso8601String(),
+      'durationMs': stopwatch.elapsedMilliseconds,
+      'recoveryAttemptsRemaining': recoveryAttemptsRemaining,
+    });
     debugPrint('Auto-sync to Google Drive completed: $success');
   } catch (e) {
-    debugPrint('driveAutoSyncTask error: $e');
+    failureReason = 'exception_${e.runtimeType}';
+    AppLogger.logEvent('DriveAutoSync', 'task_failed', {
+      'stage': stage,
+      'reason': failureReason,
+      'scheduledFor': scheduledFor,
+      'startedAt': startedAt.toIso8601String(),
+      'durationMs': stopwatch.elapsedMilliseconds,
+    });
+    debugPrint('driveAutoSyncTask error type: ${e.runtimeType}');
+    try {
+      await CacheHelper.prefs.setString(
+        'last_auto_sync_status',
+        '${DateTime.now().toIso8601String()}: false',
+      );
+    } catch (_) {}
+  } finally {
+    if (shouldReportResult) {
+      final finishedAt = DateTime.now();
+      try {
+        final prefs = CacheHelper.prefs;
+        await prefs.setString(
+          'last_auto_sync_finished_at',
+          finishedAt.toIso8601String(),
+        );
+      } catch (error) {
+        AppLogger.logEvent('DriveAutoSync', 'result_persistence_failed', {
+          'reason': 'exception_${error.runtimeType}',
+        });
+      }
+      await _showAutoSyncResult(
+        success,
+        recoveryAttemptsRemaining: recoveryAttemptsRemaining,
+      );
+      try {
+        if (success) {
+          await BackupService.scheduleAfterSuccessfulAutoSync();
+        } else {
+          await BackupService.scheduleRetryAfterFailedAutoSync();
+        }
+      } catch (e) {
+        AppLogger.logEvent('DriveAutoSync', 'reschedule_failed', {
+          'reason': 'exception_${e.runtimeType}',
+          'afterOutcome': success ? 'success' : 'failure',
+          'finishedAt': finishedAt.toIso8601String(),
+        });
+        debugPrint('Drive auto-sync reschedule error type: ${e.runtimeType}');
+      }
+      AppLogger.logEvent('DriveAutoSync', 'task_finished', {
+        'outcome': success ? 'success' : 'failure',
+        'reason': failureReason,
+        'scheduledFor': scheduledFor,
+        'startedAt': startedAt.toIso8601String(),
+        'finishedAt': DateTime.now().toIso8601String(),
+        'durationMs': stopwatch.elapsedMilliseconds,
+        'recoveryAttemptsRemaining': recoveryAttemptsRemaining,
+      });
+    }
+  }
+}
+
+Future<void> _showAutoSyncResult(
+  bool success, {
+  int? recoveryAttemptsRemaining,
+}) async {
+  try {
+    final plugin = FlutterLocalNotificationsPlugin();
+    const initializationSettings = InitializationSettings(
+      android: AndroidInitializationSettings('@mipmap/launcher_icon'),
+    );
+    await plugin.initialize(settings: initializationSettings);
+
+    final androidPlugin = plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    await androidPlugin?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'auto_sync_drive_v1',
+        'مزامنة Google Drive',
+        description: 'نتيجة المزامنة التلقائية مع Google Drive',
+        importance: Importance.defaultImportance,
+        playSound: false,
+        enableVibration: false,
+      ),
+    );
+
+    await plugin.show(
+      id: 99999,
+      title: success ? 'المزامنة التلقائية ✓' : 'فشل المزامنة التلقائية',
+      body: success
+          ? 'تمت مزامنة بياناتك مع جوجل درايف بنجاح.'
+          : recoveryAttemptsRemaining == null
+          ? 'تعذرت المزامنة؛ سنحاول مجددًا كل ساعة حتى الفجر.'
+          : recoveryAttemptsRemaining > 0
+          ? 'تعذرت المزامنة بعد عودة الهاتف؛ سنحاول مجددًا بعد 30 دقيقة.'
+          : 'تعذرت المزامنة بعد محاولات الاستعادة الأربع؛ ستعود إلى سياسة الإعادة المعتادة.',
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'auto_sync_drive_v1',
+          'مزامنة Google Drive',
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+          silent: true,
+        ),
+      ),
+    );
+  } catch (e) {
+    debugPrint('Drive sync notification error: $e');
   }
 }
 
@@ -160,6 +305,16 @@ class BackupService {
       'firebase_token',
       'last_sync_email',
       'last_auto_sync_status',
+      'last_auto_sync_scheduled_for',
+      'last_auto_sync_started_at',
+      'last_auto_sync_completed_at',
+      'last_auto_sync_finished_at',
+      _autoSyncLastShutdownEpochMsKey,
+      _autoSyncRetryUntilKey,
+      _autoSyncNextScheduledAtKey,
+      _autoSyncNextScheduledEpochMsKey,
+      _autoSyncRecoveryPendingKey,
+      _autoSyncRecoveryAttemptsRemainingKey,
     };
 
     for (String key in allKeys) {
@@ -562,7 +717,10 @@ class BackupService {
           return drive.DriveApi(GoogleAuthClient(silentHeaders));
         }
       } catch (e) {
-        AppLogger.log('GoogleDrive', 'Silent authorizationHeaders: $e');
+        AppLogger.log(
+          'GoogleDrive',
+          'Silent authorizationHeaders error type: ${e.runtimeType}',
+        );
       }
 
       // 3. If silent failed and UI is allowed, authenticate with driveAppdataScope in ONE dialog
@@ -587,17 +745,14 @@ class BackupService {
 
         if (authHeaders != null) {
           _cachedAuthHeaders = authHeaders;
-          AppLogger.log(
-            'GoogleDrive',
-            'DriveApi client ready',
-          );
+          AppLogger.log('GoogleDrive', 'DriveApi client ready');
           return drive.DriveApi(GoogleAuthClient(authHeaders));
         }
       }
       return null;
     } catch (e) {
-      AppLogger.log('GoogleDrive', '_getDriveApi error: $e');
-      debugPrint('Google Drive: _getDriveApi error: $e');
+      AppLogger.log('GoogleDrive', '_getDriveApi error type: ${e.runtimeType}');
+      debugPrint('Google Drive: _getDriveApi error type: ${e.runtimeType}');
       return null;
     }
   }
@@ -628,17 +783,30 @@ class BackupService {
     bool allowUI = true,
     void Function(double)? onProgress,
   }) async {
+    final startedAt = DateTime.now();
+    final stopwatch = Stopwatch()..start();
     if (_isSyncing) {
+      AppLogger.logEvent('GoogleDrive', 'upload_skipped', {
+        'reason': 'another_drive_sync_in_progress',
+        'startedAt': startedAt.toIso8601String(),
+      });
       debugPrint(
         'Google Drive: Sync already in progress, ignoring duplicate call.',
       );
       return false;
     }
     _isSyncing = true;
+    var outcome = 'failure';
+    var reason = 'unclassified_failure';
     try {
+      AppLogger.logEvent('GoogleDrive', 'upload_started', {
+        'startedAt': startedAt.toIso8601String(),
+        'allowUI': allowUI,
+      });
       debugPrint('Google Drive: Starting Sync to Drive...');
       final driveApi = await _getDriveApi(allowUI: allowUI);
       if (driveApi == null) {
+        reason = 'authentication_unavailable_or_cancelled';
         debugPrint('Google Drive: Auth failed or cancelled.');
         return false;
       }
@@ -668,6 +836,10 @@ class BackupService {
         await driveApi.files
             .update(driveFile, fileId, uploadMedia: media)
             .timeout(const Duration(minutes: 2));
+        AppLogger.logEvent('GoogleDrive', 'upload_written', {
+          'operation': 'update_existing_backup',
+          'payloadBytes': bytes.length,
+        });
         onProgress?.call(1.0);
       } else {
         final driveFile = drive.File()
@@ -676,18 +848,33 @@ class BackupService {
         await driveApi.files
             .create(driveFile, uploadMedia: media)
             .timeout(const Duration(minutes: 2));
+        AppLogger.logEvent('GoogleDrive', 'upload_written', {
+          'operation': 'create_backup',
+          'payloadBytes': bytes.length,
+        });
         onProgress?.call(1.0);
       }
 
       final prefs = CacheHelper.prefs;
       await prefs.setString('last_sync_time', DateTime.now().toIso8601String());
+      outcome = 'success';
+      reason = 'backup_uploaded';
       debugPrint('Google Drive: Sync Up Successful.');
       return true;
     } catch (e) {
-      debugPrint('Google Drive Sync Up Error: $e');
+      reason = 'exception_${e.runtimeType}';
+      debugPrint('Google Drive Sync Up error type: ${e.runtimeType}');
       return false;
     } finally {
       _isSyncing = false;
+      AppLogger.logEvent('GoogleDrive', 'upload_finished', {
+        'outcome': outcome,
+        'reason': reason,
+        'startedAt': startedAt.toIso8601String(),
+        'finishedAt': DateTime.now().toIso8601String(),
+        'durationMs': stopwatch.elapsedMilliseconds,
+        'allowUI': allowUI,
+      });
     }
   }
 
@@ -695,17 +882,32 @@ class BackupService {
     bool allowUI = true,
     void Function(double)? onProgress,
   }) async {
+    final startedAt = DateTime.now();
+    final stopwatch = Stopwatch()..start();
     if (_isSyncing) {
+      AppLogger.logEvent('GoogleDrive', 'restore_skipped', {
+        'reason': 'another_drive_sync_in_progress',
+        'startedAt': startedAt.toIso8601String(),
+      });
       debugPrint(
         'Google Drive: Sync already in progress, ignoring duplicate call.',
       );
       return false;
     }
     _isSyncing = true;
+    var outcome = 'failure';
+    var reason = 'unclassified_failure';
     try {
+      AppLogger.logEvent('GoogleDrive', 'restore_started', {
+        'startedAt': startedAt.toIso8601String(),
+        'allowUI': allowUI,
+      });
       debugPrint('Google Drive: Starting Sync from Drive...');
       final driveApi = await _getDriveApi(allowUI: allowUI);
-      if (driveApi == null) return false;
+      if (driveApi == null) {
+        reason = 'authentication_unavailable_or_cancelled';
+        return false;
+      }
 
       final fileList = await driveApi.files
           .list(
@@ -717,6 +919,7 @@ class BackupService {
       onProgress?.call(1.0);
 
       if (fileList.files == null || fileList.files!.isEmpty) {
+        reason = 'no_backup_found';
         debugPrint('Google Drive: No backup found.');
         return false;
       }
@@ -732,6 +935,10 @@ class BackupService {
       await for (var chunk in response.stream) {
         dataBytes.addAll(chunk);
       }
+      AppLogger.logEvent('GoogleDrive', 'restore_download_finished', {
+        'downloadBytes': dataBytes.length,
+        'durationMs': stopwatch.elapsedMilliseconds,
+      });
 
       onProgress?.call(0.3);
       final content = utf8.decode(dataBytes);
@@ -748,13 +955,26 @@ class BackupService {
           DateTime.now().toIso8601String(),
         );
         debugPrint('Google Drive: Sync Down Successful.');
+        outcome = 'success';
+        reason = 'backup_downloaded_and_applied';
+      } else {
+        reason = 'backup_validation_or_application_failed';
       }
       return result;
     } catch (e) {
-      debugPrint('Google Drive Sync Down Error: $e');
+      reason = 'exception_${e.runtimeType}';
+      debugPrint('Google Drive Sync Down error type: ${e.runtimeType}');
       return false;
     } finally {
       _isSyncing = false;
+      AppLogger.logEvent('GoogleDrive', 'restore_finished', {
+        'outcome': outcome,
+        'reason': reason,
+        'startedAt': startedAt.toIso8601String(),
+        'finishedAt': DateTime.now().toIso8601String(),
+        'durationMs': stopwatch.elapsedMilliseconds,
+        'allowUI': allowUI,
+      });
     }
   }
 
@@ -777,49 +997,405 @@ class BackupService {
     return prefs.getString('last_sync_time');
   }
 
-  static Future<void> scheduleNextAutoSync() async {
-    const int autoSyncAlarmId = 888;
-    final times = await PrayerService.getPrayerTimesForDateStatic(
-      DateTime.now(),
+  static const int _autoSyncAlarmId = 888;
+  static const String _autoSyncRetryUntilKey = 'auto_sync_retry_until';
+  static const String _autoSyncNextScheduledAtKey =
+      'auto_sync_next_scheduled_for';
+  static const String _autoSyncNextScheduledEpochMsKey =
+      'auto_sync_next_scheduled_epoch_ms';
+  static const String _autoSyncRecoveryPendingKey =
+      'auto_sync_recovery_pending';
+  static const String _autoSyncRecoveryAttemptsRemainingKey =
+      'auto_sync_recovery_attempts_remaining';
+  static const String _autoSyncLastShutdownEpochMsKey =
+      'auto_sync_last_shutdown_epoch_ms';
+
+  static Future<void> _markRecoveryIfScheduleWasMissedWhilePoweredOff(
+    DateTime now,
+  ) async {
+    final prefs = CacheHelper.prefs;
+    final shutdownEpoch = int.tryParse(
+      prefs.getString(_autoSyncLastShutdownEpochMsKey) ?? '',
     );
-    DateTime scheduledTime;
+    if (shutdownEpoch == null) return;
 
-    if (times != null) {
-      // One hour after Isha
-      scheduledTime = times.isha.add(const Duration(hours: 1));
-    } else {
-      // Fallback to 11:00 PM
-      scheduledTime = DateTime(
-        DateTime.now().year,
-        DateTime.now().month,
-        DateTime.now().day,
-        23,
+    final recoveryAlreadyActive = prefs.containsKey(
+      _autoSyncRecoveryAttemptsRemainingKey,
+    );
+    final scheduledEpoch = int.tryParse(
+      prefs.getString(_autoSyncNextScheduledEpochMsKey) ?? '',
+    );
+    if (!recoveryAlreadyActive &&
+        scheduledEpoch != null &&
+        scheduledEpoch > shutdownEpoch &&
+        scheduledEpoch <= now.millisecondsSinceEpoch) {
+      await prefs.setBool(_autoSyncRecoveryPendingKey, true);
+      AppLogger.logEvent('DriveAutoSync', 'missed_run_detected', {
+        'scheduledFor': DateTime.fromMillisecondsSinceEpoch(
+          scheduledEpoch,
+        ).toIso8601String(),
+        'poweredOffAt': DateTime.fromMillisecondsSinceEpoch(
+          shutdownEpoch,
+        ).toIso8601String(),
+        'detectedAt': now.toIso8601String(),
+        'reason': 'scheduled_time_passed_while_device_powered_off',
+      });
+    }
+    await prefs.remove(_autoSyncLastShutdownEpochMsKey);
+  }
+
+  static Future<int?> beginAutoSyncAttempt() async {
+    final prefs = CacheHelper.prefs;
+    await _markRecoveryIfScheduleWasMissedWhilePoweredOff(DateTime.now());
+    if (prefs.getBool(_autoSyncRecoveryPendingKey) == true) {
+      if (!prefs.containsKey(_autoSyncRecoveryAttemptsRemainingKey)) {
+        await prefs.setInt(
+          _autoSyncRecoveryAttemptsRemainingKey,
+          BackupSyncSchedule.maxPowerRecoveryAttempts,
+        );
+      }
+      await prefs.remove(_autoSyncRetryUntilKey);
+      await prefs.remove(_autoSyncRecoveryPendingKey);
+    }
+
+    final remaining = prefs.getInt(_autoSyncRecoveryAttemptsRemainingKey) ?? 0;
+    if (remaining <= 0) return null;
+    final attemptsRemaining =
+        BackupSyncSchedule.attemptsRemainingAfterPowerRecoveryAttempt(
+          remaining,
+        );
+    await prefs.setInt(
+      _autoSyncRecoveryAttemptsRemainingKey,
+      attemptsRemaining,
+    );
+    AppLogger.logEvent('DriveAutoSync', 'recovery_attempt_started', {
+      'attemptsBeforeThisAttempt': remaining,
+      'attemptsRemainingAfterThisAttempt': attemptsRemaining,
+      'startedAt': DateTime.now().toIso8601String(),
+    });
+    return attemptsRemaining;
+  }
+
+  static Future<DateTime?> _resumePowerRecoveryIfNeeded(DateTime now) async {
+    final prefs = CacheHelper.prefs;
+    await _markRecoveryIfScheduleWasMissedWhilePoweredOff(now);
+    if (prefs.getBool(_autoSyncRecoveryPendingKey) == true) {
+      if (!prefs.containsKey(_autoSyncRecoveryAttemptsRemainingKey)) {
+        await prefs.setInt(
+          _autoSyncRecoveryAttemptsRemainingKey,
+          BackupSyncSchedule.maxPowerRecoveryAttempts,
+        );
+      }
+      await prefs.remove(_autoSyncRetryUntilKey);
+      await prefs.remove(_autoSyncRecoveryPendingKey);
+      final firstAttempt = now.add(const Duration(seconds: 5));
+      await _scheduleAutoSyncAt(
+        firstAttempt,
+        reason: 'power_on_recovery_first_attempt',
       );
+      return firstAttempt;
     }
 
-    // If the scheduled time for today has already passed, schedule for tomorrow
-    if (scheduledTime.isBefore(DateTime.now())) {
-      scheduledTime = scheduledTime.add(const Duration(days: 1));
+    final remaining = prefs.getInt(_autoSyncRecoveryAttemptsRemainingKey) ?? 0;
+    if (remaining <= 0) {
+      if (prefs.containsKey(_autoSyncRecoveryAttemptsRemainingKey)) {
+        await prefs.remove(_autoSyncRecoveryAttemptsRemainingKey);
+      }
+      return null;
     }
 
-    debugPrint('Google Drive: Auto-sync scheduled for $scheduledTime');
+    final scheduledAtValue = prefs.getString(_autoSyncNextScheduledAtKey);
+    final scheduledAt = scheduledAtValue == null
+        ? null
+        : DateTime.tryParse(scheduledAtValue);
+    final nextAttempt = scheduledAt != null && scheduledAt.isAfter(now)
+        ? scheduledAt
+        : now.add(const Duration(seconds: 5));
+    await _scheduleAutoSyncAt(
+      nextAttempt,
+      reason: 'power_on_recovery_followup',
+    );
+    return nextAttempt;
+  }
 
-    await AndroidAlarmManager.oneShotAt(
-      scheduledTime,
-      autoSyncAlarmId,
-      driveAutoSyncTask,
-      exact: true,
-      wakeup: true,
-      rescheduleOnReboot: true,
+  static Future<DateTime> getNextAutoSyncTime({DateTime? now}) async {
+    final current = now ?? DateTime.now();
+    final prefs = CacheHelper.prefs;
+    if (prefs.getBool(_autoSyncRecoveryPendingKey) == true) {
+      return current.add(const Duration(seconds: 5));
+    }
+    final recoveryRemaining =
+        prefs.getInt(_autoSyncRecoveryAttemptsRemainingKey) ?? 0;
+    if (recoveryRemaining > 0) {
+      final scheduledAtValue = prefs.getString(_autoSyncNextScheduledAtKey);
+      final scheduledAt = scheduledAtValue == null
+          ? null
+          : DateTime.tryParse(scheduledAtValue);
+      if (scheduledAt != null && scheduledAt.isAfter(current)) {
+        return scheduledAt;
+      }
+      return current.add(const Duration(seconds: 5));
+    }
+    final retryUntilValue = prefs.getString(_autoSyncRetryUntilKey);
+    final retryUntil = retryUntilValue == null
+        ? null
+        : DateTime.tryParse(retryUntilValue);
+
+    if (retryUntil != null && retryUntil.isAfter(current)) {
+      final retryAt = BackupSyncSchedule.nextHourlyRetry(
+        now: current,
+        fajr: retryUntil,
+      );
+      if (retryAt != null) return retryAt;
+    }
+    if (retryUntilValue != null) {
+      await prefs.remove(_autoSyncRetryUntilKey);
+    }
+
+    return _getNextDailyAutoSyncTime(current);
+  }
+
+  static Future<DateTime> _getNextDailyAutoSyncTime(DateTime now) async {
+    final todayTimes = await PrayerService.getPrayerTimesForDateStatic(now);
+    if (todayTimes != null) {
+      final todayTarget = todayTimes.isha.add(BackupSyncSchedule.afterIsha);
+      if (todayTarget.isAfter(now)) return todayTarget;
+
+      final tomorrowDate = DateTime(now.year, now.month, now.day + 1);
+      final tomorrowTimes = await PrayerService.getPrayerTimesForDateStatic(
+        tomorrowDate,
+      );
+      if (tomorrowTimes != null) {
+        return BackupSyncSchedule.nextDailyRun(
+          now: now,
+          todayIsha: todayTimes.isha,
+          tomorrowIsha: tomorrowTimes.isha,
+        );
+      }
+    }
+
+    final fallbackToday = DateTime(now.year, now.month, now.day, 23);
+    return fallbackToday.isAfter(now)
+        ? fallbackToday
+        : DateTime(now.year, now.month, now.day + 1, 23);
+  }
+
+  static Future<DateTime?> _fajrForNightOf(
+    DateTime scheduledAt, {
+    required DateTime now,
+  }) async {
+    final scheduledDate = DateTime(
+      scheduledAt.year,
+      scheduledAt.month,
+      scheduledAt.day,
+    );
+    final todayTimes = await PrayerService.getPrayerTimesForDateStatic(
+      scheduledDate,
+    );
+    if (todayTimes == null) return _nextFajrAfter(now);
+
+    final tomorrowDate = DateTime(
+      scheduledDate.year,
+      scheduledDate.month,
+      scheduledDate.day + 1,
+    );
+    final tomorrowTimes = await PrayerService.getPrayerTimesForDateStatic(
+      tomorrowDate,
+    );
+    final retryDeadline = BackupSyncSchedule.retryDeadline(
+      now: now,
+      scheduledAt: scheduledAt,
+      ishaOnScheduledDate: todayTimes.isha,
+      fajrOnScheduledDate: todayTimes.fajr,
+      fajrOnNextDate: tomorrowTimes?.fajr,
+    );
+    if (retryDeadline != null && retryDeadline.isAfter(now)) {
+      return retryDeadline;
+    }
+    return _nextFajrAfter(now);
+  }
+
+  static Future<DateTime?> _nextFajrAfter(DateTime now) async {
+    final todayTimes = await PrayerService.getPrayerTimesForDateStatic(now);
+    if (todayTimes != null && todayTimes.fajr.isAfter(now)) {
+      return todayTimes.fajr;
+    }
+
+    final tomorrowDate = DateTime(now.year, now.month, now.day + 1);
+    final tomorrowTimes = await PrayerService.getPrayerTimesForDateStatic(
+      tomorrowDate,
+    );
+    return tomorrowTimes?.fajr;
+  }
+
+  static Future<void> _scheduleAutoSyncAt(
+    DateTime scheduledTime, {
+    String reason = 'unspecified',
+  }) async {
+    await CacheHelper.prefs.setString(
+      _autoSyncNextScheduledAtKey,
+      scheduledTime.toIso8601String(),
+    );
+    await CacheHelper.prefs.setString(
+      _autoSyncNextScheduledEpochMsKey,
+      scheduledTime.millisecondsSinceEpoch.toString(),
+    );
+    final requestedAt = DateTime.now();
+    AppLogger.logEvent('DriveAutoSync', 'schedule_requested', {
+      'reason': reason,
+      'requestedAt': requestedAt.toIso8601String(),
+      'scheduledFor': scheduledTime.toIso8601String(),
+      'alarmId': _autoSyncAlarmId,
+    });
+    try {
+      final scheduled = await AndroidAlarmManager.oneShotAt(
+        scheduledTime,
+        _autoSyncAlarmId,
+        driveAutoSyncTask,
+        exact: true,
+        allowWhileIdle: true,
+        wakeup: true,
+        rescheduleOnReboot: true,
+      );
+      AppLogger.logEvent(
+        'DriveAutoSync',
+        scheduled ? 'schedule_accepted' : 'schedule_failed',
+        {
+          'reason': reason,
+          'requestedAt': requestedAt.toIso8601String(),
+          'scheduledFor': scheduledTime.toIso8601String(),
+          'exact': true,
+          'allowWhileIdle': true,
+          if (!scheduled) 'failureReason': 'alarm_manager_returned_false',
+        },
+      );
+      if (!scheduled) {
+        debugPrint('Google Drive: Auto-sync alarm scheduling failed.');
+      }
+    } catch (error) {
+      AppLogger.logEvent('DriveAutoSync', 'schedule_failed', {
+        'reason': reason,
+        'requestedAt': requestedAt.toIso8601String(),
+        'scheduledFor': scheduledTime.toIso8601String(),
+        'failureReason': 'exception_${error.runtimeType}: $error',
+      });
+      rethrow;
+    }
+  }
+
+  static Future<void> scheduleAfterSuccessfulAutoSync() async {
+    final prefs = CacheHelper.prefs;
+    await prefs.remove(_autoSyncRetryUntilKey);
+    await prefs.remove(_autoSyncRecoveryAttemptsRemainingKey);
+    await prefs.remove(_autoSyncRecoveryPendingKey);
+    await scheduleNextAutoSync(reason: 'after_successful_auto_sync');
+  }
+
+  static Future<void> scheduleRetryAfterFailedAutoSync({DateTime? now}) async {
+    final current = now ?? DateTime.now();
+    final prefs = CacheHelper.prefs;
+    final recoveryRemaining =
+        prefs.getInt(_autoSyncRecoveryAttemptsRemainingKey) ?? 0;
+    if (recoveryRemaining > 0) {
+      final recoveryRetry = BackupSyncSchedule.nextPowerRecoveryRetry(
+        now: current,
+        attemptsRemaining: recoveryRemaining,
+      );
+      if (recoveryRetry != null) {
+        AppLogger.logEvent('DriveAutoSync', 'retry_decided', {
+          'retryAt': recoveryRetry.toIso8601String(),
+          'retryReason': 'power_recovery_attempt_failed',
+          'attemptsRemaining': recoveryRemaining,
+        });
+        await _scheduleAutoSyncAt(
+          recoveryRetry,
+          reason: 'failed_power_recovery_retry',
+        );
+        return;
+      }
+    }
+    if (prefs.containsKey(_autoSyncRecoveryAttemptsRemainingKey)) {
+      await prefs.remove(_autoSyncRecoveryAttemptsRemainingKey);
+    }
+
+    final retryUntilValue = prefs.getString(_autoSyncRetryUntilKey);
+    final savedRetryUntil = retryUntilValue == null
+        ? null
+        : DateTime.tryParse(retryUntilValue);
+    DateTime? retryUntil;
+
+    if (retryUntilValue != null) {
+      if (savedRetryUntil != null && savedRetryUntil.isAfter(current)) {
+        retryUntil = savedRetryUntil;
+      }
+    } else {
+      final scheduledAtValue = prefs.getString(_autoSyncNextScheduledAtKey);
+      final scheduledAt = scheduledAtValue == null
+          ? null
+          : DateTime.tryParse(scheduledAtValue);
+      retryUntil = scheduledAt == null
+          ? await _nextFajrAfter(current)
+          : await _fajrForNightOf(scheduledAt, now: current);
+    }
+
+    if (retryUntil == null || !retryUntil.isAfter(current)) {
+      await prefs.remove(_autoSyncRetryUntilKey);
+      await scheduleNextAutoSync(reason: 'retry_window_unavailable');
+      return;
+    }
+
+    await prefs.setString(_autoSyncRetryUntilKey, retryUntil.toIso8601String());
+    final retryAt = BackupSyncSchedule.nextHourlyRetry(
+      now: current,
+      fajr: retryUntil,
+    );
+    if (retryAt == null) {
+      await prefs.remove(_autoSyncRetryUntilKey);
+      await scheduleNextAutoSync(reason: 'hourly_retry_window_closed');
+      return;
+    }
+    AppLogger.logEvent('DriveAutoSync', 'retry_decided', {
+      'retryAt': retryAt.toIso8601String(),
+      'retryUntil': retryUntil.toIso8601String(),
+      'retryReason': 'sync_failed_retry_hourly_until_fajr',
+      'recoveryAttemptsRemaining': recoveryRemaining,
+    });
+    await _scheduleAutoSyncAt(
+      retryAt,
+      reason: 'hourly_retry_after_sync_failure',
     );
   }
 
+  static Future<void> scheduleNextAutoSync({
+    String reason = 'auto_sync_enabled_or_app_start',
+  }) async {
+    final recoveryTime = await _resumePowerRecoveryIfNeeded(DateTime.now());
+    if (recoveryTime != null) {
+      debugPrint('Google Drive: Power-on recovery scheduled for $recoveryTime');
+      return;
+    }
+    final scheduledTime = await getNextAutoSyncTime();
+    debugPrint('Google Drive: Auto-sync scheduled for $scheduledTime');
+    await _scheduleAutoSyncAt(scheduledTime, reason: reason);
+  }
+
   static Future<void> toggleAutoSync(bool enable) async {
-    const int autoSyncAlarmId = 888;
     if (enable) {
-      await scheduleNextAutoSync();
+      await scheduleNextAutoSync(reason: 'user_enabled_auto_sync');
     } else {
-      await AndroidAlarmManager.cancel(autoSyncAlarmId);
+      await AndroidAlarmManager.cancel(_autoSyncAlarmId);
+      AppLogger.logEvent('DriveAutoSync', 'schedule_cancelled', {
+        'reason': 'user_disabled_auto_sync',
+        'cancelledAt': DateTime.now().toIso8601String(),
+        'alarmId': _autoSyncAlarmId,
+      });
+      final prefs = CacheHelper.prefs;
+      await prefs.remove(_autoSyncRetryUntilKey);
+      await prefs.remove(_autoSyncNextScheduledAtKey);
+      await prefs.remove(_autoSyncNextScheduledEpochMsKey);
+      await prefs.remove(_autoSyncRecoveryPendingKey);
+      await prefs.remove(_autoSyncRecoveryAttemptsRemainingKey);
+      await prefs.remove(_autoSyncLastShutdownEpochMsKey);
     }
   }
 }
