@@ -53,10 +53,10 @@ class MainActivity: AudioServiceFragmentActivity() {
             val channel = BackgroundMethodChannelPlugin.currentChannel
             if (channel != null) {
                 channel.invokeMethod("onPayloadReceived", payload)
-                NativeLogger.log(context, "Navigation: payload '$payload' delivered to Flutter channel ✓")
+                NativeLogger.log(context, "Navigation: payload delivered to Flutter channel (length=${payload.length})")
                 pendingNavigationPayload = null
             } else {
-                NativeLogger.log(context, "Navigation: Flutter channel null — queuing payload '$payload' for retry")
+                NativeLogger.log(context, "Navigation: Flutter channel null — queuing payload (length=${payload.length}) for retry")
                 pendingNavigationPayload = payload
             }
         }
@@ -189,7 +189,7 @@ class MainActivity: AudioServiceFragmentActivity() {
         } else {
             null
         }
-        NativeLogger.log(this, "MainActivity.onCreate payload detected: $launchPayload (fromNotif=$fromNotification)")
+        NativeLogger.log(this, "MainActivity.onCreate payload detected (length=${launchPayload?.length ?: 0}, fromNotif=$fromNotification)")
 
 
         val stopSound = intent?.getBooleanExtra("stop_sound_on_open", true) ?: true
@@ -211,6 +211,7 @@ class MainActivity: AudioServiceFragmentActivity() {
                 // Reschedule any custom interval alarms via AlarmReceiver
                 val intent = Intent(this, AlarmReceiver::class.java).apply {
                     action = "android.intent.action.BOOT_COMPLETED"
+                    putExtra("app_reschedule_only", true)
                 }
                 sendBroadcast(intent)
 
@@ -316,7 +317,7 @@ class MainActivity: AudioServiceFragmentActivity() {
         setIntent(intent)
         NotificationDismissReceiver.cleanupEmptyGroupSummaries(this)
         val target = intent.getStringExtra("target_page") ?: intent.getStringExtra("payload")
-        NativeLogger.log(this, "MainActivity.onNewIntent payload detected: $target | channel ready: ${BackgroundMethodChannelPlugin.currentChannel != null}")
+        NativeLogger.log(this, "MainActivity.onNewIntent payload detected (length=${target?.length ?: 0}) | channel ready: ${BackgroundMethodChannelPlugin.currentChannel != null}")
         if (target != null) {
             val stopSound = intent.getBooleanExtra("stop_sound_on_open", true)
             if (stopSound && (target == "prayer" || target == "jumuah")) {
@@ -337,7 +338,7 @@ class MainActivity: AudioServiceFragmentActivity() {
                 android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                     val queued = pendingNavigationPayload
                     if (queued != null) {
-                        NativeLogger.log(this, "Navigation: 1.5s retry for payload '$queued' — channel: ${BackgroundMethodChannelPlugin.currentChannel != null}")
+                        NativeLogger.log(this, "Navigation: 1.5s retry for queued payload (length=${queued.length}) — channel: ${BackgroundMethodChannelPlugin.currentChannel != null}")
                         deliverPayloadToFlutter(this, queued)
                     }
                 }, 1500)

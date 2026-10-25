@@ -31,7 +31,56 @@ class AlarmReceiver : BroadcastReceiver() {
         val alarmIdForLog = intent.getIntExtra("notification_id", -1)
         android.util.Log.d("PrayerApp", "AlarmReceiver triggered with action: $action, alarmId: $alarmIdForLog")
 
+        if (action == Intent.ACTION_SHUTDOWN) {
+            val flutterPrefs = context.getSharedPreferences(
+                "FlutterSharedPreferences",
+                Context.MODE_PRIVATE,
+            )
+            if (flutterPrefs.getBoolean("flutter.auto_sync_drive", false)) {
+                flutterPrefs.edit()
+                    .putString(
+                        "flutter.auto_sync_last_shutdown_epoch_ms",
+                        System.currentTimeMillis().toString(),
+                    )
+                    .commit()
+            }
+            return
+        }
+
         if (action == Intent.ACTION_BOOT_COMPLETED || action == "android.intent.action.QUICKBOOT_POWERON") {
+            if (!intent.getBooleanExtra("app_reschedule_only", false)) {
+                val flutterPrefs = context.getSharedPreferences(
+                    "FlutterSharedPreferences",
+                    Context.MODE_PRIVATE,
+                )
+                val autoSyncEnabled = flutterPrefs.getBoolean(
+                    "flutter.auto_sync_drive",
+                    false,
+                )
+                val scheduledEpoch = flutterPrefs.getString(
+                    "flutter.auto_sync_next_scheduled_epoch_ms",
+                    null,
+                )?.toLongOrNull() ?: 0L
+                val shutdownEpoch = flutterPrefs.getString(
+                    "flutter.auto_sync_last_shutdown_epoch_ms",
+                    null,
+                )?.toLongOrNull() ?: 0L
+                val recoveryAlreadyActive = flutterPrefs.contains(
+                    "flutter.auto_sync_recovery_attempts_remaining",
+                )
+                val missedWhilePoweredOff = shutdownEpoch > 0L &&
+                    scheduledEpoch > shutdownEpoch &&
+                    scheduledEpoch <= System.currentTimeMillis()
+                if (autoSyncEnabled && !recoveryAlreadyActive &&
+                    missedWhilePoweredOff) {
+                    flutterPrefs.edit()
+                        .putBoolean("flutter.auto_sync_recovery_pending", true)
+                        .apply()
+                }
+                flutterPrefs.edit()
+                    .remove("flutter.auto_sync_last_shutdown_epoch_ms")
+                    .apply()
+            }
             rescheduleAllAlarms(context)
             refreshFromStoredEpochs(context)
             WidgetUpdateHelper.onPrayerAlarmFired(context, -1)
@@ -292,7 +341,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 // to prevent stale notifications (like Friday's notification arriving on Saturday).
                 // For repeating interval alarms, they will be rescheduled correctly by the chaining logic.
                 if (System.currentTimeMillis() - intendedCal.timeInMillis > 3600000L) {
-                    NativeLogger.log(context, "AlarmReceiver: Dropping stale notification $title. Was scheduled for ${intendedCal.time}")
+                    NativeLogger.log(context, "AlarmReceiver: Dropping stale notification alarmId=$alarmId scheduledFor=${java.time.Instant.ofEpochMilli(intendedCal.timeInMillis)}")
                     // We don't return here completely! We must still run the chaining logic below 
                     // so the NEXT occurrence gets scheduled!
                     val chainSoundName = soundName
@@ -328,7 +377,7 @@ class AlarmReceiver : BroadcastReceiver() {
             }
 
             if (!skipNotif) {
-                NativeLogger.log(context, "Notification Fired! Title: $title | Body: $body | AlarmId: $alarmId | Payload: $finalPayload")
+                NativeLogger.log(context, "Notification Fired! AlarmId: $alarmId")
                 showNotification(context, alarmId, title, body, finalSoundName, finalPayload, audioPath, finalCustomSoundName)
             } else {
                 NativeLogger.log(context, "Notification Skipped (disabled or in quiet hours). AlarmId: $alarmId")

@@ -42,15 +42,32 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
             day == other.day && month == other.month && year == other.year
     }
 
-    override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+    override suspend fun doWork(): Result {
+        val actualStartedAt = System.currentTimeMillis()
+        val trigger = inputData.getString(INPUT_REASON)
+            ?: if (runAttemptCount > 0) "work_manager_retry" else "scheduled_or_app_check"
+        var outcome = "unknown"
+        var reason = "unclassified_exit"
+        NativeLogger.log(
+            applicationContext,
+            "HijriSyncWorker: START actualStartedAt=${Date(actualStartedAt).toInstant()} trigger=$trigger runAttempt=$runAttemptCount",
+        )
+        return try {
+            withContext(Dispatchers.IO) {
         val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (prefs.getString(KEY_SYSTEM, "umm_alqura") != "egyptian") return@withContext Result.success()
+        if (prefs.getString(KEY_SYSTEM, "umm_alqura") != "egyptian") {
+            outcome = "skipped"
+            reason = "non_egyptian_calendar"
+            return@withContext Result.success()
+        }
 
         val today = civilDate(Date())
         val todayKey = dateKey(today)
         val lastFetchDate = prefs.getString(key(KEY_LAST_FETCH), null)
         val temporary = prefs.getBoolean(key(KEY_TEMPORARY), false)
         if (lastFetchDate == todayKey && !temporary && hasTrustedStoredDate(prefs)) {
+            outcome = "skipped"
+            reason = "already_verified_today"
             return@withContext Result.success()
         }
 
@@ -64,6 +81,8 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
         if (runAttemptCount == 0 && lastAttempt == today &&
             System.currentTimeMillis() - lastAttemptMillis < RETRY_THROTTLE_MS &&
             (!online || previousAttemptOnline)) {
+            outcome = "skipped"
+            reason = if (online) "retry_throttle_active" else "offline_retry_already_queued"
             applyOfflineProjection(prefs, today)
             if (!online) HijriSyncScheduler.enqueueConnectedRetry(applicationContext)
             return@withContext Result.success()
@@ -77,9 +96,13 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
             applyOfflineProjection(prefs, today)
             showFailureNotification(prefs, todayKey)
             if (inputData.getString(INPUT_REASON) == "network_restored") {
+                outcome = "retry"
+                reason = "network_unavailable_on_connected_retry"
                 return@withContext Result.retry()
             }
             HijriSyncScheduler.enqueueConnectedRetry(applicationContext)
+            outcome = "retry_scheduled"
+            reason = "no_validated_internet_connected_retry_enqueued"
             return@withContext Result.success()
         }
 
@@ -94,6 +117,8 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
         if (chosen == null) {
             applyOfflineProjection(prefs, today)
             showFailureNotification(prefs, todayKey)
+            outcome = "retry"
+            reason = "dar_alifta_live_date_unavailable"
             return@withContext Result.retry()
         }
 
@@ -101,6 +126,8 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
         if (offset == null) {
             applyOfflineProjection(prefs, today)
             showFailureNotification(prefs, todayKey)
+            outcome = "retry"
+            reason = "official_date_outside_safe_offset_range"
             return@withContext Result.retry()
         }
 
@@ -138,7 +165,21 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
         if (correctionNeeded || previousDate == null || previousTemporary) {
             showCorrectionNotification(prefs, chosen, todayKey, temporaryDarSource)
         }
+        outcome = "success"
+        reason = "date_applied_source_$source"
         Result.success()
+            }
+        } catch (error: Exception) {
+            outcome = "exception"
+            reason = "exception_${error.javaClass.simpleName}"
+            throw error
+        } finally {
+            val actualFinishedAt = System.currentTimeMillis()
+            NativeLogger.log(
+                applicationContext,
+                "HijriSyncWorker: FINISHED actualFinishedAt=${Date(actualFinishedAt).toInstant()} outcome=$outcome reason=$reason trigger=$trigger runAttempt=$runAttemptCount durationMs=${actualFinishedAt - actualStartedAt}",
+            )
+        }
     }
 
     private fun hasValidatedInternet(): Boolean {
@@ -170,7 +211,14 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
 
     private fun fetchText(url: String, browserAgent: Boolean = false): String? {
         val timeouts = intArrayOf(15_000, 30_000, 45_000)
-        for (timeout in timeouts) {
+        val sourceHost = runCatching { URL(url).host }.getOrDefault("unknown")
+        for ((index, timeout) in timeouts.withIndex()) {
+            val startedAt = System.currentTimeMillis()
+            var attemptReason = "request_not_completed"
+            NativeLogger.log(
+                applicationContext,
+                "HijriSyncWorker: SOURCE_REQUEST_STARTED source=$sourceHost attempt=${index + 1}/${timeouts.size} timeoutMs=$timeout startedAt=${Date(startedAt).toInstant()}",
+            )
             var connection: HttpURLConnection? = null
             try {
                 connection = URL(url).openConnection() as HttpURLConnection
@@ -184,16 +232,40 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
                     )
                 }
-                if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-                    return connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                val statusCode = connection.responseCode
+                if (statusCode == HttpURLConnection.HTTP_OK) {
+                    val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                    NativeLogger.log(
+                        applicationContext,
+                        "HijriSyncWorker: SOURCE_REQUEST_FINISHED source=$sourceHost attempt=${index + 1} outcome=success httpStatus=$statusCode responseBytes=${body.toByteArray(Charsets.UTF_8).size} durationMs=${System.currentTimeMillis() - startedAt}",
+                    )
+                    return body
                 }
-                if (connection.responseCode in 400..499) return null
-            } catch (_: Exception) {
+                attemptReason = "http_status_$statusCode"
+                if (statusCode in 400..499) {
+                    NativeLogger.log(
+                        applicationContext,
+                        "HijriSyncWorker: SOURCE_REQUEST_FAILED source=$sourceHost attempt=${index + 1} reason=$attemptReason durationMs=${System.currentTimeMillis() - startedAt}",
+                    )
+                    return null
+                }
+            } catch (error: Exception) {
                 // WorkManager retries this job with exponential backoff.
+                attemptReason = "exception_${error.javaClass.simpleName}"
             } finally {
                 connection?.disconnect()
             }
-            try { Thread.sleep(1_500) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
+            NativeLogger.log(
+                applicationContext,
+                "HijriSyncWorker: SOURCE_REQUEST_FAILED source=$sourceHost attempt=${index + 1} reason=$attemptReason durationMs=${System.currentTimeMillis() - startedAt}",
+            )
+            if (index + 1 < timeouts.size) {
+                NativeLogger.log(
+                    applicationContext,
+                    "HijriSyncWorker: SOURCE_RETRY_SCHEDULED source=$sourceHost nextAttempt=${index + 2} delayMs=1500 reason=$attemptReason",
+                )
+                try { Thread.sleep(1_500) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
+            }
         }
         return null
     }

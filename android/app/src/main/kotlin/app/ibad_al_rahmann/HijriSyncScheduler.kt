@@ -28,23 +28,32 @@ object HijriSyncScheduler {
     private const val DAILY_INTERVAL_HOURS = 24L
 
     fun onAppStarted(context: Context) {
+        NativeLogger.log(context, "HijriSyncScheduler: TRIGGER reason=app_open actualAt=${java.time.Instant.now()}")
         scheduleMidnightCheck(context)
         ensurePeriodicWork(context)
         enqueueOneTimeCheck(context, "app_open")
     }
 
     fun onSystemEvent(context: Context, action: String?) {
+        NativeLogger.log(context, "HijriSyncScheduler: TRIGGER reason=system_event action=${action ?: "unknown"} actualAt=${java.time.Instant.now()}")
         scheduleMidnightCheck(context)
         ensurePeriodicWork(context)
         enqueueOneTimeCheck(context, action ?: "system_event")
     }
 
     fun onMidnightAlarm(context: Context) {
+        NativeLogger.log(context, "HijriSyncScheduler: TRIGGER reason=midnight_alarm actualAt=${java.time.Instant.now()}")
         enqueueOneTimeCheck(context, "midnight")
         scheduleMidnightCheck(context)
     }
 
     private fun ensurePeriodicWork(context: Context) {
+        val scheduleRequestedAt = System.currentTimeMillis()
+        val expectedFirstRunAt = scheduleRequestedAt + millisUntilNextMidnight()
+        NativeLogger.log(
+            context,
+            "HijriSyncScheduler: PERIODIC_ENQUEUE_REQUESTED reason=daily_authority_check requestedAt=${java.time.Instant.ofEpochMilli(scheduleRequestedAt)} expectedFirstRunAt=${java.time.Instant.ofEpochMilli(expectedFirstRunAt)} intervalHours=$DAILY_INTERVAL_HOURS backoff=exponential_15m",
+        )
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
             .build()
@@ -61,9 +70,18 @@ object HijriSyncScheduler {
             ExistingPeriodicWorkPolicy.KEEP,
             request,
         )
+        NativeLogger.log(
+            context,
+            "HijriSyncScheduler: PERIODIC_ENQUEUE_SUBMITTED expectedFirstRunAt=${java.time.Instant.ofEpochMilli(expectedFirstRunAt)} policy=KEEP",
+        )
     }
 
     private fun enqueueOneTimeCheck(context: Context, reason: String) {
+        val requestedAt = System.currentTimeMillis()
+        NativeLogger.log(
+            context,
+            "HijriSyncScheduler: ONE_TIME_ENQUEUE_REQUESTED reason=$reason requestedAt=${java.time.Instant.ofEpochMilli(requestedAt)} backoff=exponential_15m",
+        )
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
             .build()
@@ -77,9 +95,18 @@ object HijriSyncScheduler {
             ExistingWorkPolicy.KEEP,
             request,
         )
+        NativeLogger.log(
+            context,
+            "HijriSyncScheduler: ONE_TIME_ENQUEUE_SUBMITTED reason=$reason expectedEarliestAt=${java.time.Instant.ofEpochMilli(requestedAt)} policy=KEEP",
+        )
     }
 
     fun enqueueConnectedRetry(context: Context) {
+        val requestedAt = System.currentTimeMillis()
+        NativeLogger.log(
+            context,
+            "HijriSyncScheduler: CONNECTED_RETRY_REQUESTED reason=network_restored requestedAt=${java.time.Instant.ofEpochMilli(requestedAt)}",
+        )
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
@@ -92,6 +119,10 @@ object HijriSyncScheduler {
             CONNECTED_RETRY_WORK_NAME,
             ExistingWorkPolicy.KEEP,
             request,
+        )
+        NativeLogger.log(
+            context,
+            "HijriSyncScheduler: CONNECTED_RETRY_SUBMITTED expectedAt=${java.time.Instant.ofEpochMilli(requestedAt)} networkRequired=CONNECTED policy=KEEP",
         )
     }
 
@@ -113,6 +144,7 @@ object HijriSyncScheduler {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        var exact = true
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(
@@ -124,6 +156,7 @@ object HijriSyncScheduler {
                 alarmManager.setExact(AlarmManager.RTC_WAKEUP, next.timeInMillis, pendingIntent)
             }
         } catch (_: SecurityException) {
+            exact = false
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
@@ -134,6 +167,10 @@ object HijriSyncScheduler {
                 alarmManager.set(AlarmManager.RTC_WAKEUP, next.timeInMillis, pendingIntent)
             }
         }
+        NativeLogger.log(
+            context,
+            "HijriSyncScheduler: MIDNIGHT_ALARM_SCHEDULED reason=daily_check scheduledFor=${java.time.Instant.ofEpochMilli(next.timeInMillis)} exact=$exact",
+        )
     }
 
     private fun millisUntilNextMidnight(): Long {

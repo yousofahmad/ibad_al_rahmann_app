@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import 'egyptian_hijri_sync.dart';
+import 'app_logger.dart';
 
 /// Calendar-only task, deliberately separate from prayer alarms and their IDs.
 const int egyptianHijriSyncAlarmId = 874321;
@@ -14,10 +15,25 @@ const int egyptianHijriSyncAlarmId = 874321;
 Future<void> egyptianHijriSyncBackgroundCallback() async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
+  await AppLogger.init();
+  final startedAt = DateTime.now();
+  final stopwatch = Stopwatch()..start();
+  AppLogger.logEvent('HijriSyncScheduler', 'background_callback_started', {
+    'scheduledInterval': '6h_periodic_best_effort',
+    'startedAt': startedAt.toIso8601String(),
+  });
   try {
-    await EgyptianHijriSync.instance.refresh();
+    await EgyptianHijriSync.instance.refresh(trigger: 'android_alarm_manager');
+    AppLogger.logEvent('HijriSyncScheduler', 'background_callback_finished', {
+      'outcome': 'callback_completed',
+      'durationMs': stopwatch.elapsedMilliseconds,
+    });
   } catch (error) {
-    debugPrint('Egyptian calendar background sync unavailable: $error');
+    AppLogger.logEvent('HijriSyncScheduler', 'background_callback_failed', {
+      'reason': 'exception_${error.runtimeType}',
+      'durationMs': stopwatch.elapsedMilliseconds,
+    });
+    debugPrint('Egyptian calendar background sync error: ${error.runtimeType}');
   }
 }
 
@@ -34,16 +50,27 @@ class EgyptianHijriSyncRunner with WidgetsBindingObserver {
     if (_started) return;
     _started = true;
     WidgetsBinding.instance.addObserver(this);
-    unawaited(_refreshSafely());
+    unawaited(_refreshSafely('app_start'));
     _foregroundTimer = Timer.periodic(const Duration(minutes: 15), (_) {
       if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-        unawaited(_refreshSafely());
+        unawaited(_refreshSafely('foreground_15m_check'));
       }
     });
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       try {
+        final scheduleStartedAt = DateTime.now();
+        AppLogger.logEvent('HijriSyncScheduler', 'schedule_started', {
+          'trigger': 'runner_start',
+          'intervalHours': 6,
+          'expectedFirstRunAt': scheduleStartedAt
+              .add(const Duration(hours: 6))
+              .toIso8601String(),
+        });
         final initialized = await AndroidAlarmManager.initialize();
         if (!initialized) {
+          AppLogger.logEvent('HijriSyncScheduler', 'schedule_failed', {
+            'reason': 'alarm_manager_initialization_returned_false',
+          });
           debugPrint(
             'Egyptian calendar background scheduler did not initialize',
           );
@@ -57,28 +84,63 @@ class EgyptianHijriSyncRunner with WidgetsBindingObserver {
           wakeup: false,
           rescheduleOnReboot: true,
         );
+        AppLogger.logEvent(
+          'HijriSyncScheduler',
+          scheduled ? 'schedule_accepted' : 'schedule_failed',
+          {
+            'intervalHours': 6,
+            'expectedFirstRunAt': scheduleStartedAt
+                .add(const Duration(hours: 6))
+                .toIso8601String(),
+            'exact': false,
+            'wakeup': false,
+            if (!scheduled) 'reason': 'alarm_manager_returned_false',
+          },
+        );
         if (!scheduled) {
           debugPrint('Egyptian calendar background schedule was not accepted');
         }
       } catch (error) {
+        AppLogger.logEvent('HijriSyncScheduler', 'schedule_failed', {
+          'reason': 'exception_${error.runtimeType}',
+        });
         debugPrint(
-          'Egyptian calendar background scheduling unavailable: $error',
+          'Egyptian calendar background scheduling error: ${error.runtimeType}',
         );
       }
     }
   }
 
-  Future<void> _refreshSafely() async {
+  Future<void> _refreshSafely(String trigger) async {
+    final startedAt = DateTime.now();
+    final stopwatch = Stopwatch()..start();
+    AppLogger.logEvent('HijriSyncScheduler', 'refresh_triggered', {
+      'trigger': trigger,
+      'expectedAt': startedAt.toIso8601String(),
+      'startedAt': startedAt.toIso8601String(),
+    });
     try {
-      await EgyptianHijriSync.instance.refresh();
+      await EgyptianHijriSync.instance.refresh(trigger: trigger);
+      AppLogger.logEvent('HijriSyncScheduler', 'refresh_callback_finished', {
+        'trigger': trigger,
+        'outcome': 'callback_completed',
+        'durationMs': stopwatch.elapsedMilliseconds,
+      });
     } catch (error) {
-      debugPrint('Egyptian calendar sync unavailable: $error');
+      AppLogger.logEvent('HijriSyncScheduler', 'refresh_callback_failed', {
+        'trigger': trigger,
+        'reason': 'exception_${error.runtimeType}',
+        'durationMs': stopwatch.elapsedMilliseconds,
+      });
+      debugPrint('Egyptian calendar sync error: ${error.runtimeType}');
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(_refreshSafely());
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshSafely('app_resumed'));
+    }
   }
 
   void dispose() {

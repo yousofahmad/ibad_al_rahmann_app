@@ -2,6 +2,10 @@ import 'dart:convert';
 
 import 'package:html/parser.dart' as html_parser;
 import 'package:http/http.dart' as http;
+import 'package:timezone/data/latest.dart' as tzdata;
+import 'package:timezone/timezone.dart' as tz;
+
+import 'app_logger.dart';
 
 class OfficialHijriValue {
   final int day, month, year;
@@ -32,6 +36,13 @@ class EgyptianHijriSources {
   final http.Client client;
   EgyptianHijriSources({http.Client? client})
     : client = client ?? http.Client();
+  static const _browserHeaders = <String, String>{
+    'Cache-Control': 'no-cache',
+    'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
+  };
+  static bool _zonesReady = false;
   static const darIftaApiUrl =
       'http://di107.dar-alifta.org/api/HijriDate?langID=1';
   static const darIftaHttpsApiUrl =
@@ -40,9 +51,70 @@ class EgyptianHijriSources {
       'https://www.dar-alifta.org/ar/services/details/12/التاريخ-الهجري';
   static const surveyUrl = 'https://www.esa.gov.eg/monthlymwaket.aspx';
 
-  Future<http.Response> _get(String url) => client
-      .get(Uri.parse(url), headers: const {'Cache-Control': 'no-cache'})
-      .timeout(const Duration(seconds: 15));
+  Future<http.Response> _get(String url, {required String source}) =>
+      _request(
+        () => client.get(Uri.parse(url), headers: _browserHeaders),
+        source: source,
+        method: 'GET',
+      );
+
+  Future<http.Response> _post(
+    String url,
+    Map<String, String> fields, {
+    required String source,
+    Map<String, String>? extraHeaders,
+  }) => _request(
+    () => client.post(
+      Uri.parse(url),
+      headers: {
+        ..._browserHeaders,
+        if (extraHeaders != null) ...extraHeaders,
+        'Origin': Uri.parse(url).origin,
+        'Referer': url,
+      },
+      body: fields,
+    ),
+    source: source,
+    method: 'POST',
+  );
+
+  Future<http.Response> _request(
+    Future<http.Response> Function() send, {
+    required String source,
+    required String method,
+  }) async {
+    final startedAt = DateTime.now().toUtc();
+    final stopwatch = Stopwatch()..start();
+    AppLogger.logEvent('EgyptianHijriSources', 'network_attempt_started', {
+      'source': source,
+      'method': method,
+      'startedAt': startedAt.toIso8601String(),
+      'timeoutSeconds': 15,
+    });
+    try {
+      final response = await send().timeout(const Duration(seconds: 15));
+      AppLogger.logEvent('EgyptianHijriSources', 'network_attempt_finished', {
+        'source': source,
+        'method': method,
+        'httpStatus': response.statusCode,
+        'outcome': response.statusCode >= 200 && response.statusCode < 300
+            ? 'http_success'
+            : 'http_failure',
+        'finishedAt': DateTime.now().toUtc().toIso8601String(),
+        'durationMs': stopwatch.elapsedMilliseconds,
+      });
+      return response;
+    } catch (error) {
+      AppLogger.logEvent('EgyptianHijriSources', 'network_attempt_failed', {
+        'source': source,
+        'method': method,
+        'reason': 'exception_${error.runtimeType}',
+        'finishedAt': DateTime.now().toUtc().toIso8601String(),
+        'durationMs': stopwatch.elapsedMilliseconds,
+      });
+      rethrow;
+    }
+  }
   static void _check(http.Response response) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw StateError('Official source HTTP ${response.statusCode}');
@@ -50,8 +122,44 @@ class EgyptianHijriSources {
   }
 
   static String _body(http.Response response) {
+    final bytes = response.bodyBytes;
+    final contentType = response.headers['content-type'] ?? '';
+    final charset = RegExp(r'charset\s*=\s*([^;]+)', caseSensitive: false)
+        .firstMatch(contentType)
+        ?.group(1)
+        ?.trim()
+        .replaceAll('"', '')
+        .replaceAll("'", '')
+        .toLowerCase();
+    final hasLittleEndianBom =
+        bytes.length >= 2 && bytes[0] == 0xff && bytes[1] == 0xfe;
+    final hasBigEndianBom =
+        bytes.length >= 2 && bytes[0] == 0xfe && bytes[1] == 0xff;
+    final isUtf16 =
+        hasLittleEndianBom ||
+        hasBigEndianBom ||
+        charset == 'utf-16' ||
+        charset == 'utf-16le' ||
+        charset == 'utf-16be';
+    if (isUtf16) {
+      final offset = hasLittleEndianBom || hasBigEndianBom ? 2 : 0;
+      if ((bytes.length - offset).isOdd) {
+        throw const FormatException('Invalid UTF-16 response body');
+      }
+      final littleEndian =
+          hasLittleEndianBom || (!hasBigEndianBom && charset == 'utf-16le');
+      final codeUnits = <int>[];
+      for (var i = offset; i < bytes.length; i += 2) {
+        codeUnits.add(
+          littleEndian
+              ? bytes[i] | (bytes[i + 1] << 8)
+              : (bytes[i] << 8) | bytes[i + 1],
+        );
+      }
+      return String.fromCharCodes(codeUnits);
+    }
     try {
-      return utf8.decode(response.bodyBytes);
+      return utf8.decode(bytes);
     } catch (_) {
       return response.body;
     }
@@ -73,6 +181,7 @@ class EgyptianHijriSources {
 
   static final _hijriMonths = <String, int>{
     'محرم': 1,
+    'المحرم': 1,
     'صفر': 2,
     'ربيع الأول': 3,
     'ربيع الاول': 3,
@@ -87,6 +196,8 @@ class EgyptianHijriSources {
     'جمادى الثانية': 6,
     'جمادى الآخرة': 6,
     'جمادى الاخرة': 6,
+    'جماد الآخر': 6,
+    'جماد الاخر': 6,
     'جماد الثاني': 6,
     'جماد الثانى': 6,
     'رجب': 7,
@@ -95,8 +206,12 @@ class EgyptianHijriSources {
     'شوال': 10,
     'ذو القعدة': 11,
     'ذو القعده': 11,
+    'ذوالقعدة': 11,
+    'ذوالقعده': 11,
     'ذو الحجة': 12,
     'ذو الحجه': 12,
+    'ذوالحجة': 12,
+    'ذوالحجه': 12,
   };
   static const _civilMonths = <String, int>{
     'يناير': 1,
@@ -118,19 +233,86 @@ class EgyptianHijriSources {
   static bool _same(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
-  /// The unavailable API has no verified JSON contract. Do not invent one or
-  /// date-stamp a bare Hijri string. Only the same proven HTML civil-date pair
-  /// can be accepted; otherwise fetch the official current-date HTTPS page.
+  static DateTime? _parseHttpDate(String? value) {
+    if (value == null) return null;
+    final match = RegExp(
+      r'^[A-Za-z]{3},\s*(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\s+GMT$',
+    ).firstMatch(value.trim());
+    if (match == null) return null;
+    const months = <String, int>{
+      'Jan': 1,
+      'Feb': 2,
+      'Mar': 3,
+      'Apr': 4,
+      'May': 5,
+      'Jun': 6,
+      'Jul': 7,
+      'Aug': 8,
+      'Sep': 9,
+      'Oct': 10,
+      'Nov': 11,
+      'Dec': 12,
+    };
+    final month = months[match.group(2)];
+    if (month == null) return null;
+    final day = int.parse(match.group(1)!);
+    final year = int.parse(match.group(3)!);
+    final hour = int.parse(match.group(4)!);
+    final minute = int.parse(match.group(5)!);
+    final second = int.parse(match.group(6)!);
+    final result = DateTime.utc(year, month, day, hour, minute, second);
+    if (result.year != year ||
+        result.month != month ||
+        result.day != day ||
+        hour > 23 ||
+        minute > 59 ||
+        second > 59) {
+      return null;
+    }
+    return result;
+  }
+
+  static bool _sameCairoDay(DateTime instant, DateTime requested) {
+    if (!_zonesReady) {
+      tzdata.initializeTimeZones();
+      _zonesReady = true;
+    }
+    final cairo = tz.TZDateTime.from(
+      instant.toUtc(),
+      tz.getLocation('Africa/Cairo'),
+    );
+    return _same(DateTime(cairo.year, cairo.month, cairo.day), requested);
+  }
+
+  /// Accept only the published current-date API's JSON string and only when
+  /// its HTTP Date header belongs to the requested civil day in Cairo.
   static OfficialHijriValue? parseDarIftaApi(
     String body, {
     DateTime? civilDate,
+    String? responseDate,
   }) {
-    if (civilDate == null ||
-        body.trimLeft().startsWith('{') ||
-        body.trimLeft().startsWith('[')) {
+    if (civilDate == null) {
       return null;
     }
-    return parseDarIftaHeader(body, civilDate)?.$2;
+    final servedAt = _parseHttpDate(responseDate);
+    if (servedAt == null || !_sameCairoDay(servedAt, civilDate)) return null;
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! String) return null;
+      final text = _clean(decoded);
+      final match = RegExp(r'^(\d{1,2})\s+(.+?)\s+(\d{3,4})$')
+          .firstMatch(text);
+      if (match == null) return null;
+      final day = int.parse(match.group(1)!);
+      final month = _hijriMonths[match.group(2)!];
+      final year = int.parse(match.group(3)!);
+      if (month == null || day < 1 || day > 30 || year < 1 || year > 9999) {
+        return null;
+      }
+      return OfficialHijriValue(day, month, year);
+    } catch (_) {
+      return null;
+    }
   }
 
   static (DateTime, OfficialHijriValue)? parseDarIftaHeader(
@@ -166,9 +348,13 @@ class EgyptianHijriSources {
   Future<DarIftaSnapshot> fetchDarIfta(DateTime cairoToday) async {
     for (final endpoint in [darIftaHttpsApiUrl, darIftaApiUrl]) {
       try {
-        final r = await _get(endpoint);
+        final r = await _get(endpoint, source: 'dar_alifta_current_date_api');
         _check(r);
-        final value = parseDarIftaApi(_body(r), civilDate: cairoToday);
+        final value = parseDarIftaApi(
+          _body(r),
+          civilDate: cairoToday,
+          responseDate: r.headers['date'],
+        );
         if (value != null) {
           return DarIftaSnapshot(
             civilDate: cairoToday,
@@ -176,11 +362,27 @@ class EgyptianHijriSources {
             sourceUrl: endpoint,
           );
         }
+        AppLogger.logEvent(
+          'EgyptianHijriSources',
+          'source_value_rejected',
+          {
+            'source': 'dar_alifta_current_date_api',
+            'civilDate': [
+              cairoToday.year.toString().padLeft(4, '0'),
+              cairoToday.month.toString().padLeft(2, '0'),
+              cairoToday.day.toString().padLeft(2, '0'),
+            ].join('-'),
+            'reason': 'invalid_payload_or_http_date_not_current_cairo_day',
+          },
+        );
       } catch (_) {
         /* Fallback to the published current-date service page. */
       }
     }
-    final response = await _get(darIftaUrl);
+    final response = await _get(
+      darIftaUrl,
+      source: 'dar_alifta_current_date_page',
+    );
     _check(response);
     final pair = parseDarIftaHeader(_body(response), cairoToday);
     if (pair == null) {
@@ -202,7 +404,10 @@ class EgyptianHijriSources {
     if (month < 1 || month > 12 || year < 1 || year > 9999) {
       throw ArgumentError('Invalid requested Gregorian year/month');
     }
-    final initial = await _get(surveyUrl);
+    final initial = await _get(
+      surveyUrl,
+      source: 'survey_authority_month_form',
+    );
     _check(initial);
     final doc = html_parser.parse(_body(initial));
     final form = doc.querySelector('form#ctl00');
@@ -232,9 +437,12 @@ class EgyptianHijriSources {
           .map((cookie) => cookie.split(';').first.trim())
           .join('; ');
     }
-    final response = await client
-        .post(Uri.parse(surveyUrl), headers: headers, body: fields)
-        .timeout(const Duration(seconds: 15));
+    final response = await _post(
+      surveyUrl,
+      fields,
+      source: 'survey_authority_month_table',
+      extraHeaders: headers,
+    );
     _check(response);
     return parseSurveyMonth(_body(response), month: month, expectedYear: year);
   }

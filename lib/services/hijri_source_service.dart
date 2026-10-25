@@ -1,41 +1,14 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:home_widget/home_widget.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/services/app_logger.dart';
+import 'package:ibad_al_rahmann/services/egyptian_hijri_calendar.dart';
+import 'package:ibad_al_rahmann/services/egyptian_hijri_sources.dart';
+import 'package:ibad_al_rahmann/services/egyptian_hijri_sync.dart';
 import 'package:ibad_al_rahmann/services/notification_service.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
-
-Future<http.Response?> _getWithLongRetry(
-  Uri uri, {
-  Map<String, String>? headers,
-}) async {
-  const timeouts = [
-    Duration(seconds: 15),
-    Duration(seconds: 30),
-    Duration(seconds: 45),
-  ];
-  for (var attempt = 0; attempt < timeouts.length; attempt++) {
-    try {
-      final response = await http
-          .get(uri, headers: headers)
-          .timeout(timeouts[attempt]);
-      if (response.statusCode < 500 && response.statusCode != 408) {
-        return response;
-      }
-    } catch (_) {
-      // Retry transient failures and weak connections with a longer timeout.
-    }
-    if (attempt + 1 < timeouts.length) {
-      await Future<void>.delayed(Duration(seconds: 2 << attempt));
-    }
-  }
-  return null;
-}
 
 /// A fully parsed Hijri date received from an Egyptian authority.
 @immutable
@@ -157,106 +130,121 @@ class HijriSourceDate {
 }
 
 class EgyptDarAlIftaProvider {
-  static const String apiUrl =
-      'https://di107.dar-alifta.org/api/HijriDate?langID=2';
+  static const String apiUrl = EgyptianHijriSources.darIftaHttpsApiUrl;
 
-  Future<HijriSourceDate?> fetchDate() async {
+  Future<HijriSourceDate?> fetchDate({DateTime? civilDate}) async {
+    final startedAt = DateTime.now().toUtc();
+    final stopwatch = Stopwatch()..start();
+    final sources = EgyptianHijriSources();
+    var outcome = 'failed';
+    var reason = 'no_valid_response';
+    AppLogger.logEvent('HijriSync', 'source_sync_started', {
+      'source': 'dar_alifta_current_date_api',
+      'civilDate': EgyptianHijriCalendar.civilKey(
+        EgyptianHijriSync.cairoToday(civilDate),
+      ),
+      'startedAt': startedAt.toIso8601String(),
+      'url': apiUrl,
+    });
     try {
-      AppLogger.log('HijriSync', 'Fetching from Dar Al-Ifta: $apiUrl');
-      final response = await _getWithLongRetry(Uri.parse(apiUrl));
-      if (response != null && response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        final date = _findDate(decoded);
-        if (date != null) return date;
-        AppLogger.log(
-          'HijriSync',
-          'Dar Al-Ifta returned an unrecognized Hijri date: ${response.body}',
-        );
-      } else if (response != null) {
-        AppLogger.log(
-          'HijriSync',
-          'Dar Al-Ifta Error: Status code ${response.statusCode}, Body: ${response.body}',
-        );
-      }
-    } catch (e) {
-      AppLogger.log('HijriSync', 'Dar Al-Ifta Exception: $e');
-      debugPrint('Dar Al-Ifta fetch error: $e');
+      final snapshot = await sources.fetchDarIfta(
+        EgyptianHijriSync.cairoToday(civilDate),
+      );
+      outcome = 'success';
+      reason = 'current_cairo_date_verified';
+      return HijriSourceDate(
+        day: snapshot.hijri.day,
+        month: snapshot.hijri.month,
+        year: snapshot.hijri.year,
+      );
+    } catch (error) {
+      reason = 'exception_${error.runtimeType}';
+      AppLogger.log(
+        'HijriSync',
+        'Dar Al-Ifta fetch error type: ${error.runtimeType}',
+      );
+      return null;
+    } finally {
+      sources.close();
+      AppLogger.logEvent('HijriSync', 'source_sync_finished', {
+        'source': 'dar_alifta_current_date_api',
+        'startedAt': startedAt.toIso8601String(),
+        'finishedAt': DateTime.now().toUtc().toIso8601String(),
+        'outcome': outcome,
+        'reason': reason,
+        'durationMs': stopwatch.elapsedMilliseconds,
+      });
     }
-    return null;
   }
 
-  /// Kept for callers from older app versions and diagnostics.
-  Future<int?> fetchDay() async => (await fetchDate())?.day;
-
-  static HijriSourceDate? _findDate(dynamic value) {
-    if (value is String) return HijriSourceDate.parse(value);
-    if (value is List) {
-      for (final item in value) {
-        final date = _findDate(item);
-        if (date != null) return date;
-      }
-    }
-    if (value is Map) {
-      for (final item in value.values) {
-        final date = _findDate(item);
-        if (date != null) return date;
-      }
-    }
-    return null;
-  }
+  Future<int?> fetchDay({DateTime? civilDate}) async =>
+      (await fetchDate(civilDate: civilDate))?.day;
 }
 
 class EgyptSurveyAuthorityProvider {
-  static const String pageUrl = 'https://www.esa.gov.eg/praytimes.aspx';
+  static const String pageUrl = EgyptianHijriCalendar.sourceUrl;
 
-  Future<HijriSourceDate?> fetchDate() async {
+  Future<HijriSourceDate?> fetchDate({DateTime? civilDate}) async {
+    final startedAt = DateTime.now().toUtc();
+    final stopwatch = Stopwatch()..start();
+    final sources = EgyptianHijriSources();
+    final day = EgyptianHijriSync.cairoToday(civilDate);
+    var outcome = 'failed';
+    var reason = 'official_esa_day_missing';
+    AppLogger.logEvent('HijriSync', 'source_sync_started', {
+      'source': 'survey_authority_annual_calendar',
+      'civilDate': EgyptianHijriCalendar.civilKey(day),
+      'startedAt': startedAt.toIso8601String(),
+      'url': pageUrl,
+    });
     try {
-      AppLogger.log('HijriSync', 'Fetching from Survey Authority: $pageUrl');
-      final response = await _getWithLongRetry(
-        Uri.parse(pageUrl),
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-      );
-
-      if (response != null && response.statusCode == 200) {
-        final html = response.body;
-        // The Cairo row contains Gregorian then Hijri dates in adjacent cells.
-        final regex = RegExp(
-          r'القاهرة.*?<\/td>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>([^<]+)<\/td>',
-          dotAll: true,
-        );
-        final match = regex.firstMatch(html);
-        if (match != null) {
-          final rawDate = match.group(1)?.replaceAll('ـ', '').trim() ?? '';
-          AppLogger.log('HijriSync', 'Survey Authority Raw Hijri: $rawDate');
-          final date = HijriSourceDate.parse(rawDate);
-          if (date != null) return date;
-          AppLogger.log(
-            'HijriSync',
-            'Survey Authority returned an unrecognized Hijri date: $rawDate',
-          );
-        } else {
-          AppLogger.log(
-            'HijriSync',
-            'Survey Authority: Cairo row regex did not match.',
-          );
+      final calendar = EgyptianHijriCalendar.instance;
+      if (!calendar.isInitialized) {
+        try {
+          await calendar.initialize();
+        } catch (_) {
+          // A full live year can still be fetched if the bundled asset is bad.
         }
-      } else if (response != null) {
-        AppLogger.log(
-          'HijriSync',
-          'Survey Authority Error: Status code ${response.statusCode}',
-        );
       }
-    } catch (e) {
-      AppLogger.log('HijriSync', 'Survey Authority Exception: $e');
-      debugPrint('Survey Authority fetch error: $e');
+      final key = EgyptianHijriCalendar.civilKey(day);
+      var official = calendar.surveyDates[key];
+      if (official == null) {
+        final year = EgyptianHijriCalendar.parseDates(
+          await sources.fetchSurveyYear(day.year),
+        );
+        official = year[key];
+      }
+      if (official == null) return null;
+      outcome = 'success';
+      reason = 'annual_esa_calendar';
+      return HijriSourceDate(
+        day: official.hDay,
+        month: official.hMonth,
+        year: official.hYear,
+      );
+    } catch (error) {
+      reason = 'exception_${error.runtimeType}';
+      AppLogger.log(
+        'HijriSync',
+        'ESA calendar fetch error type: ${error.runtimeType}',
+      );
+      return null;
+    } finally {
+      sources.close();
+      AppLogger.logEvent('HijriSync', 'source_sync_finished', {
+        'source': 'survey_authority_annual_calendar',
+        'civilDate': EgyptianHijriCalendar.civilKey(day),
+        'startedAt': startedAt.toIso8601String(),
+        'finishedAt': DateTime.now().toUtc().toIso8601String(),
+        'outcome': outcome,
+        'reason': reason,
+        'durationMs': stopwatch.elapsedMilliseconds,
+      });
     }
-    return null;
   }
 
-  /// Kept for callers from older app versions and diagnostics.
-  Future<int?> fetchDay() async => (await fetchDate())?.day;
+  Future<int?> fetchDay({DateTime? civilDate}) async =>
+      (await fetchDate(civilDate: civilDate))?.day;
 }
 
 class HijriSourceService {
@@ -307,12 +295,11 @@ class HijriSourceService {
       ((CacheHelper.prefs.getBool(_temporarySourceKey) ?? false) ||
           !hasTrustedStoredDate);
 
-  /// The daily Dar Al-Ifta API is the live date source; ESA only verifies it.
-  /// Return null when Dar is unavailable rather than substituting ESA's table.
+  /// ESA's annual Cairo table is primary; Dar Al-Ifta is comparison-only.
   static HijriSourceDate? selectLiveDate({
     required HijriSourceDate? darAlIftaDate,
     required HijriSourceDate? surveyAuthorityDate,
-  }) => darAlIftaDate;
+  }) => surveyAuthorityDate;
 
   static HijriSourceDate projectOfflineDate(
     HijriSourceDate savedDate,
@@ -338,20 +325,30 @@ class HijriSourceService {
     return projected;
   }
 
-  /// Compares Egyptian sources after local midnight. Dar Al-Ifta is the
-  /// provisional source until the Survey Authority catches up.
+  /// Applies the ESA annual table to the existing date-offset calculation;
+  /// Dar Al-Ifta remains a daily comparison source, not a replacement.
   static Future<void> syncOffsetIfNeeded({
     DateTime? now,
     bool rescheduleNotifications = true,
   }) async {
     if (!PrayerService.isEgyptianSystem) {
+      AppLogger.logEvent('HijriSync', 'sync_skipped', {
+        'trigger': 'syncOffsetIfNeeded',
+        'reason': 'non_egyptian_calendar',
+      });
       AppLogger.log(
         'HijriSync',
         'syncOffsetIfNeeded: Skipped because active system is Umm Al-Qura.',
       );
       return;
     }
-    if (_isSyncing) return;
+    if (_isSyncing) {
+      AppLogger.logEvent('HijriSync', 'sync_skipped', {
+        'trigger': 'syncOffsetIfNeeded',
+        'reason': 'another_sync_in_progress',
+      });
+      return;
+    }
 
     final currentTime = now ?? DateTime.now();
     final todayStr = DateFormat('yyyy-MM-dd').format(currentTime);
@@ -383,6 +380,11 @@ class HijriSourceService {
     if (lastFetchDate == todayStr &&
         !temporaryDarSource &&
         hasTrustedStoredDate) {
+      AppLogger.logEvent('HijriSync', 'sync_skipped', {
+        'trigger': 'syncOffsetIfNeeded',
+        'civilDate': todayStr,
+        'reason': 'already_verified_today',
+      });
       return;
     }
 
@@ -392,6 +394,12 @@ class HijriSourceService {
       if (lastAttempt != null &&
           DateFormat('yyyy-MM-dd').format(lastAttempt) == todayStr &&
           currentTime.difference(lastAttempt) < _retryInterval) {
+        AppLogger.logEvent('HijriSync', 'sync_skipped', {
+          'trigger': 'syncOffsetIfNeeded',
+          'civilDate': todayStr,
+          'reason': 'retry_throttle_active',
+          'retryAfter': lastAttempt.add(_retryInterval).toIso8601String(),
+        });
         await _applyOfflineProjection(currentTime);
         return;
       }
@@ -424,7 +432,15 @@ class HijriSourceService {
 
   /// Force fetch the full Hijri date from both Egyptian sources right now.
   static Future<bool> forceSync() async {
-    if (!PrayerService.isEgyptianSystem || _isSyncing) return false;
+    if (!PrayerService.isEgyptianSystem || _isSyncing) {
+      AppLogger.logEvent('HijriSync', 'sync_skipped', {
+        'trigger': 'manual_force_sync',
+        'reason': PrayerService.isEgyptianSystem
+            ? 'another_sync_in_progress'
+            : 'non_egyptian_calendar',
+      });
+      return false;
+    }
     final now = DateTime.now();
     final todayStr = DateFormat('yyyy-MM-dd').format(now);
     AppLogger.log('HijriSync', 'Manual forceSync requested for $todayStr.');
@@ -474,16 +490,65 @@ class HijriSourceService {
     DateTime? effectiveDate,
     bool rescheduleNotifications = true,
   }) async {
+    final startedAt = DateTime.now();
+    final stopwatch = Stopwatch()..start();
+    AppLogger.logEvent('HijriSync', 'dual_sync_started', {
+      'trigger': 'official_sources',
+      'civilDate': todayStr,
+      'startedAt': startedAt.toIso8601String(),
+      'effectiveDate': (effectiveDate ?? now).toIso8601String(),
+    });
+    try {
+      final success = await _performDualSyncBody(
+        todayStr,
+        now,
+        effectiveDate: effectiveDate,
+        rescheduleNotifications: rescheduleNotifications,
+      );
+      AppLogger.logEvent('HijriSync', 'dual_sync_finished', {
+        'civilDate': todayStr,
+        'outcome': success ? 'success' : 'failed',
+        'reason': success ? 'official_date_applied' : 'no_safe_date_applied',
+        'durationMs': stopwatch.elapsedMilliseconds,
+      });
+      return success;
+    } catch (error) {
+      AppLogger.logEvent('HijriSync', 'dual_sync_finished', {
+        'civilDate': todayStr,
+        'outcome': 'exception',
+        'reason': 'exception_${error.runtimeType}',
+        'durationMs': stopwatch.elapsedMilliseconds,
+      });
+      rethrow;
+    }
+  }
+
+  static Future<bool> _performDualSyncBody(
+    String todayStr,
+    DateTime now, {
+    DateTime? effectiveDate,
+    bool rescheduleNotifications = true,
+  }) async {
     final prefs = CacheHelper.prefs;
     await prefs.setString(_lastAttemptAtKey, now.toIso8601String());
 
+    final comparisonDate = effectiveDate ?? now;
     final results = await Future.wait([
-      _darAlIftaProvider.fetchDate(),
-      _surveyAuthorityProvider.fetchDate(),
+      _darAlIftaProvider.fetchDate(civilDate: comparisonDate),
+      _surveyAuthorityProvider.fetchDate(civilDate: comparisonDate),
     ]);
     final darAlIftaDate = results[0];
     final esaDate = results[1];
-    final comparisonDate = effectiveDate ?? now;
+    final confirmed = EgyptianHijriCalendar.instance.userConfirmation?.lookup(
+      comparisonDate,
+    );
+    final manualDate = confirmed == null
+        ? null
+        : HijriSourceDate(
+            day: confirmed.hDay,
+            month: confirmed.hMonth,
+            year: confirmed.hYear,
+          );
 
     AppLogger.log(
       'HijriSync',
@@ -499,25 +564,43 @@ class HijriSourceService {
       } else {
         AppLogger.log(
           'HijriSync',
-          'Source discrepancy: Dar Al-Ifta ${_formatDate(darAlIftaDate)}; Survey Authority ${_formatDate(esaDate)}. Using Dar Al-Ifta until ESA catches up.',
+          [
+            'Source discrepancy: Dar Al-Ifta ${_formatDate(darAlIftaDate)}; ',
+            'ESA annual table ${_formatDate(esaDate)}. Retaining the ESA date; ',
+            'daily confirmation is handled by EgyptianHijriSync.',
+          ].join(),
         );
       }
     }
 
-    // Dar Al-Ifta supplies today's live date. The Survey Authority's complete
-    // calendar is only a verifier; never substitute it when the live API fails.
-    final chosenDate = selectLiveDate(
-      darAlIftaDate: darAlIftaDate,
-      surveyAuthorityDate: esaDate,
-    );
-    if (chosenDate == null) return false;
+    final chosenDate = manualDate ??
+        selectLiveDate(
+          darAlIftaDate: darAlIftaDate,
+          surveyAuthorityDate: esaDate,
+        );
+    if (chosenDate == null) {
+      AppLogger.logEvent('HijriSync', 'dual_sync_decision', {
+        'civilDate': todayStr,
+        'outcome': 'failed',
+        'reason': 'no_esa_annual_or_confirmed_date_available',
+      });
+      return false;
+    }
 
     final offset = resolveOffsetForDate(chosenDate, comparisonDate);
     if (offset == null) {
       AppLogger.log(
         'HijriSync',
-        'Rejected Dar Al-Ifta Hijri date ${_formatDate(chosenDate)}: no safe offset within +/-3 days of the local calculation.',
+        [
+          'Rejected official Hijri date ${_formatDate(chosenDate)}: ',
+          'no safe offset within +/-3 days of the local calculation.',
+        ].join(),
       );
+      AppLogger.logEvent('HijriSync', 'dual_sync_decision', {
+        'civilDate': todayStr,
+        'outcome': 'failed',
+        'reason': 'unsafe_offset_outside_plus_minus_3_days',
+      });
       return false;
     }
 
@@ -540,18 +623,22 @@ class HijriSourceService {
         previousHijri.hDay != updatedHijri.hDay ||
         previousHijri.hMonth != updatedHijri.hMonth ||
         previousHijri.hYear != updatedHijri.hYear;
-    final temporaryDarSource =
-        darAlIftaDate != null &&
-        (esaDate == null || !darAlIftaDate.sameDate(esaDate));
+    const temporaryDarSource = false;
 
     await prefs.setInt(_localOffsetKey, offset);
     await prefs.setInt(_lockedMonthKey, updatedHijri.hMonth);
     await prefs.setInt(_lockedYearKey, updatedHijri.hYear);
     await prefs.setString(_lastFetchDateKey, todayStr);
     await prefs.setString(_confirmedDateKey, todayStr);
-    final chosenSource = esaDate != null && chosenDate.sameDate(esaDate)
+    final authoritiesAgree =
+        darAlIftaDate != null &&
+        esaDate != null &&
+        darAlIftaDate.sameDate(esaDate);
+    final chosenSource = manualDate != null
+        ? 'manual'
+        : authoritiesAgree
         ? 'both_authorities'
-        : 'dar_alifta_api';
+        : 'survey_authority_annual_calendar';
     await _saveStoredDate(chosenDate, comparisonDate, chosenSource);
     await prefs.setString(
       'local_hijri_confirmed_source_$todayStr',
@@ -580,7 +667,7 @@ class HijriSourceService {
 
     AppLogger.log(
       'HijriSync',
-      'Hijri date updated to ${_formatDate(chosenDate)} (offset: $offset, temporary Dar Al-Ifta: $temporaryDarSource).',
+      'Hijri date updated to ${_formatDate(chosenDate)} from $chosenSource (offset: $offset).',
     );
     return true;
   }
@@ -637,7 +724,7 @@ class HijriSourceService {
       } catch (e) {
         AppLogger.log(
           'HijriSync',
-          'Native date adoption reschedule failed: $e',
+          'Native date adoption reschedule failed type: ${e.runtimeType}',
         );
       }
     }
@@ -662,7 +749,10 @@ class HijriSourceService {
         try {
           await PrayerService().scheduleNotifications(isUserAction: false);
         } catch (e) {
-          AppLogger.log('HijriSync', 'Library fallback reschedule failed: $e');
+          AppLogger.log(
+            'HijriSync',
+            'Library fallback reschedule error type: ${e.runtimeType}',
+          );
         }
       }
       return false;
@@ -711,7 +801,7 @@ class HijriSourceService {
       } catch (e) {
         AppLogger.log(
           'HijriSync',
-          'Offline notification reschedule failed: $e',
+          'Offline notification reschedule error type: ${e.runtimeType}',
         );
       }
     }
@@ -780,7 +870,10 @@ class HijriSourceService {
       try {
         await HomeWidget.updateWidget(name: name);
       } catch (e) {
-        AppLogger.log('HijriSync', 'Widget update failed for $name: $e');
+        AppLogger.log(
+          'HijriSync',
+          'Widget update failed for $name, error type: ${e.runtimeType}',
+        );
       }
     }
   }

@@ -59,7 +59,10 @@ class _EgyptianHijriSyncStatusState extends State<EgyptianHijriSyncStatus> {
     if (_refreshing) return;
     setState(() => _refreshing = true);
     try {
-      await _sync.refresh(force: true);
+      await _sync.refresh(
+        force: true,
+        trigger: 'manual_prayer_times_calendar_refresh',
+      );
     } finally {
       if (mounted) setState(() => _refreshing = false);
     }

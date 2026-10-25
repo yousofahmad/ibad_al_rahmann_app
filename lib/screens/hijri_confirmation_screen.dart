@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
-import 'package:ibad_al_rahmann/services/hijri_source_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import '../services/egyptian_hijri_calendar.dart';
+import '../services/egyptian_hijri_sync.dart';
 
 class HijriConfirmationScreen extends StatefulWidget {
   const HijriConfirmationScreen({super.key});
@@ -18,7 +19,10 @@ class _HijriConfirmationScreenState extends State<HijriConfirmationScreen> {
 
   Future<void> _syncOnline() async {
     setState(() => _isLoading = true);
-    final success = await HijriSourceService.forceSync();
+    final success = await EgyptianHijriSync.instance.refresh(
+      force: true,
+      trigger: 'manual_hijri_confirmation_screen',
+    );
     if (!mounted) return;
     setState(() => _isLoading = false);
 
@@ -27,7 +31,7 @@ class _HijriConfirmationScreenState extends State<HijriConfirmationScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'تم تأكيد التاريخ الهجري وتحديثه بنجاح من المصدر الرسمي.',
+            'تم تحديث جدول الهيئة ومقارنته بقراءة دار الإفتاء بنجاح.',
           ),
         ),
       );
@@ -37,7 +41,7 @@ class _HijriConfirmationScreenState extends State<HijriConfirmationScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'تعذر الاتصال بالمصدر الرسمي. يرجى التحقق من الإنترنت أو التأكيد يدوياً.',
+            'لم يكتمل التحديث من المصدرين؛ نحتفظ بآخر جدول ناجح ولا نستبدله بتاريخ المكتبة.',
           ),
         ),
       );
@@ -45,53 +49,15 @@ class _HijriConfirmationScreenState extends State<HijriConfirmationScreen> {
   }
 
   Future<void> _manualConfirm(bool isNewMonth) async {
-    if (PrayerService.isEgyptianSystem) {
-      final current = Provider.of<PrayerService>(
-        context,
-        listen: false,
-      ).getAdjustedHijri();
-      var month = current.hMonth;
-      var year = current.hYear;
-      if (isNewMonth && current.hDay != 1) {
-        if (month == 12) {
-          month = 1;
-          year++;
-        } else {
-          month++;
-        }
-      } else if (!isNewMonth && current.hDay == 1) {
-        if (month == 1) {
-          month = 12;
-          year--;
-        } else {
-          month--;
-        }
-      }
-      final success = await HijriSourceService.setManualHijriDate(
-        HijriSourceDate(day: isNewMonth ? 1 : 30, month: month, year: year),
-      );
-      if (!success) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'تعذر مطابقة التاريخ المختار مع تقويم المكتبة. جرّب التحديث من الإنترنت.',
-            ),
-          ),
-        );
-        return;
-      }
-    } else {
-      // Umm al-Qura stays library-based; the manual day adjustment remains
-      // independent from the Egyptian authority date.
-      final prefs = CacheHelper.prefs;
-      final currentAdjustment = prefs.getInt('manual_day_adjustment') ?? 0;
-      await prefs.setInt(
-        'manual_day_adjustment',
-        currentAdjustment + (isNewMonth ? 1 : 0),
-      );
-      Provider.of<PrayerService>(context, listen: false).refreshUI();
-    }
+    if (PrayerService.isEgyptianSystem) return;
+    // Umm al-Qura stays library-based; the manual adjustment remains separate.
+    final prefs = CacheHelper.prefs;
+    final currentAdjustment = prefs.getInt('manual_day_adjustment') ?? 0;
+    await prefs.setInt(
+      'manual_day_adjustment',
+      currentAdjustment + (isNewMonth ? 1 : 0),
+    );
+    Provider.of<PrayerService>(context, listen: false).refreshUI();
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -104,9 +70,13 @@ class _HijriConfirmationScreenState extends State<HijriConfirmationScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isEgyptian = PrayerService.isEgyptianSystem;
-    final currentHijri = Provider.of<PrayerService>(context).getAdjustedHijri();
-    final savedDate = HijriSourceService.storedHijriDate;
-    final hasTrustedDate = HijriSourceService.hasTrustedStoredDate;
+    final calendar = EgyptianHijriCalendar.instance;
+    final officialDate = isEgyptian
+        ? calendar.lookup(EgyptianHijriSync.cairoToday())
+        : null;
+    final currentDateText = isEgyptian
+        ? (officialDate?.format ?? 'غير متاح من جدول الهيئة')
+        : Provider.of<PrayerService>(context).getAdjustedHijriString();
 
     // For manual adjustment display
     final currentManualAdjustment =
@@ -132,7 +102,7 @@ class _HijriConfirmationScreenState extends State<HijriConfirmationScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'التاريخ المعروض الآن: ${currentHijri.hDay} ${currentHijri.longMonthName} ${currentHijri.hYear} هـ',
+              'التاريخ المعروض الآن: $currentDateText',
               style: TextStyle(
                 fontSize: 16,
                 fontFamily: AppConsts.cairo,
@@ -144,9 +114,14 @@ class _HijriConfirmationScreenState extends State<HijriConfirmationScreen> {
             const SizedBox(height: 12),
             Text(
               isEgyptian
-                  ? savedDate == null || !hasTrustedDate
-                        ? 'لا يوجد تاريخ موثوق محفوظ من API دار الإفتاء؛ يعرض التطبيق تاريخ المكتبة مؤقتًا مع هذا التحذير. بعد اكتمال يوم 29 وعند منتصف الليل التالي يحاول التطبيق التحديث من دار الإفتاء، ويستخدم جدول هيئة المساحة الكامل للتحقق يوميًا حتى يتطابق، ويعيد المحاولة عند فتح الجهاز إذا كان مغلقًا.'
-                        : 'التاريخ المصري المحفوظ: ${savedDate.day}/${savedDate.month}/${savedDate.year} هـ. بعد اكتمال يوم 29 وعند منتصف الليل التالي يحاول التطبيق التحديث من دار الإفتاء، ثم يعيد مقارنة بيانات هيئة المساحة يوميًا إذا لم تتطابق. الإشعار خارج التطبيق إشعار نظام Android عادي قابل للضغط، وليس منبه صلاة.'
+                  ? calendar.lastError == null
+                        ? calendar.verificationStatus ??
+                              'التاريخ المصري يعتمد على جدول الهيئة؛ لا نستبدله بتاريخ المكتبة.'
+                        : [
+                            calendar.verificationStatus ??
+                                'نحتفظ بآخر جدول هيئة ناجح.',
+                            'تعذر آخر تحديث؛ لا نستبدل البيانات المحفوظة بتاريخ المكتبة.',
+                          ].join(' ')
                   : 'يعرض هذا النظام تاريخ أم القرى المحسوب بالمكتبة. التعديلات اليدوية تبقى محلية ولا تحتاج إلى اتصال بالإنترنت.',
               style: TextStyle(
                 fontSize: 16,
@@ -171,7 +146,7 @@ class _HijriConfirmationScreenState extends State<HijriConfirmationScreen> {
                       )
                     : const Icon(Icons.sync),
                 label: const Text(
-                  'تحديث من الإنترنت الآن',
+                  'تحديث جدول الهيئة والتحقق اليومي الآن',
                   style: TextStyle(fontFamily: AppConsts.cairo, fontSize: 16),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -182,54 +157,50 @@ class _HijriConfirmationScreenState extends State<HijriConfirmationScreen> {
               ),
               const SizedBox(height: 48),
             ],
-            const Divider(),
-            const SizedBox(height: 16),
-            const Text(
-              "أو أكّد بنفسك (الخطة البديلة):",
-              style: TextStyle(
-                fontSize: 18,
-                fontFamily: AppConsts.cairo,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => _manualConfirm(false),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.all(16),
-                    ),
-                    child: Text(
-                      isEgyptian
-                          ? 'اليوم 30\nمن الشهر الحالي'
-                          : 'لسه يوم 29\n(الشهر مخلصش)',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontFamily: AppConsts.cairo),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => _manualConfirm(true),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.all(16),
-                    ),
-                    child: Text(
-                      isEgyptian
-                          ? 'غرة الشهر الجديد\n(اليوم 1)'
-                          : 'بدأ الشهر الجديد\n(غرة شهر جديد)',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontFamily: AppConsts.cairo),
-                    ),
-                  ),
-                ),
-              ],
-            ),
             if (!isEgyptian) ...[
+              const Divider(),
+              const SizedBox(height: 16),
+              const Text(
+                "أو أكّد بنفسك (الخطة البديلة):",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontFamily: AppConsts.cairo,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _manualConfirm(false),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.all(16),
+                      ),
+                      child: const Text(
+                        'لسه يوم 29\n(الشهر مخلصش)',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontFamily: AppConsts.cairo),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _manualConfirm(true),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.all(16),
+                      ),
+                      child: const Text(
+                        'بدأ الشهر الجديد\n(غرة شهر جديد)',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontFamily: AppConsts.cairo),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 48),
               const Divider(),
               const SizedBox(height: 16),
@@ -244,7 +215,7 @@ class _HijriConfirmationScreenState extends State<HijriConfirmationScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                "في حالة وجود خطأ دائم رغم التأكيد، يمكنك تعديل التاريخ يدوياً.",
+                "في حالة وجود خطأ دائم، يمكنك تعديل التاريخ يدوياً.",
                 style: TextStyle(
                   fontSize: 14,
                   fontFamily: AppConsts.cairo,

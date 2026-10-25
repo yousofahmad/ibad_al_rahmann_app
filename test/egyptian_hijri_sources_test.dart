@@ -41,6 +41,59 @@ void main() {
       }
     },
   );
+  test('Dar API date string requires a current Cairo HTTP Date header', () {
+    const body = '"14 جُمادى الأولى 1448"';
+    expect(
+      EgyptianHijriSources.parseDarIftaApi(
+        body,
+        civilDate: DateTime(2026, 10, 25),
+        responseDate: 'Sun, 25 Oct 2026 10:25:55 GMT',
+      ),
+      const OfficialHijriValue(14, 5, 1448),
+    );
+    expect(
+      EgyptianHijriSources.parseDarIftaApi(
+        body,
+        civilDate: DateTime(2026, 10, 25),
+        responseDate: 'Sat, 24 Oct 2026 10:25:55 GMT',
+      ),
+      isNull,
+    );
+    expect(
+      EgyptianHijriSources.parseDarIftaApi(
+        '{"day":14,"month":5,"year":1448}',
+        civilDate: DateTime(2026, 10, 25),
+        responseDate: 'Sun, 25 Oct 2026 10:25:55 GMT',
+      ),
+      isNull,
+    );
+  });
+  test('Dar API UTF-16LE JSON body is decoded before parsing', () async {
+    const json = '"14 جُمادى الأولى 1448"';
+    final bytes = <int>[0xff, 0xfe];
+    for (final codeUnit in json.codeUnits) {
+      bytes
+        ..add(codeUnit & 0xff)
+        ..add(codeUnit >> 8);
+    }
+    final source = EgyptianHijriSources(
+      client: MockClient(
+        (_) async => http.Response.bytes(
+          bytes,
+          200,
+          headers: {
+            'content-type': 'application/json; charset=utf-16',
+            'date': 'Sun, 25 Oct 2026 10:25:55 GMT',
+          },
+        ),
+      ),
+    );
+
+    final snapshot = await source.fetchDarIfta(DateTime(2026, 10, 25));
+
+    expect(snapshot.hijri, const OfficialHijriValue(14, 5, 1448));
+    source.close();
+  });
   test('actual top date accepts only a paired current civil date', () {
     expect(
       EgyptianHijriSources.parseDarIftaHeader(
@@ -97,6 +150,22 @@ void main() {
       expect(rabi['2026-10-01']!['month'], 4);
     },
   );
+  test('ESA live compact month spellings are parsed', () {
+    const spellings = {
+      'المحرم': 1,
+      'جماد الآخر': 6,
+      'ذوالقعدة': 11,
+      'ذوالحجة': 12,
+    };
+    for (final entry in spellings.entries) {
+      final result = EgyptianHijriSources.parseSurveyMonth(
+        _month(1, 2026).replaceAll('جماد الأول', entry.key),
+        month: 1,
+        expectedYear: 2026,
+      );
+      expect(result['2026-01-01']!['month'], entry.value, reason: entry.key);
+    }
+  });
   test(
     'ESA parser rejects bad dates, wrong year, duplicate days and incomplete months',
     () {
@@ -154,6 +223,7 @@ void main() {
       final source = EgyptianHijriSources(
         client: MockClient((request) async {
           expect(request.url.toString(), EgyptianHijriSources.surveyUrl);
+          expect(request.headers['user-agent'], contains('Mozilla/5.0'));
           if (request.method == 'GET') {
             return http.Response(
               '<form id="ctl00"><input type="hidden" name="__VIEWSTATE" value="state123"><select id="placeholder1_DropDownList1"><option value="القـاهـرة">القـاهـرة</option></select></form>',
@@ -164,6 +234,7 @@ void main() {
               },
             );
           }
+          expect(request.headers['origin'], 'https://www.esa.gov.eg');
           final fields = Uri.splitQueryString(request.body);
           expect(fields['__VIEWSTATE'], 'state123');
           expect(fields['ctl00\$placeholder1\$DropDownList1'], 'القـاهـرة');

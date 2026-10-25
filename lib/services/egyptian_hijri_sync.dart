@@ -6,6 +6,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'egyptian_hijri_calendar.dart';
 import 'egyptian_hijri_sources.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 
 /// Compares observations; a disagreement is NOT proof that ESA is wrong.
 /// Only an explicit user confirmation can override the displayed ESA date.
@@ -77,6 +78,22 @@ class EgyptianHijriSync {
     if (data.length != expected.length ||
         !data.keys.toSet().containsAll(expected)) {
       throw const FormatException('Incomplete or wrong-year ESA calendar');
+    }
+  }
+
+  static bool _hasCompleteYear(
+    Map<String, EgyptianHijriDate> data,
+    int year,
+  ) {
+    try {
+      final yearPrefix = '$year-';
+      final yearData = Map<String, EgyptianHijriDate>.fromEntries(
+        data.entries.where((entry) => entry.key.startsWith(yearPrefix)),
+      );
+      _validateSpan(yearData, DateTime(year), DateTime(year + 1));
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -181,14 +198,34 @@ class EgyptianHijriSync {
     }
   }
 
-  Future<void> refresh({bool force = false}) async {
-    if (_busy) return;
+  Future<bool> refresh({
+    bool force = false,
+    String trigger = 'unspecified',
+  }) async {
+    if (_busy) {
+      AppLogger.logEvent('EgyptianHijriSync', 'sync_skipped', {
+        'trigger': trigger,
+        'reason': 'another_sync_in_progress',
+      });
+      return false;
+    }
     _busy = true;
+    final startedAt = _clock().toUtc();
+    final stopwatch = Stopwatch()..start();
+    var outcome = 'exception';
+    var completionReason = 'unexpected_termination';
+    var civilDateKey = 'unknown';
+    AppLogger.logEvent('EgyptianHijriSync', 'sync_started', {
+      'trigger': trigger,
+      'force': force,
+      'startedAt': startedAt.toIso8601String(),
+    });
     final calendar = EgyptianHijriCalendar.instance;
     try {
       final now = _clock().toUtc(), today = cairoToday(_clock());
       final key = EgyptianHijriCalendar.civilKey(today),
           stamp = now.toIso8601String();
+      civilDateKey = key;
       final prefs = await _prefsFactory();
       await prefs.reload();
       if (!calendar.isInitialized) {
@@ -289,6 +326,15 @@ class EgyptianHijriSync {
               _due(state['darAttempt'], now, const Duration(hours: 1))) {
         attempted = true;
         state['darAttempt'] = stamp;
+        final sourceStartedAt = _clock().toUtc();
+        final sourceStopwatch = Stopwatch()..start();
+        AppLogger.logEvent('EgyptianHijriSync', 'source_fetch_started', {
+          'source': 'dar_alifta',
+          'trigger': trigger,
+          'civilDate': key,
+          'reason': force ? 'manual_force' : 'missing_or_conflicting_value',
+          'startedAt': sourceStartedAt.toIso8601String(),
+        });
         try {
           final snap = await sources.fetchDarIfta(today);
           if (EgyptianHijriCalendar.civilKey(snap.civilDate) != key) {
@@ -309,21 +355,52 @@ class EgyptianHijriSync {
           }
           freshDar = true;
           conflict = survey[key] != null && survey[key] != dar;
+          AppLogger.logEvent('EgyptianHijriSync', 'source_fetch_finished', {
+            'source': 'dar_alifta',
+            'outcome': 'success',
+            'civilDate': key,
+            'finishedAt': _clock().toUtc().toIso8601String(),
+            'durationMs': sourceStopwatch.elapsedMilliseconds,
+          });
         } catch (error) {
           errors.add('Dar Ifta: $error');
+          AppLogger.logEvent('EgyptianHijriSync', 'source_fetch_failed', {
+            'source': 'dar_alifta',
+            'trigger': trigger,
+            'civilDate': key,
+            'reason': 'exception_${error.runtimeType}',
+            'retryAfter': _clock()
+                .toUtc()
+                .add(const Duration(hours: 1))
+                .toIso8601String(),
+            'finishedAt': _clock().toUtc().toIso8601String(),
+            'durationMs': sourceStopwatch.elapsedMilliseconds,
+          });
         }
         // Do not open a new dialog before ESA has also had a chance to catch up.
         await save();
       }
 
       final annualDue =
-          state['annualYear'] != today.year || state['annualSuccess'] == null;
+          force ||
+          state['annualYear'] != today.year ||
+          state['annualSuccess'] == null ||
+          !_hasCompleteYear(survey, today.year);
       var downloadedToday = false;
       if (annualDue &&
           (force ||
               _due(state['annualAttempt'], now, const Duration(days: 1)))) {
         attempted = true;
         state['annualAttempt'] = stamp;
+        final sourceStartedAt = _clock().toUtc();
+        final sourceStopwatch = Stopwatch()..start();
+        AppLogger.logEvent('EgyptianHijriSync', 'source_fetch_started', {
+          'source': 'survey_authority_annual_calendar',
+          'trigger': trigger,
+          'year': today.year,
+          'reason': force ? 'manual_force' : 'annual_calendar_due',
+          'startedAt': sourceStartedAt.toIso8601String(),
+        });
         try {
           final data = EgyptianHijriCalendar.parseDates(
             await sources.fetchSurveyYear(today.year),
@@ -336,8 +413,28 @@ class EgyptianHijriSync {
           downloadedToday = true;
           freshSurvey = true;
           if (dar != null) conflict = survey[key] != dar;
+          AppLogger.logEvent('EgyptianHijriSync', 'source_fetch_finished', {
+            'source': 'survey_authority_annual_calendar',
+            'trigger': trigger,
+            'outcome': 'success',
+            'daysReceived': data.length,
+            'finishedAt': _clock().toUtc().toIso8601String(),
+            'durationMs': sourceStopwatch.elapsedMilliseconds,
+          });
         } catch (error) {
           errors.add('ESA year: $error');
+          AppLogger.logEvent('EgyptianHijriSync', 'source_fetch_failed', {
+            'source': 'survey_authority_annual_calendar',
+            'trigger': trigger,
+            'year': today.year,
+            'reason': 'exception_${error.runtimeType}',
+            'retryAfter': _clock()
+                .toUtc()
+                .add(const Duration(days: 1))
+                .toIso8601String(),
+            'finishedAt': _clock().toUtc().toIso8601String(),
+            'durationMs': sourceStopwatch.elapsedMilliseconds,
+          });
         }
       }
       final effective =
@@ -360,6 +457,20 @@ class EgyptianHijriSync {
                   ))) {
         attempted = true;
         state['surveyAttempt'] = stamp;
+        final sourceStartedAt = _clock().toUtc();
+        final sourceStopwatch = Stopwatch()..start();
+        AppLogger.logEvent('EgyptianHijriSync', 'source_fetch_started', {
+          'source': 'survey_authority_month_calendar',
+          'trigger': trigger,
+          'year': today.year,
+          'month': today.month,
+          'reason': force
+              ? 'manual_force'
+              : conflict
+              ? 'sources_disagree'
+              : 'boundary_review',
+          'startedAt': sourceStartedAt.toIso8601String(),
+        });
         try {
           final data = EgyptianHijriCalendar.parseDates(
             await sources.fetchSurveyMonth(today.month, today.year),
@@ -373,8 +484,29 @@ class EgyptianHijriSync {
           state['surveySuccessDay'] = key;
           freshSurvey = true;
           if (dar != null) conflict = survey[key] != dar;
+          AppLogger.logEvent('EgyptianHijriSync', 'source_fetch_finished', {
+            'source': 'survey_authority_month_calendar',
+            'trigger': trigger,
+            'outcome': 'success',
+            'daysReceived': data.length,
+            'finishedAt': _clock().toUtc().toIso8601String(),
+            'durationMs': sourceStopwatch.elapsedMilliseconds,
+          });
         } catch (error) {
           errors.add('ESA month: $error');
+          AppLogger.logEvent('EgyptianHijriSync', 'source_fetch_failed', {
+            'source': 'survey_authority_month_calendar',
+            'trigger': trigger,
+            'year': today.year,
+            'month': today.month,
+            'reason': 'exception_${error.runtimeType}',
+            'retryAfter': _clock()
+                .toUtc()
+                .add(const Duration(hours: 1))
+                .toIso8601String(),
+            'finishedAt': _clock().toUtc().toIso8601String(),
+            'durationMs': sourceStopwatch.elapsedMilliseconds,
+          });
         }
       }
       _observeDisagreement(
@@ -403,15 +535,57 @@ class EgyptianHijriSync {
       state['lastAttempt'] = attempted ? stamp : state['lastAttempt'];
       publish();
       await save();
+      outcome = errors.isEmpty
+          ? (attempted ? 'success' : 'skipped')
+          : (attempted ? 'partial_failure' : 'failure');
+      completionReason = errors.isEmpty
+          ? (attempted ? 'source_checks_completed' : 'no_source_due')
+          : 'source_errors_${errors.length}';
+      AppLogger.logEvent('EgyptianHijriSync', 'sync_decision', {
+        'civilDate': key,
+        'outcome': outcome,
+        'reason': completionReason,
+        'selectedSource': calendar.userConfirmation?.lookup(today) != null
+            ? 'user_confirmation'
+            : survey[key] != null
+            ? 'survey_authority_annual_calendar'
+            : dar != null
+            ? 'dar_alifta_daily_comparison_only'
+            : 'unavailable',
+        if (survey[key] != null) 'selectedDate': survey[key]!.toJson(),
+        'attemptedSources': attempted,
+        'darAvailable': dar != null,
+        'surveyAvailable': survey[key] != null,
+        'sourcesDisagree': conflict,
+        'errorCount': errors.length,
+        'confirmationPending': pending() != null,
+      });
+      return errors.isEmpty && survey[key] != null && dar != null;
     } catch (error) {
+      outcome = 'failed';
+      completionReason = 'exception_${error.runtimeType}';
+      AppLogger.logEvent('EgyptianHijriSync', 'sync_error', {
+        'civilDate': civilDateKey,
+        'reason': completionReason,
+      });
       calendar.replaceSnapshot(
         calendar.surveyDates,
         pending: calendar.pendingConfirmation,
         status: 'تعذر إكمال المراجعة؛ يبقى تأكيدك أو آخر جدول مساحة متاح.',
         error: error.toString(),
       );
+      return false;
     } finally {
       _busy = false;
+      AppLogger.logEvent('EgyptianHijriSync', 'sync_finished', {
+        'trigger': trigger,
+        'civilDate': civilDateKey,
+        'outcome': outcome,
+        'reason': completionReason,
+        'startedAt': startedAt.toIso8601String(),
+        'finishedAt': _clock().toUtc().toIso8601String(),
+        'durationMs': stopwatch.elapsedMilliseconds,
+      });
     }
   }
 

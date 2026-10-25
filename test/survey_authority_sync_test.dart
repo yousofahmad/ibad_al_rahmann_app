@@ -60,7 +60,7 @@ void main() {
     expect(shawwalDate?.month, equals(10));
   });
 
-  test('Dar Al-Ifta stays primary until the full ESA calendar matches', () {
+  test('ESA annual calendar stays primary; Dar is comparison-only', () {
     const darDate = HijriSourceDate(day: 1, month: 10, year: 1448);
     const staleSurveyDate = HijriSourceDate(day: 30, month: 9, year: 1448);
 
@@ -69,12 +69,19 @@ void main() {
         darAlIftaDate: darDate,
         surveyAuthorityDate: staleSurveyDate,
       ),
-      same(darDate),
+      same(staleSurveyDate),
     );
     expect(
       HijriSourceService.selectLiveDate(
         darAlIftaDate: null,
         surveyAuthorityDate: staleSurveyDate,
+      ),
+      same(staleSurveyDate),
+    );
+    expect(
+      HijriSourceService.selectLiveDate(
+        darAlIftaDate: darDate,
+        surveyAuthorityDate: null,
       ),
       isNull,
     );

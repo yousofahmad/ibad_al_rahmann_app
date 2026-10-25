@@ -332,6 +332,33 @@ void main() {
   );
 
   test(
+    'forced refresh reloads a successful annual ESA table and keeps it primary',
+    () async {
+      await _seed(
+        _state(
+          survey: _fullYear(2026, currentDay: 8),
+          annualYear: '2026',
+          annualSuccess: _now.toIso8601String(),
+        ),
+      );
+      final source = FakeSources(annualDay: 9, darDay: 7);
+      await _refreshAt(
+        source,
+        _now.add(const Duration(hours: 2)),
+        force: true,
+      );
+      expect(source.annualCalls, 1);
+      expect(EgyptianHijriCalendar.instance.lookup(_now)?.hDay, 9);
+      expect(
+        EgyptianHijriCalendar.instance.dateSourceLabel(_now),
+        EgyptianHijriCalendar.sourceName,
+      );
+      expect(EgyptianHijriCalendar.instance.pendingConfirmation, isNull);
+      expect((await _savedState())['survey'].length, 365);
+    },
+  );
+
+  test(
     'annual successful once per year, new Gregorian year downloads, and wrong-year data preserves old survey',
     () async {
       final source = FakeSources();
