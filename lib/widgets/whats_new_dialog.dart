@@ -8,7 +8,7 @@ class WhatsNewDialog extends StatelessWidget {
   const WhatsNewDialog({super.key});
 
   static const String _versionKey = 'last_seen_whats_new_version';
-  static const String _currentVersion = '1.3.3';
+  static const String _currentVersion = '1.2.0';
 
   static Future<void> checkAndShow(BuildContext context) async {
     final prefs = CacheHelper.prefs;

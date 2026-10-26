@@ -44,14 +44,14 @@ void main() {
         PackageInfo.setMockInitialValues(
           appName: 'Ibad',
           packageName: 'app.ibad',
-          version: '1.3.3',
-          buildNumber: '13',
+          version: '1.2.0',
+          buildNumber: '14',
           buildSignature: '',
         );
 
         expect(
           await AppLogger.getInstalledVersionLabelForTesting(),
-          '1.3.3+13',
+          '1.2.0+14',
         );
       },
     );

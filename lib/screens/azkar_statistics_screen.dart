@@ -342,7 +342,7 @@ class _AzkarStatisticsScreenState extends State<AzkarStatisticsScreen> {
                     jsonFile: "evening.json",
                   ),
                   _buildStatCard(
-                    title: "أذكار الصلاة",
+                    title: "الأذكار بعد الصلاة",
                     count: _prayerCount,
                     icon: Icons.mosque_rounded,
                     jsonFile: "prayer.json",

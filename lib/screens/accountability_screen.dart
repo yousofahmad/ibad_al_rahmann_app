@@ -700,7 +700,9 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              item,
+                              item == 'أذكار الصلاة'
+                                  ? 'الأذكار بعد الصلاة'
+                                  : item,
                               style: TextStyle(
                                 fontFamily: AppConsts.expoArabic,
                                 fontSize: 14.sp,
@@ -1711,7 +1713,9 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
                             checkColor: Colors.white,
                             contentPadding: EdgeInsets.zero,
                             title: Text(
-                              key,
+                              key == 'أذكار الصلاة'
+                                  ? 'الأذكار بعد الصلاة'
+                                  : key,
                               style: TextStyle(
                                 fontFamily: AppConsts.expoArabic,
                                 fontSize: 14.sp,

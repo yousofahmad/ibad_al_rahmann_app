@@ -15,6 +15,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'package:ibad_al_rahmann/main.dart'; // To access scaffoldMessengerKey
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
@@ -33,6 +34,8 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen>
     with WidgetsBindingObserver {
   final PrayerService _prayerService = PrayerService();
+  late final Future<PackageInfo> _packageInfoFuture;
+  String? _installedVersionLabel;
 
   @override
   void dispose() {
@@ -116,6 +119,14 @@ class _SettingsScreenState extends State<SettingsScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _packageInfoFuture = PackageInfo.fromPlatform();
+    _packageInfoFuture.then((packageInfo) {
+      if (!mounted) return;
+      setState(() {
+        _installedVersionLabel =
+            '${packageInfo.version}+${packageInfo.buildNumber}';
+      });
+    });
     _is24Hour = _prayerService.is24Hour;
     _hijriOffset = _prayerService.manualHijriOffset;
     _localHijriDelta = _prayerService.localHijriDelta;
@@ -1250,13 +1261,16 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           _buildListTile(
             "عن التطبيق",
-            "الإصدار 1.2.0+9",
+            "الإصدار ${_installedVersionLabel ?? '...'}",
             Icons.info_outline,
-            onTap: () {
+            onTap: () async {
+              final packageInfo = await _packageInfoFuture;
+              if (!context.mounted) return;
               showAboutDialog(
                 context: context,
                 applicationName: "عباد الرحمن",
-                applicationVersion: "1.2.0+9",
+                applicationVersion:
+                    "${packageInfo.version}+${packageInfo.buildNumber}",
                 applicationIcon: Image.asset(
                   "assets/images/logo.png",
                   width: 50.w,

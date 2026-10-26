@@ -121,10 +121,10 @@ class MuslimAzkarScreen extends StatelessWidget {
                     ),
                     _buildAzkarButton(
                       context,
-                      "أذكار الصلاة",
+                      "الأذكار بعد الصلاة",
                       Icons.mosque,
                       const AzkarPage(
-                        title: "أذكار الصلاة",
+                        title: "الأذكار بعد الصلاة",
                         jsonFile: "prayer.json",
                         image: "assets/images/mosque.jpg",
                       ),
