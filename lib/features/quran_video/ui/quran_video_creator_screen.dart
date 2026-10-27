@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +10,9 @@ import 'package:ibad_al_rahmann/core/app_constants.dart';
 import 'package:ibad_al_rahmann/features/quran_audio/data/surah_list.dart';
 import 'package:ibad_al_rahmann/features/quran_reciters/data/models/reciter_model.dart';
 import 'package:ibad_al_rahmann/features/quran_video/models/quran_video_options.dart';
+import 'package:ibad_al_rahmann/features/quran_video/services/quran_video_background_preview_service.dart';
 import 'package:ibad_al_rahmann/features/quran_video/services/quran_video_export_service.dart';
+import 'package:ibad_al_rahmann/features/quran_video/ui/quran_video_caption_preview.dart';
 import 'package:path/path.dart' as p;
 import 'package:quran/quran.dart' as quran;
 import 'package:share_plus/share_plus.dart';
@@ -31,6 +34,8 @@ class QuranVideoCreatorScreen extends StatefulWidget {
 
 class _QuranVideoCreatorScreenState extends State<QuranVideoCreatorScreen> {
   final QuranVideoExportService _exportService = QuranVideoExportService();
+  final QuranVideoBackgroundPreviewService _backgroundPreviewService =
+      const QuranVideoBackgroundPreviewService();
   final TextEditingController _fromVerseController = TextEditingController(
     text: '1',
   );
@@ -44,6 +49,9 @@ class _QuranVideoCreatorScreenState extends State<QuranVideoCreatorScreen> {
   QuranVideoBackgroundType _backgroundType = QuranVideoBackgroundType.image;
   QuranVideoExportOptions _options = const QuranVideoExportOptions();
   String? _backgroundPath;
+  String? _videoPreviewPath;
+  int _backgroundPreviewRequest = 0;
+  bool _isPreparingBackgroundPreview = false;
   QuranVideoExportProgress? _progress;
   QuranVideoExportResult? _result;
   bool _isExporting = false;
@@ -73,6 +81,7 @@ class _QuranVideoCreatorScreenState extends State<QuranVideoCreatorScreen> {
 
   @override
   void dispose() {
+    _backgroundPreviewRequest++;
     if (_isExporting) unawaited(_exportService.cancel());
     _fromVerseController.dispose();
     _toVerseController.dispose();
@@ -183,8 +192,59 @@ class _QuranVideoCreatorScreenState extends State<QuranVideoCreatorScreen> {
     );
   }
 
+  bool get _hasPreviewBackground =>
+      _backgroundPath != null &&
+      (_backgroundType != QuranVideoBackgroundType.video ||
+          _videoPreviewPath != null);
+
+  bool get _canExpandPreview =>
+      _hasPreviewBackground &&
+      !_isPreparingBackgroundPreview &&
+      _safePreviewVerse() != null;
+
+  String get _previewDescription {
+    if (_isPreparingBackgroundPreview) {
+      return 'جارٍ تجهيز معاينة أول إطار من مقطع الفيديو…';
+    }
+    if (_backgroundPath == null) {
+      return 'اختر صورة أو مقطع فيديو لعرض الخلفية الفعلية قبل التصدير.';
+    }
+    if (!_hasPreviewBackground) return 'تعذر تجهيز معاينة الخلفية.';
+    if (_safePreviewVerse() == null) {
+      return 'راجع نطاق الآيات لعرض معاينة صحيحة.';
+    }
+    final backgroundNote = _backgroundType == QuranVideoBackgroundType.video
+        ? 'إطار الفيديو الأول'
+        : 'الصورة المختارة';
+    return 'معاينة الآية $_fromVerse من النطاق المحدد مع $backgroundNote.';
+  }
+
   Widget _buildPreview(ThemeData theme) {
-    final ratio = _options.aspectRatio.ratio;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildPreviewFrame(theme),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _previewDescription,
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _canExpandPreview ? _showExpandedPreview : null,
+              icon: const Icon(Icons.fullscreen_rounded, size: 19),
+              label: const Text('تكبير المعاينة'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPreviewFrame(ThemeData theme) {
     final previewVerse = _safePreviewVerse();
     return Card(
       margin: EdgeInsets.zero,
@@ -192,130 +252,70 @@ class _QuranVideoCreatorScreenState extends State<QuranVideoCreatorScreen> {
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: AspectRatio(
-        aspectRatio: ratio,
+        aspectRatio: _options.aspectRatio.ratio,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final outputShortSide = _options.width < _options.height
-                ? _options.width
-                : _options.height;
-            final previewShortSide = width < constraints.maxHeight
-                ? width
-                : constraints.maxHeight;
-            final previewFont =
-                (_options.fontSize * previewShortSide / outputShortSide).clamp(
-                  12.0,
-                  30.0,
-                );
+            final previewShortSide = math.min(
+              constraints.maxWidth,
+              constraints.maxHeight,
+            );
+            final previewFont = _options.fontSize * previewShortSide / 1080;
             final alignmentY = (_options.position * 2 - 1).clamp(-0.9, 0.9);
             return Stack(
               fit: StackFit.expand,
               children: [
                 _buildPreviewBackground(theme),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.05),
-                        Colors.black.withValues(alpha: 0.16),
-                      ],
-                    ),
-                  ),
-                ),
-                Align(
-                  alignment: Alignment(0, alignmentY),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 9,
-                      ),
-                      decoration: _options.showTextPanel
-                          ? BoxDecoration(
-                              color: Colors.black.withValues(
-                                alpha: _options.panelOpacity,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            )
-                          : null,
-                      child: _buildPreviewText(previewVerse, previewFont),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.42),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
+                if (_hasPreviewBackground &&
+                    !_isPreparingBackgroundPreview &&
+                    previewVerse != null)
+                  Align(
+                    alignment: Alignment(0, alignmentY),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 9,
+                        ),
+                        decoration: _options.showTextPanel
+                            ? BoxDecoration(
+                                color: Colors.black.withValues(
+                                  alpha: _options.panelOpacity,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              )
+                            : null,
+                        child: QuranVideoCaptionPreview(
+                          verse: previewVerse,
+                          options: _options,
+                          fontSize: previewFont,
+                        ),
                       ),
+                    ),
+                  )
+                else if (_hasPreviewBackground &&
+                    !_isPreparingBackgroundPreview)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
                       child: Text(
-                        '${quranSurahs[_surahNumber - 1]} · ${_reciter.name}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        'أدخل نطاق آيات صحيحًا لعرض النص الذي سيُصدَّر.',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.white,
-                          fontSize: 11,
                         ),
                       ),
                     ),
                   ),
-                ),
+                if (_isPreparingBackgroundPreview)
+                  const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
               ],
             );
           },
         ),
       ),
-    );
-  }
-
-  Widget _buildPreviewText(String verse, double fontSize) {
-    final words = verse.split(RegExp(r'\s+')).where((word) => word.isNotEmpty);
-    final allWords = words.toList();
-    final visibleWords =
-        _options.displayMode == QuranVideoDisplayMode.wordReveal
-        ? allWords.take(1).toList()
-        : allWords;
-    return Text.rich(
-      TextSpan(
-        style: TextStyle(
-          color: _options.textColor,
-          fontFamily: AppConsts.expoArabic,
-          fontSize: fontSize,
-          fontWeight: FontWeight.w600,
-          height: 1.55,
-          shadows: const [Shadow(color: Colors.black87, blurRadius: 6)],
-        ),
-        children: [
-          for (var index = 0; index < visibleWords.length; index++)
-            TextSpan(
-              text:
-                  '${visibleWords[index]}${index < visibleWords.length - 1 ? ' ' : ''}',
-              style: TextStyle(
-                color:
-                    _options.showHighlight &&
-                        (_options.displayMode ==
-                                QuranVideoDisplayMode.ayahByAyah ||
-                            index == 0)
-                    ? _options.highlightColor
-                    : _options.textColor,
-              ),
-            ),
-        ],
-      ),
-      textAlign: TextAlign.center,
-      textDirection: TextDirection.rtl,
-      maxLines: 3,
-      overflow: TextOverflow.ellipsis,
     );
   }
 
@@ -325,42 +325,100 @@ class _QuranVideoCreatorScreenState extends State<QuranVideoCreatorScreen> {
       return Image.file(
         File(_backgroundPath!),
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stack) => _previewPlaceholder(theme),
+        errorBuilder: (context, error, stack) =>
+            _emptyPreviewBackground('تعذر تحميل الصورة المختارة.', theme),
       );
     }
-    return _previewPlaceholder(theme);
+    if (_videoPreviewPath != null &&
+        _backgroundType == QuranVideoBackgroundType.video) {
+      return Image.file(
+        File(_videoPreviewPath!),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stack) =>
+            _emptyPreviewBackground('تعذر تحميل إطار الفيديو.', theme),
+      );
+    }
+    return _emptyPreviewBackground(
+      _isPreparingBackgroundPreview
+          ? 'جارٍ تجهيز معاينة الفيديو…'
+          : 'اختر خلفية لعرض المعاينة الفعلية.',
+      theme,
+    );
   }
 
-  Widget _previewPlaceholder(ThemeData theme) {
-    final isVideo = _backgroundType == QuranVideoBackgroundType.video;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            theme.colorScheme.primary.withValues(alpha: 0.65),
-            theme.colorScheme.tertiary.withValues(alpha: 0.72),
-            const Color(0xFF101820),
-          ],
-        ),
-      ),
+  Widget _emptyPreviewBackground(String message, ThemeData theme) {
+    return ColoredBox(
+      color: const Color(0xFF111111),
       child: Center(
-        child: Icon(
-          isVideo ? Icons.videocam_rounded : Icons.image_rounded,
-          size: 54,
-          color: Colors.white.withValues(alpha: 0.7),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            message,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+          ),
         ),
       ),
     );
   }
 
-  String _safePreviewVerse() {
+  Future<void> _showExpandedPreview() async {
+    if (!_canExpandPreview) return;
+    final theme = Theme.of(context);
+    final size = MediaQuery.sizeOf(context);
+    final previewWidth = math.min(
+      size.width - 48,
+      size.height * 0.65 * _options.aspectRatio.ratio,
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'معاينة قبل التصدير',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'إغلاق المعاينة',
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SizedBox(width: previewWidth, child: _buildPreviewFrame(theme)),
+              const SizedBox(height: 8),
+              Text(
+                'الآية $_fromVerse من سورة ${quranSurahs[_surahNumber - 1]} · النص والألوان والموضع كما ستظهر في الفيديو.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _safePreviewVerse() {
+    if (_fromVerse < 1 ||
+        _fromVerse > _verseCount ||
+        _toVerse < _fromVerse ||
+        _toVerse > _verseCount) {
+      return null;
+    }
     try {
-      final verseNumber = _fromVerse.clamp(1, _verseCount);
-      return quran.getVerse(_surahNumber, verseNumber);
+      return quran.getVerse(_surahNumber, _fromVerse);
     } catch (_) {
-      return 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ';
+      return null;
     }
   }
 
@@ -385,9 +443,12 @@ class _QuranVideoCreatorScreenState extends State<QuranVideoCreatorScreen> {
           onSelectionChanged: _isExporting
               ? null
               : (selection) {
+                  _backgroundPreviewRequest++;
                   setState(() {
                     _backgroundType = selection.first;
                     _backgroundPath = null;
+                    _videoPreviewPath = null;
+                    _isPreparingBackgroundPreview = false;
                     _result = null;
                   });
                 },
@@ -422,10 +483,15 @@ class _QuranVideoCreatorScreenState extends State<QuranVideoCreatorScreen> {
                 visualDensity: VisualDensity.compact,
                 onPressed: _isExporting
                     ? null
-                    : () => setState(() {
-                        _backgroundPath = null;
-                        _result = null;
-                      }),
+                    : () {
+                        _backgroundPreviewRequest++;
+                        setState(() {
+                          _backgroundPath = null;
+                          _videoPreviewPath = null;
+                          _isPreparingBackgroundPreview = false;
+                          _result = null;
+                        });
+                      },
                 icon: const Icon(Icons.close_rounded),
               ),
             ],
@@ -849,13 +915,29 @@ class _QuranVideoCreatorScreenState extends State<QuranVideoCreatorScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _isExporting ? _cancelExport : _startExport,
-                icon: Icon(
+                onPressed: _isExporting
+                    ? _cancelExport
+                    : _isPreparingBackgroundPreview
+                    ? null
+                    : _startExport,
+                icon: _isPreparingBackgroundPreview
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        _isExporting
+                            ? Icons.cancel_outlined
+                            : Icons.movie_creation_outlined,
+                      ),
+                label: Text(
                   _isExporting
-                      ? Icons.cancel_outlined
-                      : Icons.movie_creation_outlined,
+                      ? 'إلغاء التصدير'
+                      : _isPreparingBackgroundPreview
+                      ? 'جارٍ تجهيز المعاينة…'
+                      : 'إنشاء الفيديو',
                 ),
-                label: Text(_isExporting ? 'إلغاء التصدير' : 'إنشاء الفيديو'),
                 style: FilledButton.styleFrom(
                   backgroundColor: _isExporting
                       ? theme.colorScheme.error
@@ -933,10 +1015,36 @@ class _QuranVideoCreatorScreenState extends State<QuranVideoCreatorScreen> {
         return;
       }
       if (!mounted) return;
+      final selectedType = _backgroundType;
+      final previewRequest = ++_backgroundPreviewRequest;
       setState(() {
         _backgroundPath = path;
+        _videoPreviewPath = null;
+        _isPreparingBackgroundPreview =
+            selectedType == QuranVideoBackgroundType.video;
         _result = null;
       });
+      if (selectedType == QuranVideoBackgroundType.video) {
+        try {
+          final thumbnailPath = await _backgroundPreviewService
+              .createVideoThumbnail(path);
+          if (!mounted || previewRequest != _backgroundPreviewRequest) return;
+          setState(() {
+            _videoPreviewPath = thumbnailPath;
+            _isPreparingBackgroundPreview = false;
+          });
+        } catch (_) {
+          if (!mounted || previewRequest != _backgroundPreviewRequest) return;
+          setState(() {
+            _backgroundPath = null;
+            _videoPreviewPath = null;
+            _isPreparingBackgroundPreview = false;
+          });
+          _showMessage(
+            'تعذر تجهيز معاينة لهذا المقطع. اختر فيديو آخر قبل التصدير.',
+          );
+        }
+      }
     } catch (_) {
       _showMessage(
         'لم أتمكن من فتح ملف الخلفية. حاول اختيار صورة أو فيديو آخر.',
@@ -949,6 +1057,12 @@ class _QuranVideoCreatorScreenState extends State<QuranVideoCreatorScreen> {
     final toVerse = _toVerse;
     if (_backgroundPath == null) {
       _showMessage('اختر صورة أو فيديو للخلفية أولًا.');
+      return;
+    }
+    if (_isPreparingBackgroundPreview ||
+        (_backgroundType == QuranVideoBackgroundType.video &&
+            _videoPreviewPath == null)) {
+      _showMessage('انتظر ظهور معاينة الخلفية قبل تصدير الفيديو.');
       return;
     }
     if (fromVerse < 1 || toVerse < fromVerse || toVerse > _verseCount) {
