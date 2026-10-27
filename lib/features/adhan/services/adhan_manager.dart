@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:audioplayers/audioplayers.dart'; // or just_audio
+import 'package:ibad_al_rahmann/core/helpers/background_resource_download_service.dart';
 import 'package:ibad_al_rahmann/features/adhan/models/muezzin_model.dart';
 
 class AdhanManager {
@@ -10,12 +10,6 @@ class AdhanManager {
   factory AdhanManager() => _instance;
   AdhanManager._internal();
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 15),
-    ),
-  );
   final AudioPlayer _player = AudioPlayer();
 
   // --- 1. The Massive Library ---
@@ -203,18 +197,16 @@ class AdhanManager {
   ) async {
     final savePath = await _getFilePath(muezzin.id);
     try {
-      await _dio.download(
-        muezzin.url,
-        savePath,
-        onReceiveProgress: (received, total) {
-          if (total != -1) {
-            onProgress(received / total);
-          }
-        },
+      await BackgroundResourceDownloadService.instance.downloadToPath(
+        id: 'adhan-manager:${muezzin.id}',
+        url: muezzin.url,
+        destinationPath: savePath,
+        displayName: 'أذان ${muezzin.name}',
+        onProgress: onProgress,
       );
-      debugPrint("Downloaded ${muezzin.name} to $savePath");
+      debugPrint('Downloaded ${muezzin.name}');
     } catch (e) {
-      debugPrint("Download error: $e");
+      debugPrint('Download error: ${e.runtimeType}');
       rethrow;
     }
   }

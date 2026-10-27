@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:ibad_al_rahmann/core/helpers/mushaf_format_repository.dart';
+import 'package:ibad_al_rahmann/features/quran/ui/widgets/menus/tajweed_color_legend.dart';
 
 class MushafFormatPicker extends StatefulWidget {
   final MushafFormatRepository? repository;
@@ -100,6 +101,9 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
           final hasAdditionalFormats = visibleFormats.any(
             (format) => !format.isBuiltin,
           );
+          final hasTajweedFormat = visibleFormats.any(
+            (format) => format.hasTajweed,
+          );
           return Padding(
             padding: EdgeInsets.only(
               bottom: MediaQuery.viewInsetsOf(context).bottom,
@@ -146,6 +150,16 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
                       'مصحف المدينة (1405هـ) موجود في التطبيق. نزّل من هنا أحد التنسيقات المدعومة، وسيُفعّل بعد اكتمال التنزيل. يستمر التنزيل في الخلفية، ويمكن متابعة تفاصيله من الإشعار.',
                     ),
                   ),
+                  if (hasTajweedFormat)
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton.icon(
+                        onPressed: () =>
+                            unawaited(TajweedColorLegend.show(context)),
+                        icon: const Icon(Icons.colorize_outlined),
+                        label: const Text('دليل ألوان التجويد'),
+                      ),
+                    ),
                   if (_refreshing) const LinearProgressIndicator(),
                   if (_error != null)
                     Padding(

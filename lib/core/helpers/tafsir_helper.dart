@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
+import 'package:ibad_al_rahmann/core/helpers/background_resource_download_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'feature_resource_repository.dart';
@@ -739,21 +740,13 @@ class TafsirHelper {
         onProgress(0.80);
       } else {
         final zipUrl = normalizeDownloadUrl(book.url ?? book.id);
-        final dio = Dio(
-          BaseOptions(
-            connectTimeout: const Duration(seconds: 30),
-            receiveTimeout: const Duration(minutes: 5),
-          ),
-        );
         try {
-          await dio.download(
-            zipUrl,
-            tempZipFile.path,
-            onReceiveProgress: (received, total) {
-              if (total > 0) {
-                onProgress(0.05 + (received / total) * 0.75);
-              }
-            },
+          await BackgroundResourceDownloadService.instance.downloadToPath(
+            id: 'tafsir:${book.id}',
+            url: zipUrl,
+            destinationPath: tempZipFile.path,
+            displayName: book.name,
+            onProgress: (progress) => onProgress(0.05 + progress * 0.75),
           );
         } catch (downloadErr) {
           // Fallback: If URL ended with .json try .zip, and vice-versa
@@ -769,20 +762,15 @@ class TafsirHelper {
               'book': book.id,
               'attempt': attempts,
               'reason': downloadErr.runtimeType.toString(),
-              'http_status': downloadErr is DioException
-                  ? downloadErr.response?.statusCode
-                  : null,
               'strategy': 'alternate_extension',
               'backoff_ms': 0,
             });
-            await dio.download(
-              altUrl,
-              tempZipFile.path,
-              onReceiveProgress: (received, total) {
-                if (total > 0) {
-                  onProgress(0.05 + (received / total) * 0.75);
-                }
-              },
+            await BackgroundResourceDownloadService.instance.downloadToPath(
+              id: 'tafsir:${book.id}',
+              url: altUrl,
+              destinationPath: tempZipFile.path,
+              displayName: book.name,
+              onProgress: (progress) => onProgress(0.05 + progress * 0.75),
             );
           } else {
             rethrow;

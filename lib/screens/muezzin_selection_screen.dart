@@ -6,6 +6,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
+import 'package:ibad_al_rahmann/core/helpers/background_resource_download_service.dart';
 import 'package:ibad_al_rahmann/widgets/app_skeleton.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
@@ -318,15 +319,13 @@ class _MuezzinSelectionScreenState extends State<MuezzinSelectionScreen> {
       final url = "${_baseUrl}audio/adhan/${id.trim()}.mp3";
       final savePath = "$_localPath/$id.mp3";
 
-      await _dio.download(
-        url,
-        savePath,
-        onReceiveProgress: (received, total) {
-          if (total != -1 && mounted) {
-            setState(() {
-              _downloadProgress[id] = received / total;
-            });
-          }
+      await BackgroundResourceDownloadService.instance.downloadToPath(
+        id: 'muezzin-selection:$id',
+        url: url,
+        destinationPath: savePath,
+        displayName: 'أذان $id',
+        onProgress: (progress) {
+          if (mounted) setState(() => _downloadProgress[id] = progress);
         },
       );
 

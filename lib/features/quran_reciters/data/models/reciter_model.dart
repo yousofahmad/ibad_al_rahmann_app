@@ -7,6 +7,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:ibad_al_rahmann/core/helpers/background_resource_download_service.dart';
 import 'package:ibad_al_rahmann/services/app_logger.dart';
 
 import 'package:archive/archive.dart';
@@ -1232,12 +1233,12 @@ class ReciterAudioHelper {
         await File.fromUri(uri).copy(tempPath);
         onProgress(1);
       } else {
-        await dioFactory().download(
-          remoteUrl,
-          tempPath,
-          onReceiveProgress: (received, total) {
-            if (total > 0) onProgress(received / total);
-          },
+        await BackgroundResourceDownloadService.instance.downloadToPath(
+          id: 'reciter-audio:$folderName:$surahNumber',
+          url: remoteUrl,
+          destinationPath: tempPath,
+          displayName: 'تلاوة السورة $surahNumber',
+          onProgress: onProgress,
         );
       }
       final tempFile = File(tempPath);

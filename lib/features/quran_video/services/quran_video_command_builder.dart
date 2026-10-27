@@ -73,6 +73,7 @@ class QuranVideoCommandBuilder {
       '[a]',
       '-c:v',
       videoEncoder,
+      if (videoEncoder == 'libx264') ...['-preset', 'ultrafast'],
       '-b:v',
       '${options.videoBitrateKbps}k',
       '-g',

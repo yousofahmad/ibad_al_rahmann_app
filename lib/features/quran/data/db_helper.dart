@@ -7,11 +7,13 @@ import 'dart:collection';
 import 'quran_word.dart';
 import 'models/page_line.dart';
 import '../../../core/helpers/mushaf_format_repository.dart';
+import 'mushaf_format_database_cache.dart';
 
 class QuranWbwDbHelper {
   static final QuranWbwDbHelper instance = QuranWbwDbHelper._init();
   static Database? _database;
-  final Map<String, Database> _formatDatabases = {};
+  final MushafFormatDatabaseCache<Database> _formatDatabases =
+      MushafFormatDatabaseCache<Database>();
   String get _formatKey => MushafFormatRepository.instance.current.id;
 
   QuranWbwDbHelper._init();
@@ -119,14 +121,21 @@ class QuranWbwDbHelper {
       return _database!;
     }
     final key = manager.current.id;
-    final existing = _formatDatabases[key];
-    if (existing != null) return existing;
-    final db = await openDatabase(wordsPath, readOnly: true);
-    await db.execute(
-      "ATTACH DATABASE '${layoutPath.replaceAll("'", "''")}' AS map_db",
-    );
-    _formatDatabases[key] = db;
-    return db;
+    return _formatDatabases.getOrOpen(key, () async {
+      final db = await openDatabase(wordsPath, readOnly: true);
+      final attachedDbs = await db.rawQuery('PRAGMA database_list');
+      final isAttached = attachedDbs.any(
+        (database) =>
+            database['name'] == 'map_db' ||
+            database['file']?.toString() == layoutPath,
+      );
+      if (!isAttached) {
+        await db.execute(
+          "ATTACH DATABASE '${layoutPath.replaceAll("'", "''")}' AS map_db",
+        );
+      }
+      return db;
+    });
   }
 
   Future<void> _copyDbAssetIfMissing(String dbPath, String fileName) async {
@@ -218,8 +227,9 @@ class QuranWbwDbHelper {
   /// Query all words and headers for a specific page.
   /// Merges `words` from main DB and `pages` from map_db dynamically.
   Future<List<QuranWord>> getPageWords(int pageNumber) async {
+    final formatKey = _formatKey;
     final cached = getPageWordsSync(pageNumber);
-    if (cached != null) {
+    if (cached != null && cached.isNotEmpty) {
       return cached;
     }
     try {
@@ -260,12 +270,14 @@ class QuranWbwDbHelper {
           position: _toInt(map['word_position']),
         );
       }).toList();
-      _updateLru(
-        _pageWordsCache,
-        '$_formatKey:$pageNumber',
-        result,
-        _maxCachePages,
-      );
+      if (_formatKey == formatKey && result.isNotEmpty) {
+        _updateLru(
+          _pageWordsCache,
+          '$formatKey:$pageNumber',
+          result,
+          _maxCachePages,
+        );
+      }
       return result;
     } catch (e) {
       // debugPrint('🔴 Error in getPageWords($pageNumber): $e');
@@ -274,8 +286,9 @@ class QuranWbwDbHelper {
   }
 
   Future<List<PageLine>> getPageLines(int pageNumber) async {
+    final formatKey = _formatKey;
     final cached = getPageLinesSync(pageNumber);
-    if (cached != null) {
+    if (cached != null && cached.isNotEmpty) {
       return cached;
     }
     try {
@@ -297,12 +310,14 @@ class QuranWbwDbHelper {
         pageNumber,
       ]);
       final result = maps.map((map) => PageLine.fromJson(map)).toList();
-      _updateLru(
-        _pageLinesCache,
-        '$_formatKey:$pageNumber',
-        result,
-        _maxCachePages,
-      );
+      if (_formatKey == formatKey && result.isNotEmpty) {
+        _updateLru(
+          _pageLinesCache,
+          '$formatKey:$pageNumber',
+          result,
+          _maxCachePages,
+        );
+      }
       return result;
     } catch (e) {
       // debugPrint('🔴 Error in getPageLines($pageNumber): $e');

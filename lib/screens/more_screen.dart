@@ -9,6 +9,8 @@ import 'occasions_screen.dart';
 import 'package:ibad_al_rahmann/screens/fasting_days_screen.dart';
 import 'package:ibad_al_rahmann/screens/app_features_guide_screen.dart';
 import 'package:ibad_al_rahmann/features/share_cards/ui/share_cards_screen.dart';
+import 'package:ibad_al_rahmann/features/quran_reciters/data/models/reciter_model.dart';
+import 'package:ibad_al_rahmann/features/quran_video/ui/quran_video_creator_screen.dart';
 import 'time_for_allah_screen.dart';
 import 'package:ibad_al_rahmann/services/notification_service.dart';
 import 'package:flutter/services.dart';
@@ -128,6 +130,20 @@ class _MoreScreenState extends State<MoreScreen> {
             onTap: () => showDialog(
               context: context,
               builder: (ctx) => const SalawatReminderDialog(),
+            ),
+          ),
+
+          _buildMenuButton(
+            context: context,
+            title: "منشئ فيديو القرآن",
+            icon: Icons.movie_creation_outlined,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => QuranVideoCreatorScreen(
+                  initialReciter: ReciterAudioHelper.availableReciters.first,
+                ),
+              ),
             ),
           ),
 

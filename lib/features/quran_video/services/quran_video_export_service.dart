@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:dio/dio.dart';
 import 'package:ffmpeg_kit_flutter_new_full/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_full/ffmpeg_kit_config.dart';
 import 'package:ffmpeg_kit_flutter_new_full/ffmpeg_session.dart';
@@ -11,6 +10,7 @@ import 'package:ffmpeg_kit_flutter_new_full/log.dart';
 import 'package:ffmpeg_kit_flutter_new_full/return_code.dart';
 import 'package:ffmpeg_kit_flutter_new_full/statistics.dart';
 import 'package:flutter/services.dart';
+import 'package:ibad_al_rahmann/core/helpers/background_resource_download_service.dart';
 import 'package:ibad_al_rahmann/features/quran_reciters/data/models/reciter_model.dart';
 import 'package:ibad_al_rahmann/features/quran_video/models/quran_video_options.dart';
 import 'package:ibad_al_rahmann/features/quran_video/services/quran_video_ass_builder.dart';
@@ -55,6 +55,13 @@ class QuranVideoExportException implements Exception {
   String toString() => message;
 }
 
+class _EncoderAttempt {
+  const _EncoderAttempt({required this.session, this.timedOut = false});
+
+  final FFmpegSession session;
+  final bool timedOut;
+}
+
 class _PreparedVerseAudio {
   const _PreparedVerseAudio({
     required this.verseNumber,
@@ -86,13 +93,15 @@ class _PreparedAudioTrack {
 }
 
 class QuranVideoExportService {
-  QuranVideoExportService({Dio? dio}) : _dio = dio ?? Dio();
+  QuranVideoExportService();
 
-  final Dio _dio;
-  CancelToken? _cancelToken;
+  static const Duration _encoderStartupTimeout = Duration(seconds: 20);
+
   int? _activeSessionId;
+  String? _activeResourceDownloadId;
   bool _isExporting = false;
   bool _cancelRequested = false;
+  final Set<String> _stagedAudioPaths = {};
 
   Future<QuranVideoExportResult> export({
     required ReciterAudioModel reciter,
@@ -109,8 +118,7 @@ class QuranVideoExportService {
     }
     _isExporting = true;
     _cancelRequested = false;
-    final cancelToken = CancelToken();
-    _cancelToken = cancelToken;
+    _stagedAudioPaths.clear();
     final startedAt = DateTime.now();
     final stopwatch = Stopwatch()..start();
     final operationId = startedAt.microsecondsSinceEpoch.toString();
@@ -163,7 +171,6 @@ class QuranVideoExportService {
         toVerse: toVerse,
         workDirectory: workDirectory,
         options: options,
-        cancelToken: cancelToken,
         onProgress: onProgress,
       );
       audioKind = track.kind.name;
@@ -214,21 +221,6 @@ class QuranVideoExportService {
         'quran_${surahNumber}_$fromVerse-$toVerse-${DateTime.now().millisecondsSinceEpoch}.mp4',
       );
 
-      final encoder = _videoEncoderForCurrentPlatform();
-      final arguments = QuranVideoCommandBuilder.build(
-        audioKind: track.kind,
-        audioInput: track.input,
-        audioClipStartMs: track.clipStartMs,
-        audioClipEndMs: track.clipEndMs,
-        backgroundType: backgroundType,
-        backgroundPath: backgroundPath,
-        subtitlePath: subtitleFile.path,
-        fontDirectory: fontDirectory.path,
-        outputPath: outputPath,
-        videoEncoder: encoder,
-        options: options,
-      );
-
       onProgress(
         const QuranVideoExportProgress(
           fraction: 0.38,
@@ -236,52 +228,78 @@ class QuranVideoExportService {
         ),
       );
 
-      final completion = Completer<FFmpegSession>();
-      final session = await FFmpegKit.executeWithArgumentsAsync(
-        arguments,
-        (completedSession) {
-          if (!completion.isCompleted) completion.complete(completedSession);
-        },
-        (Log _) {
-          // FFmpeg can include private source paths and URLs in logs. Keep its
-          // detailed output out of the app log and user-facing UI.
-        },
-        (Statistics statistics) {
-          final fraction = track.durationMs <= 0
-              ? 0.65
-              : (statistics.getTime() / track.durationMs).clamp(0.0, 1.0);
+      final encoders = <String>[_videoEncoderForCurrentPlatform(), 'libx264'];
+      _EncoderAttempt? successfulAttempt;
+      var usedEncoder = encoders.first;
+      for (var index = 0; index < encoders.length; index++) {
+        final encoder = encoders[index];
+        usedEncoder = encoder;
+        final arguments = QuranVideoCommandBuilder.build(
+          audioKind: track.kind,
+          audioInput: track.input,
+          audioClipStartMs: track.clipStartMs,
+          audioClipEndMs: track.clipEndMs,
+          backgroundType: backgroundType,
+          backgroundPath: backgroundPath,
+          subtitlePath: subtitleFile.path,
+          fontDirectory: fontDirectory.path,
+          outputPath: outputPath,
+          videoEncoder: encoder,
+          options: options,
+        );
+        AppLogger.logEvent('QuranVideo', 'encoding_started', {
+          'operation_id': operationId,
+          'encoder': encoder,
+          'duration_ms': track.durationMs,
+        });
+        final attempt = await _runEncoderAttempt(
+          arguments: arguments,
+          durationMs: track.durationMs,
+          onProgress: onProgress,
+        );
+        _checkCancelled();
+        final returnCode = await attempt.session.getReturnCode();
+        if (!attempt.timedOut && ReturnCode.isSuccess(returnCode)) {
+          successfulAttempt = attempt;
+          break;
+        }
+        if (!attempt.timedOut &&
+            (ReturnCode.isCancel(returnCode) || _cancelRequested)) {
+          throw const QuranVideoExportException('تم إلغاء إنشاء الفيديو.');
+        }
+        AppLogger.logEvent('QuranVideo', 'encoding_attempt_failed', {
+          'operation_id': operationId,
+          'encoder': encoder,
+          'reason': attempt.timedOut ? 'timeout' : 'return_code',
+          'return_code': returnCode?.getValue(),
+        });
+        if (index + 1 < encoders.length) {
+          AppLogger.logEvent('QuranVideo', 'encoding_fallback_started', {
+            'operation_id': operationId,
+            'from_encoder': encoder,
+            'to_encoder': encoders[index + 1],
+          });
           onProgress(
-            QuranVideoExportProgress(
-              fraction: 0.38 + fraction * 0.58,
-              message: 'جارٍ ترميز الفيديو…',
+            const QuranVideoExportProgress(
+              fraction: 0.38,
+              message: 'محرك الترميز لم يستجب؛ جارٍ استخدام محرك بديل…',
             ),
           );
-        },
-      );
-      _activeSessionId = session.getSessionId();
-      if (_cancelRequested) {
-        await FFmpegKit.cancel(_activeSessionId);
+        }
       }
-      final completedSession = await completion.future;
-      _checkCancelled();
-      final returnCode = await completedSession.getReturnCode();
-      if (!ReturnCode.isSuccess(returnCode)) {
+
+      if (successfulAttempt == null) {
         AppLogger.logEvent('QuranVideo', 'export_failed', {
           'operation_id': operationId,
-          'reason': ReturnCode.isCancel(returnCode)
-              ? 'native_cancelled'
-              : 'ffmpeg_return_code',
-          'return_code': returnCode?.getValue(),
+          'reason': 'all_video_encoders_failed',
+          'encoder': usedEncoder,
           'reader_id': reciter.id,
           'finished_at': DateTime.now().toIso8601String(),
           'elapsed_ms': stopwatch.elapsedMilliseconds,
         });
         failureLogged = true;
-        if (ReturnCode.isCancel(returnCode) || _cancelRequested) {
-          throw const QuranVideoExportException('تم إلغاء إنشاء الفيديو.');
-        }
         throw const QuranVideoExportException(
-          'تعذر إنشاء الفيديو على هذا الجهاز. تأكد من صلاحية الملفات والمساحة المتاحة ثم حاول مرة أخرى.',
+          'تعذر إنشاء الفيديو. تحقق من مساحة التخزين، ثم حاول مرة أخرى.',
         );
       }
 
@@ -315,8 +333,8 @@ class QuranVideoExportService {
         durationMs: track.durationMs,
         fileSizeBytes: fileSizeBytes,
       );
-    } on DioException catch (error) {
-      if (CancelToken.isCancel(error) || _cancelRequested) {
+    } on BackgroundResourceDownloadException catch (error) {
+      if (error.wasCancelled || _cancelRequested) {
         throw const QuranVideoExportException('تم إلغاء إنشاء الفيديو.');
       }
       AppLogger.logEvent('QuranVideo', 'export_failed', {
@@ -368,7 +386,7 @@ class QuranVideoExportService {
     } finally {
       stopwatch.stop();
       _activeSessionId = null;
-      _cancelToken = null;
+      _activeResourceDownloadId = null;
       _isExporting = false;
       if (workDirectory != null && await workDirectory.exists()) {
         try {
@@ -377,6 +395,15 @@ class QuranVideoExportService {
           // Temporary export material is best-effort cleanup only.
         }
       }
+      for (final audioPath in _stagedAudioPaths.toList()) {
+        try {
+          final audioFile = File(audioPath);
+          if (await audioFile.exists()) await audioFile.delete();
+        } catch (_) {
+          // Staged recitation clips are temporary and best-effort cleanup.
+        }
+      }
+      _stagedAudioPaths.clear();
       if (!completedSuccessfully && outputPath != null) {
         try {
           final outputFile = File(outputPath);
@@ -390,7 +417,14 @@ class QuranVideoExportService {
 
   Future<void> cancel() async {
     _cancelRequested = true;
-    _cancelToken?.cancel('user_cancelled');
+    final downloadId = _activeResourceDownloadId;
+    if (downloadId != null) {
+      try {
+        await BackgroundResourceDownloadService.instance.cancel(downloadId);
+      } catch (_) {
+        // Cancellation remains best-effort if the native task has finished.
+      }
+    }
     final sessionId = _activeSessionId;
     if (sessionId != null) {
       try {
@@ -399,6 +433,97 @@ class QuranVideoExportService {
         // Cancellation remains best-effort if the native session has finished.
       }
     }
+  }
+
+  Future<_EncoderAttempt> _runEncoderAttempt({
+    required List<String> arguments,
+    required int durationMs,
+    required QuranVideoProgressCallback onProgress,
+  }) async {
+    final completion = Completer<FFmpegSession>();
+    final startFuture = FFmpegKit.executeWithArgumentsAsync(
+      arguments,
+      (completedSession) {
+        if (!completion.isCompleted) completion.complete(completedSession);
+      },
+      (Log _) {
+        // FFmpeg logs may contain private local paths or source URLs.
+      },
+      (Statistics statistics) {
+        final fraction = durationMs <= 0
+            ? 0.65
+            : (statistics.getTime() / durationMs).clamp(0.0, 1.0);
+        onProgress(
+          QuranVideoExportProgress(
+            fraction: 0.38 + fraction * 0.58,
+            message: 'جارٍ ترميز الفيديو…',
+          ),
+        );
+      },
+    );
+    late final FFmpegSession session;
+    try {
+      session = await startFuture.timeout(_encoderStartupTimeout);
+    } on TimeoutException {
+      unawaited(
+        startFuture
+            .then((lateSession) async {
+              try {
+                await FFmpegKit.cancel(lateSession.getSessionId());
+              } catch (_) {
+                // A late session must not continue consuming resources.
+              }
+            })
+            .catchError((Object _) {}),
+      );
+      if (_cancelRequested) {
+        throw const QuranVideoExportException('تم إلغاء إنشاء الفيديو.');
+      }
+      throw const QuranVideoExportException(
+        'لم يستجب محرك الترميز لبدء التصدير؛ أُوقفت المحاولة.',
+      );
+    }
+    _activeSessionId = session.getSessionId();
+    if (_cancelRequested) {
+      await FFmpegKit.cancel(_activeSessionId);
+    }
+
+    try {
+      final completed = await completion.future.timeout(
+        _encoderTimeout(durationMs),
+      );
+      return _EncoderAttempt(session: completed);
+    } on TimeoutException {
+      final sessionId = _activeSessionId;
+      if (sessionId != null) {
+        try {
+          await FFmpegKit.cancel(sessionId);
+        } catch (_) {
+          // Continue waiting briefly for FFmpeg's completion callback.
+        }
+      }
+      try {
+        final stoppedSession = await completion.future.timeout(
+          const Duration(seconds: 12),
+        );
+        return _EncoderAttempt(session: stoppedSession, timedOut: true);
+      } on TimeoutException {
+        if (_cancelRequested) {
+          throw const QuranVideoExportException('تم إلغاء إنشاء الفيديو.');
+        }
+        throw const QuranVideoExportException(
+          'توقف محرك الترميز دون استجابة؛ أُوقفت المحاولة لحماية التطبيق.',
+        );
+      }
+    } finally {
+      _activeSessionId = null;
+    }
+  }
+
+  Duration _encoderTimeout(int durationMs) {
+    final playbackSeconds = durationMs > 0 ? durationMs / 1000 : 0;
+    final estimatedSeconds = (playbackSeconds * 3 + 20).ceil();
+    return Duration(seconds: estimatedSeconds < 45 ? 45 : estimatedSeconds);
   }
 
   void _validateRequest(
@@ -435,7 +560,6 @@ class QuranVideoExportService {
     required int toVerse,
     required Directory workDirectory,
     required QuranVideoExportOptions options,
-    required CancelToken cancelToken,
     required QuranVideoProgressCallback onProgress,
   }) async {
     final verseNumbers = List<int>.generate(
@@ -487,7 +611,6 @@ class QuranVideoExportService {
         verseNumbers: verseNumbers,
         verseTimings: verseTimings,
         workDirectory: workDirectory,
-        cancelToken: cancelToken,
         onProgress: onProgress,
       );
     }
@@ -519,7 +642,60 @@ class QuranVideoExportService {
           'توقيت الآيات في ملف هذا القارئ غير صالح للتصدير.',
         );
       }
-      final input = await _resolveAudioInput(fullSurahItem.audioUrl, reciter);
+      var input = await _resolveAudioInput(fullSurahItem.audioUrl, reciter);
+      if (!File(input).existsSync()) {
+        final temporaryDirectory = await getTemporaryDirectory();
+        final audioDirectory = Directory(
+          p.join(
+            temporaryDirectory.path,
+            'quran_video_audio',
+            reciter.id,
+            surahNumber.toString().padLeft(3, '0'),
+          ),
+        );
+        await audioDirectory.create(recursive: true);
+        final sourceUri = Uri.tryParse(input);
+        final sourceExtension = p
+            .extension(sourceUri?.path ?? '')
+            .toLowerCase();
+        const supportedExtensions = {
+          '.mp3',
+          '.m4a',
+          '.aac',
+          '.ogg',
+          '.opus',
+          '.wav',
+        };
+        final extension = supportedExtensions.contains(sourceExtension)
+            ? sourceExtension
+            : '.mp3';
+        final destinationPath = p.join(
+          audioDirectory.path,
+          'full_surah$extension',
+        );
+        final downloadId = 'quran-video:${reciter.id}:$surahNumber:full-surah';
+        _activeResourceDownloadId = downloadId;
+        try {
+          input = await BackgroundResourceDownloadService.instance
+              .downloadToPath(
+                id: downloadId,
+                url: input,
+                destinationPath: destinationPath,
+                displayName: 'تلاوة السورة $surahNumber',
+                onProgress: (progress) => onProgress(
+                  QuranVideoExportProgress(
+                    fraction: 0.05 + progress * 0.29,
+                    message: 'جارٍ تنزيل التلاوة…',
+                  ),
+                ),
+              );
+          _stagedAudioPaths.add(input);
+        } finally {
+          if (_activeResourceDownloadId == downloadId) {
+            _activeResourceDownloadId = null;
+          }
+        }
+      }
       return _PreparedAudioTrack(
         kind: QuranVideoAudioKind.fullSurah,
         input: input,
@@ -548,7 +724,6 @@ class QuranVideoExportService {
         verseNumbers: verseNumbers,
         verseTimings: verseTimings,
         workDirectory: workDirectory,
-        cancelToken: cancelToken,
         onProgress: onProgress,
         useEveryAyahFallback: true,
       );
@@ -565,12 +740,21 @@ class QuranVideoExportService {
     required List<int> verseNumbers,
     required Map<int, VerseTiming?> verseTimings,
     required Directory workDirectory,
-    required CancelToken cancelToken,
     required QuranVideoProgressCallback onProgress,
     bool useEveryAyahFallback = false,
   }) async {
     final audioDirectory = Directory(p.join(workDirectory.path, 'audio'));
     await audioDirectory.create(recursive: true);
+    final temporaryDirectory = await getTemporaryDirectory();
+    final downloadDirectory = Directory(
+      p.join(
+        temporaryDirectory.path,
+        'quran_video_audio',
+        reciter.id,
+        surahNumber.toString().padLeft(3, '0'),
+      ),
+    );
+    await downloadDirectory.create(recursive: true);
     final clips = <_PreparedVerseAudio>[];
     final clipPaths = <String>[];
     var durationOffsetMs = 0;
@@ -592,38 +776,49 @@ class QuranVideoExportService {
         );
       }
 
-      final destination = File(
-        p.join(
-          audioDirectory.path,
-          'ayah_${surahNumber.toString().padLeft(3, '0')}_${verseNumber.toString().padLeft(3, '0')}.mp3',
-        ),
-      );
+      final fileName =
+          'ayah_${surahNumber.toString().padLeft(3, '0')}_${verseNumber.toString().padLeft(3, '0')}.mp3';
+      final workingDestination = File(p.join(audioDirectory.path, fileName));
       final safeSource = await _resolveAudioInput(source, reciter);
       final sourceUri = Uri.tryParse(source);
       final isLocal =
           sourceUri?.scheme == 'file' || File(safeSource).existsSync();
       final existingDuration = timing?.durationMs ?? 0;
+      late final File destination;
       if (isLocal) {
+        destination = workingDestination;
         await File(safeSource).copy(destination.path);
       } else {
-        await _dio.download(
-          safeSource,
-          destination.path,
-          cancelToken: cancelToken,
-          onReceiveProgress: (received, total) {
-            final currentFraction = total > 0
-                ? (received / total).clamp(0.0, 1.0)
-                : 0.0;
-            final overall = (index + currentFraction) / verseNumbers.length;
-            onProgress(
-              QuranVideoExportProgress(
-                fraction: 0.05 + overall * 0.29,
-                message:
-                    'جارٍ تنزيل التلاوة (${index + 1}/${verseNumbers.length})…',
-              ),
-            );
-          },
-        );
+        final downloadId =
+            'quran-video:${reciter.id}:$surahNumber:$verseNumber';
+        _activeResourceDownloadId = downloadId;
+        try {
+          final downloadedPath = await BackgroundResourceDownloadService
+              .instance
+              .downloadToPath(
+                id: downloadId,
+                url: safeSource,
+                destinationPath: p.join(downloadDirectory.path, fileName),
+                displayName: 'تلاوة الآية $verseNumber',
+                onProgress: (currentFraction) {
+                  final overall =
+                      (index + currentFraction) / verseNumbers.length;
+                  onProgress(
+                    QuranVideoExportProgress(
+                      fraction: 0.05 + overall * 0.29,
+                      message:
+                          'جارٍ تنزيل التلاوة (${index + 1}/${verseNumbers.length})…',
+                    ),
+                  );
+                },
+              );
+          destination = File(downloadedPath);
+          _stagedAudioPaths.add(downloadedPath);
+        } finally {
+          if (_activeResourceDownloadId == downloadId) {
+            _activeResourceDownloadId = null;
+          }
+        }
       }
       _checkCancelled();
 
@@ -835,7 +1030,7 @@ class QuranVideoExportService {
       .replaceAll('\r', '');
 
   void _checkCancelled() {
-    if (_cancelRequested || (_cancelToken?.isCancelled ?? false)) {
+    if (_cancelRequested) {
       throw const QuranVideoExportException('تم إلغاء إنشاء الفيديو.');
     }
   }

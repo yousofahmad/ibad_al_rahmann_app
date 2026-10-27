@@ -12,8 +12,8 @@ import 'package:ibad_al_rahmann/features/share_cards/services/share_cards_servic
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:ibad_al_rahmann/core/helpers/background_resource_download_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 const _gold = Color(0xFFD0A871);
@@ -75,8 +75,13 @@ class _RamadanScreenState extends State<RamadanScreen> {
   Future<void> _shareCard(String url) async {
     try {
       final tempDir = await getTemporaryDirectory();
-      final path = "${tempDir.path}/ramadan_share.jpg";
-      await Dio().download(url, path);
+      final path = '${tempDir.path}/ramadan_share_${url.hashCode}.jpg';
+      await BackgroundResourceDownloadService.instance.downloadToPath(
+        id: 'ramadan-share:${url.hashCode}',
+        url: url,
+        destinationPath: path,
+        displayName: 'بطاقة رمضانية للمشاركة',
+      );
       // ignore: deprecated_member_use
       await Share.shareXFiles([
         XFile(path),

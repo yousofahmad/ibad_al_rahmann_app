@@ -7,8 +7,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:gal/gal.dart';
-import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:ibad_al_rahmann/core/helpers/background_resource_download_service.dart';
 
 class ShareCardsScreen extends StatefulWidget {
   const ShareCardsScreen({super.key});
@@ -44,8 +44,13 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
     setState(() => _downloadingUrls.add(url));
     try {
       final tempDir = await getTemporaryDirectory();
-      final path = "${tempDir.path}/share_image.jpg";
-      await Dio().download(url, path);
+      final path = '${tempDir.path}/share_image_${url.hashCode}.jpg';
+      await BackgroundResourceDownloadService.instance.downloadToPath(
+        id: 'share-card:share:${url.hashCode}',
+        url: url,
+        destinationPath: path,
+        displayName: 'صورة للمشاركة',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -75,8 +80,13 @@ class _ShareCardsScreenState extends State<ShareCardsScreen> {
     setState(() => _downloadingUrls.add(url));
     try {
       final tempDir = await getTemporaryDirectory();
-      final path = "${tempDir.path}/temp_save.jpg";
-      await Dio().download(url, path);
+      final path = '${tempDir.path}/temp_save_${url.hashCode}.jpg';
+      await BackgroundResourceDownloadService.instance.downloadToPath(
+        id: 'share-card:gallery:${url.hashCode}',
+        url: url,
+        destinationPath: path,
+        displayName: 'صورة للحفظ',
+      );
       await Gal.putImage(path);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -1,16 +1,9 @@
 import 'dart:io';
-import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
+import '../core/helpers/background_resource_download_service.dart';
 import '../models/muezzin_model.dart';
 
 class MuezzinRepository {
-  final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 15),
-    ),
-  );
-
   final List<Muezzin> _muezzins = [
     Muezzin(
       id: 'makkah_ali_mulla',
@@ -150,17 +143,13 @@ class MuezzinRepository {
 
       final savePath = '${adhanDir.path}/${muezzin.fileName}';
 
-      await _dio.download(
-        muezzin.url,
-        savePath,
-        onReceiveProgress: (received, total) {
-          if (total != -1) {
-            onProgress(received / total);
-          }
-        },
+      return await BackgroundResourceDownloadService.instance.downloadToPath(
+        id: 'muezzin-repository:${muezzin.id}',
+        url: muezzin.url,
+        destinationPath: savePath,
+        displayName: 'أذان ${muezzin.name}',
+        onProgress: onProgress,
       );
-
-      return savePath;
     } catch (e) {
       // print('Download error: $e');
       return null;

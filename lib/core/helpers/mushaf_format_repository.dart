@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/app_logger.dart';
+import 'background_download_runtime.dart';
 import 'feature_resource_repository.dart';
 import 'mushaf_pagination.dart';
 
@@ -474,11 +475,10 @@ class MushafFormatRepository extends ChangeNotifier {
       ),
       progressBar: true,
     );
-    await downloader.start(
-      doTrackTasks: true,
+    await BackgroundDownloadRuntime.ensureStarted();
+    await downloader.trackTasksInGroup(
+      _backgroundDownloadGroup,
       markDownloadedComplete: true,
-      doRescheduleKilledTasks: true,
-      autoCleanDatabase: false,
     );
   }
 

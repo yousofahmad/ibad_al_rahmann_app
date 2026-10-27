@@ -62,6 +62,22 @@ class OptionalMushafPageWidget extends StatefulWidget {
     this.onPageLoaded,
   });
 
+  static bool shouldUseDarkPaper({
+    required bool darkTheme,
+    required bool hasTajweed,
+  }) => darkTheme && !hasTajweed;
+
+  static bool shouldForceLightPaper({
+    required bool darkTheme,
+    required bool hasTajweed,
+  }) => darkTheme && hasTajweed;
+
+  static bool canRenderFromCachedPage({
+    required bool hasLines,
+    required bool hasWords,
+    required bool fontLoaded,
+  }) => hasLines && hasWords && fontLoaded;
+
   final bool isLandscape;
 
   @override
@@ -154,10 +170,14 @@ class _OptionalMushafPageWidgetState extends State<OptionalMushafPageWidget>
     );
     final isFontLoaded = FontsHelper.isFontLoaded(_fontFamily!);
 
-    if (cachedLines != null && cachedWords != null && isFontLoaded) {
-      _pageLines = cachedLines;
+    if (OptionalMushafPageWidget.canRenderFromCachedPage(
+      hasLines: cachedLines?.isNotEmpty ?? false,
+      hasWords: cachedWords?.isNotEmpty ?? false,
+      fontLoaded: isFontLoaded,
+    )) {
+      _pageLines = cachedLines!;
       final Map<int, List<QuranWord>> lineMap = {};
-      for (var word in cachedWords) {
+      for (var word in cachedWords!) {
         final ln = word.lineNumber ?? 1;
         lineMap.putIfAbsent(ln, () => []).add(word);
       }
@@ -186,6 +206,18 @@ class _OptionalMushafPageWidgetState extends State<OptionalMushafPageWidget>
         FontsHelper.loadFontFromFamily(_fontFamily!),
         _fetchDbData(formatRevision),
       ]);
+
+      if (mounted &&
+          epoch == _loadEpoch &&
+          (_pageLines?.isEmpty ?? true) &&
+          formatRevision == _formatRepository.selectionRevision.value) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        if (mounted &&
+            epoch == _loadEpoch &&
+            formatRevision == _formatRepository.selectionRevision.value) {
+          await _fetchDbData(formatRevision);
+        }
+      }
 
       if (mounted && epoch == _loadEpoch) {
         setState(() {
@@ -430,15 +462,29 @@ class _OptionalMushafPageWidgetState extends State<OptionalMushafPageWidget>
         hasDarkOverride ?? (themeState.mode == ThemeMode.dark);
 
     final quranThemeEarly = Theme.of(context).extension<QuranThemeColors>();
-    final Color effectivePaperColor =
-        widget.paperColorOverride ??
-        (isDarkInner
-            ? (quranThemeEarly?.paperColorDark ?? Colors.white)
-            : (quranThemeEarly?.paperColorLight ?? Colors.white));
+    final bool hasTajweed = _formatRepository.current.hasTajweed;
+    final bool forceLightPaper = OptionalMushafPageWidget.shouldForceLightPaper(
+      darkTheme: isDarkInner,
+      hasTajweed: hasTajweed,
+    );
+    final bool useDarkPaper = OptionalMushafPageWidget.shouldUseDarkPaper(
+      darkTheme: isDarkInner,
+      hasTajweed: hasTajweed,
+    );
+    final Color effectivePaperColor = forceLightPaper
+        ? (quranThemeEarly?.paperColorLight ?? Colors.white)
+        : widget.paperColorOverride ??
+              (useDarkPaper
+                  ? (quranThemeEarly?.paperColorDark ?? Colors.white)
+                  : (quranThemeEarly?.paperColorLight ?? Colors.white));
+    final Color? effectiveTextColorOverride = forceLightPaper
+        ? null
+        : widget.textColorOverride;
     final bool isDarkPaper = effectivePaperColor.computeLuminance() < 0.5;
 
     Color headerTextColor =
-        widget.textColorOverride ?? (isDarkPaper ? Colors.white : Colors.black);
+        effectiveTextColorOverride ??
+        (isDarkPaper ? Colors.white : Colors.black);
 
     final int juzNum = getJuzNumber(surahNum, verseNum == 0 ? 1 : verseNum);
     final bool isTablet = context.isTablet;
@@ -782,7 +828,7 @@ class _OptionalMushafPageWidgetState extends State<OptionalMushafPageWidget>
                             (isVerseHighlighted || isSelectedOrNav);
 
                         Color textColor =
-                            widget.textColorOverride ??
+                            effectiveTextColorOverride ??
                             (isDarkPaper ? Colors.white : Colors.black);
 
                         if (!isVisible) textColor = Colors.transparent;

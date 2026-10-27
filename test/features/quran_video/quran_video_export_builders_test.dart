@@ -135,5 +135,35 @@ void main() {
       expect(filterGraph, isNot(contains('aresample')));
       expect(args, contains('2400k'));
     });
+
+    test(
+      'software fallback keeps the selected resolution and video bitrate',
+      () {
+        final args = QuranVideoCommandBuilder.build(
+          audioKind: QuranVideoAudioKind.concatenatedVerses,
+          audioInput: '/tmp/audio.ffconcat',
+          audioClipStartMs: 0,
+          audioClipEndMs: 5000,
+          backgroundType: QuranVideoBackgroundType.image,
+          backgroundPath: '/tmp/background.jpg',
+          subtitlePath: '/tmp/captions.ass',
+          fontDirectory: '/tmp/fonts',
+          outputPath: '/tmp/output.mp4',
+          videoEncoder: 'libx264',
+          options: const QuranVideoExportOptions(
+            resolution: QuranVideoResolution.fullHd1080,
+          ),
+        );
+
+        expect(
+          args,
+          containsAllInOrder(['-c:v', 'libx264', '-preset', 'ultrafast']),
+        );
+        expect(args, contains('4400k'));
+        expect(args, containsAllInOrder(['-map', '[v]', '-map', '[a]']));
+        expect(args, contains('aac'));
+        expect(args, isNot(contains('1:a:0')));
+      },
+    );
   });
 }
