@@ -1596,6 +1596,27 @@ class PrayerService extends ChangeNotifier {
     return h;
   }
 
+  /// Uses the published Egyptian civil-date row for displayed dates whenever
+  /// it is available; the existing offset conversion remains the fallback.
+  static HijriCalendar getDisplayHijriForDate(
+    int remoteOffset, [
+    DateTime? date,
+  ]) {
+    final civilDate = date ?? DateTime.now();
+    if (isEgyptianSystem) {
+      final official = EgyptianHijriCalendar
+          .instance
+          .surveyDates[EgyptianHijriCalendar.civilKey(civilDate)];
+      if (official != null) {
+        return HijriCalendar()
+          ..hDay = official.hDay
+          ..hMonth = official.hMonth
+          ..hYear = official.hYear;
+      }
+    }
+    return getHijriWithOffset(remoteOffset, civilDate);
+  }
+
   int get hijriOffset =>
       RemoteConfigService.globalHijriOffset + _hijriOffset + _localHijriDelta;
   int get manualHijriOffset => _hijriOffset;

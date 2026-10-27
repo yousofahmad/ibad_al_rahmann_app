@@ -658,7 +658,7 @@ class _TaqwimPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final hijriOffset = PrayerService().hijriOffset;
-    final hijri = PrayerService.getHijriWithOffset(hijriOffset, date);
+    final hijri = PrayerService.getDisplayHijriForDate(hijriOffset, date);
 
     final dayName = DateFormat('EEEE', 'ar').format(date);
     final gregDay = date.day.toString();
