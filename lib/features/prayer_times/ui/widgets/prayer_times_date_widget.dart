@@ -7,7 +7,21 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../core/theme/app_images.dart';
 import '../../../../core/theme/app_styles.dart';
+import '../../../../services/prayer_service.dart';
 import '../../data/models/prayer_times_model.dart';
+
+String _hijriDateTitle(PrayerTimesResponseModel prayers) {
+  if (PrayerService.isEgyptianSystem) {
+    final date = PrayerService.getDisplayHijriForDate(
+      PrayerService().hijriOffset,
+      DateTime.now(),
+    );
+    return '${date.hDay.toArabicNums} ${date.longMonthName} ${date.hYear.toArabicNums} هـ';
+  }
+
+  final date = prayers.hijriDate;
+  return '${date.day.toArabicNums} ${date.monthName} ${date.year.toArabicNums} هـ';
+}
 
 class PrayerTimesDateWidget extends StatelessWidget {
   const PrayerTimesDateWidget({super.key, required this.prayers});
@@ -79,7 +93,7 @@ class MobilePrayerTimesDateWidget extends StatelessWidget {
   }
 
   String get title2 {
-    return '${prayers.hijriDate.day.toArabicNums} ${prayers.hijriDate.monthName} ${prayers.hijriDate.year.toArabicNums}??';
+    return _hijriDateTitle(prayers);
   }
 }
 
@@ -132,6 +146,6 @@ class TabletPrayerTimesDateWidget extends StatelessWidget {
   }
 
   String get title2 {
-    return '${prayers.hijriDate.day.toArabicNums} ${prayers.hijriDate.monthName} ${prayers.hijriDate.year.toArabicNums}??';
+    return _hijriDateTitle(prayers);
   }
 }

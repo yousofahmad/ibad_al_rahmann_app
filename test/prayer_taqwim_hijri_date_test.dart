@@ -25,11 +25,7 @@ void main() {
       calendar.applyUserConfirmation(
         EgyptianHijriUserConfirmation(
           anchorDate: DateTime(2026, 10, 11),
-          hijri: const EgyptianHijriDate(
-            hDay: 30,
-            hMonth: 4,
-            hYear: 1448,
-          ),
+          hijri: const EgyptianHijriDate(hDay: 30, hMonth: 4, hYear: 1448),
           confirmedAt: '2026-10-11T00:00:00Z',
         ),
       );
@@ -50,6 +46,23 @@ void main() {
       expect(octoberTwelfth.hDay, 1);
       expect(octoberTwelfth.hMonth, 5);
       expect(octoberTwelfth.hYear, 1448);
+
+      final octoberEleventhFromSharedService = PrayerService.getHijriWithOffset(
+        1,
+        DateTime(2026, 10, 11),
+      );
+      final octoberTwelfthFromSharedService = PrayerService.getHijriWithOffset(
+        1,
+        DateTime(2026, 10, 12),
+      );
+      expect(octoberEleventhFromSharedService.hDay, 29);
+      expect(octoberEleventhFromSharedService.hMonth, 4);
+      expect(octoberTwelfthFromSharedService.hDay, 1);
+      expect(octoberTwelfthFromSharedService.hMonth, 5);
+      expect(
+        PrayerService.hijriToGregorianDate(1448, 5, 1),
+        DateTime(2026, 10, 12),
+      );
     },
   );
 }

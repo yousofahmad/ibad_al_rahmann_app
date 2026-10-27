@@ -1544,13 +1544,11 @@ class PrayerService extends ChangeNotifier {
   /// Egyptian dates come only from the official civil-date snapshot; missing
   /// rows stay null rather than being fabricated by a conversion library.
   static HijriCalendar? getNotificationHijriForDate(DateTime date) {
+    HijriCalendar.setLocal('ar');
     if (isEgyptianSystem) {
       final official = EgyptianHijriCalendar.instance.lookup(date);
       if (official == null) return null;
-      return HijriCalendar()
-        ..hDay = official.hDay
-        ..hMonth = official.hMonth
-        ..hYear = official.hYear;
+      return _hijriCalendarFromEgyptianDate(official, date);
     }
     return getHijriWithOffset(
       RemoteConfigService.globalHijriOffset +
@@ -1561,10 +1559,16 @@ class PrayerService extends ChangeNotifier {
   }
 
   static HijriCalendar getHijriWithOffset(int remoteOffset, [DateTime? date]) {
+    HijriCalendar.setLocal('ar');
     final baseDate = date ?? DateTime.now();
     final isEgyptian = isEgyptianSystem;
+    final official = isEgyptian
+        ? EgyptianHijriCalendar
+              .instance
+              .surveyDates[EgyptianHijriCalendar.civilKey(baseDate)]
+        : null;
 
-    // الأولوية 1: local_hijri_offset (خاص بالنظام المصري فقط عند توفره)
+    // صف الهيئة المصري هو المرجع؛ الإزاحات تُستخدم فقط عند غياب هذا الصف.
     final localOffset = isEgyptian
         ? CacheHelper.prefs.getInt('local_hijri_offset')
         : null;
@@ -1572,18 +1576,19 @@ class PrayerService extends ChangeNotifier {
         ? 0
         : (CacheHelper.prefs.getInt('manual_day_adjustment') ?? 0);
 
-    // في النظام المصري نعتمد على localOffset أو remoteOffset تلقائياً
-    // في نظام أم القرى نعتمد على الحساب الفلكي + التعديل اليدوي فقط دون تدخل أي مصدر خارجي
+    // عند غياب الصف المصري نرجع إلى الإزاحة المحلية أو البعيدة.
+    // أم القرى تستخدم التحويل الفلكي مع التعديل اليدوي.
     final offsetDays = (localOffset != null)
         ? localOffset
         : (isEgyptian ? remoteOffset : remoteOffset + manualAdjustment);
 
-    DateTime effectiveDate = NotificationScheduleHelpers.addCivilDays(
-      baseDate,
-      offsetDays,
-    );
+    final effectiveDate = official == null
+        ? NotificationScheduleHelpers.addCivilDays(baseDate, offsetDays)
+        : baseDate;
 
-    final h = HijriCalendar.fromDate(effectiveDate);
+    final h = official == null
+        ? HijriCalendar.fromDate(effectiveDate)
+        : _hijriCalendarFromEgyptianDate(official, baseDate);
     final hijriStr = "\u200F${h.hDay} ${h.longMonthName} ${h.hYear}\u200F";
     final gDateStr =
         "${baseDate.year}-${baseDate.month.toString().padLeft(2, '0')}-${baseDate.day.toString().padLeft(2, '0')}";
@@ -1602,19 +1607,16 @@ class PrayerService extends ChangeNotifier {
     int remoteOffset, [
     DateTime? date,
   ]) {
-    final civilDate = date ?? DateTime.now();
-    if (isEgyptianSystem) {
-      final official = EgyptianHijriCalendar
-          .instance
-          .surveyDates[EgyptianHijriCalendar.civilKey(civilDate)];
-      if (official != null) {
-        return HijriCalendar()
-          ..hDay = official.hDay
-          ..hMonth = official.hMonth
-          ..hYear = official.hYear;
-      }
-    }
-    return getHijriWithOffset(remoteOffset, civilDate);
+    return getHijriWithOffset(remoteOffset, date);
+  }
+
+  static HijriCalendar _hijriCalendarFromEgyptianDate(
+    EgyptianHijriDate date,
+    DateTime civilDate,
+  ) {
+    final hijri = HijriCalendar.fromDate(civilDate);
+    hijri.hDate(date.hYear, date.hMonth, date.hDay);
+    return hijri;
   }
 
   int get hijriOffset =>
@@ -1675,6 +1677,14 @@ class PrayerService extends ChangeNotifier {
   }
 
   static DateTime hijriToGregorianDate(int year, int month, int day) {
+    if (isEgyptianSystem) {
+      for (final entry in EgyptianHijriCalendar.instance.surveyDates.entries) {
+        final hijri = entry.value;
+        if (hijri.hYear == year && hijri.hMonth == month && hijri.hDay == day) {
+          return EgyptianHijriCalendar.parseCivilKey(entry.key);
+        }
+      }
+    }
     final calculated = HijriCalendar().hijriToGregorian(year, month, day);
     return NotificationScheduleHelpers.addCivilDays(
       calculated,
