@@ -73,6 +73,8 @@ class TafsirBook {
 
   String get familyId => TafsirCatalog.isValidId(groupId) ? groupId! : id;
   String get familyName => _nonEmpty(groupName) ?? name;
+  String get displayName =>
+      TafsirCatalog.familyDisplayName(familyId, familyName, [this]);
   String get languageLabel =>
       _nonEmpty(languageName) ??
       nativeLanguageNames[languageCode.toLowerCase().split('-').first] ??
@@ -151,6 +153,8 @@ class TafsirBookGroup {
         ? '${book.languageLabel} — ${book.id}'
         : book.languageLabel;
   }
+
+  String get displayName => TafsirCatalog.familyDisplayName(id, name, variants);
 }
 
 class TafsirCatalog {
@@ -162,6 +166,43 @@ class TafsirCatalog {
     'mukhtasar': 'tafsir_al_mukhtasar',
     'qul_tafsir_37': 'tabari',
   };
+
+  static const _arabicFamilyNames = <String, String>{
+    'muyassar': 'التفسير الميسر',
+    'tafsir_al_muyassar': 'التفسير الميسر',
+    'ibn_katheer': 'تفسير ابن كثير',
+    'ibn_kathir': 'تفسير ابن كثير',
+    'tafsir_ibn_kathir': 'تفسير ابن كثير',
+    'tabari': 'تفسير الطبري',
+    'tafsir_al_tabari': 'تفسير الطبري',
+    'tafsir_al_saadi': 'تفسير السعدي',
+    'as_saadi': 'تفسير السعدي',
+    'saadi': 'تفسير السعدي',
+    'jalalayn': 'تفسير الجلالين',
+    'al_jalalayn': 'تفسير الجلالين',
+    'tafsir_al_jalalayn': 'تفسير الجلالين',
+    'mukhtasar': 'التفسير المختصر',
+    'tafsir_al_mukhtasar': 'التفسير المختصر',
+  };
+
+  static String familyDisplayName(
+    String id,
+    String sourceName,
+    Iterable<TafsirBook> variants,
+  ) {
+    final canonicalId = canonicalGroupIds[id] ?? id;
+    final knownName = _arabicFamilyNames[id] ?? _arabicFamilyNames[canonicalId];
+    if (knownName != null) return knownName;
+    if (_containsArabic(sourceName)) return sourceName;
+    for (final book in variants) {
+      if (_containsArabic(book.name)) return book.name;
+      if (_containsArabic(book.familyName)) return book.familyName;
+    }
+    return sourceName;
+  }
+
+  static bool _containsArabic(String value) =>
+      RegExp(r'[\u0600-\u06FF]').hasMatch(value);
 
   static bool isValidId(String? id) =>
       id != null && RegExp(r'^[A-Za-z0-9_-]{1,64}$').hasMatch(id);

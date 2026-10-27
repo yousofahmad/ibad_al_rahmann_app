@@ -63,12 +63,21 @@ class MushafFormat {
     this.licenseSha256,
   });
 
+  static const _arabicDisplayNames = <String, String>{
+    'qpc_v1_builtin': 'مصحف المدينة المنورة (1405هـ)',
+    'qpc_v2_1421': 'مصحف المدينة المنورة (1421هـ)',
+    'qpc_v4_tajweed_1441': 'مصحف التجويد الملوّن (1441هـ)',
+    'digital_khatt_v2': 'الخط الرقمي — الإصدار الثاني',
+  };
+
+  String get displayName => _arabicDisplayNames[id] ?? name;
+
   bool get isUnicodeFont => fontMode == 'unicode_single';
 
   static const builtin = MushafFormat(
     id: 'qpc_v1_builtin',
     name: 'المصحف الحالي',
-    description: 'مصاحف التطبيق المضمّن',
+    description: 'المصحف الأصلي المضمّن في التطبيق — إصدار 1405هـ',
     pageCount: 604,
     lineCount: 15,
     hasTajweed: false,

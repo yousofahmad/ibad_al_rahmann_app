@@ -657,6 +657,12 @@ class _PageActionBarState extends State<PageActionBar>
     }
   }
 
+  void _onOpenFormats() {
+    if (_isBusy) return;
+    widget.onDismiss();
+    MushafFormatPicker.show(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).primaryColor;
@@ -718,6 +724,14 @@ class _PageActionBarState extends State<PageActionBar>
                         icon: Icons.color_lens_rounded,
                         label: 'الألوان',
                         onTap: _onOpenColorPalette,
+                        isEnabled: !_isBusy,
+                        color: onBar,
+                      ),
+                      _divider(onBarSubtle),
+                      _ActionButton(
+                        icon: Icons.auto_stories_outlined,
+                        label: 'تنسيقات المصحف',
+                        onTap: _onOpenFormats,
                         isEnabled: !_isBusy,
                         color: onBar,
                       ),

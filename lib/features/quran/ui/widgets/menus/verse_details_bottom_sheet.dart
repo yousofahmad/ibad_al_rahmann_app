@@ -13,6 +13,7 @@ import 'package:ibad_al_rahmann/core/theme/app_styles.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/quran/quran_cubit.dart';
 import 'package:ibad_al_rahmann/features/quran/data/models/selected_verse_model.dart';
 import 'package:ibad_al_rahmann/features/quran/bloc/verse_player/verse_player_cubit.dart';
+import 'tafsir_family_selector.dart';
 import 'tafsir_language_selector.dart';
 
 class VerseDetailsBottomSheet extends StatefulWidget {
@@ -133,7 +134,7 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    'تم تحميل ${book.name} (${book.languageLabel}) بنجاح!',
+                    'تم تحميل ${book.displayName} (${book.languageLabel}) بنجاح!',
                     style: const TextStyle(fontFamily: AppConsts.expoArabic),
                   ),
                   backgroundColor: const Color(0xFF00897B),
@@ -351,93 +352,12 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                   ),
                   SizedBox(height: 8.h),
 
-                  // One chip per tafsir family, never one per language.
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    reverse: true, // RTL order
-                    child: Row(
-                      children: groups.map((group) {
-                        final isSelected = group.id == currentGroup.id;
-                        final isDownloaded = group.variants.any(
-                          (book) =>
-                              _downloadedStatus[book.id] ?? book.isBuiltIn,
-                        );
-                        final isDown = group.variants.any(
-                          (book) => _isDownloading[book.id] == true,
-                        );
-
-                        return Padding(
-                          padding: EdgeInsets.only(left: 8.w),
-                          child: InkWell(
-                            onTap: () => _handleGroupSelection(group),
-                            borderRadius: BorderRadius.circular(12.r),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 12.w,
-                                vertical: 8.h,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? goldColor.withValues(alpha: 0.15)
-                                    : (isPaperDark
-                                          ? Colors.white10
-                                          : Colors.grey.withValues(
-                                              alpha: 0.08,
-                                            )),
-                                borderRadius: BorderRadius.circular(12.r),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? goldColor
-                                      : Colors.transparent,
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (isDown) ...[
-                                    SizedBox(
-                                      width: 14.w,
-                                      height: 14.w,
-                                      child: const CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation(
-                                          goldColor,
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: 6.w),
-                                  ] else if (!isDownloaded) ...[
-                                    Icon(
-                                      Icons.cloud_download_outlined,
-                                      size: 15.sp,
-                                      color: isSelected
-                                          ? goldColor
-                                          : Colors.grey,
-                                    ),
-                                    SizedBox(width: 4.w),
-                                  ],
-                                  Text(
-                                    group.name,
-                                    style: TextStyle(
-                                      fontFamily: AppConsts.expoArabic,
-                                      fontSize: 12.sp,
-                                      fontWeight: isSelected
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                      color: isSelected
-                                          ? goldColor
-                                          : onSurface.withValues(alpha: 0.75),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                  TafsirFamilySelector(
+                    groups: groups,
+                    selectedGroupId: currentGroup.id,
+                    downloadedStatus: _downloadedStatus,
+                    downloadingStatus: _isDownloading,
+                    onChanged: _handleGroupSelection,
                   ),
                   SizedBox(height: 14.h),
                   TafsirLanguageSelector(
@@ -500,7 +420,7 @@ class _VerseDetailsBottomSheetState extends State<VerseDetailsBottomSheet> {
                           ),
                           SizedBox(height: 8.h),
                           Text(
-                            currentBook.name,
+                            currentBook.displayName,
                             style: TextStyle(
                               fontFamily: AppConsts.expoArabic,
                               fontSize: 16.sp,

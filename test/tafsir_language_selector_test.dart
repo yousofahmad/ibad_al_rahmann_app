@@ -29,7 +29,7 @@ void main() {
     ),
   ];
 
-  testWidgets('native language labels select the exact downloadable variant', (
+  testWidgets('native-language labels select the exact downloadable variant', (
     tester,
   ) async {
     String? selected;
@@ -51,19 +51,72 @@ void main() {
         ),
       ),
     );
+
     await tester.tap(find.byKey(const ValueKey('tafsir-language-selector')));
     await tester.pumpAndSettle();
-    expect(find.text('English'), findsWidgets);
-    expect(find.text('Español'), findsWidgets);
-    final english = tester.widget<Text>(find.text('English').last);
-    expect(english.textDirection, TextDirection.ltr);
-    await tester.tap(find.text('English').last);
+    expect(find.text('English'), findsOneWidget);
+    expect(find.text('Español'), findsOneWidget);
+    final englishRow = tester.widget<ListTile>(
+      find.byKey(const ValueKey('tafsir-language-option-family_en')),
+    );
+    expect((englishRow.title! as Text).textDirection, TextDirection.ltr);
+    expect(englishRow.leading, isA<Icon>());
+    await tester.tap(
+      find.byKey(const ValueKey('tafsir-language-option-family_en')),
+    );
     await tester.pumpAndSettle();
     expect(selected, 'family_en');
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a single-language family shows a disabled language choice', (
+  testWidgets('long edition labels remain readable in the chooser', (
+    tester,
+  ) async {
+    const longBook = TafsirBook(
+      id: 'long_id',
+      name: 'Book',
+      author: '',
+      groupId: 'long_family',
+      languageCode: 'id',
+      languageName: 'Bahasa Indonesia',
+      edition:
+          'Edisi bahasa Indonesia dengan nama yang cukup panjang agar tidak terpotong di layar ponsel',
+    );
+    const arabicBook = TafsirBook(
+      id: 'arabic_id',
+      name: 'Book',
+      author: '',
+      groupId: 'long_family',
+      languageCode: 'ar',
+    );
+    final group = TafsirCatalog.groupBooks([arabicBook, longBook]).single;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 240,
+            child: TafsirLanguageSelector(
+              group: group,
+              selectedBookId: arabicBook.id,
+              onChanged: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('tafsir-language-selector')));
+    await tester.pumpAndSettle();
+    final longRow = tester.widget<ListTile>(
+      find.byKey(const ValueKey('tafsir-language-option-long_id')),
+    );
+    expect(
+      (longRow.title! as Text).data,
+      contains('Edisi bahasa Indonesia dengan nama yang cukup panjang'),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a single-language family keeps its selector disabled', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -77,10 +130,10 @@ void main() {
         ),
       ),
     );
-    final dropdown = tester.widget<DropdownButton<String>>(
+    final selector = tester.widget<InkWell>(
       find.byKey(const ValueKey('tafsir-language-selector')),
     );
-    expect(dropdown.onChanged, isNull);
+    expect(selector.onTap, isNull);
     expect(tester.takeException(), isNull);
   });
 }

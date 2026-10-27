@@ -75,7 +75,7 @@ class DoubleTapDialog extends StatelessWidget {
             _buildHintRow(
               Icons.palette_outlined,
               'الإعدادات',
-              'لمزيد من تنسيقات المصحف اضغط زر الإعدادات، ثم «تنسيق المصحف».',
+              'لتنزيل تنسيق للمصحف، اضغط ضغطة واحدة واختر «تنسيقات المصحف».',
               textColor,
               subTextColor,
             ),

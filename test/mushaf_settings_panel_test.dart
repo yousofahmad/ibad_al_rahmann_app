@@ -23,11 +23,11 @@ void main() {
     );
 
     expect(find.text('الألوان'), findsOneWidget);
-    expect(find.text('تنسيق المصحف'), findsOneWidget);
+    expect(find.text('تنسيقات المصحف'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('الألوان'));
-    await tester.tap(find.text('تنسيق المصحف'));
+    await tester.tap(find.text('تنسيقات المصحف'));
     expect(selections, ['colors', 'format']);
     expect(tester.takeException(), isNull);
   });

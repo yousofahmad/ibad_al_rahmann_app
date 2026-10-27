@@ -22,6 +22,13 @@ class MushafFormatPicker extends StatefulWidget {
 }
 
 class _MushafFormatPickerState extends State<MushafFormatPicker> {
+  static const _supportedFormatIds = <String>{
+    'qpc_v1_builtin',
+    'qpc_v2_1421',
+    'qpc_v4_tajweed_1441',
+    'digital_khatt_v2',
+  };
+
   late final MushafFormatRepository _repository;
   String? _workingId;
   String? _error;
@@ -59,7 +66,7 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
       final messenger = ScaffoldMessenger.maybeOf(context);
       Navigator.of(context).pop();
       messenger?.showSnackBar(
-        SnackBar(content: Text('تم تفعيل ${format.name}')),
+        SnackBar(content: Text('تم تفعيل ${format.displayName}')),
       );
     } catch (_) {
       if (mounted) {
@@ -84,9 +91,15 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
         builder: (context, _) {
           final formats = _repository.formats;
           final visibleFormats = formats
-              .where((format) => format.compatible)
+              .where(
+                (format) =>
+                    _supportedFormatIds.contains(format.id) &&
+                    format.compatible,
+              )
               .toList();
-          final hiddenFormatsCount = formats.length - visibleFormats.length;
+          final hasAdditionalFormats = visibleFormats.any(
+            (format) => !format.isBuiltin,
+          );
           return Padding(
             padding: EdgeInsets.only(
               bottom: MediaQuery.viewInsetsOf(context).bottom,
@@ -115,7 +128,7 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'تنسيق المصحف',
+                            'تنسيقات المصحف',
                             style: theme.textTheme.titleLarge,
                           ),
                         ),
@@ -130,7 +143,7 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
-                      'اختر شكل صفحات المصحف من دون تغيير لون الورق. لا يُفعّل تنسيق غير متوافق مع ترقيم الصفحات وترتيب الكلمات.',
+                      'مصحف المدينة (1405هـ) موجود في التطبيق. نزّل من هنا أحد التنسيقات المدعومة، وسيُفعّل بعد اكتمال التنزيل.',
                     ),
                   ),
                   if (_refreshing) const LinearProgressIndicator(),
@@ -142,27 +155,20 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
                         style: TextStyle(color: theme.colorScheme.error),
                       ),
                     ),
-                  if (hiddenFormatsCount > 0)
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(20, 10, 20, 0),
-                      child: Text(
-                        'بعض التنسيقات غير المتوافقة مخفية لحماية التنقل والتظليل.',
-                      ),
-                    ),
                   Flexible(
                     child: ListView.separated(
                       shrinkWrap: true,
                       padding: const EdgeInsets.fromLTRB(12, 14, 12, 20),
                       itemCount:
                           visibleFormats.length +
-                          (visibleFormats.length == 1 && !_refreshing ? 1 : 0),
+                          (!hasAdditionalFormats && !_refreshing ? 1 : 0),
                       separatorBuilder: (_, _) => const Divider(height: 1),
                       itemBuilder: (context, index) {
                         if (index == visibleFormats.length) {
                           return const Padding(
                             padding: EdgeInsets.all(16),
                             child: Text(
-                              'لا توجد تنسيقات إضافية متاحة في القائمة الحالية. يمكنك تحديث القائمة لاحقًا.',
+                              'تعذّر تحميل التنسيقات الإضافية الآن. حدّث القائمة عند الاتصال بالإنترنت.',
                               textAlign: TextAlign.center,
                             ),
                           );
@@ -229,8 +235,8 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
       leading: Icon(
         format.hasTajweed ? Icons.colorize_outlined : Icons.menu_book_outlined,
       ),
-      title: Text(format.name),
-      subtitle: Text(detail),
+      title: Text(format.displayName, softWrap: true),
+      subtitle: Text(detail, softWrap: true),
       trailing: action,
     );
   }

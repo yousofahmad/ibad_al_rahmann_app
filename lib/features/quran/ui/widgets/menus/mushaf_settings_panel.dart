@@ -40,8 +40,8 @@ class MushafSettingsPanel extends StatelessWidget {
             const SizedBox(height: 8),
             _SettingTile(
               icon: Icons.auto_stories_outlined,
-              title: 'تنسيق المصحف',
-              subtitle: 'اختيار تنسيق متوافق مع صفحات التطبيق',
+              title: 'تنسيقات المصحف',
+              subtitle: 'تنزيل تنسيق مدعوم أو تفعيله',
               accent: accent,
               onTap: () => onSelectionChanged('format'),
             ),
