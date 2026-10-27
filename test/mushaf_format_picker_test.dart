@@ -9,6 +9,10 @@ import 'package:ibad_al_rahmann/core/helpers/mushaf_format_repository.dart';
 import 'package:ibad_al_rahmann/features/quran/ui/widgets/menus/mushaf_format_picker.dart';
 
 class _PickerRepository extends MushafFormatRepository {
+  String? activeDownloadId;
+  MushafDownloadDetails? activeDownloadDetails;
+  int cancelRequests = 0;
+
   _PickerRepository({
     required super.preferences,
     required super.documentsDirectory,
@@ -18,6 +22,21 @@ class _PickerRepository extends MushafFormatRepository {
   // widget test's fake clock.
   @override
   Future<void> refreshCatalog() async {}
+
+  @override
+  bool isDownloading(String id) => activeDownloadId == id;
+
+  @override
+  MushafDownloadDetails? downloadDetails(String id) =>
+      activeDownloadId == id ? activeDownloadDetails : null;
+
+  @override
+  Future<bool> cancelDownload(String id) async {
+    cancelRequests++;
+    activeDownloadId = null;
+    notifyListeners();
+    return true;
+  }
 }
 
 void main() {
@@ -172,6 +191,52 @@ void main() {
     await tester.drag(find.byType(ListView), const Offset(0, -1000));
     await tester.pumpAndSettle();
     expect(find.text('اسم تقني'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    source.dispose();
+  });
+
+  testWidgets('shows downloaded size and speed and can cancel a transfer', (
+    tester,
+  ) async {
+    final source =
+        (await tester.runAsync(
+              () => repository([
+                _format(
+                  'qpc_v2_1421',
+                  'https://github.com/yousofahmad/ibad-alrahman-features/releases/download/qpc-layouts-v1/qpc_v2_1421.zip',
+                ),
+              ]),
+            ))!
+            as _PickerRepository;
+    source.activeDownloadId = 'qpc_v2_1421';
+    source.activeDownloadDetails = const MushafDownloadDetails(
+      progress: 0.4,
+      downloadedBytes: 1572864,
+      totalBytes: 4194304,
+      speedBytesPerSecond: 1048576,
+      timeRemaining: Duration(seconds: 25),
+      phase: MushafDownloadPhase.downloading,
+    );
+    await show(tester, source);
+    await tester.scrollUntilVisible(
+      find.text('مصحف المدينة المنورة (1421هـ)'),
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.textContaining('تم تنزيل 1.5 م.ب من 4.0 م.ب'), findsOneWidget);
+    expect(find.textContaining('جارٍ التنزيل'), findsOneWidget);
+    expect(find.textContaining('40٪'), findsOneWidget);
+    expect(find.textContaining('1.0 م.ب/ث'), findsOneWidget);
+    expect(find.byTooltip('إلغاء التنزيل'), findsOneWidget);
+
+    await tester.ensureVisible(find.byTooltip('إلغاء التنزيل'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('إلغاء التنزيل'));
+    await tester.pumpAndSettle();
+    expect(source.cancelRequests, 1);
+    expect(find.byTooltip('إلغاء التنزيل'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     source.dispose();

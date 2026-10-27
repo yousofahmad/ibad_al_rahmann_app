@@ -68,8 +68,8 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
       messenger?.showSnackBar(
         SnackBar(content: Text('تم تفعيل ${format.displayName}')),
       );
-    } catch (_) {
-      if (mounted) {
+    } catch (error) {
+      if (mounted && error is! MushafDownloadCancelledException) {
         setState(
           () => _error = download
               ? 'تعذر تنزيل هذا التنسيق أو التحقق من ملفاته.'
@@ -143,7 +143,7 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
-                      'مصحف المدينة (1405هـ) موجود في التطبيق. نزّل من هنا أحد التنسيقات المدعومة، وسيُفعّل بعد اكتمال التنزيل.',
+                      'مصحف المدينة (1405هـ) موجود في التطبيق. نزّل من هنا أحد التنسيقات المدعومة، وسيُفعّل بعد اكتمال التنزيل. يستمر التنزيل في الخلفية، ويمكن متابعة تفاصيله من الإشعار.',
                     ),
                   ),
                   if (_refreshing) const LinearProgressIndicator(),
@@ -190,25 +190,24 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
     final installed = _repository.isInstalled(format.id);
     final isCurrent = _repository.current.id == format.id;
     final downloading = _repository.isDownloading(format.id);
-    final progress = _repository.downloadProgress(format.id);
+    final downloadDetails = _repository.downloadDetails(format.id);
     Widget action;
     if (isCurrent) {
       action = const Chip(
         avatar: Icon(Icons.check_circle_outline, size: 18),
         label: Text('الحالي'),
       );
-    } else if (downloading || _workingId == format.id) {
-      action = SizedBox(
-        width: 70,
-        child: progress == null
-            ? const Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              )
-            : LinearProgressIndicator(value: progress),
+    } else if (downloading) {
+      action = IconButton(
+        tooltip: 'إلغاء التنزيل',
+        onPressed: () => unawaited(_repository.cancelDownload(format.id)),
+        icon: const Icon(Icons.close),
+      );
+    } else if (_workingId == format.id) {
+      action = const SizedBox(
+        width: 24,
+        height: 24,
+        child: CircularProgressIndicator(strokeWidth: 2),
       );
     } else if (!format.compatible) {
       action = const Tooltip(
@@ -236,8 +235,71 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
         format.hasTajweed ? Icons.colorize_outlined : Icons.menu_book_outlined,
       ),
       title: Text(format.displayName, softWrap: true),
-      subtitle: Text(detail, softWrap: true),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(detail, softWrap: true),
+          if (downloading && downloadDetails != null) ...[
+            const SizedBox(height: 8),
+            _buildDownloadDetails(downloadDetails),
+          ],
+          if (downloading && downloadDetails == null) ...[
+            const SizedBox(height: 8),
+            const LinearProgressIndicator(),
+            const SizedBox(height: 4),
+            const Text('جارٍ تجهيز التنزيل…'),
+          ],
+        ],
+      ),
       trailing: action,
     );
+  }
+
+  Widget _buildDownloadDetails(MushafDownloadDetails details) {
+    final theme = Theme.of(context);
+    final progress = details.progress?.clamp(0.0, 1.0).toDouble();
+    final phaseLabel = switch (details.phase) {
+      MushafDownloadPhase.queued => 'بانتظار بدء التنزيل',
+      MushafDownloadPhase.downloading => 'جارٍ التنزيل',
+      MushafDownloadPhase.verifying => 'جارٍ التحقق من الملفات وتثبيتها',
+    };
+    final total = details.totalBytes;
+    final receivedLabel = total == null
+        ? 'تم تنزيل ${_formatMegabytes(details.downloadedBytes)}'
+        : 'تم تنزيل ${_formatMegabytes(details.downloadedBytes)} من ${_formatMegabytes(total)}';
+    final speed = details.speedBytesPerSecond;
+    final remaining = details.timeRemaining;
+    final extraDetails = <String>[
+      if (speed != null && speed > 0)
+        '${(speed / (1024 * 1024)).toStringAsFixed(1)} م.ب/ث',
+      if (remaining != null && remaining.inSeconds > 0)
+        'متبقٍ نحو ${_formatRemainingTime(remaining)}',
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        LinearProgressIndicator(value: progress),
+        const SizedBox(height: 5),
+        Text(
+          [
+            phaseLabel,
+            receivedLabel,
+            if (progress != null) '${(progress * 100).round()}٪',
+            ...extraDetails,
+          ].join(' · '),
+          style: theme.textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+
+  String _formatMegabytes(int bytes) =>
+      '${(bytes / (1024 * 1024)).toStringAsFixed(1)} م.ب';
+
+  String _formatRemainingTime(Duration remaining) {
+    final minutes = remaining.inMinutes;
+    final seconds = remaining.inSeconds.remainder(60);
+    return minutes > 0 ? '$minutes د و$seconds ث' : '$seconds ث';
   }
 }

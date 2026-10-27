@@ -89,6 +89,7 @@ dependencies:
   shimmer: ^3.0.0
   flutter_native_splash: ^2.4.0
   ffmpeg_kit_flutter_new_full: ^2.5.7
+  background_downloader: '>=9.5.9 <9.6.0'
 
 
 dev_dependencies:

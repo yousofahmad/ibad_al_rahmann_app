@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:background_downloader/background_downloader.dart';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -157,6 +157,30 @@ class MushafFormat {
   static int? _nullableInt(dynamic value) => value == null ? null : _int(value);
 }
 
+enum MushafDownloadPhase { queued, downloading, verifying }
+
+class MushafDownloadDetails {
+  final double? progress;
+  final int downloadedBytes;
+  final int? totalBytes;
+  final double? speedBytesPerSecond;
+  final Duration? timeRemaining;
+  final MushafDownloadPhase phase;
+
+  const MushafDownloadDetails({
+    required this.progress,
+    required this.downloadedBytes,
+    required this.totalBytes,
+    required this.speedBytesPerSecond,
+    required this.timeRemaining,
+    required this.phase,
+  });
+}
+
+class MushafDownloadCancelledException implements Exception {
+  const MushafDownloadCancelledException();
+}
+
 class MushafFormatRepository extends ChangeNotifier {
   static final MushafFormatRepository instance = MushafFormatRepository();
   static const _selectedKey = 'mushaf_selected_format';
@@ -166,6 +190,7 @@ class MushafFormatRepository extends ChangeNotifier {
   // must not be offered a single-font package they cannot install.
   static const _remoteCatalog = '${_remoteRoot}mushaf/catalog-v2.json';
   static const _maxZipBytes = 200 * 1024 * 1024;
+  static const _backgroundDownloadGroup = 'mushaf_format_downloads';
 
   final SharedPreferences? _providedPreferences;
   final Directory? _providedDocumentsDirectory;
@@ -180,6 +205,17 @@ class MushafFormatRepository extends ChangeNotifier {
   final ValueNotifier<int> selectionRevision = ValueNotifier<int>(0);
   final Set<String> _downloading = <String>{};
   final Map<String, double> _progress = <String, double>{};
+  final Map<String, MushafDownloadPhase> _downloadPhases =
+      <String, MushafDownloadPhase>{};
+  final Map<String, int> _downloadedBytes = <String, int>{};
+  final Map<String, int> _downloadTotalBytes = <String, int>{};
+  final Map<String, double> _downloadSpeedBytesPerSecond = <String, double>{};
+  final Map<String, Duration> _downloadTimeRemaining = <String, Duration>{};
+  final Map<String, DownloadTask> _backgroundTasks = <String, DownloadTask>{};
+  final Map<String, Completer<String>> _downloadCompletions =
+      <String, Completer<String>>{};
+  final Set<String> _recoveredInstallsInFlight = <String>{};
+  Future<void>? _backgroundDownloaderFuture;
   final Map<String, Future<void>> _inflight = <String, Future<void>>{};
   final Set<String> _validatedInstalled = <String>{};
 
@@ -206,6 +242,18 @@ class MushafFormatRepository extends ChangeNotifier {
 
   bool isDownloading(String id) => _downloading.contains(id);
   double? downloadProgress(String id) => _progress[id];
+  MushafDownloadDetails? downloadDetails(String id) {
+    final phase = _downloadPhases[id];
+    if (phase == null) return null;
+    return MushafDownloadDetails(
+      progress: _progress[id],
+      downloadedBytes: _downloadedBytes[id] ?? 0,
+      totalBytes: _downloadTotalBytes[id],
+      speedBytesPerSecond: _downloadSpeedBytesPerSecond[id],
+      timeRemaining: _downloadTimeRemaining[id],
+      phase: phase,
+    );
+  }
 
   String? get getActiveWordsDatabasePath => _databasePath('words.sqlite');
   String? get getActiveLayoutDatabasePath => _databasePath('layout.sqlite');
@@ -358,6 +406,9 @@ class MushafFormatRepository extends ChangeNotifier {
         'elapsed_ms': _elapsed(started),
       });
       notifyListeners();
+      if (_backgroundDownloaderFuture != null) {
+        unawaited(_restoreBackgroundDownloads());
+      }
     } catch (error) {
       _log('catalog_finish', {
         'outcome': 'offline_cache',
@@ -375,6 +426,269 @@ class MushafFormatRepository extends ChangeNotifier {
     return future.whenComplete(() => _inflight.remove(id));
   }
 
+  Future<void> prepareBackgroundDownloads() async {
+    try {
+      await initialize();
+      await _ensureBackgroundDownloader();
+      await _restoreBackgroundDownloads();
+    } catch (error) {
+      _log('background_restore_finish', {
+        'outcome': 'failed',
+        'reason': error.runtimeType.toString(),
+      });
+    }
+  }
+
+  Future<void> _ensureBackgroundDownloader() async {
+    try {
+      await (_backgroundDownloaderFuture ??= _startBackgroundDownloader());
+    } catch (_) {
+      _backgroundDownloaderFuture = null;
+      rethrow;
+    }
+  }
+
+  Future<void> _startBackgroundDownloader() async {
+    final downloader = FileDownloader();
+    downloader.registerCallbacks(
+      group: _backgroundDownloadGroup,
+      taskStatusCallback: _onBackgroundTaskStatus,
+      taskProgressCallback: _onBackgroundTaskProgress,
+    );
+    downloader.configureNotification(
+      running: const TaskNotification(
+        'تنزيل تنسيق المصحف',
+        '{displayName} · {progress}',
+      ),
+      complete: const TaskNotification(
+        'اكتمل تنزيل تنسيق المصحف',
+        '{displayName}',
+      ),
+      error: const TaskNotification(
+        'تعذّر تنزيل تنسيق المصحف',
+        '{displayName}',
+      ),
+      canceled: const TaskNotification(
+        'أُلغي تنزيل تنسيق المصحف',
+        '{displayName}',
+      ),
+      progressBar: true,
+    );
+    await downloader.start(
+      doTrackTasks: true,
+      markDownloadedComplete: true,
+      doRescheduleKilledTasks: true,
+      autoCleanDatabase: false,
+    );
+  }
+
+  Future<void> _restoreBackgroundDownloads() async {
+    final records = await FileDownloader().database.allRecords(
+      group: _backgroundDownloadGroup,
+    );
+    final latestRecords = <String, TaskRecord>{};
+    for (final record in records) {
+      final formatId = record.task.metaData;
+      final previous = latestRecords[formatId];
+      if (previous == null ||
+          record.task.creationTime.isAfter(previous.task.creationTime)) {
+        latestRecords[formatId] = record;
+      }
+    }
+    for (final entry in latestRecords.entries) {
+      final formatId = entry.key;
+      final format = _formats.where((item) => item.id == formatId).firstOrNull;
+      final record = entry.value;
+      if (format == null || !format.compatible || isInstalled(formatId)) {
+        await FileDownloader().database.deleteRecordWithId(record.taskId);
+        continue;
+      }
+      if (record.task is! DownloadTask) continue;
+      final task = record.task as DownloadTask;
+      _backgroundTasks[formatId] = task;
+      switch (record.status) {
+        case TaskStatus.enqueued:
+        case TaskStatus.running:
+        case TaskStatus.waitingToRetry:
+        case TaskStatus.paused:
+          _downloading.add(formatId);
+          _progress[formatId] = record.progress.clamp(0.0, 1.0).toDouble();
+          _downloadPhases[formatId] =
+              record.status == TaskStatus.enqueued ||
+                  record.status == TaskStatus.waitingToRetry ||
+                  record.status == TaskStatus.paused
+              ? MushafDownloadPhase.queued
+              : MushafDownloadPhase.downloading;
+          final total = record.expectedFileSize > 0
+              ? record.expectedFileSize
+              : format.sizeBytes;
+          if (total != null && total > 0) {
+            _downloadTotalBytes[formatId] = total;
+            _downloadedBytes[formatId] = (_progress[formatId]! * total).round();
+          }
+          break;
+        case TaskStatus.complete:
+          _downloading.add(formatId);
+          _progress[formatId] = 1;
+          _downloadPhases[formatId] = MushafDownloadPhase.verifying;
+          if (!_inflight.containsKey(formatId)) {
+            unawaited(_installRecoveredDownload(format, task));
+          }
+          break;
+        case TaskStatus.failed:
+        case TaskStatus.notFound:
+        case TaskStatus.canceled:
+          await _discardBackgroundTask(task);
+          break;
+      }
+    }
+    notifyListeners();
+  }
+
+  void _onBackgroundTaskProgress(TaskProgressUpdate update) {
+    final formatId = update.task.metaData;
+    final format = _formats.where((item) => item.id == formatId).firstOrNull;
+    if (format == null || !format.compatible || update.progress < 0) return;
+    final progress = update.progress.clamp(0.0, 1.0).toDouble();
+    _downloading.add(formatId);
+    _progress[formatId] = progress;
+    _downloadPhases[formatId] = MushafDownloadPhase.downloading;
+    final total = update.hasExpectedFileSize
+        ? update.expectedFileSize
+        : format.sizeBytes;
+    if (total != null && total > 0) {
+      _downloadTotalBytes[formatId] = total;
+      _downloadedBytes[formatId] = (progress * total).round();
+    }
+    if (update.hasNetworkSpeed) {
+      _downloadSpeedBytesPerSecond[formatId] =
+          update.networkSpeed * 1024 * 1024;
+    }
+    if (update.hasTimeRemaining) {
+      _downloadTimeRemaining[formatId] = update.timeRemaining;
+    }
+    notifyListeners();
+    if (update.hasExpectedFileSize && update.expectedFileSize > _maxZipBytes) {
+      final completion = _downloadCompletions[formatId];
+      if (completion != null && !completion.isCompleted) {
+        completion.completeError(StateError('Package too large'));
+      }
+      final task = _backgroundTasks[formatId];
+      if (task != null) unawaited(FileDownloader().cancel(task));
+    }
+  }
+
+  void _onBackgroundTaskStatus(TaskStatusUpdate update) {
+    final formatId = update.task.metaData;
+    final format = _formats.where((item) => item.id == formatId).firstOrNull;
+    if (format == null || !format.compatible) return;
+    _log('download_status', {
+      'id': formatId,
+      'status': update.status.name,
+      'trigger': 'background_callback',
+    });
+    switch (update.status) {
+      case TaskStatus.enqueued:
+      case TaskStatus.waitingToRetry:
+      case TaskStatus.paused:
+        _downloading.add(formatId);
+        _downloadPhases[formatId] = MushafDownloadPhase.queued;
+        break;
+      case TaskStatus.running:
+        _downloading.add(formatId);
+        _downloadPhases[formatId] = MushafDownloadPhase.downloading;
+        break;
+      case TaskStatus.complete:
+        _downloading.add(formatId);
+        _progress[formatId] = 1;
+        _downloadPhases[formatId] = MushafDownloadPhase.verifying;
+        if (update.task is DownloadTask) {
+          final task = update.task as DownloadTask;
+          final completion = _downloadCompletions[formatId];
+          if (completion != null) {
+            unawaited(_completeDownloadWaiter(task, completion));
+          } else if (!_inflight.containsKey(formatId)) {
+            unawaited(_installRecoveredDownload(format, task));
+          }
+        }
+        break;
+      case TaskStatus.failed:
+      case TaskStatus.notFound:
+        final completion = _downloadCompletions[formatId];
+        if (completion != null && !completion.isCompleted) {
+          completion.completeError(StateError('Background download failed'));
+        } else {
+          _clearDownloadState(formatId);
+          if (update.task is DownloadTask) {
+            unawaited(_discardBackgroundTask(update.task as DownloadTask));
+          }
+        }
+        break;
+      case TaskStatus.canceled:
+        final completion = _downloadCompletions[formatId];
+        if (completion != null && !completion.isCompleted) {
+          completion.completeError(const MushafDownloadCancelledException());
+        } else {
+          _clearDownloadState(formatId);
+          if (update.task is DownloadTask) {
+            unawaited(_discardBackgroundTask(update.task as DownloadTask));
+          }
+        }
+        break;
+    }
+    notifyListeners();
+  }
+
+  Future<void> _completeDownloadWaiter(
+    DownloadTask task,
+    Completer<String> completion,
+  ) async {
+    try {
+      completion.complete(await task.filePath());
+    } catch (error) {
+      if (!completion.isCompleted) completion.completeError(error);
+    }
+  }
+
+  Future<bool> cancelDownload(String id) async {
+    final task = _backgroundTasks[id];
+    if (task == null) return false;
+    final cancelled = await FileDownloader().cancel(task);
+    if (cancelled) {
+      final completion = _downloadCompletions[id];
+      if (completion != null && !completion.isCompleted) {
+        completion.completeError(const MushafDownloadCancelledException());
+      } else {
+        _clearDownloadState(id);
+        unawaited(_discardBackgroundTask(task));
+      }
+      _log('download_cancel', {'id': id, 'outcome': 'requested'});
+      notifyListeners();
+    }
+    return cancelled;
+  }
+
+  Future<void> _discardBackgroundTask(DownloadTask task) async {
+    try {
+      final file = File(await task.filePath());
+      if (await file.exists()) await file.delete();
+    } catch (_) {}
+    try {
+      await FileDownloader().database.deleteRecordWithId(task.taskId);
+    } catch (_) {}
+  }
+
+  void _clearDownloadState(String id) {
+    _downloading.remove(id);
+    _progress.remove(id);
+    _downloadPhases.remove(id);
+    _downloadedBytes.remove(id);
+    _downloadTotalBytes.remove(id);
+    _downloadSpeedBytesPerSecond.remove(id);
+    _downloadTimeRemaining.remove(id);
+    _backgroundTasks.remove(id);
+  }
+
   Future<void> _install(String id) async {
     await initialize();
     final format = _formats.where((f) => f.id == id).firstOrNull;
@@ -388,7 +702,116 @@ class MushafFormatRepository extends ChangeNotifier {
     });
     _downloading.add(id);
     _progress[id] = 0;
+    _downloadPhases[id] = MushafDownloadPhase.queued;
+    if (format.sizeBytes != null && format.sizeBytes! > 0) {
+      _downloadTotalBytes[id] = format.sizeBytes!;
+    }
     notifyListeners();
+    try {
+      final bytes = await _download(format);
+      _downloadPhases[id] = MushafDownloadPhase.verifying;
+      notifyListeners();
+      await _installArchive(format, bytes);
+      _log('install_finish', {
+        'id': id,
+        'outcome': 'success',
+        'elapsed_ms': _elapsed(started),
+        'retry': 0,
+      });
+    } catch (error) {
+      _log('install_finish', {
+        'id': id,
+        'outcome': error is MushafDownloadCancelledException
+            ? 'canceled'
+            : 'failed',
+        'reason': error.runtimeType.toString(),
+        'elapsed_ms': _elapsed(started),
+        'retry': 0,
+      });
+      rethrow;
+    } finally {
+      _clearDownloadState(id);
+      notifyListeners();
+    }
+  }
+
+  Future<Uint8List> _download(MushafFormat format) async {
+    final local = await _resources.readBytes(format.packageUrl!);
+    if (local != null) {
+      if (local.length > _maxZipBytes) throw StateError('Package too large');
+      _progress[format.id] = 1;
+      _downloadedBytes[format.id] = local.length;
+      _downloadTotalBytes[format.id] = local.length;
+      _downloadPhases[format.id] = MushafDownloadPhase.verifying;
+      notifyListeners();
+      return local;
+    }
+    if (format.sizeBytes != null && format.sizeBytes! > _maxZipBytes) {
+      throw StateError('Package too large');
+    }
+    final url = format.packageUrl!.startsWith('http')
+        ? format.packageUrl!
+        : '$_remoteRoot${format.packageUrl}';
+    await _ensureBackgroundDownloader();
+    final task = DownloadTask(
+      taskId: 'mushaf_${format.id}_${DateTime.now().microsecondsSinceEpoch}',
+      url: url,
+      filename: '${format.id}.zip',
+      directory: 'mushaf_format_downloads',
+      baseDirectory: BaseDirectory.applicationDocuments,
+      group: _backgroundDownloadGroup,
+      updates: Updates.statusAndProgress,
+      retries: 2,
+      allowPause: true,
+      priority: 0,
+      metaData: format.id,
+      displayName: format.displayName,
+    );
+    final completion = Completer<String>();
+    _backgroundTasks[format.id] = task;
+    _downloadCompletions[format.id] = completion;
+    _downloadPhases[format.id] = MushafDownloadPhase.queued;
+    _log('download_start', {
+      'id': format.id,
+      'source': 'background_downloader',
+      'trigger': 'user',
+      'expected_bytes': format.sizeBytes,
+    });
+    notifyListeners();
+    File? archiveFile;
+    try {
+      final enqueued = await FileDownloader().enqueue(task);
+      if (!enqueued) throw StateError('Background download was not enqueued');
+      final path = await completion.future;
+      archiveFile = File(path);
+      if (!await archiveFile.exists()) {
+        throw StateError('Background download file is missing');
+      }
+      final length = await archiveFile.length();
+      if (length > _maxZipBytes) throw StateError('Package too large');
+      _downloadedBytes[format.id] = length;
+      _downloadTotalBytes[format.id] = length;
+      return await archiveFile.readAsBytes();
+    } finally {
+      if (archiveFile != null && await archiveFile.exists()) {
+        await archiveFile.delete();
+      } else {
+        try {
+          final path = await task.filePath();
+          final partial = File(path);
+          if (await partial.exists()) await partial.delete();
+        } catch (_) {}
+      }
+      _downloadCompletions.remove(format.id);
+      _backgroundTasks.remove(format.id);
+      try {
+        await FileDownloader().database.deleteRecordWithId(task.taskId);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _installArchive(MushafFormat format, Uint8List bytes) async {
+    final id = format.id;
     final base = Directory(p.join(_documentsDirectory!.path, 'mushaf_formats'));
     final staging = Directory(
       p.join(
@@ -397,7 +820,6 @@ class MushafFormatRepository extends ChangeNotifier {
       ),
     );
     try {
-      final bytes = await _download(format);
       await compute(_extractAndValidate, {
         'bytes': bytes,
         'directory': staging.path,
@@ -422,73 +844,58 @@ class MushafFormatRepository extends ChangeNotifier {
         }
       } catch (_) {
         if (await target.exists()) await target.delete(recursive: true);
-        if (await backup.exists()) {
-          await backup.rename(target.path);
-        }
+        if (await backup.exists()) await backup.rename(target.path);
         rethrow;
       }
       if (await backup.exists()) await backup.delete(recursive: true);
       _validatedInstalled.add(id);
-      _log('install_finish', {
-        'id': id,
-        'outcome': 'success',
-        'elapsed_ms': _elapsed(started),
-        'retry': 0,
-      });
-    } catch (error) {
+    } catch (_) {
       if (await staging.exists()) await staging.delete(recursive: true);
-      _log('install_finish', {
-        'id': id,
-        'outcome': 'failed',
-        'reason': error.runtimeType.toString(),
-        'elapsed_ms': _elapsed(started),
-        'retry': 0,
-      });
       rethrow;
-    } finally {
-      _downloading.remove(id);
-      _progress.remove(id);
-      notifyListeners();
     }
   }
 
-  Future<Uint8List> _download(MushafFormat format) async {
-    final local = await _resources.readBytes(format.packageUrl!);
-    if (local != null) {
-      if (local.length > _maxZipBytes) throw StateError('Package too large');
-      _progress[format.id] = 0.5;
+  Future<void> _installRecoveredDownload(
+    MushafFormat format,
+    DownloadTask task,
+  ) async {
+    if (!_recoveredInstallsInFlight.add(task.taskId)) return;
+    final started = task.creationTime;
+    _downloading.add(format.id);
+    _downloadPhases[format.id] = MushafDownloadPhase.verifying;
+    _progress[format.id] = 1;
+    notifyListeners();
+    try {
+      final file = File(await task.filePath());
+      if (!await file.exists()) throw StateError('Downloaded package missing');
+      final length = await file.length();
+      if (length > _maxZipBytes) throw StateError('Package too large');
+      final bytes = await file.readAsBytes();
+      await _installArchive(format, bytes);
+      _log('install_recovery_finish', {
+        'id': format.id,
+        'outcome': 'success',
+        'source': 'background_download',
+        'elapsed_ms': _elapsed(started),
+      });
+    } catch (error) {
+      _log('install_recovery_finish', {
+        'id': format.id,
+        'outcome': 'failed',
+        'reason': error.runtimeType.toString(),
+        'elapsed_ms': _elapsed(started),
+      });
+    } finally {
+      try {
+        final path = await task.filePath();
+        final file = File(path);
+        if (await file.exists()) await file.delete();
+        await FileDownloader().database.deleteRecordWithId(task.taskId);
+      } catch (_) {}
+      _recoveredInstallsInFlight.remove(task.taskId);
+      _clearDownloadState(format.id);
       notifyListeners();
-      return local;
     }
-    final url = format.packageUrl!.startsWith('http')
-        ? format.packageUrl!
-        : '$_remoteRoot${format.packageUrl}';
-    final response = await _dio.get<ResponseBody>(
-      url,
-      options: Options(
-        responseType: ResponseType.stream,
-        receiveTimeout: const Duration(minutes: 2),
-        sendTimeout: const Duration(seconds: 15),
-      ),
-    );
-    final declaredTotal = int.tryParse(
-      response.headers.value(Headers.contentLengthHeader) ?? '',
-    );
-    if (declaredTotal != null && declaredTotal > _maxZipBytes) {
-      throw StateError('Package too large');
-    }
-    final output = BytesBuilder(copy: false);
-    var received = 0;
-    await for (final chunk in response.data!.stream) {
-      received += chunk.length;
-      if (received > _maxZipBytes) throw StateError('Package too large');
-      output.add(chunk);
-      if (declaredTotal != null && declaredTotal > 0) {
-        _progress[format.id] = received / declaredTotal;
-        notifyListeners();
-      }
-    }
-    return output.takeBytes();
   }
 
   Future<void> select(String id) async {

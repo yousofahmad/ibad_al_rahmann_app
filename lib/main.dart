@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ibad_al_rahmann/features/quran_audio/logic/quran_player/quran_player_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -30,6 +32,7 @@ import 'services/app_logger.dart';
 import 'core/di/di.dart';
 import 'core/helpers/tafsir_helper.dart';
 import 'core/helpers/app_migration_helper.dart';
+import 'core/helpers/mushaf_format_repository.dart';
 import 'core/helpers/navigation_payload.dart';
 import 'core/theme/theme_manager/theme_cubit.dart';
 
@@ -165,6 +168,8 @@ Future<void> main() async {
 Future<void> _runBackgroundInits() async {
   await WidgetsBinding.instance.endOfFrame;
   await Future.delayed(const Duration(milliseconds: 500));
+
+  unawaited(MushafFormatRepository.instance.prepareBackgroundDownloads());
 
   AppLogger.log('BgInit', 'start');
 
