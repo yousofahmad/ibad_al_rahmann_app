@@ -160,12 +160,63 @@ class MainActivity: AudioServiceFragmentActivity() {
                 }
             }
 
-            // setAlarmClock pierces deep Doze mode and custom ROM battery limits.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                val alarmClockInfo = AlarmManager.AlarmClockInfo(calendar.timeInMillis, pendingIntent)
-                alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
-            } else {
-                alarmManager.setExact(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, pendingIntent)
+            try {
+                val exactAlarmAccessAvailable =
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                        alarmManager.canScheduleExactAlarms()
+                if (exactAlarmAccessAvailable &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP
+                ) {
+                    // setAlarmClock pierces deep Doze mode when special access is granted.
+                    val alarmClockInfo =
+                        AlarmManager.AlarmClockInfo(calendar.timeInMillis, pendingIntent)
+                    alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
+                } else if (exactAlarmAccessAvailable) {
+                    alarmManager.setExact(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent,
+                    )
+                } else {
+                    // Exact access may be denied or revoked on Android 12+.
+                    // Keep reminders alive; Android may deliver this fallback later.
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent,
+                    )
+                    NativeLogger.log(
+                        context,
+                        "Alarm $id scheduled inexactly because exact-alarm access is unavailable",
+                    )
+                }
+            } catch (error: SecurityException) {
+                // Permission can change between the check and setAlarmClock call.
+                NativeLogger.log(
+                    context,
+                    "Alarm $id exact scheduling denied (${error.message}); trying inexact fallback",
+                )
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        alarmManager.setAndAllowWhileIdle(
+                            AlarmManager.RTC_WAKEUP,
+                            calendar.timeInMillis,
+                            pendingIntent,
+                        )
+                    } else {
+                        alarmManager.setExact(
+                            AlarmManager.RTC_WAKEUP,
+                            calendar.timeInMillis,
+                            pendingIntent,
+                        )
+                    }
+                } catch (fallbackError: Exception) {
+                    editor.putBoolean("alarm_${id}_active", false)
+                    NativeLogger.log(
+                        context,
+                        "Alarm $id scheduling failed after inexact fallback: ${fallbackError.message}",
+                    )
+                }
             }
         }
     }

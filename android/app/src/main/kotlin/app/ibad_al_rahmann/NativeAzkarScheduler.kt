@@ -299,18 +299,26 @@ object NativeAzkarScheduler {
         payload: String
     ) {
         // year=-1, month=-1, day=-1 tells scheduleAlarmInternal this is a daily alarm
-        MainActivity.scheduleAlarmInternal(
-            context, editor, id,
-            year = -1, month = -1, day = -1,
-            hour = hour, minute = minute,
-            soundName = sound,
-            title = title, body = body, payload = payload,
-            isRepeating = false,
-            audioPath = null,
-            intervalMinutes = 0,
-            customSoundName = customSound,
-            allowedDays = null
-        )
+        try {
+            MainActivity.scheduleAlarmInternal(
+                context, editor, id,
+                year = -1, month = -1, day = -1,
+                hour = hour, minute = minute,
+                soundName = sound,
+                title = title, body = body, payload = payload,
+                isRepeating = false,
+                audioPath = null,
+                intervalMinutes = 0,
+                customSoundName = customSound,
+                allowedDays = null
+            )
+        } catch (error: Exception) {
+            editor.putBoolean("alarm_${id}_active", false)
+            NativeLogger.log(
+                context,
+                "Native Azkar scheduling failed for alarm $id: ${error.message}",
+            )
+        }
     }
 
     private fun cancelAlarm(context: Context, editor: SharedPreferences.Editor, id: Int) {

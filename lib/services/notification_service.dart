@@ -302,6 +302,11 @@ class NotificationService {
       try {
         await _platform.invokeMethod('rescheduleNativeAlarms', {});
       } catch (e) {
+        AppLogger.logEvent(
+          'NotificationService',
+          'native_azkar_reschedule_failed',
+          {'error_type': e.runtimeType.toString()},
+        );
         debugPrint("Error rescheduling native alarms: $e");
       }
 

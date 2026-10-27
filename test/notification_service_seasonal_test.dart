@@ -103,6 +103,28 @@ void main() {
     );
   }
 
+  test('enabled Ruqyah reminders are delegated to native scheduling', () async {
+    await configure(
+      settings: {
+        'azkar_ruqyah_enabled': true,
+        'time_azkar_morning': '06:15',
+        'time_azkar_evening': '19:30',
+      },
+    );
+
+    await rebuild();
+
+    final nativeRescheduleCalls = calls
+        .where((call) => call.method == 'rescheduleNativeAlarms')
+        .toList();
+    expect(nativeRescheduleCalls, hasLength(1));
+    expect(nativeRescheduleCalls.single.arguments, isEmpty);
+    expect(
+      (await SharedPreferences.getInstance()).getBool('azkar_ruqyah_enabled'),
+      isTrue,
+    );
+  });
+
   Map<String, dynamic> alarm(int id) =>
       alarms.singleWhere((a) => a['id'] == id);
   DateTime scheduled(Map<String, dynamic> a) => DateTime(

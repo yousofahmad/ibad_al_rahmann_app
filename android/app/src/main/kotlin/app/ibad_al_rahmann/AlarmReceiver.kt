@@ -82,9 +82,22 @@ class AlarmReceiver : BroadcastReceiver() {
                     .apply()
             }
             rescheduleAllAlarms(context)
+            if (!intent.getBooleanExtra("app_reschedule_only", false)) {
+                rescheduleAzkar(context)
+            }
             refreshFromStoredEpochs(context)
             WidgetUpdateHelper.onPrayerAlarmFired(context, -1)
             WidgetUpdateHelper.scheduleMidnightRefresh(context) // تشغيل محرك منتصف الليل
+            return
+        }
+
+        if (action == Intent.ACTION_MY_PACKAGE_REPLACED ||
+            action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED
+        ) {
+            rescheduleAllAlarms(context)
+            rescheduleAzkar(context)
+            refreshFromStoredEpochs(context)
+            WidgetUpdateHelper.scheduleMidnightRefresh(context)
             return
         }
 
@@ -93,6 +106,7 @@ class AlarmReceiver : BroadcastReceiver() {
             action == Intent.ACTION_DATE_CHANGED ||
             action == "android.intent.action.TIME_SET") {
             refreshFromStoredEpochs(context)
+            rescheduleAzkar(context)
             return
         }
 
@@ -522,6 +536,17 @@ class AlarmReceiver : BroadcastReceiver() {
                     e.printStackTrace()
                 }
             }
+        }
+    }
+
+    private fun rescheduleAzkar(context: Context) {
+        try {
+            NativeAzkarScheduler.scheduleAzkar(context)
+        } catch (error: Exception) {
+            NativeLogger.log(
+                context,
+                "Unable to restore Azkar/Ruqyah alarms: ${error.message}",
+            )
         }
     }
 
