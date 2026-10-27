@@ -1562,13 +1562,11 @@ class PrayerService extends ChangeNotifier {
     HijriCalendar.setLocal('ar');
     final baseDate = date ?? DateTime.now();
     final isEgyptian = isEgyptianSystem;
-    final official = isEgyptian
-        ? EgyptianHijriCalendar
-              .instance
-              .surveyDates[EgyptianHijriCalendar.civilKey(baseDate)]
+    final egyptianDate = isEgyptian
+        ? EgyptianHijriCalendar.instance.lookup(baseDate)
         : null;
 
-    // صف الهيئة المصري هو المرجع؛ الإزاحات تُستخدم فقط عند غياب هذا الصف.
+    // تأكيد المستخدم النشط يتقدم على صف الهيئة؛ والجدول هو المرجع المعتاد.
     final localOffset = isEgyptian
         ? CacheHelper.prefs.getInt('local_hijri_offset')
         : null;
@@ -1576,19 +1574,19 @@ class PrayerService extends ChangeNotifier {
         ? 0
         : (CacheHelper.prefs.getInt('manual_day_adjustment') ?? 0);
 
-    // عند غياب الصف المصري نرجع إلى الإزاحة المحلية أو البعيدة.
+    // عند غياب أي تاريخ مصري موثوق نرجع إلى الإزاحة المحلية أو البعيدة.
     // أم القرى تستخدم التحويل الفلكي مع التعديل اليدوي.
     final offsetDays = (localOffset != null)
         ? localOffset
         : (isEgyptian ? remoteOffset : remoteOffset + manualAdjustment);
 
-    final effectiveDate = official == null
+    final effectiveDate = egyptianDate == null
         ? NotificationScheduleHelpers.addCivilDays(baseDate, offsetDays)
         : baseDate;
 
-    final h = official == null
+    final h = egyptianDate == null
         ? HijriCalendar.fromDate(effectiveDate)
-        : _hijriCalendarFromEgyptianDate(official, baseDate);
+        : _hijriCalendarFromEgyptianDate(egyptianDate, baseDate);
     final hijriStr = "\u200F${h.hDay} ${h.longMonthName} ${h.hYear}\u200F";
     final gDateStr =
         "${baseDate.year}-${baseDate.month.toString().padLeft(2, '0')}-${baseDate.day.toString().padLeft(2, '0')}";
@@ -1601,8 +1599,8 @@ class PrayerService extends ChangeNotifier {
     return h;
   }
 
-  /// Uses the published Egyptian civil-date row for displayed dates whenever
-  /// it is available; the existing offset conversion remains the fallback.
+  /// Uses an active user confirmation first, then the published Egyptian row;
+  /// offset conversion remains the fallback when neither has a date.
   static HijriCalendar getDisplayHijriForDate(
     int remoteOffset, [
     DateTime? date,
@@ -1662,8 +1660,7 @@ class PrayerService extends ChangeNotifier {
 
   static bool get isEgyptianSystem => hijriSystem == systemEgyptian;
 
-  /// Effective day adjustment used by every screen when converting a selected
-  /// Hijri date back to the corresponding Gregorian civil date.
+  /// Fallback day adjustment when no confirmed or published Egyptian row exists.
   static int get effectiveHijriDayAdjustment {
     final prefs = CacheHelper.prefs;
     final generalOffset =
@@ -1678,10 +1675,32 @@ class PrayerService extends ChangeNotifier {
 
   static DateTime hijriToGregorianDate(int year, int month, int day) {
     if (isEgyptianSystem) {
-      for (final entry in EgyptianHijriCalendar.instance.surveyDates.entries) {
-        final hijri = entry.value;
-        if (hijri.hYear == year && hijri.hMonth == month && hijri.hDay == day) {
-          return EgyptianHijriCalendar.parseCivilKey(entry.key);
+      final calendar = EgyptianHijriCalendar.instance;
+      final confirmation = calendar.userConfirmation;
+      if (confirmation != null) {
+        for (var offset = 0; offset <= 29; offset++) {
+          final civilDate = DateTime(
+            confirmation.anchorDate.year,
+            confirmation.anchorDate.month,
+            confirmation.anchorDate.day + offset,
+          );
+          final confirmed = confirmation.lookup(civilDate);
+          if (confirmed == null) break;
+          if (confirmed.hYear == year &&
+              confirmed.hMonth == month &&
+              confirmed.hDay == day) {
+            return DateTime(civilDate.year, civilDate.month, civilDate.day);
+          }
+        }
+      }
+      for (final entry in calendar.surveyDates.entries) {
+        final civilDate = EgyptianHijriCalendar.parseCivilKey(entry.key);
+        final hijri = calendar.lookup(civilDate);
+        if (hijri != null &&
+            hijri.hYear == year &&
+            hijri.hMonth == month &&
+            hijri.hDay == day) {
+          return civilDate;
         }
       }
     }

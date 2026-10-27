@@ -18,47 +18,95 @@ void main() {
 
   tearDown(() => EgyptianHijriCalendar.instance.resetForTesting());
 
+  test('the official Egyptian table remains primary without confirmation', () {
+    final octoberEleventh = PrayerService.getDisplayHijriForDate(
+      1,
+      DateTime(2026, 10, 11),
+    );
+    final octoberTwelfth = PrayerService.getHijriWithOffset(
+      1,
+      DateTime(2026, 10, 12),
+    );
+
+    expect(octoberEleventh.hDay, 29);
+    expect(octoberEleventh.hMonth, 4);
+    expect(octoberTwelfth.hDay, 1);
+    expect(octoberTwelfth.hMonth, 5);
+    expect(
+      PrayerService.hijriToGregorianDate(1448, 5, 1),
+      DateTime(2026, 10, 12),
+    );
+  });
+
   test(
-    'daily result uses the official Egyptian date at the month boundary',
+    'user confirmation overrides conflicting rows through day 29, then ESA resumes',
     () {
       final calendar = EgyptianHijriCalendar.instance;
+      expect(
+        calendar.surveyDates['2026-10-09'],
+        const EgyptianHijriDate(hDay: 27, hMonth: 4, hYear: 1448),
+      );
+      expect(
+        calendar.surveyDates['2026-10-10'],
+        const EgyptianHijriDate(hDay: 28, hMonth: 4, hYear: 1448),
+      );
       calendar.applyUserConfirmation(
         EgyptianHijriUserConfirmation(
-          anchorDate: DateTime(2026, 10, 11),
-          hijri: const EgyptianHijriDate(hDay: 30, hMonth: 4, hYear: 1448),
-          confirmedAt: '2026-10-11T00:00:00Z',
+          anchorDate: DateTime(2026, 10, 9),
+          hijri: const EgyptianHijriDate(hDay: 28, hMonth: 4, hYear: 1448),
+          confirmedAt: '2026-10-09T00:00:00Z',
         ),
       );
-      expect(calendar.lookup(DateTime(2026, 10, 11))?.hDay, 30);
 
-      final octoberEleventh = PrayerService.getDisplayHijriForDate(
-        1,
-        DateTime(2026, 10, 11),
+      // The stored user anchor conflicts with ESA (28 vs 27), as does its
+      // continuation through day 29 on October 10 (29 vs 28).
+      expect(calendar.lookup(DateTime(2026, 10, 9))?.hDay, 28);
+      expect(calendar.lookup(DateTime(2026, 10, 10))?.hDay, 29);
+      expect(
+        calendar.userConfirmation!.recheckDue(DateTime(2026, 10, 10)),
+        isTrue,
       );
-      final octoberTwelfth = PrayerService.getDisplayHijriForDate(
-        1,
-        DateTime(2026, 10, 12),
+      expect(
+        calendar.dateSourceLabel(DateTime(2026, 10, 10)),
+        'بتأكيد المستخدم',
       );
 
-      expect(octoberEleventh.hDay, 29);
-      expect(octoberEleventh.hMonth, 4);
-      expect(octoberEleventh.hYear, 1448);
-      expect(octoberTwelfth.hDay, 1);
-      expect(octoberTwelfth.hMonth, 5);
-      expect(octoberTwelfth.hYear, 1448);
+      final anchorDisplay = PrayerService.getDisplayHijriForDate(
+        1,
+        DateTime(2026, 10, 9),
+      );
+      final dayTwentyNineDisplay = PrayerService.getHijriWithOffset(
+        1,
+        DateTime(2026, 10, 10),
+      );
+      expect(anchorDisplay.hDay, 28);
+      expect(dayTwentyNineDisplay.hDay, 29);
+      expect(dayTwentyNineDisplay.hMonth, 4);
 
-      final octoberEleventhFromSharedService = PrayerService.getHijriWithOffset(
-        1,
-        DateTime(2026, 10, 11),
+      // Notifications share the same confirmation-aware lookup as displays.
+      expect(
+        PrayerService.getNotificationHijriForDate(DateTime(2026, 10, 10))?.hDay,
+        29,
       );
-      final octoberTwelfthFromSharedService = PrayerService.getHijriWithOffset(
-        1,
-        DateTime(2026, 10, 12),
+
+      // Inverse conversion prefers the confirmed day 29 over the conflicting
+      // official occurrence on October 11.
+      expect(
+        PrayerService.hijriToGregorianDate(1448, 4, 29),
+        DateTime(2026, 10, 10),
       );
-      expect(octoberEleventhFromSharedService.hDay, 29);
-      expect(octoberEleventhFromSharedService.hMonth, 4);
-      expect(octoberTwelfthFromSharedService.hDay, 1);
-      expect(octoberTwelfthFromSharedService.hMonth, 5);
+
+      // Day 30 is not projected from the confirmation. The lookup and inverse
+      // conversion return to the published table after the confirmed day 29.
+      expect(calendar.userConfirmation!.lookup(DateTime(2026, 10, 11)), isNull);
+      expect(
+        calendar.dateSourceLabel(DateTime(2026, 10, 11)),
+        EgyptianHijriCalendar.sourceName,
+      );
+      expect(
+        PrayerService.getHijriWithOffset(1, DateTime(2026, 10, 11)).hDay,
+        29,
+      );
       expect(
         PrayerService.hijriToGregorianDate(1448, 5, 1),
         DateTime(2026, 10, 12),
