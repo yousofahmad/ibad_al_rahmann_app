@@ -73,9 +73,9 @@ class DoubleTapDialog extends StatelessWidget {
             ),
             SizedBox(height: 15.h),
             _buildHintRow(
-              Icons.palette_outlined,
-              'الإعدادات',
-              'لتنزيل تنسيق للمصحف، اضغط ضغطة واحدة واختر «تنسيقات المصحف».',
+              Icons.auto_stories_outlined,
+              'تنسيقات المصحف',
+              'افتح أي تنسيق لقراءة وصفه ومعرفة الفرق قبل التنزيل أو التفعيل.',
               textColor,
               subTextColor,
             ),

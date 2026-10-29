@@ -67,18 +67,44 @@ void main() {
     return result;
   }
 
-  Future<void> show(WidgetTester tester, MushafFormatRepository source) async {
-    tester.view.physicalSize = const Size(320, 640);
+  Future<void> show(
+    WidgetTester tester,
+    MushafFormatRepository source, {
+    bool inModalSheet = false,
+    Size viewSize = const Size(320, 640),
+  }) async {
+    tester.view.physicalSize = viewSize;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
+        theme: ThemeData(splashFactory: NoSplash.splashFactory),
         home: Scaffold(
-          body: Center(child: MushafFormatPicker(repository: source)),
+          body: Center(
+            child: inModalSheet
+                ? Builder(
+                    builder: (context) => GestureDetector(
+                      onTap: () {
+                        showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          useSafeArea: true,
+                          builder: (_) =>
+                              MushafFormatPicker(repository: source),
+                        );
+                      },
+                      child: const Text('افتح التنسيقات'),
+                    ),
+                  )
+                : MushafFormatPicker(repository: source),
+          ),
         ),
       ),
     );
+    if (inModalSheet) {
+      await tester.tap(find.text('افتح التنسيقات'));
+    }
     await tester.pumpAndSettle();
   }
 
@@ -192,6 +218,46 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('اسم تقني'), findsNothing);
     expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    source.dispose();
+  });
+
+  testWidgets('shows format differences before a user chooses to download', (
+    tester,
+  ) async {
+    final source = (await tester.runAsync(
+      () => repository([
+        _format(
+          'qpc_v2_1421',
+          'https://github.com/yousofahmad/ibad-alrahman-features/releases/download/qpc-layouts-v1/qpc_v2_1421.zip',
+        ),
+      ]),
+    ))!;
+    await show(
+      tester,
+      source,
+      inModalSheet: true,
+      viewSize: const Size(400, 1000),
+    );
+    final formatTile = find.widgetWithText(
+      ListTile,
+      'مصحف المدينة المنورة (1421هـ)',
+    );
+    await tester.tap(formatTile);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('طبعة مصحف المدينة لعام 1421هـ'),
+      findsNWidgets(2),
+    );
+    expect(find.text('15 سطرًا للصفحة'), findsOneWidget);
+    expect(find.textContaining('توزيع الآيات على الصفحات'), findsOneWidget);
+    expect(find.text('تنزيل هذا التنسيق'), findsOneWidget);
+    expect(source.isDownloading('qpc_v2_1421'), isFalse);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('إغلاق'));
+    await tester.pumpAndSettle();
     await tester.pumpWidget(const SizedBox.shrink());
     source.dispose();
   });

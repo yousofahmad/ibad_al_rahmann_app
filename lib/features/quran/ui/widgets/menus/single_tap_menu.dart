@@ -11,7 +11,6 @@ import '../../../bloc/quran/quran_cubit.dart';
 import '../../../bloc/verse_player/verse_player_cubit.dart';
 import '../bookmark_widget/bookmarks_dialog.dart';
 import 'mushaf_format_picker.dart';
-import 'mushaf_settings_panel.dart';
 
 import 'package:ibad_al_rahmann/core/helpers/share_helper.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
@@ -639,24 +638,6 @@ class _PageActionBarState extends State<PageActionBar>
     PageActionBar.showColorPalette(context);
   }
 
-  Future<void> _onOpenSettings() async {
-    if (_isBusy) return;
-    final selection = await showModalBottomSheet<String>(
-      context: context,
-      useSafeArea: true,
-      builder: (sheetContext) => MushafSettingsPanel(
-        onSelectionChanged: (value) => Navigator.of(sheetContext).pop(value),
-      ),
-    );
-    if (!mounted || selection == null) return;
-    if (selection == 'colors') {
-      _onOpenColorPalette();
-    } else if (selection == 'format') {
-      widget.onDismiss();
-      MushafFormatPicker.show(context);
-    }
-  }
-
   void _onOpenFormats() {
     if (_isBusy) return;
     widget.onDismiss();
@@ -732,14 +713,6 @@ class _PageActionBarState extends State<PageActionBar>
                         icon: Icons.auto_stories_outlined,
                         label: 'تنسيقات المصحف',
                         onTap: _onOpenFormats,
-                        isEnabled: !_isBusy,
-                        color: onBar,
-                      ),
-                      _divider(onBarSubtle),
-                      _ActionButton(
-                        icon: Icons.settings_outlined,
-                        label: 'الإعدادات',
-                        onTap: _onOpenSettings,
                         isEnabled: !_isBusy,
                         color: onBar,
                       ),

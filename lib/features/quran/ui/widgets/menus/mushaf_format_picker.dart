@@ -147,7 +147,7 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
-                      'مصحف المدينة (1405هـ) موجود في التطبيق. نزّل من هنا أحد التنسيقات المدعومة، وسيُفعّل بعد اكتمال التنزيل. يستمر التنزيل في الخلفية، ويمكن متابعة تفاصيله من الإشعار.',
+                      'مصحف المدينة (1405هـ) موجود في التطبيق. اضغط على بطاقة أي تنسيق لمعرفة وصفه والفرق قبل التنزيل أو التفعيل. يستمر التنزيل في الخلفية، ويمكن متابعة تفاصيله من الإشعار.',
                     ),
                   ),
                   if (hasTajweedFormat)
@@ -200,6 +200,141 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
     );
   }
 
+  Future<void> _showFormatDetails(MushafFormat format) async {
+    final action = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        final isCurrent = _repository.current.id == format.id;
+        final downloading = _repository.isDownloading(format.id);
+        final installed = _repository.isInstalled(format.id);
+        final canSelect =
+            !isCurrent &&
+            !downloading &&
+            _workingId == null &&
+            format.compatible;
+        final size = format.sizeBytes;
+        final buttonLabel = isCurrent
+            ? 'مفعّل الآن'
+            : downloading
+            ? 'جارٍ التنزيل'
+            : _workingId != null
+            ? 'انتظر حتى تنتهي العملية الحالية'
+            : installed
+            ? 'تفعيل هذا التنسيق'
+            : 'تنزيل هذا التنسيق';
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 38,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: theme.dividerColor,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(format.displayName, style: theme.textTheme.titleLarge),
+                    const SizedBox(height: 10),
+                    Text(_formatDescription(format)),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        Chip(label: Text('${format.pageCount} صفحة')),
+                        Chip(label: Text('${format.lineCount} سطرًا للصفحة')),
+                        if (format.hasTajweed)
+                          const Chip(label: Text('ألوان لأحكام التجويد')),
+                        if (format.isUnicodeFont)
+                          const Chip(label: Text('خط موحّد للصفحات')),
+                        if (size != null && size > 0)
+                          Chip(
+                            label: Text(
+                              '${(size / (1024 * 1024)).ceil()} م.ب للتنزيل',
+                            ),
+                          ),
+                      ],
+                    ),
+                    if (!format.isBuiltin &&
+                        !format.paginationMatchesBuiltin) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'قد يختلف توزيع الآيات على الصفحات عن نسخة 1405هـ؛ '
+                        'ويعتمد الانتقال على فهرس هذا التنسيق.',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () =>
+                                Navigator.of(sheetContext).pop(false),
+                            child: const Text('إغلاق'),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: FilledButton.icon(
+                            onPressed: canSelect
+                                ? () => Navigator.of(sheetContext).pop(true)
+                                : null,
+                            icon: Icon(
+                              installed
+                                  ? Icons.check_circle_outline
+                                  : Icons.download_outlined,
+                            ),
+                            label: Text(buttonLabel),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    if (action == true && mounted) {
+      await _choose(format, download: !_repository.isInstalled(format.id));
+    }
+  }
+
+  String _formatDescription(MushafFormat format) {
+    final description = format.description.trim();
+    if (description.isNotEmpty) return description;
+    return switch (format.id) {
+      'qpc_v1_builtin' =>
+        'المصحف الأصلي المضمّن في التطبيق — إصدار 1405هـ، ولا يحتاج إلى تنزيل.',
+      'qpc_v2_1421' =>
+        'طبعة مصحف المدينة لعام 1421هـ، بصفحات من 15 سطرًا. يختلف توزيع '
+            'بعض الآيات عن نسخة 1405هـ المضمّنة في التطبيق.',
+      'qpc_v4_tajweed_1441' =>
+        'طبعة 1441هـ مع تلوين بصري لأحكام التجويد. يختلف توزيع بعض الآيات '
+            'عن نسخة 1405هـ المضمّنة في التطبيق.',
+      'digital_khatt_v2' =>
+        'يعرض صفحات المصحف باستخدام خط رقمي موحّد بدل خط منفصل لكل صفحة؛ '
+            'يتغيّر بذلك شكل الحروف المعروضة.',
+      _ => 'تنسيق إضافي للمصحف متوافق مع عرض التطبيق.',
+    };
+  }
+
   Widget _buildFormatTile(MushafFormat format) {
     final installed = _repository.isInstalled(format.id);
     final isCurrent = _repository.current.id == format.id;
@@ -238,10 +373,13 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
     }
     final size = format.sizeBytes;
     final detail = [
-      format.description,
+      _formatDescription(format),
       if (!format.compatible) 'غير متوافق مع صفحات التطبيق الحالية',
       '${format.pageCount} صفحة · ${format.lineCount} سطرًا',
       if (format.hasTajweed) 'تلوين أحكام التجويد',
+      if (!format.isBuiltin && !format.paginationMatchesBuiltin)
+        'توزيع صفحات مختلف عن إصدار 1405هـ',
+      if (format.isUnicodeFont) 'خط موحّد للصفحات',
       if (size != null && size > 0) '${(size / (1024 * 1024)).ceil()} م.ب',
     ].where((value) => value.isNotEmpty).join(' · ');
     return ListTile(
@@ -249,6 +387,7 @@ class _MushafFormatPickerState extends State<MushafFormatPicker> {
         format.hasTajweed ? Icons.colorize_outlined : Icons.menu_book_outlined,
       ),
       title: Text(format.displayName, softWrap: true),
+      onTap: () => unawaited(_showFormatDetails(format)),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
