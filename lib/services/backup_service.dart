@@ -22,6 +22,7 @@ import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:ibad_al_rahmann/services/backup_payload_validator.dart';
 import 'package:ibad_al_rahmann/services/backup_sync_schedule.dart';
+import 'package:ibad_al_rahmann/services/drive_sync_diagnostics.dart';
 
 @pragma('vm:entry-point')
 Future<void> driveAutoSyncTask() async {
@@ -95,9 +96,10 @@ Future<void> driveAutoSyncTask() async {
           : 'power_recovery_retry',
       'recoveryAttemptsRemaining': recoveryAttemptsRemaining,
     });
+    final syncStartedAt = DateTime.now();
     await prefs.setString(
       'last_auto_sync_started_at',
-      DateTime.now().toIso8601String(),
+      syncStartedAt.toIso8601String(),
     );
 
     // 1. مزامنة مع مهلة دقيقتين للنت الضعيف
@@ -120,7 +122,7 @@ Future<void> driveAutoSyncTask() async {
       'outcome': success ? 'success' : 'failure',
       'reason': failureReason,
       'scheduledFor': scheduledAt,
-      'startedAt': prefs.getString('last_auto_sync_started_at'),
+      'startedAt': syncStartedAt.toIso8601String(),
       'finishedAt': DateTime.now().toIso8601String(),
       'durationMs': stopwatch.elapsedMilliseconds,
       'recoveryAttemptsRemaining': recoveryAttemptsRemaining,
@@ -695,65 +697,97 @@ class BackupService {
   static bool _isSyncing = false;
   static bool get isSyncing => _isSyncing;
 
-  /// Gets authenticated Drive API client with a single prompt.
+  /// Restores the signed-in account silently for background work, then obtains
+  /// a fresh token for the appData scope from that account's authorization client.
   static Future<drive.DriveApi?> _getDriveApi({bool allowUI = true}) async {
     try {
       await _ensureInitialized();
+      const scopes = [drive.DriveApi.driveAppdataScope];
+      var account = _cachedAccount;
 
-      // 1. If we already have valid auth headers in memory, return client immediately
-      if (_cachedAuthHeaders != null) {
-        return drive.DriveApi(GoogleAuthClient(_cachedAuthHeaders!));
-      }
-
-      // 2. Try silent headers retrieval first without prompt
+      // Scheduled Android callbacks run in a fresh isolate, so restore the
+      // account before asking its authorization client for a fresh token.
       try {
-        final silentHeaders = await GoogleSignIn.instance.authorizationClient
-            .authorizationHeaders([
-              drive.DriveApi.driveAppdataScope,
-            ], promptIfNecessary: false);
-        if (silentHeaders != null && silentHeaders.isNotEmpty) {
-          _cachedAuthHeaders = silentHeaders;
-          AppLogger.log('GoogleDrive', 'Silent headers OK');
-          return drive.DriveApi(GoogleAuthClient(silentHeaders));
+        final restored = await GoogleSignIn.instance
+            .attemptLightweightAuthentication();
+        if (restored != null) {
+          account = restored;
+          _cachedAccount = restored;
         }
-      } catch (e) {
-        AppLogger.log(
-          'GoogleDrive',
-          'Silent authorizationHeaders error type: ${e.runtimeType}',
-        );
+      } catch (error) {
+        AppLogger.logEvent('GoogleDrive', 'silent_account_restore_failed', {
+          'reason': 'exception_${error.runtimeType}',
+          'allowUI': allowUI,
+        });
       }
 
-      // 3. If silent failed and UI is allowed, authenticate with driveAppdataScope in ONE dialog
-      if (allowUI) {
-        AppLogger.log(
-          'GoogleDrive',
-          'Triggering single interactive authenticate()',
-        );
-        final account = await GoogleSignIn.instance.authenticate(
-          scopeHint: [drive.DriveApi.driveAppdataScope],
-        );
-        _cachedAccount = account;
-        final prefs = CacheHelper.prefs;
-        await prefs.setString('last_sync_email', account.email);
-        AppLogger.log('GoogleDrive', 'Interactive auth completed');
-
-        // Retrieve the authorized headers immediately
-        final authHeaders = await GoogleSignIn.instance.authorizationClient
-            .authorizationHeaders([
-              drive.DriveApi.driveAppdataScope,
-            ], promptIfNecessary: false);
-
-        if (authHeaders != null) {
+      if (account != null) {
+        var authHeaders = await account.authorizationClient
+            .authorizationHeaders(scopes, promptIfNecessary: false);
+        if ((authHeaders == null || authHeaders.isEmpty) && allowUI) {
+          authHeaders = await account.authorizationClient.authorizationHeaders(
+            scopes,
+            promptIfNecessary: true,
+          );
+        }
+        if (authHeaders != null && authHeaders.isNotEmpty) {
           _cachedAuthHeaders = authHeaders;
-          AppLogger.log('GoogleDrive', 'DriveApi client ready');
           return drive.DriveApi(GoogleAuthClient(authHeaders));
         }
       }
+
+      if (allowUI) {
+        account = await GoogleSignIn.instance.authenticate(scopeHint: scopes);
+        _cachedAccount = account;
+        await CacheHelper.prefs.setString('last_sync_email', account.email);
+        final authHeaders = await account.authorizationClient
+            .authorizationHeaders(scopes, promptIfNecessary: true);
+        if (authHeaders != null && authHeaders.isNotEmpty) {
+          _cachedAuthHeaders = authHeaders;
+          return drive.DriveApi(GoogleAuthClient(authHeaders));
+        }
+      }
+      _cachedAuthHeaders = null;
       return null;
     } catch (e) {
       AppLogger.log('GoogleDrive', '_getDriveApi error type: ${e.runtimeType}');
       debugPrint('Google Drive: _getDriveApi error type: ${e.runtimeType}');
       return null;
+    }
+  }
+
+  static Future<T> _driveRequest<T>({
+    required drive.DriveApi api,
+    required Future<T> Function(drive.DriveApi api) request,
+    required String operation,
+    required bool allowUI,
+  }) async {
+    try {
+      return await request(api);
+    } on drive.DetailedApiRequestError catch (error) {
+      if (!DriveSyncDiagnostics.requiresAuthorizationRefresh(error)) rethrow;
+      final authorization = _cachedAuthHeaders?['Authorization'];
+      final token = authorization?.startsWith('Bearer ') == true
+          ? authorization!.substring('Bearer '.length)
+          : null;
+      if (token != null && _cachedAccount != null) {
+        try {
+          await _cachedAccount!.authorizationClient.clearAuthorizationToken(
+            accessToken: token,
+          );
+        } catch (_) {
+          // Continue with a silent restore; never log or persist the token.
+        }
+      }
+      _cachedAuthHeaders = null;
+      AppLogger.logEvent('GoogleDrive', 'unauthorized_token_refresh', {
+        'operation': operation,
+        'statusCode': error.status,
+        'retryCount': 1,
+      });
+      final refreshedApi = await _getDriveApi(allowUI: allowUI);
+      if (refreshedApi == null) rethrow;
+      return request(refreshedApi);
     }
   }
 
@@ -798,6 +832,7 @@ class BackupService {
     _isSyncing = true;
     var outcome = 'failure';
     var reason = 'unclassified_failure';
+    var operation = 'authenticate';
     try {
       AppLogger.logEvent('GoogleDrive', 'upload_started', {
         'startedAt': startedAt.toIso8601String(),
@@ -812,6 +847,7 @@ class BackupService {
       }
 
       onProgress?.call(0.1);
+      operation = 'generate_backup';
       final backupData = await _generateBackupData();
       onProgress?.call(0.3);
       final content = jsonEncode(backupData);
@@ -819,23 +855,37 @@ class BackupService {
       final bytes = utf8.encode(content);
       onProgress?.call(0.7);
 
-      final fileList = await driveApi.files
-          .list(
-            q: "name = '$_backupFileName' and 'appDataFolder' in parents",
-            spaces: 'appDataFolder',
-            $fields: 'files(id)',
-          )
-          .timeout(const Duration(minutes: 2));
+      operation = 'list_backup_files';
+      final fileList = await _driveRequest(
+        api: driveApi,
+        operation: operation,
+        allowUI: allowUI,
+        request: (api) => api.files
+            .list(
+              q: "name = '$_backupFileName' and 'appDataFolder' in parents",
+              spaces: 'appDataFolder',
+              $fields: 'files(id)',
+            )
+            .timeout(const Duration(minutes: 2)),
+      );
       onProgress?.call(1.0);
-
-      final media = drive.Media(Stream.value(bytes), bytes.length);
 
       if (fileList.files != null && fileList.files!.isNotEmpty) {
         final fileId = fileList.files!.first.id!;
         final driveFile = drive.File()..name = _backupFileName;
-        await driveApi.files
-            .update(driveFile, fileId, uploadMedia: media)
-            .timeout(const Duration(minutes: 2));
+        operation = 'update_existing_backup';
+        await _driveRequest(
+          api: driveApi,
+          operation: operation,
+          allowUI: allowUI,
+          request: (api) => api.files
+              .update(
+                driveFile,
+                fileId,
+                uploadMedia: drive.Media(Stream.value(bytes), bytes.length),
+              )
+              .timeout(const Duration(minutes: 2)),
+        );
         AppLogger.logEvent('GoogleDrive', 'upload_written', {
           'operation': 'update_existing_backup',
           'payloadBytes': bytes.length,
@@ -845,9 +895,18 @@ class BackupService {
         final driveFile = drive.File()
           ..name = _backupFileName
           ..parents = ['appDataFolder'];
-        await driveApi.files
-            .create(driveFile, uploadMedia: media)
-            .timeout(const Duration(minutes: 2));
+        operation = 'create_backup';
+        await _driveRequest(
+          api: driveApi,
+          operation: operation,
+          allowUI: allowUI,
+          request: (api) => api.files
+              .create(
+                driveFile,
+                uploadMedia: drive.Media(Stream.value(bytes), bytes.length),
+              )
+              .timeout(const Duration(minutes: 2)),
+        );
         AppLogger.logEvent('GoogleDrive', 'upload_written', {
           'operation': 'create_backup',
           'payloadBytes': bytes.length,
@@ -862,7 +921,17 @@ class BackupService {
       debugPrint('Google Drive: Sync Up Successful.');
       return true;
     } catch (e) {
-      reason = 'exception_${e.runtimeType}';
+      final failure = DriveSyncDiagnostics.failureFields(
+        e,
+        operation: operation,
+      );
+      reason = failure['reason']?.toString() ?? 'exception_${e.runtimeType}';
+      if (e is drive.DetailedApiRequestError) {
+        AppLogger.logEvent('GoogleDrive', 'upload_api_request_failed', {
+          ...Map<String, dynamic>.from(failure),
+          'allowUI': allowUI,
+        });
+      }
       debugPrint('Google Drive Sync Up error type: ${e.runtimeType}');
       return false;
     } finally {
@@ -897,6 +966,7 @@ class BackupService {
     _isSyncing = true;
     var outcome = 'failure';
     var reason = 'unclassified_failure';
+    var operation = 'authenticate';
     try {
       AppLogger.logEvent('GoogleDrive', 'restore_started', {
         'startedAt': startedAt.toIso8601String(),
@@ -909,13 +979,19 @@ class BackupService {
         return false;
       }
 
-      final fileList = await driveApi.files
-          .list(
-            q: "name = '$_backupFileName' and 'appDataFolder' in parents",
-            spaces: 'appDataFolder',
-            $fields: 'files(id)',
-          )
-          .timeout(const Duration(minutes: 2));
+      operation = 'list_backup_files';
+      final fileList = await _driveRequest(
+        api: driveApi,
+        operation: operation,
+        allowUI: allowUI,
+        request: (api) => api.files
+            .list(
+              q: "name = '$_backupFileName' and 'appDataFolder' in parents",
+              spaces: 'appDataFolder',
+              $fields: 'files(id)',
+            )
+            .timeout(const Duration(minutes: 2)),
+      );
       onProgress?.call(1.0);
 
       if (fileList.files == null || fileList.files!.isEmpty) {
@@ -925,10 +1001,19 @@ class BackupService {
       }
 
       final fileId = fileList.files!.first.id!;
+      operation = 'download_backup';
       final response =
-          await driveApi.files
-                  .get(fileId, downloadOptions: drive.DownloadOptions.fullMedia)
-                  .timeout(const Duration(minutes: 3))
+          (await _driveRequest(
+                api: driveApi,
+                operation: operation,
+                allowUI: allowUI,
+                request: (api) => api.files
+                    .get(
+                      fileId,
+                      downloadOptions: drive.DownloadOptions.fullMedia,
+                    )
+                    .timeout(const Duration(minutes: 3)),
+              ))
               as drive.Media;
 
       final List<int> dataBytes = [];
@@ -962,7 +1047,17 @@ class BackupService {
       }
       return result;
     } catch (e) {
-      reason = 'exception_${e.runtimeType}';
+      final failure = DriveSyncDiagnostics.failureFields(
+        e,
+        operation: operation,
+      );
+      reason = failure['reason']?.toString() ?? 'exception_${e.runtimeType}';
+      if (e is drive.DetailedApiRequestError) {
+        AppLogger.logEvent('GoogleDrive', 'restore_api_request_failed', {
+          ...Map<String, dynamic>.from(failure),
+          'allowUI': allowUI,
+        });
+      }
       debugPrint('Google Drive Sync Down error type: ${e.runtimeType}');
       return false;
     } finally {

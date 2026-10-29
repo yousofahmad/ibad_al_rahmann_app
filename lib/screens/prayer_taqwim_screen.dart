@@ -657,8 +657,8 @@ class _TaqwimPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hijriOffset = PrayerService().hijriOffset;
-    final hijri = PrayerService.getDisplayHijriForDate(hijriOffset, date);
+    final hijri = PrayerService.getEgyptianResultHijriForDate(date);
+    final hijriSource = EgyptianHijriCalendar.instance.dateSourceLabel(date);
 
     final dayName = DateFormat('EEEE', 'ar').format(date);
     final gregDay = date.day.toString();
@@ -755,9 +755,9 @@ class _TaqwimPage extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _buildDateSide(
-                            hijri.hDay.toString(),
-                            hijri.longMonthName,
-                            "${hijri.hYear} هـ",
+                            hijri?.hDay.toString() ?? '—',
+                            hijri?.longMonthName ?? 'التاريخ الرسمي غير متاح',
+                            hijri == null ? '' : '${hijri.hYear} هـ',
                             isFriday ? Colors.redAccent : goldColor,
                             textColor,
                           ),
@@ -784,6 +784,12 @@ class _TaqwimPage extends StatelessWidget {
                             textColor,
                           ),
                         ],
+                      ),
+                      SizedBox(height: 3.h),
+                      Text(
+                        hijriSource,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 9.sp, color: subTextColor),
                       ),
 
                       SizedBox(height: 5.h),

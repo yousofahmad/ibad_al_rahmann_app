@@ -16,20 +16,16 @@ import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import java.util.TimeZone
 import java.time.LocalDate
-import java.time.temporal.ChronoUnit
+import java.time.ZoneId
 import kotlin.math.floor
 
 /**
@@ -37,11 +33,6 @@ import kotlin.math.floor
  * It reads/writes the same FlutterSharedPreferences keys as HijriSourceService.
  */
 class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
-    data class HijriDate(val day: Int, val month: Int, val year: Int) {
-        fun sameAs(other: HijriDate): Boolean =
-            day == other.day && month == other.month && year == other.year
-    }
-
     override suspend fun doWork(): Result {
         val actualStartedAt = System.currentTimeMillis()
         val trigger = inputData.getString(INPUT_REASON)
@@ -61,30 +52,60 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
             return@withContext Result.success()
         }
 
-        val today = civilDate(Date())
-        val todayKey = dateKey(today)
-        val lastFetchDate = prefs.getString(key(KEY_LAST_FETCH), null)
-        val temporary = prefs.getBoolean(key(KEY_TEMPORARY), false)
-        if (lastFetchDate == todayKey && !temporary && hasTrustedStoredDate(prefs)) {
+        val cairoDate = LocalDate.now(ZoneId.of("Africa/Cairo"))
+        val todayKey = cairoDate.toString()
+        val today = Date.from(cairoDate.atStartOfDay(ZoneId.systemDefault()).toInstant())
+        val online = hasValidatedInternet()
+        val manualDate = HijriSyncDatePolicy.parseUserConfirmation(
+            prefs.getString(key(KEY_USER_CONFIRMATION), null),
+            todayKey,
+        )
+        val esaDate = HijriSyncDatePolicy.parseAnnualEsaDate(
+            prefs.getString(key(KEY_EGYPTIAN_SYNC_STATE), null),
+            todayKey,
+            prefs.getString(key("notification_hijri_$todayKey"), null),
+            prefs.getString(key("local_hijri_confirmed_source_$todayKey"), null),
+        )
+        val selection = HijriSyncDatePolicy.select(manualDate, esaDate)
+        NativeLogger.log(
+            applicationContext,
+            "HijriSyncWorker: SOURCE_LOOKUP civilDate=$todayKey manualAvailable=${manualDate != null} esaAnnualAvailable=${esaDate != null} selectedSource=${selection?.source ?: "unavailable"} selectedDate=${selection?.date?.let { "${it.day}/${it.month}/${it.year}" } ?: "unavailable"}",
+        )
+        if (selection == null) {
+            if (!online) HijriSyncScheduler.enqueueConnectedRetry(applicationContext)
             outcome = "skipped"
-            reason = "already_verified_today"
+            reason = if (online) "esa_annual_row_not_cached" else "offline_no_cached_esa_row"
+            return@withContext Result.success()
+        }
+
+        val lastFetchDate = prefs.getString(key(KEY_LAST_FETCH), null)
+        val previousDate = readStoredDate(prefs)
+        if (lastFetchDate == todayKey &&
+            previousDate?.sameAs(selection.date) == true &&
+            selection.source == prefs.getString(key(KEY_DATE_SOURCE), null)
+        ) {
+            outcome = "skipped"
+            reason = "selected_date_already_applied_today"
             return@withContext Result.success()
         }
 
         val lastAttemptRaw = prefs.getString(key(KEY_LAST_ATTEMPT), null)
-        val lastAttempt = parseCivilDate(lastAttemptRaw)
+        val lastAttemptKey = lastAttemptRaw?.take(10)
         val lastAttemptMillis = lastAttemptRaw
             ?.let { runCatching { java.time.Instant.parse(it).toEpochMilli() }.getOrNull() }
             ?: 0L
-        val online = hasValidatedInternet()
         val previousAttemptOnline = prefs.getBoolean(key(KEY_LAST_ATTEMPT_ONLINE), false)
-        if (runAttemptCount == 0 && lastAttempt == today &&
+        if (runAttemptCount == 0 && lastAttemptKey == todayKey &&
             System.currentTimeMillis() - lastAttemptMillis < RETRY_THROTTLE_MS &&
             (!online || previousAttemptOnline)) {
-            outcome = "skipped"
-            reason = if (online) "retry_throttle_active" else "offline_retry_already_queued"
-            applyOfflineProjection(prefs, today)
+            if (previousDate?.sameAs(selection.date) != true ||
+                selection.source != prefs.getString(key(KEY_DATE_SOURCE), null)
+            ) {
+                applySelectedDate(prefs, today, todayKey, selection)
+            }
             if (!online) HijriSyncScheduler.enqueueConnectedRetry(applicationContext)
+            outcome = "skipped"
+            reason = if (online) "retry_throttle_active_cached_date_applied" else "offline_cached_date_applied"
             return@withContext Result.success()
         }
 
@@ -93,80 +114,28 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
             .putBoolean(key(KEY_LAST_ATTEMPT_ONLINE), online)
             .apply()
         if (!online) {
-            applyOfflineProjection(prefs, today)
-            showFailureNotification(prefs, todayKey)
-            if (inputData.getString(INPUT_REASON) == "network_restored") {
-                outcome = "retry"
-                reason = "network_unavailable_on_connected_retry"
-                return@withContext Result.retry()
-            }
+            applySelectedDate(prefs, today, todayKey, selection)
             HijriSyncScheduler.enqueueConnectedRetry(applicationContext)
-            outcome = "retry_scheduled"
-            reason = "no_validated_internet_connected_retry_enqueued"
+            outcome = "success"
+            reason = "cached_${selection.source}_applied_offline"
             return@withContext Result.success()
         }
 
-        val (darDate, esaDate) = coroutineScope {
-            val dar = async(Dispatchers.IO) { fetchDarAlIfta() }
-            val esa = async(Dispatchers.IO) { fetchSurveyAuthority() }
-            dar.await() to esa.await()
+        // Apply the official/manual date before any network comparison; Dar
+        // al-Ifta availability must never delay Egyptian notifications.
+        applySelectedDate(prefs, today, todayKey, selection)
+        val darDate = fetchDarAlIfta()
+        val comparisonOutcome = when {
+            darDate == null -> "unavailable"
+            darDate.sameAs(selection.date) -> "matches_selected_egyptian_date"
+            else -> "differs_from_selected_egyptian_date"
         }
-        // Dar Al-Ifta is the live date for today; ESA's full calendar is a
-        // verifier only and is never substituted when the API is unavailable.
-        val chosen = darDate
-        if (chosen == null) {
-            applyOfflineProjection(prefs, today)
-            showFailureNotification(prefs, todayKey)
-            outcome = "retry"
-            reason = "dar_alifta_live_date_unavailable"
-            return@withContext Result.retry()
-        }
-
-        val offset = resolveOffset(chosen, today)
-        if (offset == null) {
-            applyOfflineProjection(prefs, today)
-            showFailureNotification(prefs, todayKey)
-            outcome = "retry"
-            reason = "official_date_outside_safe_offset_range"
-            return@withContext Result.retry()
-        }
-
-        val previousDate = readStoredDate(prefs)
-        val previousTemporary = prefs.getBoolean(key(KEY_TEMPORARY), false)
-        val oldOffset = readInt(prefs, key(KEY_LOCAL_OFFSET))
-            ?: readInt(prefs, key("hijri_offset"))
-            ?: 0
-        val previousDisplayed = hijriAt(today, oldOffset)
-        val correctionNeeded = !chosen.sameAs(previousDisplayed)
-        val temporaryDarSource = darDate != null &&
-            (esaDate == null || !darDate.sameAs(esaDate))
-        val source = when {
-            darDate != null && esaDate != null && darDate.sameAs(esaDate) -> "both_authorities"
-            else -> "dar_alifta_api"
-        }
-
-        val edit = prefs.edit()
-            .putLong(key(KEY_LOCAL_OFFSET), offset.toLong())
-            .putLong(key(KEY_LOCKED_MONTH), chosen.month.toLong())
-            .putLong(key(KEY_LOCKED_YEAR), chosen.year.toLong())
-            .putString(key(KEY_LAST_FETCH), todayKey)
-            .putString(key(KEY_CONFIRMED), todayKey)
-            .putString(key(KEY_DATE_SOURCE), source)
-            .putString(key(KEY_ANCHOR_DATE), todayKey)
-            .putLong(key(KEY_OFFICIAL_DAY), chosen.day.toLong())
-            .putLong(key(KEY_OFFICIAL_MONTH), chosen.month.toLong())
-            .putLong(key(KEY_OFFICIAL_YEAR), chosen.year.toLong())
-            .putBoolean(key(KEY_TEMPORARY), temporaryDarSource)
-            .putBoolean(key(KEY_NATIVE_RESCHEDULE), correctionNeeded || oldOffset != offset)
-            .putString(key("local_hijri_confirmed_source_$todayKey"), source)
-        edit.apply()
-
-        updateNativeDateAndWidgets()
-        if (correctionNeeded || previousDate == null || previousTemporary) {
-            showCorrectionNotification(prefs, chosen, todayKey, temporaryDarSource)
-        }
+        NativeLogger.log(
+            applicationContext,
+            "HijriSyncWorker: COMPARISON source=dar_alifta_daily_comparison_only civilDate=$todayKey outcome=$comparisonOutcome comparisonDate=${darDate?.let { "${it.day}/${it.month}/${it.year}" } ?: "unavailable"} selectedSource=${selection.source} selectedDate=${selection.date.day}/${selection.date.month}/${selection.date.year}",
+        )
         outcome = "success"
-        reason = "date_applied_source_$source"
+        reason = "date_applied_source_${selection.source}_dar_comparison_$comparisonOutcome"
         Result.success()
             }
         } catch (error: Exception) {
@@ -192,6 +161,62 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
     }
 
+    private fun applySelectedDate(
+        prefs: android.content.SharedPreferences,
+        today: Date,
+        todayKey: String,
+        selection: HijriSyncDatePolicy.Selection,
+    ) {
+        val chosen = selection.date
+        val previousDate = readStoredDate(prefs)
+        val previousTemporary = prefs.getBoolean(key(KEY_TEMPORARY), false)
+        val oldOffset = readInt(prefs, key(KEY_LOCAL_OFFSET))
+            ?: readInt(prefs, key("hijri_offset"))
+            ?: 0
+        val offset = resolveOffset(chosen, today)
+        val correctionNeeded = previousDate == null || !chosen.sameAs(previousDate)
+        val edit = prefs.edit()
+            .putLong(key(KEY_LOCKED_MONTH), chosen.month.toLong())
+            .putLong(key(KEY_LOCKED_YEAR), chosen.year.toLong())
+            .putString(key(KEY_LAST_FETCH), todayKey)
+            .putString(key(KEY_DATE_SOURCE), selection.source)
+            .putString(key(KEY_ANCHOR_DATE), todayKey)
+            .putLong(key(KEY_OFFICIAL_DAY), chosen.day.toLong())
+            .putLong(key(KEY_OFFICIAL_MONTH), chosen.month.toLong())
+            .putLong(key(KEY_OFFICIAL_YEAR), chosen.year.toLong())
+            .putBoolean(key(KEY_TEMPORARY), false)
+            .putBoolean(
+                key(KEY_NATIVE_RESCHEDULE),
+                correctionNeeded || (offset != null && oldOffset != offset),
+            )
+            .putString(key("local_hijri_confirmed_source_$todayKey"), selection.source)
+            .putString(
+                key("notification_hijri_$todayKey"),
+                "${chosen.day},${chosen.month},${chosen.year}",
+            )
+        if (offset != null) edit.putLong(key(KEY_LOCAL_OFFSET), offset.toLong())
+
+        if (selection.source == "user_confirmation") {
+            val confirmation = prefs.getString(key(KEY_USER_CONFIRMATION), null)
+            val cairoToday = LocalDate.parse(todayKey)
+            for (daysAhead in 1..32) {
+                val targetKey = cairoToday.plusDays(daysAhead.toLong()).toString()
+                val confirmed = HijriSyncDatePolicy.parseUserConfirmation(confirmation, targetKey)
+                    ?: continue
+                edit.putString(
+                    key("notification_hijri_$targetKey"),
+                    "${confirmed.day},${confirmed.month},${confirmed.year}",
+                )
+            }
+        }
+        edit.apply()
+
+        updateNativeDateAndWidgets()
+        if (correctionNeeded || previousDate == null || previousTemporary) {
+            showCorrectionNotification(prefs, chosen, todayKey, selection.source)
+        }
+    }
+
     private fun fetchDarAlIfta(): HijriDate? {
         val raw = fetchText(DAR_ALIFTA_URL) ?: return null
         return try {
@@ -201,16 +226,9 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
         }
     }
 
-    private fun fetchSurveyAuthority(): HijriDate? {
-        val raw = fetchText(SURVEY_AUTHORITY_URL, browserAgent = true) ?: return null
-        val row = Regex(
-            "(?is)القاهرة.*?</td>\\s*<td[^>]*>[^<]*</td>\\s*<td[^>]*>([^<]+)</td>",
-        ).find(raw)?.groupValues?.getOrNull(1) ?: return null
-        return parseDate(row)
-    }
-
-    private fun fetchText(url: String, browserAgent: Boolean = false): String? {
-        val timeouts = intArrayOf(15_000, 30_000, 45_000)
+    private fun fetchText(url: String): String? {
+        // This is a daily comparison only; a brief failure is not a sync failure.
+        val timeouts = intArrayOf(10_000)
         val sourceHost = runCatching { URL(url).host }.getOrDefault("unknown")
         for ((index, timeout) in timeouts.withIndex()) {
             val startedAt = System.currentTimeMillis()
@@ -226,12 +244,6 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 connection.connectTimeout = timeout
                 connection.readTimeout = timeout
                 connection.setRequestProperty("Accept", "application/json,text/html,*/*")
-                if (browserAgent) {
-                    connection.setRequestProperty(
-                        "User-Agent",
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
-                    )
-                }
                 val statusCode = connection.responseCode
                 if (statusCode == HttpURLConnection.HTTP_OK) {
                     val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
@@ -399,87 +411,19 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
         return HijriDate(hijriDay, hijriMonth, hijriYear)
     }
 
-    private fun applyOfflineProjection(prefs: android.content.SharedPreferences, today: Date) {
-        val saved = readStoredDate(prefs)
-        if (saved == null || !hasTrustedStoredDate(prefs)) {
-            val hadLocalOffset = prefs.contains(key(KEY_LOCAL_OFFSET))
-            prefs.edit()
-                .putBoolean(key(KEY_TEMPORARY), true)
-                .putBoolean(key(KEY_NATIVE_RESCHEDULE), hadLocalOffset)
-                .remove(key(KEY_LOCAL_OFFSET))
-                .apply()
-            if (saved != null) updateNativeDateAndWidgets()
-            return
-        }
-        val anchor = parseCivilDate(prefs.getString(key(KEY_ANCHOR_DATE), null)) ?: return
-        val elapsed = try {
-            ChronoUnit.DAYS.between(
-                LocalDate.parse(dateKey(anchor)),
-                LocalDate.parse(dateKey(today)),
-            ).toInt().coerceAtLeast(0)
-        } catch (_: Exception) { 0 }
-        if (elapsed == 0) return
-
-        var projected = saved ?: return
-        for (day in 0 until elapsed) {
-            if (projected.day == 29) break
-            projected = if (projected.day == 30) {
-                if (projected.month == 12) HijriDate(1, 1, projected.year + 1)
-                else HijriDate(1, projected.month + 1, projected.year)
-            } else {
-                HijriDate(projected.day + 1, projected.month, projected.year)
-            }
-        }
-        val offset = resolveOffset(projected, today) ?: return
-        val previousOffset = readInt(prefs, key(KEY_LOCAL_OFFSET))
-        val dateChanged = !projected.sameAs(saved)
-        val edit = prefs.edit()
-            .putLong(key(KEY_LOCAL_OFFSET), offset.toLong())
-            .putLong(key(KEY_LOCKED_MONTH), projected.month.toLong())
-            .putLong(key(KEY_LOCKED_YEAR), projected.year.toLong())
-            .putLong(key(KEY_OFFICIAL_DAY), projected.day.toLong())
-            .putLong(key(KEY_OFFICIAL_MONTH), projected.month.toLong())
-            .putLong(key(KEY_OFFICIAL_YEAR), projected.year.toLong())
-            .putString(key(KEY_ANCHOR_DATE), dateKey(today))
-            .putString(key(KEY_DATE_SOURCE), "offline_estimate")
-            .putString(key(KEY_CONFIRMED), dateKey(today))
-            .putBoolean(key(KEY_TEMPORARY), true)
-            .putBoolean(key(KEY_NATIVE_RESCHEDULE), dateChanged || previousOffset != offset)
-        edit.apply()
-        updateNativeDateAndWidgets()
-    }
-
-    private fun showFailureNotification(prefs: android.content.SharedPreferences, todayKey: String) {
-        val notificationKey = key("local_hijri_failure_notified_$todayKey")
-        if (prefs.getBoolean(notificationKey, false)) return
-        val saved = readStoredDate(prefs)
-        val body = when {
-            saved == null || !hasTrustedStoredDate(prefs) -> "تعذر الاتصال بـ API دار الإفتاء ولا يوجد تاريخ محفوظ منه. سيعرض التطبيق تاريخ المكتبة مؤقتًا؛ افتح الإعدادات للتحديث أو الإدخال اليدوي."
-            saved.day >= 29 -> "فشل تحديث المصادر المصرية ووصل التاريخ المحفوظ إلى اليوم 29. اتصل بالإنترنت لتأكيد هل الغد 30 أم غرة الشهر."
-            else -> "تعذر الاتصال بالمصادر المصرية. سيواصل التطبيق من التاريخ المحفوظ مؤقتًا ويحاول التحديث مجددًا."
-        }
-        prefs.edit().putBoolean(notificationKey, true).apply()
-        showSystemNotification(
-            title = "تعذّر تحديث التاريخ الهجري",
-            body = body,
-            payload = "hijri_confirmation",
-            notificationId = FAILURE_NOTIFICATION_ID,
-        )
-    }
-
     private fun showCorrectionNotification(
         prefs: android.content.SharedPreferences,
         date: HijriDate,
         todayKey: String,
-        temporary: Boolean,
+        source: String,
     ) {
         val correctionKey = "$todayKey:${date.day}-${date.month}-${date.year}"
         val preferenceKey = key(KEY_LAST_NOTIFIED_CORRECTION)
         if (prefs.getString(preferenceKey, null) == correctionKey) return
-        val body = if (temporary) {
-            "تم تحديث التاريخ إلى ${date.day}/${date.month}/${date.year} هـ وفق دار الإفتاء مؤقتًا، وسيستمر التحقق يوميًا من جدول هيئة المساحة."
+        val body = if (source == "user_confirmation") {
+            "تم تحديث التاريخ الهجري إلى ${date.day}/${date.month}/${date.year} هـ وفق التأكيد اليدوي المحفوظ."
         } else {
-            "تم تأكيد التاريخ الهجري ${date.day}/${date.month}/${date.year} هـ من المصادر المصرية."
+            "تم تحديث التاريخ الهجري إلى ${date.day}/${date.month}/${date.year} هـ وفق جدول هيئة المساحة السنوي."
         }
         prefs.edit().putString(preferenceKey, correctionKey).apply()
         showSystemNotification(
@@ -550,18 +494,6 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
         }
     }
 
-    private fun hasTrustedStoredDate(prefs: android.content.SharedPreferences): Boolean {
-        if (readStoredDate(prefs) == null) return false
-        val source = prefs.getString(key(KEY_DATE_SOURCE), null)
-        if (source == "survey_authority") return false
-        val lastFetch = prefs.getString(key(KEY_LAST_FETCH), null)
-        val previousSource = lastFetch?.let {
-            prefs.getString(key("local_hijri_confirmed_source_$it"), null)
-        }
-        if (source == null && previousSource == "survey_authority") return false
-        return true
-    }
-
     private fun readStoredDate(prefs: android.content.SharedPreferences): HijriDate? {
         val day = readInt(prefs, key(KEY_OFFICIAL_DAY)) ?: return null
         val month = readInt(prefs, key(KEY_OFFICIAL_MONTH)) ?: return null
@@ -577,24 +509,6 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
         else -> null
     }
 
-    private fun civilDate(date: Date): Date {
-        val calendar = Calendar.getInstance().apply { time = date }
-        return Calendar.getInstance().apply {
-            clear()
-            set(calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH), 0, 0, 0)
-        }.time
-    }
-
-    private fun dateKey(date: Date): String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
-
-    private fun parseCivilDate(raw: String?): Date? {
-        if (raw.isNullOrBlank()) return null
-        return try {
-            val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false }
-            formatter.parse(raw.take(10))
-        } catch (_: Exception) { null }
-    }
-
     companion object {
         const val INPUT_REASON = "hijri_sync_reason"
         private const val PREFS_NAME = "FlutterSharedPreferences"
@@ -603,7 +517,6 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
         private const val KEY_LAST_FETCH = "local_hijri_last_fetch"
         private const val KEY_LAST_ATTEMPT = "local_hijri_last_attempt_at"
         private const val KEY_LAST_ATTEMPT_ONLINE = "local_hijri_last_attempt_online"
-        private const val KEY_CONFIRMED = "local_hijri_confirmed_date"
         private const val KEY_LOCKED_MONTH = "local_hijri_locked_month"
         private const val KEY_LOCKED_YEAR = "local_hijri_locked_year"
         private const val KEY_TEMPORARY = "local_hijri_dar_alifta_temporary"
@@ -615,11 +528,11 @@ class HijriSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
         private const val KEY_DATE_SOURCE = "local_hijri_date_source"
         private const val KEY_NATIVE_RESCHEDULE = "local_hijri_native_reschedule_required"
         private const val RETRY_THROTTLE_MS = 23L * 60L * 60L * 1000L
-        private const val FAILURE_NOTIFICATION_ID = 29130
         private const val CORRECTION_NOTIFICATION_ID = 29131
         private const val CONTENT_INTENT_REQUEST = 29132
         private const val DAR_ALIFTA_URL = "https://di107.dar-alifta.org/api/HijriDate?langID=2"
-        private const val SURVEY_AUTHORITY_URL = "https://www.esa.gov.eg/praytimes.aspx"
+        private const val KEY_USER_CONFIRMATION = "egyptian_hijri_user_confirmation_v1"
+        private const val KEY_EGYPTIAN_SYNC_STATE = "egyptian_hijri_sync_state_v2"
 
         private fun key(name: String): String = "flutter.$name"
     }

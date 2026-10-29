@@ -190,8 +190,23 @@ object NativePrayerManager {
 }
 
 object HijriCalendarHelper {
-    fun getHijriDateComponents(context: Context, date: Date): Triple<Int, Int, Int> {
+    fun getHijriDateComponents(context: Context, date: Date): Triple<Int, Int, Int>? {
         val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+
+        if (prefs.getString("flutter.hijri_system", "umm_alqura") == "egyptian") {
+            val civilDate = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("Africa/Cairo")
+            }.format(date)
+            val source = prefs.getString("flutter.local_hijri_confirmed_source_$civilDate", null)
+            if (source != "survey_authority_annual_calendar" &&
+                source != "both_authorities" &&
+                source != "manual" &&
+                source != "user_confirmation"
+            ) return null
+            return parseEgyptianHijriSnapshot(
+                prefs.getString("flutter.notification_hijri_$civilDate", null),
+            )
+        }
         
         fun parseOffset(key: String): Int {
             val raw = prefs.all[key]
@@ -228,20 +243,15 @@ object HijriCalendarHelper {
             } catch (_: Exception) {}
         }
 
-        val isEgyptianSystem = prefs.getString("flutter.hijri_system", "umm_alqura") == "egyptian"
-        val totalOffset = if (isEgyptianSystem) {
-            if (prefs.contains("flutter.local_hijri_offset")) sourceOffset else generalOffset
+        val libraryOffset = if (
+            prefs.contains("flutter.hijri_offset_manual") ||
+            prefs.contains("flutter.hijri_local_delta")
+        ) {
+            manualOffset + localDelta + parseOffset("flutter.global_hijri_offset")
         } else {
-            val libraryOffset = if (
-                prefs.contains("flutter.hijri_offset_manual") ||
-                prefs.contains("flutter.hijri_local_delta")
-            ) {
-                manualOffset + localDelta + parseOffset("flutter.global_hijri_offset")
-            } else {
-                generalOffset
-            }
-            libraryOffset + manualDayAdjustment
+            generalOffset
         }
+        val totalOffset = libraryOffset + manualDayAdjustment
         
         val adjustedCal = Calendar.getInstance()
         adjustedCal.time = date
@@ -314,10 +324,34 @@ object HijriCalendarHelper {
         return Triple(hDay, hMonth, hYear)
     }
 
+    internal fun parseEgyptianHijriSnapshot(raw: String?): Triple<Int, Int, Int>? {
+        val values = raw?.split(',') ?: return null
+        if (values.size != 3) return null
+        val day = values[0].toIntOrNull() ?: return null
+        val month = values[1].toIntOrNull() ?: return null
+        val year = values[2].toIntOrNull() ?: return null
+        if (day !in 1..30 || month !in 1..12 || year !in 1..9999) return null
+        return Triple(day, month, year)
+    }
+
     fun getArabicDate(context: Context, date: Date): String {
         try {
             val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-            val gDateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ENGLISH).format(date)
+            val gDateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ENGLISH).apply {
+                timeZone = TimeZone.getTimeZone("Africa/Cairo")
+            }.format(date)
+
+            val monthsAr = arrayOf(
+                "محرم", "صفر", "ربيع الأول", "ربيع الثاني", "جمادى الأولى", "جمادى الآخرة",
+                "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
+            )
+            if (prefs.getString("flutter.hijri_system", "umm_alqura") == "egyptian") {
+                val components = getHijriDateComponents(context, date)
+                    ?: return "التاريخ الرسمي غير متاح"
+                val (hDay, hMonth, hYear) = components
+                return toArabicDigits("$hDay ${monthsAr[hMonth - 1]} $hYear هـ")
+            }
+
             val flutterHijri = prefs.getString("flutter.shared_hijri_date_$gDateStr", null) ?: prefs.getString("flutter.shared_hijri_date", null)
             
             // Only use shared_hijri_date if we are asking for today's date, or if we have exact match
@@ -330,11 +364,9 @@ object HijriCalendarHelper {
                 return toArabicDigits(flutterHijri)
             }
 
-            val (hDay, hMonth, hYear) = getHijriDateComponents(context, date)
-            val monthsAr = arrayOf(
-                "محرم", "صفر", "ربيع الأول", "ربيع الثاني", "جمادى الأولى", "جمادى الآخرة",
-                "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
-            )
+            val components = getHijriDateComponents(context, date)
+                ?: return "التاريخ الهجري غير متاح"
+            val (hDay, hMonth, hYear) = components
             
             val monthName = if (hMonth in 1..12) monthsAr[hMonth - 1] else "شهر"
             

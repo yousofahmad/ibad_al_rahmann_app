@@ -82,6 +82,8 @@ flutter {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     implementation("com.google.firebase:firebase-config")
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("androidx.activity:activity-ktx:1.9.3")

@@ -200,8 +200,9 @@ class PrayerService extends ChangeNotifier {
       String? methodKey = prefs.getString(keyMethod);
       if (methodKey != null) _method = _getMethodFromKey(methodKey);
       String? madhabKey = prefs.getString(keyMadhab);
-      if (madhabKey != null)
+      if (madhabKey != null) {
         _madhab = madhabKey == 'hanafi' ? Madhab.hanafi : Madhab.shafi;
+      }
       _ramadanIshaDelayMode = prefs.getInt(keyRamadanCycle) ?? 0;
       const prayers = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
       for (String p in prayers) {
@@ -1065,8 +1066,9 @@ class PrayerService extends ChangeNotifier {
     String? methodKey = prefs.getString(keyMethod);
     if (methodKey != null) _method = _getMethodFromKey(methodKey);
     String? madhabKey = prefs.getString(keyMadhab);
-    if (madhabKey != null)
+    if (madhabKey != null) {
       _madhab = madhabKey == 'hanafi' ? Madhab.hanafi : Madhab.shafi;
+    }
     _ramadanIshaDelayMode = prefs.getInt(keyRamadanCycle) ?? 0;
     const prayers = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
     for (String p in prayers) {
@@ -1608,6 +1610,14 @@ class PrayerService extends ChangeNotifier {
     return getHijriWithOffset(remoteOffset, date);
   }
 
+  /// The Egyptian calendar on the result card is not a conversion fallback:
+  /// show the active user confirmation or the published ESA row only.
+  static HijriCalendar? getEgyptianResultHijriForDate(DateTime date) {
+    final official = EgyptianHijriCalendar.instance.lookup(date);
+    if (official == null) return null;
+    return _hijriCalendarFromEgyptianDate(official, date);
+  }
+
   static HijriCalendar _hijriCalendarFromEgyptianDate(
     EgyptianHijriDate date,
     DateTime civilDate,
@@ -1748,6 +1758,7 @@ class PrayerService extends ChangeNotifier {
 
   static Future<void> cacheHijriDatesForNative(int offset) async {
     final prefs = CacheHelper.prefs;
+    final egyptianSystem = isEgyptianSystem;
     final now = DateTime.now();
     final todayStart = DateTime(
       now.year,
@@ -1759,16 +1770,31 @@ class PrayerService extends ChangeNotifier {
     for (int i = 0; i < 33; i++) {
       final targetDate = DateTime(now.year, now.month, now.day + i);
       final hDate = getNotificationHijriForDate(targetDate);
-      final key =
-          'notification_hijri_${EgyptianHijriCalendar.civilKey(targetDate)}';
+      final civilKey = EgyptianHijriCalendar.civilKey(targetDate);
+      final key = 'notification_hijri_$civilKey';
+      final sourceKey = 'local_hijri_confirmed_source_$civilKey';
       if (hDate == null) {
         await prefs.remove(key);
+        if (egyptianSystem) await prefs.remove(sourceKey);
       } else {
         // Stable numeric contract consumed by NativePrayerManager.
         await prefs.setString(
           key,
           '${hDate.hDay},${hDate.hMonth},${hDate.hYear}',
         );
+        if (egyptianSystem) {
+          final isManual =
+              EgyptianHijriCalendar.instance.userConfirmation?.lookup(
+                targetDate,
+              ) !=
+              null;
+          await prefs.setString(
+            sourceKey,
+            isManual ? 'user_confirmation' : 'survey_authority_annual_calendar',
+          );
+        } else {
+          await prefs.remove(sourceKey);
+        }
       }
     }
   }

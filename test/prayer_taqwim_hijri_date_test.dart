@@ -18,6 +18,35 @@ void main() {
 
   tearDown(() => EgyptianHijriCalendar.instance.resetForTesting());
 
+  test(
+    'result card uses the national ESA row even if another system is selected',
+    () async {
+      await CacheHelper.prefs.setString(
+        PrayerService.keyHijriSystem,
+        PrayerService.systemUmmAlQura,
+      );
+
+      final resultDate = PrayerService.getEgyptianResultHijriForDate(
+        DateTime(2026, 10, 28),
+      );
+
+      expect(resultDate?.hDay, 17);
+      expect(resultDate?.hMonth, 5);
+      expect(resultDate?.hYear, 1448);
+    },
+  );
+
+  test(
+    'result card does not fabricate a Hijri date when the ESA row is absent',
+    () {
+      final resultDate = PrayerService.getEgyptianResultHijriForDate(
+        DateTime(2027, 1, 1),
+      );
+
+      expect(resultDate, isNull);
+    },
+  );
+
   test('the official Egyptian table remains primary without confirmation', () {
     final octoberEleventh = PrayerService.getDisplayHijriForDate(
       1,
@@ -71,16 +100,16 @@ void main() {
         'بتأكيد المستخدم',
       );
 
-      final anchorDisplay = PrayerService.getDisplayHijriForDate(
-        1,
+      final anchorDisplay = PrayerService.getEgyptianResultHijriForDate(
         DateTime(2026, 10, 9),
       );
-      final dayTwentyNineDisplay = PrayerService.getHijriWithOffset(
-        1,
+      final dayTwentyNineDisplay = PrayerService.getEgyptianResultHijriForDate(
         DateTime(2026, 10, 10),
       );
-      expect(anchorDisplay.hDay, 28);
-      expect(dayTwentyNineDisplay.hDay, 29);
+      expect(anchorDisplay, isNotNull);
+      expect(dayTwentyNineDisplay, isNotNull);
+      expect(anchorDisplay!.hDay, 28);
+      expect(dayTwentyNineDisplay!.hDay, 29);
       expect(dayTwentyNineDisplay.hMonth, 4);
 
       // Notifications share the same confirmation-aware lookup as displays.
@@ -110,6 +139,32 @@ void main() {
       expect(
         PrayerService.hijriToGregorianDate(1448, 5, 1),
         DateTime(2026, 10, 12),
+      );
+    },
+  );
+
+  test(
+    'native notification cache marks an active manual confirmation',
+    () async {
+      final today = DateTime.now();
+      final todayKey = EgyptianHijriCalendar.civilKey(today);
+      EgyptianHijriCalendar.instance.applyUserConfirmation(
+        EgyptianHijriUserConfirmation(
+          anchorDate: today,
+          hijri: const EgyptianHijriDate(hDay: 28, hMonth: 5, hYear: 1448),
+          confirmedAt: today.toUtc().toIso8601String(),
+        ),
+      );
+
+      await PrayerService.cacheHijriDatesForNative(0);
+
+      expect(
+        CacheHelper.prefs.getString('notification_hijri_$todayKey'),
+        '28,5,1448',
+      );
+      expect(
+        CacheHelper.prefs.getString('local_hijri_confirmed_source_$todayKey'),
+        'user_confirmation',
       );
     },
   );
