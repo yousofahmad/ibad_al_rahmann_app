@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_wird_title">عباد الرحمن: الورد القرآني</string>
+    <string name="widget_wird_description">الورد الحالي من الختمة النشطة مع موضع القراءة والتقدم.</string>
+    <string name="widget_azkar_title">عباد الرحمن: أذكار الصباح والمساء</string>
+    <string name="widget_azkar_description">يعرض أذكار الصباح أو المساء حسب مواقيت الفجر والعصر.</string>
+</resources>

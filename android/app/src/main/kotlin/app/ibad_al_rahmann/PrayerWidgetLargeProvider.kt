@@ -62,14 +62,21 @@ class PrayerWidgetLargeProvider : AppWidgetProvider() {
              return
         }
 
-        // Fix next_fajr_epoch if missing
-        val finalNextFajr = if (nextFajrEpoch == 0L) fEpoch + 86400000L else nextFajrEpoch
+        val finalNextFajr = PrayerWidgetSchedule.nextFajrForNight(
+            nowMillis = now,
+            fajrEpochMillis = fEpoch,
+            ishaEpochMillis = iEpoch,
+            nextFajrEpochMillis = nextFajrEpoch,
+        )
 
         val fajrThreshold = fEpoch + (60 * 60 * 1000L)
         val dhuhrThreshold = dEpoch + (45 * 60 * 1000L)
         val asrThreshold = aEpoch + (45 * 60 * 1000L)
         val maghribThreshold = mEpoch + ((iEpoch - mEpoch) / 2)
         val ishaThreshold = iEpoch + (60 * 60 * 1000L)
+        if (now in iEpoch..ishaThreshold) {
+            scheduleRefresh(context, ishaThreshold + 1000L)
+        }
 
         var nextPrayerName = ""
         var targetEpoch = 0L

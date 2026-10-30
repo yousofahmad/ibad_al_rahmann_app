@@ -10,6 +10,7 @@ import 'package:audioplayers/audioplayers.dart';
 import '../services/notification_service.dart';
 import '../services/daily_tracker_service.dart';
 import '../services/prayer_service.dart';
+import '../services/home_widget_service.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 
 class ZekrData {
@@ -165,6 +166,9 @@ class _AzkarPageState extends State<AzkarPage> {
     String key = _getCategoryKey();
     if (key.isNotEmpty) {
       await DailyTrackerService.markAsStarted(key);
+      if (key == 'morning_azkar' || key == 'evening_azkar') {
+        await HomeWidgetService.updateAzkarWidget(trigger: 'azkar_session_started');
+      }
       final streak = await DailyTrackerService.getStreak(key);
       if (mounted) setState(() => _streakCount = streak);
     }
@@ -1065,6 +1069,9 @@ class _AzkarPageState extends State<AzkarPage> {
 
     if (key.isNotEmpty) {
       await DailyTrackerService.markAsDone(key);
+      if (key == 'morning_azkar' || key == 'evening_azkar') {
+        await HomeWidgetService.updateAzkarWidget(trigger: 'azkar_session_completed');
+      }
       final countKey = 'count_${widget.jsonFile.replaceAll('.json', '')}';
       final currentDoneCount = CacheHelper.prefs.getInt(countKey) ?? 0;
       await CacheHelper.prefs.setInt(countKey, currentDoneCount + 1);

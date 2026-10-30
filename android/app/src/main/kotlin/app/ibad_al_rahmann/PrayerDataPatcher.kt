@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -35,9 +36,18 @@ object PrayerDataPatcher {
                 edit.putLong("isha_epoch", todayTimes.isha.time)
                 edit.putLong("sunrise_epoch", todayTimes.sunrise.time)
                 
-                val tomorrow = Date(System.currentTimeMillis() + 86400000L)
+                val tomorrow = Calendar.getInstance().apply {
+                    add(Calendar.DAY_OF_YEAR, 1)
+                }.time
                 val tomorrowTimes = NativePrayerManager.calculatePrayerTimes(context, tomorrow)
-                edit.putLong("next_fajr_epoch", tomorrowTimes?.fajr?.time ?: (todayTimes.isha.time + 86400000L))
+                val fallbackNextFajr = Calendar.getInstance().apply {
+                    time = todayTimes.fajr
+                    add(Calendar.DAY_OF_YEAR, 1)
+                }.timeInMillis
+                edit.putLong(
+                    "next_fajr_epoch",
+                    tomorrowTimes?.fajr?.time ?: fallbackNextFajr,
+                )
                 
                 // Format strings for display
                 val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
@@ -64,9 +74,14 @@ object PrayerDataPatcher {
             )
             val hwFajr = getSafeLong(hwPrefs, "fajr_epoch", 0L)
             
-            // CRITICAL FIX: Only use Flutter's cached widget data if it belongs to TODAY or later!
-            // If hwFajr is less than today's start of day, it's stuck/old data.
-            val startOfToday = System.currentTimeMillis() - 86400000L // Roughly 24h ago buffer
+            // Only use Flutter's cached widget data if it belongs to TODAY or later.
+            // A rolling 24-hour window could incorrectly accept yesterday's Fajr after midnight.
+            val startOfToday = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
             
             if (hwFajr > startOfToday) {
                 edit.putLong("fajr_epoch",      hwFajr)
@@ -88,7 +103,9 @@ object PrayerDataPatcher {
             val json = JSONObject(thirtyStr)
             val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
             val dateKey = sdf.format(Date())
-            val tomorrowKey = sdf.format(Date(System.currentTimeMillis() + 86400000L))
+            val tomorrowKey = sdf.format(
+                Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }.time,
+            )
             
             val dayObj = json.optJSONObject(dateKey)
             val tomorrowObj = json.optJSONObject(tomorrowKey)

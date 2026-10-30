@@ -187,6 +187,22 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_wide_info" />
         </receiver>
 
+        <!-- Home Screen Widget (Qur'an wird, 3x2) -->
+        <receiver android:name=".WirdWidgetProvider" android:enabled="true" android:exported="true" android:label="@string/widget_wird_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_wird_info" />
+        </receiver>
+
+        <!-- Home Screen Widget (morning/evening azkar, 2x1) -->
+        <receiver android:name=".AzkarWidgetProvider" android:enabled="true" android:exported="true" android:label="@string/widget_azkar_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_azkar_info" />
+        </receiver>
+
 
         <!-- Home Widget Background Receiver -->
         <receiver android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver" android:exported="true">

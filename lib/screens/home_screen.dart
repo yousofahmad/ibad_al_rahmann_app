@@ -12,6 +12,7 @@ import 'package:hijri/hijri_calendar.dart';
 import 'package:intl/intl.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 import '../services/prayer_service.dart';
+import '../services/notification_schedule_helpers.dart';
 import 'package:ibad_al_rahmann/core/helpers/app_formatters.dart';
 import '../services/notification_service.dart';
 import 'prayer_times_screen.dart';
@@ -225,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       nextTime = _prayerTimes!.timeForPrayer(_nextPrayer!);
     } else {
       // It's after Isha
-      final tomorrow = now.add(const Duration(days: 1));
+      final tomorrow = NotificationScheduleHelpers.addCivilDays(now, 1);
       final tomorrowTimes = _prayerService.getPrayerTimesForDate(tomorrow);
       nextTime = tomorrowTimes?.fajr;
       _nextPrayer = Prayer.fajr;
@@ -237,7 +238,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       currentTime = _prayerTimes!.timeForPrayer(_currentPrayer!);
     } else {
       // If before Fajr, previous was yesterday's Isha
-      final yesterday = now.subtract(const Duration(days: 1));
+      final yesterday = NotificationScheduleHelpers.addCivilDays(now, -1);
       final yesterdayTimes = _prayerService.getPrayerTimesForDate(yesterday);
       currentTime = yesterdayTimes?.isha;
     }

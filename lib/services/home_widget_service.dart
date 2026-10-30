@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:home_widget/home_widget.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
 
 /// IMPORTANT: This function MUST be:
 ///   1. A TOP-LEVEL Dart function (not inside any class).
@@ -19,6 +22,8 @@ class HomeWidgetService {
   static const String appGroupId = 'group.app.ibad_al_rahmann';
   static const String smallWidgetName = 'PrayerWidgetProvider';
   static const String largeWidgetName = 'PrayerWidgetLargeProvider';
+  static const String wirdWidgetName = 'WirdWidgetProvider';
+  static const String azkarWidgetName = 'AzkarWidgetProvider';
 
   static Future<void> initialize() async {
     // تهيئة الجروب ليتم التواصل مع الودجت
@@ -112,7 +117,7 @@ class HomeWidgetService {
       await HomeWidget.saveWidgetData<String>('locationName', locationName);
     }
 
-    // Send request to update standard & large widgets
+    // Update the existing prayer widgets without changing their layouts.
     await HomeWidget.updateWidget(
       name: smallWidgetName,
       androidName: smallWidgetName,
@@ -125,6 +130,48 @@ class HomeWidgetService {
       name: 'PrayerWidgetWideProvider',
       androidName: 'PrayerWidgetWideProvider',
     );
+    await updateAzkarWidget(trigger: 'prayer_times_updated');
+  }
+
+  static Future<void> updateWirdWidget({
+    String trigger = 'wird_data_updated',
+  }) => _requestWidgetRefresh(wirdWidgetName, trigger);
+
+  static Future<void> updateAzkarWidget({
+    String trigger = 'azkar_data_updated',
+  }) => _requestWidgetRefresh(azkarWidgetName, trigger);
+
+  static Future<void> _requestWidgetRefresh(
+    String providerName,
+    String trigger,
+  ) async {
+    if (!Platform.isAndroid) return;
+
+    final stopwatch = Stopwatch()..start();
+    AppLogger.logEvent('WidgetUpdate', 'refresh_requested', {
+      'provider': providerName,
+      'trigger': trigger,
+    });
+    try {
+      await HomeWidget.updateWidget(
+        name: providerName,
+        androidName: providerName,
+      );
+      AppLogger.logEvent('WidgetUpdate', 'refresh_request_finished', {
+        'provider': providerName,
+        'trigger': trigger,
+        'outcome': 'request_sent',
+        'elapsed_ms': stopwatch.elapsedMilliseconds,
+      });
+    } catch (error) {
+      AppLogger.logEvent('WidgetUpdate', 'refresh_request_failed', {
+        'provider': providerName,
+        'trigger': trigger,
+        'outcome': 'failed',
+        'reason': error.runtimeType.toString(),
+        'elapsed_ms': stopwatch.elapsedMilliseconds,
+      });
+    }
   }
 
   static Future<void> updateGoldWidgetData({

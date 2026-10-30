@@ -26,17 +26,18 @@ class PrayerWidgetWideProvider : AppWidgetProvider() {
         val aEpoch = activeWidgetData.getLong("asr_epoch", 0L)
         val mEpoch = activeWidgetData.getLong("maghrib_epoch", 0L)
         val iEpoch = activeWidgetData.getLong("isha_epoch", 0L)
+        val nextFajrEpoch = activeWidgetData.getLong("next_fajr_epoch", 0L)
 
         if (fEpoch == 0L) return // No data yet
 
         // ─── Smart Logic ───
         val epochs = longArrayOf(fEpoch, dEpoch, aEpoch, mEpoch, iEpoch)
         val names = arrayOf("الفجر", "الظهر", "العصر", "المغرب", "العشاء")
-        
-        val oneDayMs = 24 * 60 * 60 * 1000L
-        while (now >= epochs[0] + oneDayMs) {
-            for (i in 0..4) epochs[i] += oneDayMs
-        }
+        val upcoming = PrayerWidgetSchedule.nextUpcomingPrayer(
+            nowMillis = now,
+            prayerEpochs = epochs,
+            nextFajrEpochMillis = nextFajrEpoch,
+        ) ?: return
 
         var currentIndex = 4
         if (now < epochs[0]) {
@@ -47,18 +48,14 @@ class PrayerWidgetWideProvider : AppWidgetProvider() {
                 else break
             }
         }
-        
-        var nextIndex = (currentIndex + 1) % 5
-        var nextTargetEpoch = if (nextIndex == 0 && now >= epochs[4]) epochs[0] + oneDayMs else if (now < epochs[0]) epochs[0] else epochs[nextIndex]
-
         val currentEpoch = epochs[currentIndex]
         val elapsedFromCurrent = now - currentEpoch
         val countUpWindowMs = 45 * 60 * 1000L
         val isCountUp = elapsedFromCurrent in 0..countUpWindowMs
         
-        val targetEpochMs = if (isCountUp) currentEpoch else nextTargetEpoch
-        val statusName = if (isCountUp) "مضى على ${names[currentIndex]}" else "متبقي على ${names[nextIndex]}"
-        val activeHighlightIndex = if (isCountUp) currentIndex else nextIndex
+        val targetEpochMs = if (isCountUp) currentEpoch else upcoming.epochMillis
+        val statusName = if (isCountUp) "مضى على ${names[currentIndex]}" else "متبقي على ${upcoming.name}"
+        val activeHighlightIndex = if (isCountUp) currentIndex else upcoming.index
 
         // ─── Native Hijri Calculation ───
         val hijriString = try {

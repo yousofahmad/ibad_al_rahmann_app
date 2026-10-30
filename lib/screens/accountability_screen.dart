@@ -17,6 +17,7 @@ import 'package:ibad_al_rahmann/main.dart'; // To access scaffoldMessengerKey
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/features/accountability/accountability_prayer_status.dart';
+import 'package:ibad_al_rahmann/services/home_widget_service.dart';
 
 class AccountabilityScreen extends StatefulWidget {
   const AccountabilityScreen({super.key});
@@ -287,7 +288,6 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
 
     // ✅ حفظ فوري للإحصائيات وحساب نسبة الإنجاز فوراً
     await _saveStatsSilent();
-
     // Sync back to Service if it's an Azkar item
     if (value == true) {
       if (itemKey == 'أذكار الصباح') {
@@ -295,6 +295,11 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
       }
       if (itemKey == 'أذكار المساء') {
         await DailyTrackerService.markAsDone('evening_azkar');
+      }
+      if (itemKey == 'أذكار الصباح' || itemKey == 'أذكار المساء') {
+        await HomeWidgetService.updateAzkarWidget(
+          trigger: 'accountability_azkar_status_changed',
+        );
       }
       if (itemKey == 'أذكار الصلاة') {
         await DailyTrackerService.markAsDone('prayer_azkar');

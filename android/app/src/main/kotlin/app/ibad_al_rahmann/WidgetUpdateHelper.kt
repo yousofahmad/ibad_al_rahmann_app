@@ -89,24 +89,11 @@ object WidgetUpdateHelper {
             if (fEpoch == 0L) return
 
             val epochs = longArrayOf(fEpoch, dEpoch, aEpoch, mEpoch, iEpoch)
-            val names = arrayOf("الفجر", "الظهر", "العصر", "المغرب", "العشاء")
-
-            val oneDayMs = 24 * 60 * 60 * 1000L
-            while (now >= epochs[0] + oneDayMs) {
-                for (i in 0..4) epochs[i] += oneDayMs
-            }
-
-            var nextIdx = 0
-            var found = false
-            for (i in 0..4) {
-                if (now < epochs[i]) {
-                    nextIdx = i
-                    found = true
-                    break
-                }
-            }
-
-            val nextTargetEpoch = if (!found) epochs[0] + oneDayMs else epochs[nextIdx]
+            val nextTargetEpoch = PrayerWidgetSchedule.nextUpcomingPrayer(
+                nowMillis = now,
+                prayerEpochs = epochs,
+                nextFajrEpochMillis = activeWidgetData.getLong("next_fajr_epoch", 0L),
+            )?.epochMillis ?: return
 
             // 2) Update all home-screen widgets
             updateWidgets(context)
@@ -128,8 +115,10 @@ object WidgetUpdateHelper {
         try {
             val appWidgetManager = AppWidgetManager.getInstance(context)
             val providers = arrayOf(
-                PrayerWidgetProvider::class.java,
-                PrayerWidgetLargeProvider::class.java
+                PrayerWidgetLargeProvider::class.java,
+                PrayerWidgetWideProvider::class.java,
+                WirdWidgetProvider::class.java,
+                AzkarWidgetProvider::class.java,
             )
             for (provider in providers) {
                 val ids = appWidgetManager.getAppWidgetIds(ComponentName(context, provider))

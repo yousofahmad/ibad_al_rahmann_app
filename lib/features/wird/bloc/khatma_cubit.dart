@@ -5,13 +5,13 @@ import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:quran/quran.dart' as quran;
 import 'package:ibad_al_rahmann/services/notification_service.dart';
 import 'package:ibad_al_rahmann/services/prayer_service.dart';
+import 'package:ibad_al_rahmann/services/home_widget_service.dart';
 import '../data/khatma_model.dart';
 import '../data/completed_khatma_model.dart';
 import '../data/wird_model.dart';
 import '../utils/wird_calculator.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
-import 'package:ibad_al_rahmann/core/helpers/islamic_day.dart';
 
 part 'khatma_state.dart';
 
@@ -121,6 +121,7 @@ class KhatmaCubit extends Cubit<KhatmaState> {
       } else {
         emit(KhatmaEmpty());
       }
+      await HomeWidgetService.updateWirdWidget(trigger: 'khatma_state_loaded');
     } catch (e) {
       AppLogger.log("KhatmaCubit", "loadKhatma error: $e");
       emit(KhatmaError("حدث خطأ أثناء تحميل الختمة: $e"));
@@ -256,6 +257,7 @@ class KhatmaCubit extends Cubit<KhatmaState> {
       );
 
       emit(KhatmaLoaded(currentList));
+      await HomeWidgetService.updateWirdWidget(trigger: 'khatma_created');
     } catch (e) {
       AppLogger.log("KhatmaCubit", "startNewKhatma error: $e");
       emit(KhatmaError("حدث خطأ أثناء إنشاء الختمة الجديدة: $e"));
@@ -325,6 +327,7 @@ class KhatmaCubit extends Cubit<KhatmaState> {
       await NotificationService.rescheduleAllKhatmaNotifications();
 
       emit(KhatmaLoaded(khatmas));
+      await HomeWidgetService.updateWirdWidget(trigger: 'wird_completed');
       return false;
     }
     return false;
@@ -564,6 +567,7 @@ class KhatmaCubit extends Cubit<KhatmaState> {
       await NotificationService.rescheduleAllKhatmaNotifications();
       emit(KhatmaLoaded(khatmas));
     }
+    await HomeWidgetService.updateWirdWidget(trigger: 'khatma_deleted');
   }
 
   // -------------------------------------------------------------
