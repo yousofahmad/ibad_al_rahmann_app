@@ -45,41 +45,41 @@ class WirdCompletionService {
       // Update wirdIndex reference for accountability below
       wirdIndex = indexToMark;
 
-      if (khatma.accountabilityLabel.isNotEmpty) {
-        if (khatma.notificationType == 'prayer') {
-          final pName = _prayerNameFromIndex(wirdIndex);
-          if (pName.isNotEmpty) {
-            await DailyTrackerService.markWirdDone(
-              '${khatma.accountabilityLabel} - $pName',
-            );
-          }
-        } else {
-          await DailyTrackerService.markWirdDone(khatma.accountabilityLabel);
-        }
-      } else {
-        // Fallback for old Khatmas or empty labels
-        await DailyTrackerService.markWirdDone('ورد التلاوة');
-      }
+      final accountabilityKey = accountabilityKeyForWird(
+        label: khatma.accountabilityLabel,
+        notificationType: khatma.notificationType,
+        wirdIndex: wirdIndex,
+        startPrayerOffset: khatma.startPrayerOffset,
+      );
+      await DailyTrackerService.markWirdDone(accountabilityKey);
 
       return isKhatmaFinished;
     }
     return false;
   }
 
-  static String _prayerNameFromIndex(int index) {
-    switch (index % 5) {
-      case 0:
-        return 'الفجر';
-      case 1:
-        return 'الظهر';
-      case 2:
-        return 'العصر';
-      case 3:
-        return 'المغرب';
-      case 4:
-        return 'العشاء';
-      default:
-        return '';
-    }
+  static String prayerNameForWird({
+    required int wirdIndex,
+    int startPrayerOffset = 0,
+  }) {
+    const prayers = ['الفجر', 'الظهر', 'العصر', 'المغرب', 'العشاء'];
+    final prayerIndex = (wirdIndex + startPrayerOffset) % prayers.length;
+    return prayers[prayerIndex];
+  }
+
+  static String accountabilityKeyForWird({
+    required String label,
+    required String notificationType,
+    required int wirdIndex,
+    int startPrayerOffset = 0,
+  }) {
+    final effectiveLabel = label.isNotEmpty ? label : 'ورد التلاوة';
+    if (notificationType != 'prayer') return effectiveLabel;
+
+    final prayerName = prayerNameForWird(
+      wirdIndex: wirdIndex,
+      startPrayerOffset: startPrayerOffset,
+    );
+    return '$effectiveLabel - $prayerName';
   }
 }

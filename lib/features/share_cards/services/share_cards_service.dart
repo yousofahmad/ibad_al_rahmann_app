@@ -5,15 +5,20 @@ import 'package:ibad_al_rahmann/features/share_cards/models/share_card_model.dar
 
 class ShareCardsService {
   static const String _baseUrl =
-      "https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-features/main/";
+      "https://raw.githubusercontent.com/yousofahmad/ibad-alrahman-features/source/import-qul-resources/";
   static const String _configPath = "app_config.json";
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 15),
-    ),
-  );
+  final Dio _dio;
+
+  ShareCardsService({Dio? dio})
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              connectTimeout: const Duration(seconds: 10),
+              receiveTimeout: const Duration(seconds: 15),
+            ),
+          );
 
   Future<List<ShareCardCategory>> fetchShareCards() async {
     try {

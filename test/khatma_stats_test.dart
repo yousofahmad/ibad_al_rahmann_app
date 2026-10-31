@@ -8,7 +8,6 @@ import 'package:ibad_al_rahmann/features/wird/data/khatma_model.dart';
 import 'package:ibad_al_rahmann/features/wird/data/khatm_quran_duaa.dart';
 import 'package:ibad_al_rahmann/features/wird/data/wird_model.dart';
 import 'package:ibad_al_rahmann/features/wird/utils/wird_calculator.dart';
-import 'package:ibad_al_rahmann/core/helpers/islamic_day.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -152,7 +151,8 @@ void main() {
     );
 
     test('startNewKhatma with past startDate and initialCompletedWirds', () async {
-      final today = DateTime.parse(IslamicDay.todayKeySync());
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
       final pastDate = today.subtract(const Duration(days: 5));
 
       await cubit.startNewKhatma(

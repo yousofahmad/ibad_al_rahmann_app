@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:ibad_al_rahmann/services/prayer_service.dart' as ibad_al_rahmann_prayer;
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -18,6 +19,7 @@ import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/features/accountability/accountability_prayer_status.dart';
 import 'package:ibad_al_rahmann/services/home_widget_service.dart';
+import 'package:ibad_al_rahmann/services/app_route_observer.dart';
 
 class AccountabilityScreen extends StatefulWidget {
   const AccountabilityScreen({super.key});
@@ -26,7 +28,8 @@ class AccountabilityScreen extends StatefulWidget {
   State<AccountabilityScreen> createState() => _AccountabilityScreenState();
 }
 
-class _AccountabilityScreenState extends State<AccountabilityScreen> with WidgetsBindingObserver {
+class _AccountabilityScreenState extends State<AccountabilityScreen>
+    with WidgetsBindingObserver, RouteAware {
   bool _isPrayerPast(String prayerName) {
     final times = ibad_al_rahmann_prayer.PrayerService().getPrayerTimes();
     return AccountabilityPrayerStatus.isPast(prayerName, times);
@@ -90,9 +93,24 @@ class _AccountabilityScreenState extends State<AccountabilityScreen> with Widget
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute<dynamic>) {
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    appRouteObserver.unsubscribe(this);
     super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    unawaited(_loadDailyProgress());
   }
 
   @override
