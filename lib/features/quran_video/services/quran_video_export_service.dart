@@ -15,6 +15,7 @@ import 'package:ibad_al_rahmann/features/quran_reciters/data/models/reciter_mode
 import 'package:ibad_al_rahmann/features/quran_video/models/quran_video_options.dart';
 import 'package:ibad_al_rahmann/features/quran_video/services/quran_video_ass_builder.dart';
 import 'package:ibad_al_rahmann/features/quran_video/services/quran_video_command_builder.dart';
+import 'package:ibad_al_rahmann/features/quran_video/services/quran_video_encoder_policy.dart';
 import 'package:ibad_al_rahmann/core/helpers/feature_resource_repository.dart';
 import 'package:ibad_al_rahmann/services/app_logger.dart';
 import 'package:path/path.dart' as p;
@@ -259,12 +260,16 @@ class QuranVideoExportService {
         );
         _checkCancelled();
         final returnCode = await attempt.session.getReturnCode();
-        if (!attempt.timedOut && ReturnCode.isSuccess(returnCode)) {
+        final disposition = QuranVideoEncoderPolicy.decide(
+          timedOut: attempt.timedOut,
+          succeeded: ReturnCode.isSuccess(returnCode),
+          cancelled: ReturnCode.isCancel(returnCode) || _cancelRequested,
+        );
+        if (disposition == QuranVideoEncoderAttemptDisposition.succeeded) {
           successfulAttempt = attempt;
           break;
         }
-        if (!attempt.timedOut &&
-            (ReturnCode.isCancel(returnCode) || _cancelRequested)) {
+        if (disposition == QuranVideoEncoderAttemptDisposition.cancelled) {
           throw const QuranVideoExportException('تم إلغاء إنشاء الفيديو.');
         }
         AppLogger.logEvent('QuranVideo', 'encoding_attempt_failed', {
@@ -511,9 +516,10 @@ class QuranVideoExportService {
         if (_cancelRequested) {
           throw const QuranVideoExportException('تم إلغاء إنشاء الفيديو.');
         }
-        throw const QuranVideoExportException(
-          'توقف محرك الترميز دون استجابة؛ أُوقفت المحاولة لحماية التطبيق.',
-        );
+        // FFmpegKit may fail to deliver its completion callback after cancel.
+        // Treat the session as timed out so export() can try the software
+        // encoder instead of aborting before the configured fallback.
+        return _EncoderAttempt(session: session, timedOut: true);
       }
     } finally {
       _activeSessionId = null;
