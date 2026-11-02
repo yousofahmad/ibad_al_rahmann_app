@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
@@ -26,46 +28,51 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!_initialized) {
       _initialized = true;
 
-      // Precache the heavy background image first
-      precacheImage(
-            const AssetImage('assets/images/mosque_bottom.webp'),
-            context,
-          )
-          .then((_) {
-            // Remove native splash only after the image is fully decoded and ready
-            FlutterNativeSplash.remove();
-            _checkUser();
-          })
-          .catchError((e) {
-            debugPrint("Splash image precache error: $e");
-            FlutterNativeSplash.remove();
-            _checkUser();
-          });
+      final imageStopwatch = Stopwatch()..start();
+      AppLogger.logEvent('Splash', 'image_precache_started');
+      unawaited(
+        precacheImage(
+          const AssetImage('assets/images/mosque_bottom.webp'),
+          context,
+        )
+            .then((_) {
+              imageStopwatch.stop();
+              AppLogger.logEvent('Splash', 'image_precache_finished', {
+                'outcome': 'success',
+                'elapsedMs': imageStopwatch.elapsedMilliseconds,
+              });
+            })
+            .catchError((error) {
+              imageStopwatch.stop();
+              AppLogger.logEvent('Splash', 'image_precache_finished', {
+                'outcome': 'failure',
+                'elapsedMs': imageStopwatch.elapsedMilliseconds,
+                'errorType': error.runtimeType,
+              });
+              debugPrint('Splash image precache error type: ${error.runtimeType}');
+            }),
+      );
+
+      // Do not keep the native splash up while the decorative image decodes.
+      FlutterNativeSplash.remove();
+      unawaited(_checkUser());
     }
   }
 
   Future<void> _checkUser() async {
     NotificationService.nativeLog('SplashScreen._checkUser: started');
 
-    // 1. Minimum visibility timer for the custom splash (800ms for normal launch)
+    // Keep the ordinary splash visible briefly, but don't delay notification navigation.
     final timerFuture = Future.delayed(const Duration(milliseconds: 800));
 
-    // 2. Check Launch Payload (Parallel)
     final payloadFuture = NotificationService.checkLaunchPayload();
-
-    // 3. Check Permissions (Parallel)
     final permissionFuture = Permission.notification.status;
 
-    // Wait for critical logic only
-    final results = await Future.wait([
-      timerFuture,
-      payloadFuture,
-      permissionFuture,
-    ]);
+    final results = await Future.wait([payloadFuture, permissionFuture]);
 
-    // Extract results
-    final String? startPayload = results[1] as String?;
-    final PermissionStatus notificationStatus = results[2] as PermissionStatus;
+    final String? startPayload = results[0] as String?;
+    final PermissionStatus notificationStatus = results[1] as PermissionStatus;
+    if (startPayload == null) await timerFuture;
 
     NotificationService.nativeLog(
       'SplashScreen._checkUser: startPayload=$startPayload',

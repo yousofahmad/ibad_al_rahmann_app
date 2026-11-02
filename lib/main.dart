@@ -57,6 +57,33 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 const platform = MethodChannel('app.ibad_al_rahmann/native_notifications');
 
+Future<T> _runStartupStep<T>(
+  String operation,
+  Future<T> Function() action,
+) async {
+  final stopwatch = Stopwatch()..start();
+  AppLogger.logEvent('Startup', 'step_started', {'operation': operation});
+  try {
+    final result = await action();
+    stopwatch.stop();
+    AppLogger.logEvent('Startup', 'step_finished', {
+      'operation': operation,
+      'outcome': 'success',
+      'elapsedMs': stopwatch.elapsedMilliseconds,
+    });
+    return result;
+  } catch (error) {
+    stopwatch.stop();
+    AppLogger.logEvent('Startup', 'step_finished', {
+      'operation': operation,
+      'outcome': 'failure',
+      'elapsedMs': stopwatch.elapsedMilliseconds,
+      'errorType': error.runtimeType,
+    });
+    rethrow;
+  }
+}
+
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -111,41 +138,47 @@ void overlayMain() {
 Future<void> main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+  final startupStopwatch = Stopwatch()..start();
+  AppLogger.logEvent('Startup', 'main_started');
 
-  // 1. Core Platform Inits
-  await initializeDateFormatting('ar', null);
-  try {
-    await EgyptianHijriCalendar.instance.initialize();
-  } catch (error) {
-    // Keep prayer times usable; date views show unavailable, never a
-    // calculated replacement attributed to the Egyptian Survey Authority.
-    debugPrint('Official Egyptian Hijri calendar unavailable: $error');
-  }
-  await CacheHelper.init();
-  await AppLogger.init(); // ← يجب أن يكون بعد CacheHelper مباشرةً
-  AppLogger.log('main', 'app started — Flutter init complete');
+  // Keep the logger immediately after preferences, then initialize independent
+  // local services concurrently so no one task serially holds the native splash.
+  await _runStartupStep('shared_preferences', CacheHelper.init);
+  await _runStartupStep('app_logger', AppLogger.init);
+  await Future.wait([
+    _runStartupStep('date_formatting', () async {
+      await initializeDateFormatting('ar', null);
+    }),
+    _runStartupStep('egyptian_hijri_calendar', () async {
+      try {
+        await EgyptianHijriCalendar.instance.initialize();
+      } catch (error) {
+        // Keep prayer times usable; date views show unavailable, never a
+        // calculated replacement attributed to the Egyptian Survey Authority.
+        AppLogger.logEvent('Startup', 'step_degraded', {
+          'operation': 'egyptian_hijri_calendar',
+          'errorType': error.runtimeType,
+        });
+        debugPrint('Official Egyptian Hijri calendar unavailable: $error');
+      }
+    }),
+    _runStartupStep('hive_box', () async {
+      await Hive.initFlutter();
+      await Hive.openBox('appDataBox');
+      if (!Hive.isAdapterRegistered(0)) {
+        Hive.registerAdapter(VerseModelAdapter());
+      }
+    }),
+    _runStartupStep('service_locator', serviceLocatorInit),
+    // This handler must be ready before SplashScreen checks a cold-start payload.
+    _runStartupStep('notification_channel', NotificationService.init),
+  ]);
 
-  // 2. Initialize Firebase (CRITICAL: Must be before runApp if UI depends on it)
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e) {
-    debugPrint("Firebase Init Error in main: $e");
-  }
-
-  // 3. Essential Hive & DI
-  await Hive.initFlutter();
-  await Hive.openBox('appDataBox');
-  await serviceLocatorInit();
-
-  if (!Hive.isAdapterRegistered(0)) {
-    Hive.registerAdapter(VerseModelAdapter());
-  }
-
-  // 4. Init notification channel BEFORE runApp so the handler is ready
-  //    when SplashScreen calls checkLaunchPayload() during cold-start navigation
-  await NotificationService.init();
+  // Firebase is not used by the first screen. PrayerService initializes it
+  // during the already-deferred background startup work below.
+  AppLogger.logEvent('Startup', 'run_app_called', {
+    'elapsedMs': startupStopwatch.elapsedMilliseconds,
+  });
 
   runApp(
     MultiBlocProvider(
@@ -160,6 +193,12 @@ Future<void> main() async {
       ),
     ),
   );
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    startupStopwatch.stop();
+    AppLogger.logEvent('Startup', 'first_frame', {
+      'elapsedMs': startupStopwatch.elapsedMilliseconds,
+    });
+  });
 
   // 5. Background non-critical inits
   _runBackgroundInits();

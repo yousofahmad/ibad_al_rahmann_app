@@ -35,6 +35,10 @@ class PrayerNotificationService : Service() {
     private val syncExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val syncGeneration = AtomicLong(0L)
     private var isForegroundPromoted = false
+    private val audioHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var audioWatchdog: Runnable? = null
+    private var activeAlarmId = -1
+    private var activeSoundStartedAtElapsedMs = 0L
     
     private val refreshHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val refreshRunnable = object : Runnable {
@@ -90,7 +94,7 @@ class PrayerNotificationService : Service() {
         when (action) {
             "PLAY_SOUND" -> handlePlaySound(intent)
             "STOP_SOUND" -> {
-                stopAudio()
+                stopAudio(reason = "explicit_stop", continueQueue = false)
             }
             "UPDATE_PRAYER_NOTIFICATION" -> handleUpdateIntent(intent!!)
             else -> {
@@ -118,8 +122,10 @@ class PrayerNotificationService : Service() {
     private fun playSoundAndNotify(intent: Intent, alarmId: Int) {
         val soundName = intent.getStringExtra("sound_name") ?: "default"
         val cleanSoundName = soundName.replace(".mp3", "").lowercase().trim()
+        val isQueuedAudio = intent.getBooleanExtra("is_queued", false)
+        NativeLogger.log(this, "Audio playback requested: alarmId=$alarmId sound=$cleanSoundName queued=$isQueuedAudio")
         if (cleanSoundName == "none" || cleanSoundName == "null" || cleanSoundName.isEmpty()) {
-            if (intent.getBooleanExtra("is_queued", false)) {
+            if (isQueuedAudio) {
                 NotificationQueueManager.onAudioFinished(this)
             }
             return
@@ -135,13 +141,14 @@ class PrayerNotificationService : Service() {
         // 1. Evaluate State FIRST before initializing MediaPlayer
         if (!AudioVibrationManager.evaluateAudioVibrationState(this, soundName, overrideSilent)) {
             showSoundNotification(intent, alarmId, isSilent = true) // Visual only
-            if (intent.getBooleanExtra("is_queued", false)) {
+            if (isQueuedAudio) {
                 NotificationQueueManager.onAudioFinished(this)
             }
             return
         }
 
-        stopAudio()
+        // Do not advance/reset the queue while replacing the currently selected audio.
+        stopAudio(reason = "replace_before_play", notifyQueue = false)
         acquireWakeLock()
         audioVolumeManager.captureState()
         val forceSpeaker = flutterPrefs.getBoolean("flutter.force_speaker", false)
@@ -158,7 +165,11 @@ class PrayerNotificationService : Service() {
         
         if (soundUri != null) {
             try {
-                mediaPlayer = MediaPlayer().apply {
+                val player = MediaPlayer()
+                mediaPlayer = player
+                activeAlarmId = alarmId
+                activeSoundStartedAtElapsedMs = 0L
+                player.apply {
                     setWakeMode(this@PrayerNotificationService, PowerManager.PARTIAL_WAKE_LOCK)
                     setDataSource(this@PrayerNotificationService, soundUri)
                     setAudioAttributes(AudioAttributes.Builder()
@@ -168,15 +179,45 @@ class PrayerNotificationService : Service() {
                     
                     setVolume(1.0f, 1.0f) // Maximize internal player volume
                     isLooping = false
-                    setOnCompletionListener { 
-                        stopAudio()
+                    setOnPreparedListener { preparedPlayer ->
+                        if (mediaPlayer !== preparedPlayer) {
+                            try { preparedPlayer.release() } catch (_: Exception) {}
+                            return@setOnPreparedListener
+                        }
+                        try {
+                            preparedPlayer.start()
+                            activeSoundStartedAtElapsedMs = android.os.SystemClock.elapsedRealtime()
+                            val durationMs = preparedPlayer.duration.toLong()
+                            val watchdogDelayMs = if (durationMs > 0L) {
+                                (durationMs + 30_000L).coerceAtMost(30 * 60 * 1000L)
+                            } else {
+                                15 * 60 * 1000L
+                            }
+                            val watchdog = Runnable {
+                                if (mediaPlayer === preparedPlayer) {
+                                    NativeLogger.log(this@PrayerNotificationService, "Audio watchdog stopped playback: alarmId=$activeAlarmId elapsedMs=${android.os.SystemClock.elapsedRealtime() - activeSoundStartedAtElapsedMs}")
+                                    stopAudio(reason = "watchdog_timeout")
+                                }
+                            }
+                            audioWatchdog = watchdog
+                            audioHandler.postDelayed(watchdog, watchdogDelayMs)
+                            NativeLogger.log(this@PrayerNotificationService, "Audio playback started: alarmId=$alarmId durationMs=$durationMs watchdogMs=$watchdogDelayMs")
+                        } catch (e: Exception) {
+                            NativeLogger.log(this@PrayerNotificationService, "Audio start failed: alarmId=$alarmId errorType=${e.javaClass.simpleName}")
+                            stopAudio(reason = "start_error")
+                        }
                     }
-                    setOnErrorListener { _, _, _ -> 
-                        stopAudio()
+                    setOnCompletionListener {
+                        if (mediaPlayer === player) stopAudio(reason = "completed")
+                    }
+                    setOnErrorListener { _, what, extra ->
+                        if (mediaPlayer === player) {
+                            NativeLogger.log(this@PrayerNotificationService, "Audio player error: alarmId=$alarmId what=$what extra=$extra")
+                            stopAudio(reason = "player_error")
+                        }
                         true 
                     }
-                    prepare()
-                    start()
+                    prepareAsync()
                 }
                 
                 flipToMuteManager?.startListening()
@@ -185,12 +226,14 @@ class PrayerNotificationService : Service() {
                 enqueueSync()
                 
             } catch (e: Exception) {
-                e.printStackTrace()
-                stopAudio()
+                NativeLogger.log(this, "Audio setup failed: alarmId=$alarmId errorType=${e.javaClass.simpleName}")
+                stopAudio(reason = "setup_error")
             }
         } else {
+            NativeLogger.log(this, "Audio source unavailable: alarmId=$alarmId")
             abandonAudioFocus()
             releaseWakeLock()
+            audioVolumeManager.restoreState()
             NotificationQueueManager.onAudioFinished(this)
         }
     }
@@ -315,19 +358,43 @@ class PrayerNotificationService : Service() {
 
     private fun isAdhan(id: Int): Boolean = id in 100..139 || id == 110 || id == 99999
 
-    private fun stopAudio() {
+    private fun stopAudio(
+        reason: String = "stopped",
+        continueQueue: Boolean = true,
+        notifyQueue: Boolean = true,
+        syncPersistentNotification: Boolean = true,
+    ) {
+        val player = mediaPlayer
+        mediaPlayer = null
+        audioWatchdog?.let { audioHandler.removeCallbacks(it) }
+        audioWatchdog = null
         try {
-            mediaPlayer?.let {
+            player?.let {
                 if (it.isPlaying) it.stop()
                 it.release()
             }
-        } catch (e: Exception) { e.printStackTrace() }
-        mediaPlayer = null
+        } catch (e: Exception) {
+            NativeLogger.log(this, "Audio cleanup error: alarmId=$activeAlarmId errorType=${e.javaClass.simpleName}")
+        }
+        val elapsedMs = if (activeSoundStartedAtElapsedMs > 0L) {
+            android.os.SystemClock.elapsedRealtime() - activeSoundStartedAtElapsedMs
+        } else 0L
+        if (player != null || activeSoundStartedAtElapsedMs > 0L) {
+            NativeLogger.log(this, "Audio playback stopped: alarmId=$activeAlarmId reason=$reason elapsedMs=$elapsedMs")
+        }
+        activeAlarmId = -1
+        activeSoundStartedAtElapsedMs = 0L
         flipToMuteManager?.stopListening()
         abandonAudioFocus()
         releaseWakeLock()
         audioVolumeManager.restoreState() // Restoration guarantee
-        NotificationQueueManager.onAudioFinished(this)
+        if (notifyQueue) {
+            NotificationQueueManager.onAudioFinished(
+                this,
+                continueQueue,
+                syncPersistentNotification,
+            )
+        }
     }
 
     private fun showSoundNotification(intent: Intent, alarmId: Int, isSilent: Boolean = false) {
@@ -824,7 +891,11 @@ class PrayerNotificationService : Service() {
         syncGeneration.incrementAndGet()
         syncExecutor.shutdownNow()
         cancelNextUpdateAlarm()
-        stopAudio()
+        stopAudio(
+            reason = "service_destroyed",
+            continueQueue = false,
+            syncPersistentNotification = false,
+        )
         audioVolumeManager.restoreState() // Safety guarantee
         refreshHandler.removeCallbacks(refreshRunnable)
         super.onDestroy()

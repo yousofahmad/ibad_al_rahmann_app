@@ -79,18 +79,28 @@ object NotificationQueueManager {
     /**
      * يُستدعى عند انتهاء الصوت أو إغلاقه
      */
-    fun onAudioFinished(context: Context) {
+    fun onAudioFinished(
+        context: Context,
+        continueQueue: Boolean = true,
+        syncPersistentNotification: Boolean = true,
+    ) {
         synchronized(this) {
             isAudioPlaying = false
             currentActivePriority = null
             
             // Force update persistent notification and widgets after Adhan finishes
-            val syncIntent = Intent(context, PrayerNotificationService::class.java).apply { action = "SYNC" }
-            try { androidx.core.content.ContextCompat.startForegroundService(context, syncIntent) } catch (e: Exception) { e.printStackTrace() }
+            if (syncPersistentNotification) {
+                val syncIntent = Intent(context, PrayerNotificationService::class.java).apply { action = "SYNC" }
+                try { androidx.core.content.ContextCompat.startForegroundService(context, syncIntent) } catch (e: Exception) { e.printStackTrace() }
+            }
 
-            val nextRequest = queue.poll()
-            if (nextRequest != null) {
-                startAudioService(context, nextRequest)
+            if (continueQueue) {
+                val nextRequest = queue.poll()
+                if (nextRequest != null) {
+                    startAudioService(context, nextRequest)
+                }
+            } else {
+                queue.clear()
             }
         }
     }

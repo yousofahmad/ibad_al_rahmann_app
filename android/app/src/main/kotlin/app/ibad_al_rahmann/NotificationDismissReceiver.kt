@@ -48,6 +48,22 @@ class NotificationDismissReceiver : BroadcastReceiver() {
                 e.printStackTrace()
             }
             activeMediaPlayer = null
+            if (context != null) {
+                val stopIntent = Intent(context, PrayerNotificationService::class.java).apply {
+                    action = "STOP_SOUND"
+                }
+                try {
+                    androidx.core.content.ContextCompat.startForegroundService(context, stopIntent)
+                    NativeLogger.log(context, "NotificationDismissReceiver: forwarded audio stop to PrayerNotificationService")
+                } catch (e: Exception) {
+                    NativeLogger.log(context, "NotificationDismissReceiver: foreground stop request failed; errorType=${e.javaClass.simpleName}")
+                    try {
+                        context.startService(stopIntent)
+                    } catch (fallbackError: Exception) {
+                        NativeLogger.log(context, "NotificationDismissReceiver: stop fallback failed; errorType=${fallbackError.javaClass.simpleName}")
+                    }
+                }
+            }
         }
 
         fun startFlipToMute(context: Context) {
@@ -111,4 +127,3 @@ class NotificationDismissReceiver : BroadcastReceiver() {
         cleanupEmptyGroupSummaries(context, alarmId)
     }
 }
-
