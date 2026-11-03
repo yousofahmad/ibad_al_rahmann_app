@@ -51,6 +51,7 @@ void main() {
   const native = MethodChannel('app.ibad_al_rahmann/native_notifications');
   final calls = <MethodCall>[];
   final alarms = <Map<String, dynamic>>[];
+  var failNativeAzkarReschedule = false;
   final calendar = EgyptianHijriCalendar.instance;
   final today = DateTime(2026, 1, 10);
   late PathProviderPlatform originalPaths;
@@ -125,6 +126,28 @@ void main() {
     );
   });
 
+  test(
+    'full rebuild preserves native azkar IDs when native rescheduling fails',
+    () async {
+      await configure(
+        settings: {'active_alarm_ids': ['1', '3', '4', '5']},
+      );
+      failNativeAzkarReschedule = true;
+
+      await rebuild();
+
+      final canceledIds = calls
+          .where((call) => call.method == 'cancelAlarms')
+          .expand((call) => (call.arguments['ids'] as List).cast<int>())
+          .toSet();
+      expect(
+        calls.any((call) => call.method == 'rescheduleNativeAlarms'),
+        isTrue,
+      );
+      expect(canceledIds.intersection({1, 3, 4, 5}), isEmpty);
+    },
+  );
+
   Map<String, dynamic> alarm(int id) =>
       alarms.singleWhere((a) => a['id'] == id);
   DateTime scheduled(Map<String, dynamic> a) => DateTime(
@@ -136,6 +159,7 @@ void main() {
   );
 
   setUp(() {
+    failNativeAzkarReschedule = false;
     originalPaths = PathProviderPlatform.instance;
     PathProviderPlatform.instance = _Paths();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -148,6 +172,12 @@ void main() {
                 : jsonDecode(jsonEncode(call.arguments)),
           );
           calls.add(copied);
+          if (call.method == 'rescheduleNativeAlarms' &&
+              failNativeAzkarReschedule) {
+            throw MissingPluginException(
+              'No implementation found for rescheduleNativeAlarms',
+            );
+          }
           if (call.method == 'scheduleAlarms') {
             alarms.addAll(
               (copied.arguments['alarms'] as List).map(

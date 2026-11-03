@@ -45,13 +45,13 @@ object NativeAzkarScheduler {
             val timeStr = fp.getString("flutter.time_azkar_morning", "06:00") ?: "06:00"
             val (mH, mM) = parseTime(timeStr)
             scheduleDaily(
-                context, editor, id = 4,
+                context, editor, id = RuqyahAlarmFallback.MORNING_ALARM_ID,
                 hour = mH, minute = mM,
                 title = "الرقية الشرعية", body = "لا تنس قراءة الرقية الشرعية صباحًا",
                 sound = "silent_notif", customSound = null, payload = "ruqyah"
             )
         } else {
-            cancelAlarm(context, editor, 4)
+            cancelAlarm(context, editor, RuqyahAlarmFallback.MORNING_ALARM_ID)
         }
 
         // ── أذكار المساء (ID 3) ──────────────────────────────────────────────
@@ -76,13 +76,13 @@ object NativeAzkarScheduler {
             val timeStr = fp.getString("flutter.time_azkar_evening", "17:00") ?: "17:00"
             val (eH, eM) = parseTime(timeStr)
             scheduleDaily(
-                context, editor, id = 5,
+                context, editor, id = RuqyahAlarmFallback.EVENING_ALARM_ID,
                 hour = eH, minute = eM,
                 title = "الرقية الشرعية", body = "لا تنس قراءة الرقية الشرعية مساءً",
                 sound = "silent_notif", customSound = null, payload = "ruqyah"
             )
         } else {
-            cancelAlarm(context, editor, 5)
+            cancelAlarm(context, editor, RuqyahAlarmFallback.EVENING_ALARM_ID)
         }
 
         // Dart owns the Kahf/Salawat window notifications. Cancel legacy native IDs

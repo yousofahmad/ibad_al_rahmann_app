@@ -262,17 +262,18 @@ class AlarmReceiver : BroadcastReceiver() {
                 alarmId >= 3000 -> "تنبيه موعد $prayerNameFallback"
                 else -> "صلاة $prayerNameFallback"
             }
-        } else when (alarmId) {
-            1 -> "لا تنس أذكار الصباح، مفتاح البركة والنشاط"
-            2 -> "الرقية الشرعية"
-            3 -> "اجعل لسانك رطباً بذكر الله في المساء 💙"
-            4 -> "الرقية الشرعية"
-            2000 -> "اغتنم وقت السحر بالدعاء 💙"
-            2001 -> "اغتنم وقت السحر بالدعاء 💙"
-            2002 -> "اغتنم وقت السحر بالدعاء 💙"
-            732 -> "صلاة الضحى"
-            736 -> "وقت الشروق"
-            else -> ""
+        } else {
+            RuqyahAlarmFallback.forAlarmId(alarmId)?.title ?: when (alarmId) {
+                1 -> "لا تنس أذكار الصباح، مفتاح البركة والنشاط"
+                2 -> "الرقية الشرعية"
+                3 -> "اجعل لسانك رطباً بذكر الله في المساء 💙"
+                2000 -> "اغتنم وقت السحر بالدعاء 💙"
+                2001 -> "اغتنم وقت السحر بالدعاء 💙"
+                2002 -> "اغتنم وقت السحر بالدعاء 💙"
+                732 -> "صلاة الضحى"
+                736 -> "وقت الشروق"
+                else -> ""
+            }
         }
 
         val fallbackBody = if (prayerNameFallback != null) {
@@ -296,17 +297,18 @@ class AlarmReceiver : BroadcastReceiver() {
                 alarmId >= 3000 -> "الدعاء لا يرد بين الأذان والإقامة .. استعد للصلاة"
                 else -> "حان الآن موعد صلاة $prayerNameFallback"
             }
-        } else when (alarmId) {
-            1 -> "أذكار الصباح تفتح لك أبواب الرزق والطمأنينة."
-            2 -> "حصن نفسك الآن بالرقية الشرعية"
-            3 -> "اللهم اجعل في هذا المساء نوراً في قلوبنا، وصفاءً في أرواحنا، وبركةً في أرزاقنا."
-            4 -> "حصن نفسك الآن بالرقية الشرعية"
-            2000 -> "هذا الليل أوسع من حزنك، توضأ، واغسل شحوبك، زمل قلبك الباكي قرآناً."
-            2001 -> "هذا الليل أوسع من حزنك، توضأ، واغسل شحوبك، زمل قلبك الباكي قرآناً."
-            2002 -> "هذا الليل أوسع من حزنك، توضأ، واغسل شحوبك، زمل قلبك الباكي قرآناً."
-            732 -> "صلاة الأوابين .. حان الآن موعد صلاة الضحى"
-            736 -> "حان الآن وقت الشروق"
-            else -> ""
+        } else {
+            RuqyahAlarmFallback.forAlarmId(alarmId)?.body ?: when (alarmId) {
+                1 -> "أذكار الصباح تفتح لك أبواب الرزق والطمأنينة."
+                2 -> "حصن نفسك الآن بالرقية الشرعية"
+                3 -> "اللهم اجعل في هذا المساء نوراً في قلوبنا، وصفاءً في أرواحنا، وبركةً في أرزاقنا."
+                2000 -> "هذا الليل أوسع من حزنك، توضأ، واغسل شحوبك، زمل قلبك الباكي قرآناً."
+                2001 -> "هذا الليل أوسع من حزنك، توضأ، واغسل شحوبك، زمل قلبك الباكي قرآناً."
+                2002 -> "هذا الليل أوسع من حزنك، توضأ، واغسل شحوبك، زمل قلبك الباكي قرآناً."
+                732 -> "صلاة الأوابين .. حان الآن موعد صلاة الضحى"
+                736 -> "حان الآن وقت الشروق"
+                else -> ""
+            }
         }
 
         var title = (intent.getStringExtra("title") ?: fallbackTitle).trim().take(250)
@@ -415,6 +417,12 @@ class AlarmReceiver : BroadcastReceiver() {
 
         val fp = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
 
+        if (RuqyahAlarmFallback.shouldSuppressWhenDisabled(
+                alarmId,
+                fp.getBoolean("flutter.azkar_ruqyah_enabled", false),
+            )
+        ) return true
+
         when (alarmId) {
             100, 110 -> if (fp.contains("flutter.notif_prayer_fajr") && !fp.getBoolean("flutter.notif_prayer_fajr", true)) return true
             101, 111 -> {
@@ -500,7 +508,8 @@ class AlarmReceiver : BroadcastReceiver() {
                     val soundName = savedSound ?: if (id in 100..105) "nafis" else "default"
                     val customSound = prefs.getString("alarm_${id}_custom_sound", null)
                     
-                    val fallbackTitle = when (id) {
+                    val ruqyahFallback = RuqyahAlarmFallback.forAlarmId(id)
+                    val fallbackTitle = ruqyahFallback?.title ?: when (id) {
                         100 -> "صلاة الفجر"
                         101 -> "وقت الشروق"
                         102 -> "صلاة الظهر"
@@ -509,7 +518,7 @@ class AlarmReceiver : BroadcastReceiver() {
                         105 -> "صلاة العشاء"
                         else -> ""
                     }
-                    val fallbackBody = when (id) {
+                    val fallbackBody = ruqyahFallback?.body ?: when (id) {
                         100 -> "حان الآن موعد صلاة الفجر"
                         101 -> "حان الآن وقت الشروق"
                         102 -> "حان الآن موعد صلاة الظهر"

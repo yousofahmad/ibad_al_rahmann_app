@@ -874,6 +874,10 @@ class NotificationService {
       final id = int.tryParse(idStr);
       if (id == null) continue;
 
+      // NativeAzkarScheduler owns these IDs; legacy Dart active-ID entries
+      // must not cancel them if native rescheduling is unavailable.
+      if (id == 1 || id == 3 || id == 4 || id == 5) continue;
+
       // Determine if it's a Wird ID
       bool isWirdId = (id >= 600 && id < 700) || (id >= 100000 && id < 600000);
       if (!includeWird && isWirdId) continue;
