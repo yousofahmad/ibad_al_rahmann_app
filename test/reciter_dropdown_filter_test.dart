@@ -8,6 +8,7 @@ void main() {
     required String name,
     required String category,
     bool hasSegments = true,
+    bool hasWordTimings = false,
     String? zipFileName,
   }) {
     return ReciterAudioModel(
@@ -17,6 +18,7 @@ void main() {
       folderName: 'surah-$id',
       category: category,
       hasSegments: hasSegments,
+      hasWordTimings: hasWordTimings,
       zipFileName: zipFileName,
     );
   }
@@ -25,6 +27,7 @@ void main() {
     id: 'word',
     name: 'قارئ الكلمات',
     category: 'مشاهير القراء',
+    hasWordTimings: true,
     zipFileName: 'segments.zip',
   );
   final verseOnly = reciter(

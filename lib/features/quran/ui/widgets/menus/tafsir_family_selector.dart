@@ -102,7 +102,11 @@ class _TafsirFamilySheetState extends State<_TafsirFamilySheet> {
       return query.isEmpty ||
           group.displayName.toLowerCase().contains(query) ||
           group.name.toLowerCase().contains(query) ||
-          group.variants.any((book) => book.name.toLowerCase().contains(query));
+          group.variants.any(
+            (book) =>
+                book.displayName.toLowerCase().contains(query) ||
+                book.name.toLowerCase().contains(query),
+          );
     }).toList();
 
     return Directionality(

@@ -134,53 +134,59 @@ class PortraitVersePlayer extends StatelessWidget {
                   ),
                 ),
               ),
-              SizedBox(width: 5.w),
-              // Highlight Mode (Word by Word vs Verse) toggle pill
-              InkWell(
-                onTap: () => cubit.toggleHighlightMode(),
-                borderRadius: BorderRadius.circular(16.r),
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 4.h),
-                  decoration: BoxDecoration(
-                    color: cubit.isHighlightWordByWord
-                        ? const Color(0xFFFFD54F).withValues(alpha: 0.25)
-                        : Colors.white.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(16.r),
-                    border: Border.all(
-                      color: cubit.isHighlightWordByWord
-                          ? const Color(0xFFFFD54F)
-                          : Colors.white.withValues(alpha: 0.3),
-                      width: 1,
+              if (cubit.supportsWordByWord) ...[
+                SizedBox(width: 5.w),
+                // Only show this toggle when the selected reciter has verified
+                // word timestamps; verse highlighting remains the fallback.
+                InkWell(
+                  onTap: () => cubit.toggleHighlightMode(),
+                  borderRadius: BorderRadius.circular(16.r),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 7.w,
+                      vertical: 4.h,
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        cubit.isHighlightWordByWord
-                            ? Icons.spellcheck_rounded
-                            : Icons.auto_stories_rounded,
-                        size: 13.sp,
+                    decoration: BoxDecoration(
+                      color: cubit.isHighlightWordByWord
+                          ? const Color(0xFFFFD54F).withValues(alpha: 0.25)
+                          : Colors.white.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(16.r),
+                      border: Border.all(
                         color: cubit.isHighlightWordByWord
                             ? const Color(0xFFFFD54F)
-                            : Colors.white,
+                            : Colors.white.withValues(alpha: 0.3),
+                        width: 1,
                       ),
-                      SizedBox(width: 3.w),
-                      Text(
-                        cubit.isHighlightWordByWord ? 'كلمات' : 'آية',
-                        style: TextStyle(
-                          fontFamily: AppConsts.expoArabic,
-                          fontSize: 10.5.sp,
-                          fontWeight: FontWeight.bold,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          cubit.isHighlightWordByWord
+                              ? Icons.spellcheck_rounded
+                              : Icons.auto_stories_rounded,
+                          size: 13.sp,
                           color: cubit.isHighlightWordByWord
                               ? const Color(0xFFFFD54F)
                               : Colors.white,
                         ),
-                      ),
-                    ],
+                        SizedBox(width: 3.w),
+                        Text(
+                          cubit.isHighlightWordByWord ? 'كلمات' : 'آية',
+                          style: TextStyle(
+                            fontFamily: AppConsts.expoArabic,
+                            fontSize: 10.5.sp,
+                            fontWeight: FontWeight.bold,
+                            color: cubit.isHighlightWordByWord
+                                ? const Color(0xFFFFD54F)
+                                : Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              ],
               SizedBox(width: 5.w),
               // Speed toggle
               InkWell(
@@ -369,52 +375,54 @@ class LandscapeVersePlayer extends StatelessWidget {
               ),
             ),
           ),
-          SizedBox(width: 6.w),
-          // Highlight Mode toggle pill
-          InkWell(
-            onTap: () => cubit.toggleHighlightMode(),
-            borderRadius: BorderRadius.circular(16.r),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 4.h),
-              decoration: BoxDecoration(
-                color: cubit.isHighlightWordByWord
-                    ? const Color(0xFFFFD54F).withValues(alpha: 0.25)
-                    : Colors.white.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(16.r),
-                border: Border.all(
+          if (cubit.supportsWordByWord) ...[
+            SizedBox(width: 6.w),
+            // Hidden for readers that only support verse-by-verse playback.
+            InkWell(
+              onTap: () => cubit.toggleHighlightMode(),
+              borderRadius: BorderRadius.circular(16.r),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 4.h),
+                decoration: BoxDecoration(
                   color: cubit.isHighlightWordByWord
-                      ? const Color(0xFFFFD54F)
-                      : Colors.white.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    cubit.isHighlightWordByWord
-                        ? Icons.spellcheck_rounded
-                        : Icons.auto_stories_rounded,
-                    size: 13.sp,
+                      ? const Color(0xFFFFD54F).withValues(alpha: 0.25)
+                      : Colors.white.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(16.r),
+                  border: Border.all(
                     color: cubit.isHighlightWordByWord
                         ? const Color(0xFFFFD54F)
-                        : Colors.white,
+                        : Colors.white.withValues(alpha: 0.3),
                   ),
-                  SizedBox(width: 3.w),
-                  Text(
-                    cubit.isHighlightWordByWord ? 'كلمات' : 'آية',
-                    style: TextStyle(
-                      fontFamily: AppConsts.expoArabic,
-                      fontSize: 10.5.sp,
-                      fontWeight: FontWeight.bold,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      cubit.isHighlightWordByWord
+                          ? Icons.spellcheck_rounded
+                          : Icons.auto_stories_rounded,
+                      size: 13.sp,
                       color: cubit.isHighlightWordByWord
                           ? const Color(0xFFFFD54F)
                           : Colors.white,
                     ),
-                  ),
-                ],
+                    SizedBox(width: 3.w),
+                    Text(
+                      cubit.isHighlightWordByWord ? 'كلمات' : 'آية',
+                      style: TextStyle(
+                        fontFamily: AppConsts.expoArabic,
+                        fontSize: 10.5.sp,
+                        fontWeight: FontWeight.bold,
+                        color: cubit.isHighlightWordByWord
+                            ? const Color(0xFFFFD54F)
+                            : Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
           SizedBox(width: 8.w),
           IconButton(
             onPressed: () => cubit.playPreviousVerse(),

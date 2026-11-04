@@ -539,7 +539,7 @@ class _QuranVideoCreatorScreenState extends State<QuranVideoCreatorScreen> {
                 (reciter) => DropdownMenuItem(
                   value: reciter,
                   child: Text(
-                    '${reciter.name} — ${reciter.style}',
+                    '${reciter.displayName} — ${reciter.style}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),

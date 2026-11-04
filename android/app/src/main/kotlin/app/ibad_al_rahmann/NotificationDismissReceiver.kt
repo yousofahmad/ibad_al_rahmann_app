@@ -74,38 +74,30 @@ class NotificationDismissReceiver : BroadcastReceiver() {
         }
 
         fun cleanupEmptyGroupSummaries(context: Context, dismissedAlarmId: Int = -1) {
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                try {
-                    val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                        val active = nm.activeNotifications ?: return@postDelayed
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M) return
 
-                        // 1. PRAYER_GROUP summary (ID 666)
-                        val prayerChildren = active.filter { sbn ->
-                            sbn.id != 666 && sbn.id != 667 && sbn.id != 777 && sbn.id != dismissedAlarmId &&
-                            (sbn.notification.group == "PRAYER_GROUP" || 
-                             sbn.id in 100..139 || sbn.id in 3000..3099 || sbn.id in 5000..5099 || sbn.id == 110 || sbn.id in 730..739)
-                        }
-                        if (prayerChildren.isEmpty()) {
-                            NativeLogger.log(context, "NotificationDismissReceiver: No active children in PRAYER_GROUP. Cancelling summary 666.")
-                            nm.cancel(666)
-                        }
+            try {
+                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                val activeEntries = notificationManager.activeNotifications
+                    ?.map { sbn -> ActiveNotificationGroupEntry(sbn.id, sbn.notification.group) }
+                    .orEmpty()
+                val summariesToCancel = NotificationGroupCleanupPolicy.summariesToCancel(
+                    activeEntries,
+                    dismissedNotificationId = dismissedAlarmId,
+                )
 
-                        // 2. GENERAL_GROUP summary (ID 667)
-                        val generalChildren = active.filter { sbn ->
-                            sbn.id != 666 && sbn.id != 667 && sbn.id != 777 && sbn.id != dismissedAlarmId &&
-                            (sbn.notification.group == "GENERAL_GROUP" || 
-                             (sbn.id !in 100..139 && sbn.id !in 3000..3099 && sbn.id !in 5000..5099 && sbn.id != 110 && sbn.id !in 730..739))
-                        }
-                        if (generalChildren.isEmpty()) {
-                            NativeLogger.log(context, "NotificationDismissReceiver: No active children in GENERAL_GROUP. Cancelling summary 667.")
-                            nm.cancel(667)
-                        }
+                for (summaryId in summariesToCancel) {
+                    val groupName = if (summaryId == NotificationGroupCleanupPolicy.PRAYER_SUMMARY_ID) {
+                        NotificationGroupCleanupPolicy.PRAYER_GROUP
+                    } else {
+                        NotificationGroupCleanupPolicy.GENERAL_GROUP
                     }
-                } catch (e: Exception) {
-                    e.printStackTrace()
+                    NativeLogger.log(context, "NotificationDismissReceiver: No active children in $groupName. Cancelling summary $summaryId.")
+                    notificationManager.cancel(summaryId)
                 }
-            }, 500)
+            } catch (e: Exception) {
+                NativeLogger.log(context, "NotificationDismissReceiver: group summary cleanup failed; errorType=${e.javaClass.simpleName}")
+            }
         }
         
         

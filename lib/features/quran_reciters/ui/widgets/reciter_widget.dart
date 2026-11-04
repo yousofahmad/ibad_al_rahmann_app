@@ -75,7 +75,7 @@ class ReciterWidget extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      reciter.name,
+                      reciter.displayName,
                       style: TextStyle(
                         fontFamily: AppConsts.expoArabic,
                         fontSize: (context.isTablet || context.isLandscape)

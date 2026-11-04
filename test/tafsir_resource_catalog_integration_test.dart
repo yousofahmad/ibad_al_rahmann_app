@@ -46,6 +46,8 @@ void main() {
         containsAll(indexedBooks.map((item) => item['id'].toString())),
       );
       expect(byId.keys, containsAll(['muyassar', 'ibn_katheer', 'tabari']));
+      expect(byId['qul_tafsir_23']!.displayName, 'تفسير القرطبي');
+      expect(byId['qul_tafsir_490']!.displayName, byId['qul_tafsir_490']!.name);
       expect(byId.keys, isNot(contains('qul_tafsir_41')));
       expect(byId.keys, isNot(contains('qul_tafsir_250')));
       expect(byId.keys, isNot(contains('qul_tafsir_22')));

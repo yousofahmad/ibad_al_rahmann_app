@@ -58,6 +58,7 @@ void main() {
           folderName: 'surah-recitation-ahmad-alnufais',
           zipFileName: 'ayah-recitation-alnufais.json.zip',
           hasSegments: true,
+          hasWordTimings: true,
         );
         expect(
           wbwReciter.highlightSupport,
@@ -89,6 +90,45 @@ void main() {
         );
       },
     );
+
+    test('word-by-word support requires an explicit verified timing flag', () {
+      final unverified = ReciterAudioModel(
+        id: 'unverified',
+        name: 'Reader',
+        style: 'مرتل',
+        folderName: 'reader',
+        zipFileName: 'segments.zip',
+        hasSegments: true,
+      );
+      final localized = ReciterAudioModel.fromJson({
+        'id': 'qul_c17d70ec5182',
+        'name': 'Hady Toure',
+        'name_ar': 'هادي توري',
+        'style': 'مرتل',
+        'folder_name': 'reader',
+        'has_segments': true,
+        'has_word_timings': true,
+      });
+
+      expect(unverified.supportsWordByWord, isFalse);
+      expect(localized.supportsWordByWord, isTrue);
+      expect(localized.displayName, 'هادي توري');
+      expect(localized.toJson()['name_ar'], 'هادي توري');
+      expect(localized.toJson()['has_word_timings'], isTrue);
+    });
+
+    test('audited original reader flags preserve Mansour Al Salimi timing', () {
+      final salimi = ReciterAudioHelper.defaultReciters.firstWhere(
+        (reciter) => reciter.id == 'salimi',
+      );
+      final qatami = ReciterAudioHelper.defaultReciters.firstWhere(
+        (reciter) => reciter.id == 'qatami',
+      );
+
+      expect(salimi.supportsWordByWord, isTrue);
+      expect(qatami.supportsWordByWord, isFalse);
+      expect(qatami.supportsAyahByAyah, isTrue);
+    });
 
     test(
       'WordSegment fromList parses various segment representations correctly',

@@ -35,7 +35,8 @@ class QuranReadersCubit extends Cubit<QuranReadersState> {
       };
       if (!supportsFilter) return false;
       if (normalizedQuery.isEmpty) return true;
-      return reciter.name.toLowerCase().contains(normalizedQuery) ||
+      return reciter.displayName.toLowerCase().contains(normalizedQuery) ||
+          reciter.name.toLowerCase().contains(normalizedQuery) ||
           reciter.style.toLowerCase().contains(normalizedQuery) ||
           reciter.category.toLowerCase().contains(normalizedQuery);
     }).toList();

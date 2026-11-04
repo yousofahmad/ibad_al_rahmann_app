@@ -10,6 +10,7 @@ void main() {
       style: 'مرتل',
       folderName: 'words',
       zipFileName: 'words.zip',
+      hasWordTimings: true,
       category: 'مصر',
     ),
     ReciterAudioModel(
@@ -40,6 +41,7 @@ void main() {
       folderName: '',
       hasSegments: true,
       zipFileName: 'words-only.zip',
+      hasWordTimings: true,
     ),
     ReciterAudioModel(
       id: 'ayah-audio-only',

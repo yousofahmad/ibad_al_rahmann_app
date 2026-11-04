@@ -255,6 +255,8 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   Map<String, String> get reciters => defaultReciters;
   static List<ReciterAudioModel> get allReciters =>
       ReciterAudioHelper.availableReciters;
+  bool get supportsWordByWord =>
+      currentReciterModel?.supportsWordByWord ?? false;
 
   void init() {
     reciter =
@@ -263,18 +265,30 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
         defaultReciters.keys.first;
     autoPlayNext = CacheHelper.prefs.getBool('verse_player_auto_play') ?? false;
     currentReciterModel = _resolveReciter(reciter!);
+    if (currentReciterModel != null && !supportsWordByWord) {
+      isHighlightWordByWord = false;
+      CacheHelper.prefs.setBool('verse_player_highlight_wbw', false);
+    }
   }
 
   void changeReciter(String value) {
     reciter = value;
     currentReciterModel = _resolveReciter(value);
+    if (!supportsWordByWord) setHighlightMode(false);
     CacheHelper.prefs.setString('verse_player_reciter', value);
     if (currnetVerse != null) unawaited(initVerse(autoPlay: player.playing));
   }
 
-  void selectReciter(ReciterAudioModel model) {
+  void selectReciter(ReciterAudioModel model, {ReciterAudioMode? mode}) {
     reciter = model.id;
     currentReciterModel = model;
+    if (mode != null) {
+      setHighlightMode(
+        mode == ReciterAudioMode.wordByWord && model.supportsWordByWord,
+      );
+    } else if (!supportsWordByWord) {
+      setHighlightMode(false);
+    }
     CacheHelper.prefs.setString('verse_player_reciter', model.id);
     if (currnetVerse != null) unawaited(initVerse(autoPlay: player.playing));
   }
@@ -292,13 +306,17 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
   }
 
   void setHighlightMode(bool wordByWord) {
-    isHighlightWordByWord = wordByWord;
-    CacheHelper.prefs.setBool('verse_player_highlight_wbw', wordByWord);
+    final supportedMode = wordByWord && supportsWordByWord;
+    isHighlightWordByWord = supportedMode;
+    CacheHelper.prefs.setBool('verse_player_highlight_wbw', supportedMode);
     _updatePosition(player.position);
     _emitPlayback();
   }
 
-  void toggleHighlightMode() => setHighlightMode(!isHighlightWordByWord);
+  void toggleHighlightMode() {
+    if (!supportsWordByWord) return;
+    setHighlightMode(!isHighlightWordByWord);
+  }
 
   void toggleAutoPlayNext() {
     autoPlayNext = !autoPlayNext;
@@ -457,7 +475,7 @@ class VersePlayerCubit extends Cubit<VersePlayerState> {
         id: ayahUrl,
         title: 'سورة ${surahArabicTashkel[verse.surahNumber - 1]}',
         artist: 'الآية ${verse.verseNumber.toArabicNums}',
-        album: model?.name ?? defaultReciters[activeReciter] ?? 'القارئ',
+        album: model?.displayName ?? defaultReciters[activeReciter] ?? 'القارئ',
       );
       final uriSource = AudioSource.uri(Uri.parse(ayahUrl), tag: tag);
       final source = usePairedClip

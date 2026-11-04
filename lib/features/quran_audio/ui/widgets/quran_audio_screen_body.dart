@@ -33,7 +33,7 @@ class QuranAudioScreenBody extends StatelessWidget {
         backgroundColor: scaffoldBg,
         appBar: AppBar(
           title: Text(
-            reciter.name,
+            reciter.displayName,
             style: TextStyle(
               fontFamily: AppConsts.expoArabic,
               fontWeight: FontWeight.bold,

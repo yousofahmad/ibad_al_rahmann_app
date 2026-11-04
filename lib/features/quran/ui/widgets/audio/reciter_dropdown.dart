@@ -30,7 +30,8 @@ class ReciterDropdown extends StatelessWidget {
         return false;
       }
       if (query.isEmpty) return true;
-      return r.name.toLowerCase().contains(query) ||
+      return r.displayName.toLowerCase().contains(query) ||
+          r.name.toLowerCase().contains(query) ||
           r.style.toLowerCase().contains(query) ||
           r.category.toLowerCase().contains(query);
     }).toList();
@@ -161,7 +162,6 @@ class ReciterDropdown extends StatelessWidget {
                         Expanded(
                           child: InkWell(
                             onTap: () {
-                              cubit.setHighlightMode(true);
                               selectedMode = ReciterAudioMode.wordByWord;
                               setModalState(() {});
                             },
@@ -169,7 +169,8 @@ class ReciterDropdown extends StatelessWidget {
                             child: Container(
                               padding: EdgeInsets.symmetric(vertical: 8.h),
                               decoration: BoxDecoration(
-                                color: cubit.isHighlightWordByWord
+                                color:
+                                    selectedMode == ReciterAudioMode.wordByWord
                                     ? gold
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(12.r),
@@ -180,7 +181,9 @@ class ReciterDropdown extends StatelessWidget {
                                   Icon(
                                     Icons.spellcheck_rounded,
                                     size: 16.sp,
-                                    color: cubit.isHighlightWordByWord
+                                    color:
+                                        selectedMode ==
+                                            ReciterAudioMode.wordByWord
                                         ? Colors.white
                                         : textColor.withValues(alpha: 0.6),
                                   ),
@@ -195,7 +198,9 @@ class ReciterDropdown extends StatelessWidget {
                                         fontFamily: AppConsts.expoArabic,
                                         fontSize: 12.sp,
                                         fontWeight: FontWeight.bold,
-                                        color: cubit.isHighlightWordByWord
+                                        color:
+                                            selectedMode ==
+                                                ReciterAudioMode.wordByWord
                                             ? Colors.white
                                             : textColor.withValues(alpha: 0.7),
                                       ),
@@ -209,7 +214,6 @@ class ReciterDropdown extends StatelessWidget {
                         Expanded(
                           child: InkWell(
                             onTap: () {
-                              cubit.setHighlightMode(false);
                               selectedMode = ReciterAudioMode.ayahByAyah;
                               setModalState(() {});
                             },
@@ -217,7 +221,8 @@ class ReciterDropdown extends StatelessWidget {
                             child: Container(
                               padding: EdgeInsets.symmetric(vertical: 8.h),
                               decoration: BoxDecoration(
-                                color: !cubit.isHighlightWordByWord
+                                color:
+                                    selectedMode == ReciterAudioMode.ayahByAyah
                                     ? gold
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(12.r),
@@ -228,7 +233,9 @@ class ReciterDropdown extends StatelessWidget {
                                   Icon(
                                     Icons.auto_stories_rounded,
                                     size: 16.sp,
-                                    color: !cubit.isHighlightWordByWord
+                                    color:
+                                        selectedMode ==
+                                            ReciterAudioMode.ayahByAyah
                                         ? Colors.white
                                         : textColor.withValues(alpha: 0.6),
                                   ),
@@ -243,7 +250,9 @@ class ReciterDropdown extends StatelessWidget {
                                         fontFamily: AppConsts.expoArabic,
                                         fontSize: 12.sp,
                                         fontWeight: FontWeight.bold,
-                                        color: !cubit.isHighlightWordByWord
+                                        color:
+                                            selectedMode ==
+                                                ReciterAudioMode.ayahByAyah
                                             ? Colors.white
                                             : textColor.withValues(alpha: 0.7),
                                       ),
@@ -376,7 +385,10 @@ class ReciterDropdown extends StatelessWidget {
                         final isSelected = reciterItem.id == activeModel.id;
                         return InkWell(
                           onTap: () {
-                            cubit.selectReciter(reciterItem);
+                            cubit.selectReciter(
+                              reciterItem,
+                              mode: selectedMode,
+                            );
                             Navigator.pop(modalCtx);
                           },
                           borderRadius: BorderRadius.circular(14.r),
@@ -418,7 +430,7 @@ class ReciterDropdown extends StatelessWidget {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        reciterItem.name,
+                                        reciterItem.displayName,
                                         style: TextStyle(
                                           fontFamily: AppConsts.expoArabic,
                                           fontSize: 14.sp,
@@ -525,7 +537,7 @@ class ReciterDropdown extends StatelessWidget {
             SizedBox(width: 4.w),
             Flexible(
               child: Text(
-                activeModel.name,
+                activeModel.displayName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(

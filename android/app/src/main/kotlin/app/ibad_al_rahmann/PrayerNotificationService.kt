@@ -417,6 +417,7 @@ class PrayerNotificationService : Service() {
         val fullIntent = Intent(this, MainActivity::class.java).apply {
             putExtra("payload", payload)
             putExtra("from_notification", true)   // ← marks a real notification tap
+            putExtra("alarm_id", alarmId)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
         val fullPendingIntent = PendingIntent.getActivity(this, alarmId, fullIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)

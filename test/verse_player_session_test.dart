@@ -127,6 +127,27 @@ void main() {
     return cubit;
   }
 
+  test('word highlighting cannot be enabled for a verse-only reader', () async {
+    final player = TestAudioPlayer();
+    final cubit = VersePlayerCubit(audioPlayer: player);
+    final salimi = ReciterAudioHelper.getReciterById('salimi');
+    final qatami = ReciterAudioHelper.getReciterById('qatami');
+
+    cubit.selectReciter(salimi, mode: ReciterAudioMode.wordByWord);
+    expect(cubit.supportsWordByWord, isTrue);
+    expect(cubit.isHighlightWordByWord, isTrue);
+
+    cubit.selectReciter(qatami, mode: ReciterAudioMode.wordByWord);
+    expect(cubit.supportsWordByWord, isFalse);
+    expect(cubit.isHighlightWordByWord, isFalse);
+    expect(CacheHelper.prefs.getBool('verse_player_highlight_wbw'), isFalse);
+
+    cubit.setHighlightMode(true);
+    cubit.toggleHighlightMode();
+    expect(cubit.isHighlightWordByWord, isFalse);
+    await cubit.close();
+  });
+
   test(
     'Nufais uses the URL belonging to the same recording as word timings',
     () async {
@@ -389,6 +410,7 @@ void main() {
         folderName: 'paired-test',
         everyAyahFolder: 'EveryAyah',
         hasSegments: true,
+        hasWordTimings: true,
         segmentsFileName: 'segments.json',
       );
       final cubit = VersePlayerCubit(
@@ -493,6 +515,7 @@ void main() {
           folderName: 'fixture-recording',
           everyAyahFolder: 'FixtureRecording',
           hasSegments: true,
+          hasWordTimings: true,
         );
         final cubit = VersePlayerCubit(
           audioPlayer: player,

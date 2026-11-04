@@ -745,7 +745,7 @@ class TafsirHelper {
             id: 'tafsir:${book.id}',
             url: zipUrl,
             destinationPath: tempZipFile.path,
-            displayName: book.name,
+            displayName: book.displayName,
             onProgress: (progress) => onProgress(0.05 + progress * 0.75),
           );
         } catch (downloadErr) {
@@ -769,7 +769,7 @@ class TafsirHelper {
               id: 'tafsir:${book.id}',
               url: altUrl,
               destinationPath: tempZipFile.path,
-              displayName: book.name,
+              displayName: book.displayName,
               onProgress: (progress) => onProgress(0.05 + progress * 0.75),
             );
           } else {

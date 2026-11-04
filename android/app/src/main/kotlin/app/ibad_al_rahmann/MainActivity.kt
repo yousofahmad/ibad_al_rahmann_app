@@ -241,6 +241,7 @@ class MainActivity: AudioServiceFragmentActivity() {
             null
         }
         NativeLogger.log(this, "MainActivity.onCreate payload detected (length=${launchPayload?.length ?: 0}, fromNotif=$fromNotification)")
+        if (fromNotification) cleanupOpenedNotification(intent)
 
 
         val stopSound = intent?.getBooleanExtra("stop_sound_on_open", true) ?: true
@@ -363,10 +364,24 @@ class MainActivity: AudioServiceFragmentActivity() {
         NotificationDismissReceiver.cleanupEmptyGroupSummaries(this)
     }
 
+    private fun cleanupOpenedNotification(notificationIntent: Intent?) {
+        val alarmId = notificationIntent?.getIntExtra("alarm_id", -1) ?: -1
+        if (notificationIntent?.getBooleanExtra("from_notification", false) == true && alarmId != -1) {
+            try {
+                (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(alarmId)
+            } catch (e: Exception) {
+                NativeLogger.log(this, "MainActivity: tapped notification cancellation failed; errorType=${e.javaClass.simpleName}")
+            }
+            NotificationDismissReceiver.cleanupEmptyGroupSummaries(this, alarmId)
+        } else {
+            NotificationDismissReceiver.cleanupEmptyGroupSummaries(this)
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        NotificationDismissReceiver.cleanupEmptyGroupSummaries(this)
+        cleanupOpenedNotification(intent)
         val target = intent.getStringExtra("target_page") ?: intent.getStringExtra("payload")
         NativeLogger.log(this, "MainActivity.onNewIntent payload detected (length=${target?.length ?: 0}) | channel ready: ${BackgroundMethodChannelPlugin.currentChannel != null}")
         if (target != null) {

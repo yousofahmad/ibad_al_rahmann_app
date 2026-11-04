@@ -3,6 +3,7 @@
 class TafsirBook {
   final String id;
   final String name;
+  final String? displayNameArabic;
   final String author;
   final bool isBuiltIn;
   final String? url;
@@ -18,6 +19,7 @@ class TafsirBook {
   const TafsirBook({
     required this.id,
     required this.name,
+    this.displayNameArabic,
     required this.author,
     this.isBuiltIn = false,
     this.url,
@@ -106,6 +108,7 @@ class TafsirBook {
     groupId: json['group_id']?.toString(),
     groupName: json['group_name']?.toString(),
     languageCode: _nonEmpty(json['language_code']?.toString()) ?? 'und',
+    displayNameArabic: json['display_name_ar']?.toString(),
     languageName: json['language_name']?.toString(),
     direction: json['text_direction']?.toString(),
     edition: json['edition']?.toString(),
@@ -115,6 +118,7 @@ class TafsirBook {
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
+    if (displayNameArabic != null) 'display_name_ar': displayNameArabic,
     'author': author,
     'is_builtin': isBuiltIn,
     if (url != null) 'url': url,
@@ -195,6 +199,11 @@ class TafsirCatalog {
     if (knownName != null) return knownName;
     if (_containsArabic(sourceName)) return sourceName;
     for (final book in variants) {
+      if (book.languageCode.toLowerCase().split('-').first == 'ar' &&
+          book.displayNameArabic != null &&
+          _containsArabic(book.displayNameArabic!)) {
+        return book.displayNameArabic!;
+      }
       if (_containsArabic(book.name)) return book.name;
       if (_containsArabic(book.familyName)) return book.familyName;
     }

@@ -259,6 +259,28 @@ void main() {
     },
   );
 
+  test('localized Arabic title is used only for Arabic source variants', () {
+    final arabic = TafsirBook.fromJson({
+      'id': 'qul_tafsir_23',
+      'name': 'Tafseer Al Qurtubi',
+      'display_name_ar': 'تفسير القرطبي',
+      'group_id': 'qul_tafsir_23',
+      'group_name': 'Tafseer Al Qurtubi',
+      'language_code': 'ar',
+    });
+    final english = TafsirBook.fromJson({
+      'id': 'english_edition',
+      'name': 'Tafsir Ibn Kathir - English',
+      'display_name_ar': 'تفسير ابن كثير',
+      'group_id': 'english_edition',
+      'group_name': 'Tafsir Ibn Kathir - English',
+      'language_code': 'en',
+    });
+
+    expect(arabic.displayName, 'تفسير القرطبي');
+    expect(english.displayName, 'Tafsir Ibn Kathir - English');
+  });
+
   test('invalid family/cache IDs are not accepted', () {
     expect(
       TafsirCatalog.flattenItems([

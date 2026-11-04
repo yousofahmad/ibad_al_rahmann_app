@@ -149,10 +149,12 @@ class SurahAudioItem {
 class ReciterAudioModel {
   final String id;
   final String name;
+  final String? nameAr;
   final String style;
   final String folderName;
   final String everyAyahFolder;
   final bool hasSegments;
+  final bool hasWordTimings;
   final bool localOnly;
   final bool hasSurahAudio;
   final String? zipFileName;
@@ -162,10 +164,12 @@ class ReciterAudioModel {
   ReciterAudioModel({
     required this.id,
     required this.name,
+    this.nameAr,
     required this.style,
     required this.folderName,
     this.everyAyahFolder = '',
     this.hasSegments = true,
+    this.hasWordTimings = false,
     this.localOnly = false,
     this.hasSurahAudio = true,
     this.zipFileName,
@@ -177,10 +181,12 @@ class ReciterAudioModel {
     return ReciterAudioModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
+      nameAr: json['name_ar']?.toString(),
       style: json['style']?.toString() ?? 'مرتل',
       folderName: json['folder_name']?.toString() ?? '',
       everyAyahFolder: json['every_ayah_folder']?.toString() ?? '',
       hasSegments: json['has_segments'] == true,
+      hasWordTimings: json['has_word_timings'] == true,
       localOnly: json['local_only'] == true,
       hasSurahAudio: json['has_surah_audio'] != false,
       zipFileName: json['zip_file_name']?.toString(),
@@ -189,23 +195,27 @@ class ReciterAudioModel {
     );
   }
 
+  String get displayName {
+    final localized = nameAr?.trim();
+    return localized == null || localized.isEmpty ? name : localized;
+  }
+
   ReciterHighlightSupport get highlightSupport {
-    if (!hasSegments) return ReciterHighlightSupport.none;
-    if (zipFileName != null ||
-        folderName == 'surah-recitation-abdul-basit-abd-us-samad-mujawwad' ||
-        segmentsFileName == 'letter_segments.json') {
-      return ReciterHighlightSupport.wordByWord;
-    }
-    return ReciterHighlightSupport.verseOnly;
+    if (hasWordTimings) return ReciterHighlightSupport.wordByWord;
+    if (hasSegments) return ReciterHighlightSupport.verseOnly;
+    return ReciterHighlightSupport.none;
   }
 
   bool get supportsWordByWord =>
       highlightSupport == ReciterHighlightSupport.wordByWord;
 
   /// Per-ayah metadata or an EveryAyah source supports individual verses,
-  /// even when this reciter has no synchronized highlighting metadata.
+  /// even when this reciter has no synchronized word-highlighting data.
   bool get supportsAyahByAyah =>
-      hasSegments || zipFileName != null || everyAyahFolder.trim().isNotEmpty;
+      hasSegments ||
+      hasWordTimings ||
+      zipFileName != null ||
+      everyAyahFolder.trim().isNotEmpty;
 
   /// A non-empty source folder identifies a complete-surah recording.
   bool get supportsFullSurah => hasSurahAudio && folderName.trim().isNotEmpty;
@@ -219,10 +229,12 @@ class ReciterAudioModel {
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
+    if (nameAr != null) 'name_ar': nameAr,
     'style': style,
     'folder_name': folderName,
     'every_ayah_folder': everyAyahFolder,
     'has_segments': hasSegments,
+    if (hasWordTimings) 'has_word_timings': true,
     if (localOnly) 'local_only': true,
     if (!hasSurahAudio) 'has_surah_audio': false,
     if (zipFileName != null) 'zip_file_name': zipFileName,
@@ -258,6 +270,7 @@ class ReciterAudioHelper {
       // This recording is hosted by Tarteel, not EveryAyah.
       // Resolve its exact per-ayah URL from the bundled ZIP metadata.
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName: 'ayah-recitation-alnufais.json.zip',
       segmentsFileName: 'segments.json',
       category: 'مشاهير القراء',
@@ -269,6 +282,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-mishari-rashid-al-afasy',
       everyAyahFolder: 'Alafasy_128kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName:
           'ayah-recitation-mishari-rashid-al-afasy-murattal-hafs-953.json.zip',
       segmentsFileName: 'segments.json',
@@ -281,6 +295,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-abdul-basit-abd-us-samad-murattal',
       everyAyahFolder: 'Abdul_Basit_Murattal_192kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName:
           'ayah-recitation-abdul-basit-abdul-samad-murattal-hafs-950.json.zip',
       segmentsFileName: 'segments.json',
@@ -293,6 +308,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-mahmoud-husary-murattal',
       everyAyahFolder: 'Husary_128kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName:
           'ayah-recitation-mahmoud-khalil-al-husary-murattal-hafs-955.json.zip',
       segmentsFileName: 'segments.json',
@@ -305,6 +321,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-mahmoud-husary-mujawwad',
       everyAyahFolder: 'Husary_Mujawwad_128kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName:
           'ayah-recitation-mahmoud-khalil-al-husary-mujawwad-hafs-956.json.zip',
       segmentsFileName: 'segments.json',
@@ -317,6 +334,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-mahmoud-khaleel-al-husary-muallam',
       everyAyahFolder: 'Husary_Muallim_128kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName:
           'ayah-recitation-mahmoud-khalil-al-husary-murattal-hafs-957.json.zip',
       segmentsFileName: 'segments.json',
@@ -329,6 +347,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-abdul-rahman-al-sudais',
       everyAyahFolder: 'Abdurrahmaan_As-Sudais_192kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName: 'ayah-recitation-abdur-rahman-as-sudais-recitation.json.zip',
       segmentsFileName: 'segments.json',
       category: 'أئمة الحرمين الشريفين',
@@ -340,6 +359,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-saud-al-shuraim',
       everyAyahFolder: 'Saood_ash-Shuraym_128kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName: 'ayah-recitation-saud-al-shuraim-murattal-hafs-960.json.zip',
       segmentsFileName: 'segments.json',
       category: 'أئمة الحرمين الشريفين',
@@ -351,6 +371,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-maher-al-muaiqly',
       everyAyahFolder: 'Maher_AlMuaiqly_64kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName:
           'ayah-recitation-maher-al-mu-aiqly-murattal-hafs-948.json.zip',
       segmentsFileName: 'segments.json',
@@ -363,6 +384,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-yasser-al-dosari',
       everyAyahFolder: 'Yasser_Ad-Dussary_128kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName:
           'ayah-recitation-yasser-al-dosari-murattal-hafs-961.json.zip',
       segmentsFileName: 'segments.json',
@@ -375,6 +397,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-abu-bakr-al-shatri',
       everyAyahFolder: 'Abu_Bakr_Ash-Shaatree_128kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName:
           'ayah-recitation-abu-bakr-al-shatri-murattal-hafs-952.json.zip',
       segmentsFileName: 'segments.json',
@@ -387,6 +410,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-saad-ghamadi',
       everyAyahFolder: 'Ghamadi_40kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName: 'ayah-recitation-saad-al-ghamdi-murattal-hafs-954.json.zip',
       segmentsFileName: 'segments.json',
       category: 'مشاهير القراء',
@@ -398,6 +422,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-hani-ar-rifai',
       everyAyahFolder: 'Hani_Rifai_192kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName:
           'ayah-recitation-hani-ar-rifai-recitation-murattal-hafs-68.json.zip',
       segmentsFileName: 'segments.json',
@@ -410,6 +435,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-khalifa-al-tunaiji',
       everyAyahFolder: 'khalefa_al_tunaiji_64kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName:
           'ayah-recitation-khalifa-al-tunaiji-murattal-hafs-958.json.zip',
       segmentsFileName: 'segments.json',
@@ -422,6 +448,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-mohammad-al-tablawi',
       everyAyahFolder: 'Mohammad_al_Tablaway_128kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName:
           'ayah-recitation-mohamed-al-tablawi-recitation-murattal-hafs-73.json.zip',
       segmentsFileName: 'segments.json',
@@ -434,6 +461,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-muhammad-siddiq-al-minshawy-murattal',
       everyAyahFolder: 'Minshawy_Murattal_128kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName:
           'ayah-recitation-muhammad-siddiq-al-minshawi-murattal-hafs-959.json.zip',
       segmentsFileName: 'segments.json',
@@ -447,6 +475,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-abdul-basit-abd-us-samad-mujawwad',
       everyAyahFolder: 'Abdul_Basit_Mujawwad_128kbps',
       hasSegments: true,
+      hasWordTimings: true,
       zipFileName:
           'ayah-recitation-abdul-basit-abdul-samad-mujawwad-hafs-949.json.zip',
       segmentsFileName: 'letter_segments.json',
@@ -460,6 +489,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-muhammad-siddiq-al-minshawi',
       everyAyahFolder: 'Minshawy_Murattal_128kbps',
       hasSegments: true,
+      hasWordTimings: true,
       segmentsFileName: 'segments.json',
       category: 'عمالقة القراء (مصر)',
     ),
@@ -470,6 +500,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-muhammad-siddiq-al-minshawi-with-kids',
       everyAyahFolder: 'Minshawy_Teacher_128kbps',
       hasSegments: true,
+      hasWordTimings: true,
       segmentsFileName: 'segments.json',
       category: 'المصحف المعلم',
     ),
@@ -520,6 +551,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-khalid-al-jalil',
       everyAyahFolder: 'Khalid_Al-Jileel_128kbps',
       hasSegments: true,
+      hasWordTimings: true,
       segmentsFileName: 'segments.json',
       category: 'مشاهير القراء',
     ),
@@ -550,6 +582,7 @@ class ReciterAudioHelper {
       folderName: 'surah-recitation-mansour-al-salimi-1444h',
       everyAyahFolder: 'Mansoor_Al-Salimi_128kbps',
       hasSegments: true,
+      hasWordTimings: true,
       segmentsFileName: 'segments.json',
       category: 'مشاهير القراء',
     ),
@@ -796,6 +829,7 @@ class ReciterAudioHelper {
             : ReciterAudioModel(
                 id: candidate.id,
                 name: candidate.name,
+                nameAr: candidate.nameAr,
                 style: candidate.style,
                 folderName: candidate.folderName,
                 hasSegments: false,
