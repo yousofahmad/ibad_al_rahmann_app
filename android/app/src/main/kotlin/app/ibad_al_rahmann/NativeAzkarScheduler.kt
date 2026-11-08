@@ -85,10 +85,12 @@ object NativeAzkarScheduler {
             cancelAlarm(context, editor, RuqyahAlarmFallback.EVENING_ALARM_ID)
         }
 
-        // Dart owns the Kahf/Salawat window notifications. Cancel legacy native IDs
-        // before Dart recreates the current three-day window to avoid duplicates.
-        cancelAlarm(context, editor, 2350)
-        cancelAlarm(context, editor, 2360)
+        // Dart owns the Kahf/Salawat window notifications. Remove only IDs used by
+        // older versions; current Dart IDs live in a separate range and survive
+        // app-open, reboot, and midnight rescheduling.
+        LegacyKahfAlarmIds.all.forEach { id ->
+            cancelAlarm(context, editor, id)
+        }
 
         editor.apply()
 

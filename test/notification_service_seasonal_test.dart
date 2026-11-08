@@ -527,6 +527,48 @@ void main() {
   );
 
   test(
+    'Kahf reminders use IDs outside the native legacy cleanup range',
+    () async {
+      await configure(
+        settings: {'notif_kahf_salawat': true},
+        dates: {
+          '2026-11-05': hijri(25, 5),
+          '2026-11-06': hijri(26, 5),
+          '2026-11-07': hijri(27, 5),
+          '2026-11-08': hijri(28, 5),
+        },
+      );
+      final now = DateTime(2026, 11, 5, 0, 30);
+      await rebuild(now: now);
+
+      final thursdayTimes = await PrayerService.getPrayerTimesForDateStatic(
+        DateTime(2026, 11, 5),
+      );
+      expect(thursdayTimes, isNotNull);
+      final prayerTimes = thursdayTimes!;
+      final expectedThursdayReminder = DateTime(
+        2026,
+        11,
+        5,
+        prayerTimes.isha.hour,
+        prayerTimes.isha.minute,
+      ).add(const Duration(minutes: 60));
+
+      expect(scheduled(alarm(2850)), expectedThursdayReminder);
+      expect(scheduled(alarm(2861)), DateTime(2026, 11, 6, 9));
+      final kahfIds = alarms
+          .where((alarm) => alarm['payload'] == 'kahf')
+          .map((alarm) => alarm['id'] as int)
+          .toSet();
+      expect(kahfIds, containsAll(<int>{2850, 2861}));
+      expect(
+        kahfIds.intersection(<int>{2350, 2351, 2352, 2360, 2361, 2362}),
+        isEmpty,
+      );
+    },
+  );
+
+  test(
     'Arafah and Eid Adha toggles work independently of regular fasting alerts',
     () async {
       await configure(
