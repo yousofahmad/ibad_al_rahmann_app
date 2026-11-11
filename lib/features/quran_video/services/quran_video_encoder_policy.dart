@@ -16,4 +16,7 @@ class QuranVideoEncoderPolicy {
     }
     return QuranVideoEncoderAttemptDisposition.retry;
   }
+
+  static bool shouldRetryAfterStartupFailure({required bool cancelled}) =>
+      !cancelled;
 }

@@ -253,11 +253,46 @@ class QuranVideoExportService {
           'encoder': encoder,
           'duration_ms': track.durationMs,
         });
-        final attempt = await _runEncoderAttempt(
-          arguments: arguments,
-          durationMs: track.durationMs,
-          onProgress: onProgress,
-        );
+        late final _EncoderAttempt attempt;
+        try {
+          attempt = await _runEncoderAttempt(
+            arguments: arguments,
+            durationMs: track.durationMs,
+            onProgress: onProgress,
+          );
+        } catch (error) {
+          final cancelled =
+              _cancelRequested ||
+              (error is QuranVideoExportException &&
+                  error.message == 'تم إلغاء إنشاء الفيديو.');
+          if (!QuranVideoEncoderPolicy.shouldRetryAfterStartupFailure(
+            cancelled: cancelled,
+          )) {
+            throw const QuranVideoExportException('تم إلغاء إنشاء الفيديو.');
+          }
+          AppLogger.logEvent('QuranVideo', 'encoding_attempt_failed', {
+            'operation_id': operationId,
+            'encoder': encoder,
+            'reason': 'startup_failure',
+            'error_type': error.runtimeType.toString(),
+          });
+          if (index + 1 < encoders.length) {
+            AppLogger.logEvent('QuranVideo', 'encoding_fallback_started', {
+              'operation_id': operationId,
+              'from_encoder': encoder,
+              'to_encoder': encoders[index + 1],
+              'reason': 'startup_failure',
+            });
+            onProgress(
+              const QuranVideoExportProgress(
+                fraction: 0.38,
+                message: 'تعذر تشغيل محرك الترميز؛ جارٍ استخدام محرك بديل…',
+              ),
+            );
+          }
+          _checkCancelled();
+          continue;
+        }
         _checkCancelled();
         final returnCode = await attempt.session.getReturnCode();
         final disposition = QuranVideoEncoderPolicy.decide(

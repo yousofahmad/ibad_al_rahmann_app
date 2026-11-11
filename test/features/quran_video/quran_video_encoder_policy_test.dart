@@ -38,5 +38,20 @@ void main() {
         QuranVideoEncoderAttemptDisposition.cancelled,
       );
     });
+
+    test('falls back after encoder startup failure unless export was cancelled', () {
+      expect(
+        QuranVideoEncoderPolicy.shouldRetryAfterStartupFailure(
+          cancelled: false,
+        ),
+        isTrue,
+      );
+      expect(
+        QuranVideoEncoderPolicy.shouldRetryAfterStartupFailure(
+          cancelled: true,
+        ),
+        isFalse,
+      );
+    });
   });
 }

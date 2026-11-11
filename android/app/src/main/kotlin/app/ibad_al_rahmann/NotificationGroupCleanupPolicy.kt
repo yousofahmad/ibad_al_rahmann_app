@@ -14,6 +14,31 @@ internal object NotificationGroupCleanupPolicy {
     private const val PERSISTENT_NOTIFICATION_ID = 777
 
     /**
+     * At Isha completion, old prayer alerts are no longer actionable. Return
+     * only active prayer children; leave summaries for the normal cleanup path.
+     */
+    fun prayerChildrenToClearAfterIsha(
+        activeNotifications: Iterable<ActiveNotificationGroupEntry>,
+    ): Set<Int> = activeNotifications.mapNotNull { notification ->
+        if (notification.id == PRAYER_SUMMARY_ID ||
+            notification.id == GENERAL_SUMMARY_ID ||
+            notification.id == PERSISTENT_NOTIFICATION_ID
+        ) {
+            null
+        } else {
+            when (notification.group) {
+                PRAYER_GROUP -> notification.id
+                GENERAL_GROUP -> null
+                else -> if (isLegacyPrayerNotificationId(notification.id)) {
+                    notification.id
+                } else {
+                    null
+                }
+            }
+        }
+    }.toSet()
+
+    /**
      * Returns summary IDs that should be cancelled. Explicit group membership wins;
      * ID ranges are only used for notifications created before group metadata existed.
      */

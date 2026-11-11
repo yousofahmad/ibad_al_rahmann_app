@@ -5,6 +5,22 @@ import org.junit.Test
 
 class NotificationGroupCleanupPolicyTest {
     @Test
+    fun clearsOnlyPrayerChildrenAfterIsha() {
+        val active = listOf(
+            ActiveNotificationGroupEntry(104, NotificationGroupCleanupPolicy.PRAYER_GROUP),
+            ActiveNotificationGroupEntry(3004, null),
+            ActiveNotificationGroupEntry(7001, NotificationGroupCleanupPolicy.GENERAL_GROUP),
+            ActiveNotificationGroupEntry(NotificationGroupCleanupPolicy.PRAYER_SUMMARY_ID, NotificationGroupCleanupPolicy.PRAYER_GROUP),
+            ActiveNotificationGroupEntry(777, null),
+        )
+
+        assertEquals(
+            setOf(104, 3004),
+            NotificationGroupCleanupPolicy.prayerChildrenToClearAfterIsha(active),
+        )
+    }
+
+    @Test
     fun cancelsOnlyPrayerSummaryWhenLastPrayerChildIsDismissed() {
         val active = listOf(
             ActiveNotificationGroupEntry(101, NotificationGroupCleanupPolicy.PRAYER_GROUP),

@@ -26,6 +26,21 @@ class NotificationScheduleHelpers {
           date.microsecond,
         );
 
+  /// Returns the first refresh window that has not already passed.
+  /// Prayer alarms can be delivered late, so a missed lead-time window must
+  /// be skipped rather than retried immediately in a tight loop.
+  static DateTime? firstFuturePrayerRefreshAt({
+    required DateTime now,
+    required Iterable<DateTime> prayerTimes,
+    required Duration leadTime,
+  }) {
+    for (final prayerTime in prayerTimes) {
+      final refreshAt = prayerTime.subtract(leadTime);
+      if (refreshAt.isAfter(now)) return refreshAt;
+    }
+    return null;
+  }
+
   /// The night of Eid al-Fitr starts only when the following civil day is
   /// actually 1 Shawwal.  This avoids announcing Eid after a 29th Ramadan
   /// that is followed by the 30th.

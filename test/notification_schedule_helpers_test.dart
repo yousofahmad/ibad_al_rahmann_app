@@ -33,6 +33,45 @@ void main() {
       },
     );
 
+    test('missed prayer refresh windows advance to a future prayer window', () {
+      final eveningNow = DateTime(2026, 11, 10, 18, 12);
+      expect(
+        NotificationScheduleHelpers.firstFuturePrayerRefreshAt(
+          now: eveningNow,
+          prayerTimes: [
+            DateTime(2026, 11, 10, 18, 21),
+            DateTime(2026, 11, 11, 4, 47),
+          ],
+          leadTime: const Duration(minutes: 10),
+        ),
+        DateTime(2026, 11, 11, 4, 37),
+      );
+
+      final dawnNow = DateTime(2026, 11, 11, 4, 38);
+      expect(
+        NotificationScheduleHelpers.firstFuturePrayerRefreshAt(
+          now: dawnNow,
+          prayerTimes: [
+            DateTime(2026, 11, 11, 4, 47),
+            DateTime(2026, 11, 11, 12),
+          ],
+          leadTime: const Duration(minutes: 10),
+        ),
+        DateTime(2026, 11, 11, 11, 50),
+      );
+    });
+
+    test('returns null when no refresh window remains in the supplied range', () {
+      expect(
+        NotificationScheduleHelpers.firstFuturePrayerRefreshAt(
+          now: DateTime(2026, 11, 11, 5),
+          prayerTimes: [DateTime(2026, 11, 11, 4, 47)],
+          leadTime: const Duration(minutes: 10),
+        ),
+        isNull,
+      );
+    });
+
     test(
       'fasting rules exclude Eid, Tashreeq, unknown dates and Ramadan nafl',
       () {

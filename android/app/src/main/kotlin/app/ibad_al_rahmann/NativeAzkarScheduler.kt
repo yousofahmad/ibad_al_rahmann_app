@@ -4,11 +4,11 @@ import android.content.Context
 import android.content.SharedPreferences
 
 /**
- * Native Azkar Scheduler — reschedules morning/evening Azkar and Ruqyah after device reboot.
+ * Native Azkar Scheduler — reschedules morning/evening Azkar and Ruqyah after reboot and native prayer refreshes.
  *
  * Native owns IDs 1, 3, 4, and 5 after reboot.
  * This reads the user settings from FlutterSharedPreferences and recreates those alarms
- * natively so they fire even if the Flutter engine never runs after boot.
+ * natively so they fire even if the Flutter engine never runs after boot or in a background isolate.
  *
  * Keys and IDs:
  *  flutter.azkar_morning_mode / flutter.time_azkar_morning → 1 (أذكار الصباح)
@@ -18,7 +18,7 @@ import android.content.SharedPreferences
  */
 object NativeAzkarScheduler {
 
-    fun scheduleAzkar(context: Context) {
+    fun scheduleAzkar(context: Context, scheduleWirdAfter: Boolean = true) {
         val fp = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val prefs = context.getSharedPreferences("AzkarNativePrefs", Context.MODE_PRIVATE)
         val editor = prefs.edit()
@@ -85,16 +85,20 @@ object NativeAzkarScheduler {
             cancelAlarm(context, editor, RuqyahAlarmFallback.EVENING_ALARM_ID)
         }
 
-        // Dart owns the Kahf/Salawat window notifications. Cancel legacy native IDs
-        // before Dart recreates the current three-day window to avoid duplicates.
-        cancelAlarm(context, editor, 2350)
-        cancelAlarm(context, editor, 2360)
+        // Dart owns the Kahf/Salawat window notifications. Remove only IDs used by
+        // older versions; current Dart IDs live in a separate range and survive
+        // app-open, reboot, and midnight rescheduling.
+        LegacyKahfAlarmIds.all.forEach { id ->
+            cancelAlarm(context, editor, id)
+        }
 
         editor.apply()
 
-        // ── ورد الختمة (Khatma Wird notifications) ──────────────────────────
-        // These are scheduled from Dart but lost on reboot. We reschedule them natively here.
-        scheduleWird(context)
+        if (scheduleWirdAfter) {
+            // ── ورد الختمة (Khatma Wird notifications) ──────────────────────
+            // These are scheduled from Dart but lost on reboot.
+            scheduleWird(context)
+        }
     }
 
     /**

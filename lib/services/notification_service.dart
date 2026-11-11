@@ -41,6 +41,9 @@ class NotificationService {
     'app.ibad_al_rahmann/native_notifications',
   );
   static const _activeAlarmsKey = 'active_alarm_ids';
+  // Keep current Kahf IDs separate from NativeAzkarScheduler's legacy cleanup IDs.
+  static const _kahfThursdayNightAlarmIdBase = 2850;
+  static const _kahfFridayMorningAlarmIdBase = 2860;
 
   static Future<void> _addActiveAlarmId(int id) async {
     final prefs = await SharedPreferences.getInstance();
@@ -522,7 +525,7 @@ class NotificationService {
           final kahfTime = dayTimes.isha.add(const Duration(minutes: 60));
           if (kahfTime.isAfter(now)) {
             await _scheduleNative(
-              2350 + i,
+              _kahfThursdayNightAlarmIdBase + i,
               'ليلة الجمعة',
               'لا تنس قراءة سورة الكهف والإكثار من الصلاة على النبي ﷺ',
               kahfTime.hour,
@@ -549,7 +552,7 @@ class NotificationService {
           );
           if (fridayMorningTime.isAfter(now)) {
             await _scheduleNative(
-              2360 + i,
+              _kahfFridayMorningAlarmIdBase + i,
               'يوم الجمعة',
               'لا تنس قراءة سورة الكهف والإكثار من الصلاة على النبي ﷺ',
               9,

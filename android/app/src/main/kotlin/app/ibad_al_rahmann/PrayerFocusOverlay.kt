@@ -701,6 +701,25 @@ object PrayerFocusOverlay {
                 nm.cancel(5000 + prayerIndex)           // Iqama
                 nm.cancel(1000 + prayerIndex)           // Alternate adhan IDs
                 NativeLogger.log(context, "onPrayed: cancelled notifications for prayerIndex=$prayerIndex (adhan=${100+prayerIndex}, pre-adhan=${3000+prayerIndex}, iqama=${5000+prayerIndex})")
+                if (prayerIndex == 4 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    try {
+                        val activeEntries = nm.activeNotifications
+                            ?.map { sbn -> ActiveNotificationGroupEntry(sbn.id, sbn.notification.group) }
+                            .orEmpty()
+                        val stalePrayerIds =
+                            NotificationGroupCleanupPolicy.prayerChildrenToClearAfterIsha(activeEntries)
+                        stalePrayerIds.forEach { id -> nm.cancel(id) }
+                        NativeLogger.log(
+                            context,
+                            "onPrayed: cleared ${stalePrayerIds.size} remaining prayer notifications after Isha",
+                        )
+                    } catch (e: Exception) {
+                        NativeLogger.log(
+                            context,
+                            "onPrayed: stale prayer cleanup failed after Isha (${e.javaClass.simpleName})",
+                        )
+                    }
+                }
                 NotificationDismissReceiver.cleanupEmptyGroupSummaries(context)
             }
         }

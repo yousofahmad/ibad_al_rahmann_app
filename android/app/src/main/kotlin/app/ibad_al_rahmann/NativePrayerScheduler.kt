@@ -72,6 +72,12 @@ object NativePrayerScheduler {
 
     private fun _scheduleTodayInternal(context: Context) {
         try {
+            NativeAzkarScheduler.scheduleAzkar(context, scheduleWirdAfter = false)
+            NativeLogger.log(context, "Native azkar and ruqyah alarms rescheduled with prayer engine.")
+        } catch (e: Exception) {
+            NativeLogger.log(context, "Native azkar reschedule failed: ${e.javaClass.simpleName}")
+        }
+        try {
             PrayerSilenceScheduler.schedule(context)
         } catch (e: Exception) {
             NativeLogger.log(context, "PrayerSilence scheduling failed: ${e.message}")

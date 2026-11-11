@@ -180,7 +180,6 @@ class BackgroundMethodChannelPlugin : FlutterPlugin {
                 }
                 "rescheduleNativeAlarms" -> {
                     NativeAzkarScheduler.scheduleAzkar(context)
-                    NativeAzkarScheduler.scheduleWird(context)
                     result.success("Rescheduled")
                 }
                 "updatePrayerNotification" -> {

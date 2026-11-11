@@ -18,6 +18,7 @@ import 'package:hijri/hijri_calendar.dart';
 
 import 'dart:convert';
 
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:geocoding/geocoding.dart';
@@ -38,6 +39,8 @@ import 'egyptian_hijri_calendar.dart';
 @pragma('vm:entry-point')
 Future<void> backgroundWidgetUpdateCallback() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('ar', null);
+  await initializeDateFormatting('en', null);
   await AndroidAlarmManager.initialize().catchError((e) {
     debugPrint('AlarmManager background init error: $e');
     return false;
@@ -94,6 +97,8 @@ Future<void> backgroundWidgetUpdateCallback() async {
 Future<void> prayerLocationRefreshCallback() async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
+  await initializeDateFormatting('ar', null);
+  await initializeDateFormatting('en', null);
   final callbackStartedAt = DateTime.now();
   PrayerService? service;
   String? prayerName;
@@ -411,14 +416,20 @@ class PrayerService extends ChangeNotifier {
       }
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        await scheduleNotifications(isUserAction: false);
+        await scheduleNotifications(
+          isUserAction: false,
+          scheduleLocationRefresh: false,
+        );
         logFinished('skipped', reason: 'location_service_disabled');
         return;
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.deniedForever) {
-        await scheduleNotifications(isUserAction: false);
+        await scheduleNotifications(
+          isUserAction: false,
+          scheduleLocationRefresh: false,
+        );
         logFinished('skipped', reason: 'permission_denied_forever');
         return;
       }
@@ -463,7 +474,10 @@ class PrayerService extends ChangeNotifier {
       }
 
       if (shouldReschedule) {
-        await scheduleNotifications(isUserAction: false);
+        await scheduleNotifications(
+          isUserAction: false,
+          scheduleLocationRefresh: false,
+        );
       } else {
         await updatePersistentElements();
       }
@@ -502,7 +516,10 @@ class PrayerService extends ChangeNotifier {
       );
     } catch (e) {
       try {
-        await scheduleNotifications(isUserAction: false);
+        await scheduleNotifications(
+          isUserAction: false,
+          scheduleLocationRefresh: false,
+        );
       } catch (scheduleError) {
         AppLogger.logEvent(
           'PrayerLocationRefresh',
@@ -626,7 +643,10 @@ class PrayerService extends ChangeNotifier {
 
   final _notificationScheduleRunner = NotificationScheduleRunner();
 
-  Future<void> scheduleNotifications({bool isUserAction = true}) async {
+  Future<void> scheduleNotifications({
+    bool isUserAction = true,
+    bool scheduleLocationRefresh = true,
+  }) async {
     await _notificationScheduleRunner.run((userAction) async {
       await _syncNativeEngineConfig();
       final times = getPrayerTimes();
@@ -638,9 +658,11 @@ class PrayerService extends ChangeNotifier {
         await updatePersistentElements();
       }
     }, isUserAction: isUserAction);
-    unawaited(
-      _scheduleNextLocationRefresh(trigger: 'prayer_notification_schedule'),
-    );
+    if (scheduleLocationRefresh) {
+      unawaited(
+        _scheduleNextLocationRefresh(trigger: 'prayer_notification_schedule'),
+      );
+    }
   }
 
   static const int _prayerLocationRefreshAlarmId = 724618;
@@ -695,37 +717,40 @@ class PrayerService extends ChangeNotifier {
         MapEntry(Prayer.maghrib, todayTimes.maghrib),
         MapEntry(Prayer.isha, todayTimes.isha),
       ];
-      MapEntry<Prayer, DateTime>? nextPrayer;
-      for (final entry in today) {
-        if (entry.value.isAfter(now)) {
-          nextPrayer = entry;
-          break;
-        }
-      }
-      if (nextPrayer == null) {
-        final tomorrow = NotificationScheduleHelpers.addCivilDays(now, 1);
-        final tomorrowTimes = getPrayerTimesForDate(tomorrow);
-        if (tomorrowTimes != null) {
-          nextPrayer = MapEntry(Prayer.fajr, tomorrowTimes.fajr);
-        }
-      }
-      if (nextPrayer == null) {
-        AppLogger.logEvent('PrayerLocationRefresh', 'schedule_failed', {
+      final tomorrow = NotificationScheduleHelpers.addCivilDays(now, 1);
+      final tomorrowTimes = getPrayerTimesForDate(tomorrow);
+      final candidates = <MapEntry<Prayer, DateTime>>[
+        ...today,
+        if (tomorrowTimes != null) ...[
+          MapEntry(Prayer.fajr, tomorrowTimes.fajr),
+          MapEntry(Prayer.dhuhr, tomorrowTimes.dhuhr),
+          MapEntry(Prayer.asr, tomorrowTimes.asr),
+          MapEntry(Prayer.maghrib, tomorrowTimes.maghrib),
+          MapEntry(Prayer.isha, tomorrowTimes.isha),
+        ],
+      ];
+      final scheduledAt = NotificationScheduleHelpers.firstFuturePrayerRefreshAt(
+        now: now,
+        prayerTimes: candidates.map((entry) => entry.value),
+        leadTime: _locationRefreshLeadTime,
+      );
+      if (scheduledAt == null) {
+        AppLogger.logEvent('PrayerLocationRefresh', 'schedule_skipped', {
           'trigger': trigger,
-          'reason': 'next_prayer_unavailable',
+          'reason': 'no_future_refresh_window',
           'requested_at': requestedAt.toIso8601String(),
           'actual_at': DateTime.now().toIso8601String(),
-          'outcome': 'failed',
+          'outcome': 'skipped',
         });
         return;
       }
 
+      final nextPrayer = candidates.firstWhere(
+        (entry) =>
+            entry.value.subtract(_locationRefreshLeadTime) == scheduledAt,
+      );
       final prayerKey = _locationPrayerKey(nextPrayer.key);
       final expectedAt = nextPrayer.value;
-      final targetBeforePrayer = expectedAt.subtract(_locationRefreshLeadTime);
-      final scheduledAt = targetBeforePrayer.isAfter(now)
-          ? targetBeforePrayer
-          : now.add(const Duration(seconds: 1));
       final prefs = CacheHelper.prefs;
       await prefs.setString(
         'prayer_location_refresh_expected_prayer',
