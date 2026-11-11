@@ -82,7 +82,15 @@ object PrayerFocusOverlay {
 
     fun showPreAdhan(context: Context, prayerName: String, alarmId: Int, minutesBefore: Int) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-            !android.provider.Settings.canDrawOverlays(context)) return
+            !android.provider.Settings.canDrawOverlays(context)) {
+            NativeLogger.log(
+                context,
+                PrayerFocusOverlayDiagnostics.showSkipped(
+                    "pre_adhan", "overlay_permission_missing", prayerName, alarmId, false,
+                ),
+            )
+            return
+        }
         Handler(Looper.getMainLooper()).post {
             try {
                 dismiss(context)
@@ -208,7 +216,16 @@ object PrayerFocusOverlay {
                 wm.addView(controlsLayout, ctrlParams)
                 controlsView = controlsLayout
 
-                NativeLogger.log(context, "PreAdhan overlay shown for $prayerName (${minutesBefore}min before)")
+                val powerManager = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+                val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager
+                NativeLogger.log(
+                    context,
+                    PrayerFocusOverlayDiagnostics.windowManagerAddViewReturned(
+                        "pre_adhan", prayerName, alarmId, false,
+                        powerManager?.isInteractive ?: false,
+                        keyguardManager?.isKeyguardLocked ?: false,
+                    ) + " minutesBefore=$minutesBefore",
+                )
             } catch (e: Exception) {
                 e.printStackTrace()
                 NativeLogger.log(context, "PreAdhan overlay ERROR: ${e.message}")
@@ -220,9 +237,25 @@ object PrayerFocusOverlay {
 
     fun show(context: Context, prayerName: String, alarmId: Int, isPreview: Boolean = false) {
         val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        if (!isPreview && !prefs.getBoolean("flutter.prayer_focus_enabled", false)) return
+        if (!isPreview && !prefs.getBoolean("flutter.prayer_focus_enabled", false)) {
+            NativeLogger.log(
+                context,
+                PrayerFocusOverlayDiagnostics.showSkipped(
+                    "prayer_focus", "feature_disabled", prayerName, alarmId, isPreview,
+                ),
+            )
+            return
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-            !android.provider.Settings.canDrawOverlays(context)) return
+            !android.provider.Settings.canDrawOverlays(context)) {
+            NativeLogger.log(
+                context,
+                PrayerFocusOverlayDiagnostics.showSkipped(
+                    "prayer_focus", "overlay_permission_missing", prayerName, alarmId, isPreview,
+                ),
+            )
+            return
+        }
 
         val now = System.currentTimeMillis()
         if (!isPreview && prayerName == lastShownPrayer && (now - lastShowTimestamp) < 1500L) {
@@ -551,7 +584,16 @@ object PrayerFocusOverlay {
                 wm.addView(controlsLayout, ctrlParams)
                 controlsView = controlsLayout
 
-                NativeLogger.log(context, "PrayerFocusOverlay shown for $prayerName (id: $alarmId, isPreview: $isPreview)")
+                val powerManager = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+                val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager
+                NativeLogger.log(
+                    context,
+                    PrayerFocusOverlayDiagnostics.windowManagerAddViewReturned(
+                        "prayer_focus", prayerName, alarmId, isPreview,
+                        powerManager?.isInteractive ?: false,
+                        keyguardManager?.isKeyguardLocked ?: false,
+                    ),
+                )
             } catch (e: Exception) {
                 e.printStackTrace()
                 NativeLogger.log(context, "PrayerFocusOverlay ERROR: ${e.message}")
