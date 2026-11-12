@@ -96,7 +96,11 @@ void main() {
     final clock = now ?? today;
     final times = await PrayerService.getPrayerTimesForDateStatic(clock);
     expect(times, isNotNull);
-    await NotificationService.scheduleAll(times!, nowOverride: clock);
+    await NotificationService.scheduleAll(
+      times!,
+      isUserAction: true,
+      nowOverride: clock,
+    );
     expect(
       calls.any((c) => c.method == 'updatePrayerNotification'),
       isTrue,
@@ -144,6 +148,31 @@ void main() {
         calls.any((call) => call.method == 'rescheduleNativeAlarms'),
         isTrue,
       );
+      expect(canceledIds.intersection({1, 3, 4, 5}), isEmpty);
+    },
+  );
+
+  test(
+    'background rebuild delegates native azkar scheduling and preserves native IDs',
+    () async {
+      await configure(
+        settings: {
+          'active_alarm_ids': ['1', '3', '4', '5'],
+        },
+      );
+      final times = await PrayerService.getPrayerTimesForDateStatic(today);
+      expect(times, isNotNull);
+
+      await NotificationService.scheduleAll(times!, nowOverride: today);
+
+      expect(
+        calls.any((call) => call.method == 'rescheduleNativeAlarms'),
+        isFalse,
+      );
+      final canceledIds = calls
+          .where((call) => call.method == 'cancelAlarms')
+          .expand((call) => (call.arguments['ids'] as List).cast<int>())
+          .toSet();
       expect(canceledIds.intersection({1, 3, 4, 5}), isEmpty);
     },
   );
@@ -555,7 +584,14 @@ void main() {
       ).add(const Duration(minutes: 60));
 
       expect(scheduled(alarm(2850)), expectedThursdayReminder);
-      expect(scheduled(alarm(2861)), DateTime(2026, 11, 6, 9));
+      final fridayTimes = await PrayerService.getPrayerTimesForDateStatic(
+        DateTime(2026, 11, 6),
+      );
+      expect(fridayTimes, isNotNull);
+      expect(
+        scheduled(alarm(2861)),
+        fridayTimes!.fajr.add(const Duration(hours: 1)),
+      );
       final kahfIds = alarms
           .where((alarm) => alarm['payload'] == 'kahf')
           .map((alarm) => alarm['id'] as int)

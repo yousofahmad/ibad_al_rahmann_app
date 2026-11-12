@@ -18,7 +18,6 @@ import 'package:ibad_al_rahmann/main.dart'; // To access scaffoldMessengerKey
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
 import 'package:ibad_al_rahmann/core/helpers/extensions/int_extensions.dart';
 import 'package:ibad_al_rahmann/features/accountability/accountability_prayer_status.dart';
-import 'package:ibad_al_rahmann/services/home_widget_service.dart';
 import 'package:ibad_al_rahmann/services/app_route_observer.dart';
 
 class AccountabilityScreen extends StatefulWidget {
@@ -313,11 +312,6 @@ class _AccountabilityScreenState extends State<AccountabilityScreen>
       }
       if (itemKey == 'أذكار المساء') {
         await DailyTrackerService.markAsDone('evening_azkar');
-      }
-      if (itemKey == 'أذكار الصباح' || itemKey == 'أذكار المساء') {
-        await HomeWidgetService.updateAzkarWidget(
-          trigger: 'accountability_azkar_status_changed',
-        );
       }
       if (itemKey == 'أذكار الصلاة') {
         await DailyTrackerService.markAsDone('prayer_azkar');

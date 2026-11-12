@@ -5,6 +5,10 @@ import 'package:ibad_al_rahmann/core/helpers/tafsir_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _resourceRoot = String.fromEnvironment('IBAD_LOCAL_RESOURCE_ROOT');
+const _runLocalResourceTests = bool.fromEnvironment(
+  'IBAD_RUN_LOCAL_RESOURCE_TESTS',
+);
+const _skipLocalCatalogTest = !_runLocalResourceTests || _resourceRoot == '';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -26,8 +30,6 @@ void main() {
   test(
     'merges the actual local QUL catalog without empty or duplicate books',
     () async {
-      expect(_resourceRoot, isNotEmpty);
-
       await TafsirHelper.fetchRemoteBooks();
 
       final books = TafsirHelper.availableBooks;
@@ -84,5 +86,6 @@ void main() {
       );
       expect(TafsirHelper.preferredBookForGroup(saadi).id, 'qul_tafsir_503');
     },
+    skip: _skipLocalCatalogTest,
   );
 }

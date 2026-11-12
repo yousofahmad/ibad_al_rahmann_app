@@ -105,7 +105,11 @@ Future<void> driveAutoSyncTask() async {
     // 1. مزامنة مع مهلة دقيقتين للنت الضعيف
     stage = 'sync_to_drive';
     success = await BackupService.syncToDrive(allowUI: false);
-    failureReason = success ? 'none' : 'sync_to_drive_returned_false';
+    failureReason = success
+        ? 'none'
+        : BackupService.lastAuthenticationFailureReason == null
+        ? 'sync_to_drive_returned_false'
+        : 'authentication_${BackupService.lastAuthenticationFailureReason}';
 
     stage = 'persist_result';
     await prefs.setString(
@@ -160,6 +164,7 @@ Future<void> driveAutoSyncTask() async {
       }
       await _showAutoSyncResult(
         success,
+        failureReason: failureReason,
         recoveryAttemptsRemaining: recoveryAttemptsRemaining,
       );
       try {
@@ -191,6 +196,7 @@ Future<void> driveAutoSyncTask() async {
 
 Future<void> _showAutoSyncResult(
   bool success, {
+  String? failureReason,
   int? recoveryAttemptsRemaining,
 }) async {
   try {
@@ -220,6 +226,8 @@ Future<void> _showAutoSyncResult(
       title: success ? 'المزامنة التلقائية ✓' : 'فشل المزامنة التلقائية',
       body: success
           ? 'تمت مزامنة بياناتك مع جوجل درايف بنجاح.'
+          : failureReason?.startsWith('authentication_') == true
+          ? 'افتح النسخ الاحتياطي في التطبيق وأكمل تسجيل الدخول إلى Google Drive؛ المزامنة التلقائية لا تستطيع طلب تسجيل الدخول من الخلفية.'
           : recoveryAttemptsRemaining == null
           ? 'تعذرت المزامنة؛ سنحاول مجددًا كل ساعة حتى الفجر.'
           : recoveryAttemptsRemaining > 0
@@ -263,6 +271,9 @@ class BackupService {
   static bool _isGoogleSignInInitialized = false;
   static GoogleSignInAccount? _cachedAccount;
   static Map<String, String>? _cachedAuthHeaders;
+  static String? _lastAuthenticationFailureReason;
+  static String? get lastAuthenticationFailureReason =>
+      _lastAuthenticationFailureReason;
 
   static Future<void> _ensureInitialized() async {
     if (!_isGoogleSignInInitialized) {
@@ -700,10 +711,16 @@ class BackupService {
   /// Restores the signed-in account silently for background work, then obtains
   /// a fresh token for the appData scope from that account's authorization client.
   static Future<drive.DriveApi?> _getDriveApi({bool allowUI = true}) async {
+    _lastAuthenticationFailureReason = null;
+    AppLogger.logEvent('GoogleDrive', 'authentication_resolution_started', {
+      'allowUI': allowUI,
+      'cached_account_available': _cachedAccount != null,
+    });
     try {
       await _ensureInitialized();
       const scopes = [drive.DriveApi.driveAppdataScope];
       var account = _cachedAccount;
+      var lightweightOutcome = 'not_attempted';
 
       // Scheduled Android callbacks run in a fresh isolate, so restore the
       // account before asking its authorization client for a fresh token.
@@ -713,43 +730,93 @@ class BackupService {
         if (restored != null) {
           account = restored;
           _cachedAccount = restored;
+          lightweightOutcome = 'account_restored';
+        } else {
+          lightweightOutcome = 'returned_null';
         }
       } catch (error) {
+        lightweightOutcome = 'exception_${error.runtimeType}';
         AppLogger.logEvent('GoogleDrive', 'silent_account_restore_failed', {
-          'reason': 'exception_${error.runtimeType}',
+          'reason': lightweightOutcome,
           'allowUI': allowUI,
         });
       }
+      AppLogger.logEvent('GoogleDrive', 'lightweight_authentication_finished', {
+        'outcome': lightweightOutcome,
+        'allowUI': allowUI,
+        'account_available': account != null,
+      });
 
       if (account != null) {
         var authHeaders = await account.authorizationClient
             .authorizationHeaders(scopes, promptIfNecessary: false);
+        var headersOutcome = authHeaders != null && authHeaders.isNotEmpty
+            ? 'available_without_prompt'
+            : 'empty_without_prompt';
         if ((authHeaders == null || authHeaders.isEmpty) && allowUI) {
           authHeaders = await account.authorizationClient.authorizationHeaders(
             scopes,
             promptIfNecessary: true,
           );
+          headersOutcome = authHeaders != null && authHeaders.isNotEmpty
+              ? 'available_after_prompt'
+              : 'empty_after_prompt';
         }
+        AppLogger.logEvent('GoogleDrive', 'authorization_headers_resolved', {
+          'outcome': headersOutcome,
+          'allowUI': allowUI,
+        });
         if (authHeaders != null && authHeaders.isNotEmpty) {
           _cachedAuthHeaders = authHeaders;
+          AppLogger.logEvent(
+            'GoogleDrive',
+            'authentication_resolution_finished',
+            {'outcome': 'authorized', 'allowUI': allowUI},
+          );
           return drive.DriveApi(GoogleAuthClient(authHeaders));
         }
       }
 
       if (allowUI) {
+        AppLogger.logEvent('GoogleDrive', 'interactive_authentication_started');
         account = await GoogleSignIn.instance.authenticate(scopeHint: scopes);
         _cachedAccount = account;
         await CacheHelper.prefs.setString('last_sync_email', account.email);
         final authHeaders = await account.authorizationClient
             .authorizationHeaders(scopes, promptIfNecessary: true);
+        AppLogger.logEvent(
+          'GoogleDrive',
+          'interactive_authorization_resolved',
+          {'headers_available': authHeaders != null && authHeaders.isNotEmpty},
+        );
         if (authHeaders != null && authHeaders.isNotEmpty) {
           _cachedAuthHeaders = authHeaders;
+          AppLogger.logEvent(
+            'GoogleDrive',
+            'authentication_resolution_finished',
+            {'outcome': 'authorized_after_interaction', 'allowUI': true},
+          );
           return drive.DriveApi(GoogleAuthClient(authHeaders));
         }
       }
       _cachedAuthHeaders = null;
+      AppLogger.logEvent('GoogleDrive', 'authentication_resolution_finished', {
+        'outcome': account == null
+            ? 'no_account_available'
+            : 'authorization_headers_unavailable',
+        'allowUI': allowUI,
+        'requires_foreground_reauthentication': !allowUI,
+      });
+      _lastAuthenticationFailureReason = account == null
+          ? 'no_account_available'
+          : 'authorization_headers_unavailable';
       return null;
     } catch (e) {
+      _lastAuthenticationFailureReason = 'exception_${e.runtimeType}';
+      AppLogger.logEvent('GoogleDrive', 'authentication_resolution_failed', {
+        'reason': 'exception_${e.runtimeType}',
+        'allowUI': allowUI,
+      });
       AppLogger.log('GoogleDrive', '_getDriveApi error type: ${e.runtimeType}');
       debugPrint('Google Drive: _getDriveApi error type: ${e.runtimeType}');
       return null;
@@ -841,7 +908,8 @@ class BackupService {
       debugPrint('Google Drive: Starting Sync to Drive...');
       final driveApi = await _getDriveApi(allowUI: allowUI);
       if (driveApi == null) {
-        reason = 'authentication_unavailable_or_cancelled';
+        reason =
+            'authentication_${_lastAuthenticationFailureReason ?? 'unavailable'}';
         debugPrint('Google Drive: Auth failed or cancelled.');
         return false;
       }

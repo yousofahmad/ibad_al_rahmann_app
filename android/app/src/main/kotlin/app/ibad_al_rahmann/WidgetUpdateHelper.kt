@@ -117,8 +117,6 @@ object WidgetUpdateHelper {
             val providers = arrayOf(
                 PrayerWidgetLargeProvider::class.java,
                 PrayerWidgetWideProvider::class.java,
-                WirdWidgetProvider::class.java,
-                AzkarWidgetProvider::class.java,
             )
             for (provider in providers) {
                 val ids = appWidgetManager.getAppWidgetIds(ComponentName(context, provider))

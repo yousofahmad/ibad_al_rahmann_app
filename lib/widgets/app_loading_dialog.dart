@@ -3,9 +3,12 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
 
 class AppLoadingDialog {
-  static void show(BuildContext context, {required String message}) {
+  static DialogRoute<void> createRoute(
+    BuildContext context, {
+    required String message,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    showDialog(
+    return DialogRoute<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => PopScope(
@@ -55,6 +58,13 @@ class AppLoadingDialog {
         ),
       ),
     );
+  }
+
+  static void show(BuildContext context, {required String message}) {
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).push<void>(createRoute(context, message: message));
   }
 
   static void hide(BuildContext context) {

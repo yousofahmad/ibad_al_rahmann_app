@@ -1,8 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
+import 'package:ibad_al_rahmann/services/app_logger.dart';
+import 'package:ibad_al_rahmann/services/background_service.dart';
 import 'package:ibad_al_rahmann/screens/alarms_screen.dart'; // As Alarms
 import 'package:ibad_al_rahmann/screens/settings_screen.dart';
 import 'occasions_screen.dart';
@@ -17,6 +23,7 @@ import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:ibad_al_rahmann/main.dart'; // To access scaffoldMessengerKey
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
+import 'package:ibad_al_rahmann/widgets/app_loading_dialog.dart';
 
 class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
@@ -29,6 +36,8 @@ class _MoreScreenState extends State<MoreScreen> {
   @override
   void initState() {
     super.initState();
+    _enableNativeLogging =
+        CacheHelper.prefs.getBool('enable_native_logging') ?? true;
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -166,9 +175,229 @@ class _MoreScreenState extends State<MoreScreen> {
               MaterialPageRoute(builder: (_) => const SettingsScreen()),
             ),
           ),
+          _buildSectionHeader(context, 'المساعدة والدعم'),
+          _buildMenuButton(
+            context: context,
+            title: 'الإبلاغ عن مشكلة ومشاركة السجل',
+            subtitle: 'إرسال وصف المشكلة مع سجل التطبيق للمساعدة في التشخيص',
+            icon: Icons.support_agent_rounded,
+            onTap: _reportIssueWithLog,
+          ),
+          _buildMenuButton(
+            context: context,
+            title: 'تفعيل سجل الإشعارات',
+            subtitle: 'تسجيل أحداث الإشعارات للمساعدة في حل المشاكل',
+            icon: Icons.receipt_long_rounded,
+            trailing: Switch(
+              value: _enableNativeLogging,
+              activeThumbColor: const Color(0xFFD0A871),
+              onChanged: _setNativeLogging,
+            ),
+            onTap: () => _setNativeLogging(!_enableNativeLogging),
+          ),
+          if (_enableNativeLogging)
+            _buildMenuButton(
+              context: context,
+              title: 'عرض سجل الإشعارات',
+              subtitle: 'قراءة سجل الإشعارات ونسخه',
+              icon: Icons.receipt_rounded,
+              onTap: _showNativeLog,
+            ),
+          _buildMenuButton(
+            context: context,
+            title: 'تنظيف السجل',
+            subtitle: 'الاحتفاظ بالأخطاء والتأخير وحذف السطور الروتينية',
+            icon: Icons.auto_fix_high_outlined,
+            onTap: _cleanLog,
+          ),
+          _buildMenuButton(
+            context: context,
+            title: 'عن التطبيق',
+            icon: Icons.info_outline,
+            onTap: _showAboutApp,
+          ),
         ],
       ),
     );
+  }
+
+  bool _enableNativeLogging = true;
+
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    return Padding(
+      padding: EdgeInsets.only(top: 8.h, bottom: 12.h),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontFamily: AppConsts.expoArabic,
+          color: const Color(0xFFD0A871),
+          fontSize: 18.sp,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _setNativeLogging(bool enabled) async {
+    final prefs = CacheHelper.prefs;
+    await prefs.setBool('enable_native_logging', enabled);
+    if (enabled) {
+      try {
+        final dir = await getApplicationSupportDirectory();
+        final file = File('${dir.path}/native_prayer_log.txt');
+        if (await file.exists()) await file.delete();
+      } catch (_) {}
+    }
+    if (mounted) setState(() => _enableNativeLogging = enabled);
+  }
+
+  Future<void> _reportIssueWithLog() async {
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final loadingRoute = AppLoadingDialog.createRoute(
+      context,
+      message: 'جاري تجهيز تقرير السجل...',
+    );
+    navigator.push<void>(loadingRoute);
+
+    String? nativeLog;
+    Object? loadingError;
+    try {
+      nativeLog = await BackgroundService.getNativeLog(lines: 500);
+    } catch (error) {
+      loadingError = error;
+    } finally {
+      if (navigator.mounted && loadingRoute.isActive) {
+        navigator.removeRoute(loadingRoute);
+      }
+    }
+
+    if (!mounted) return;
+    if (loadingError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذر تجهيز التقرير (${loadingError.runtimeType})'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await AppLogger.reportIssue(context, nativeLogContent: nativeLog);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر فتح المشاركة (${error.runtimeType})')),
+      );
+    }
+  }
+
+  Future<void> _showNativeLog() async {
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final file = File('${dir.path}/native_prayer_log.txt');
+      final content = await file.exists()
+          ? await file.readAsString()
+          : 'لا يوجد سجل متاح حالياً.';
+      if (!mounted) return;
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('سجل الإشعارات'),
+          content: SingleChildScrollView(
+            child: SelectableText(content, textDirection: TextDirection.ltr),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: content));
+                if (!dialogContext.mounted || !mounted) return;
+                Navigator.pop(dialogContext);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('تم نسخ السجل كله')),
+                );
+              },
+              child: const Text('نسخ السجل كله'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('إغلاق'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر قراءة السجل (${error.runtimeType})')),
+      );
+    }
+  }
+
+  Future<void> _cleanLog() async {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('جاري تحليل السجل...')));
+    final result = await AppLogger.smartClean();
+    if (!mounted) return;
+    final kept = result['kept'] ?? 0;
+    final removed = result['removed'] ?? 0;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'تم التنظيف: حُذف $removed سطر روتيني، تبقى $kept سطر مهم',
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  Future<void> _showAboutApp() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      showAboutDialog(
+        context: context,
+        applicationName: 'عباد الرحمن',
+        applicationVersion: '${packageInfo.version}+${packageInfo.buildNumber}',
+        applicationIcon: Image.asset(
+          'assets/images/logo.png',
+          width: 50.w,
+          height: 50.w,
+        ),
+        children: [
+          Text(
+            'تطبيق إسلامي شامل يهدف لخدمة المسلمين في شتى بقاع الأرض.',
+            style: TextStyle(fontSize: 14.sp, fontFamily: 'Cairo'),
+          ),
+          SizedBox(height: 10.h),
+          Text(
+            'التحديثات الأخيرة:',
+            style: TextStyle(
+              fontSize: 14.sp,
+              fontFamily: 'Cairo',
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFFD0A871),
+            ),
+          ),
+          SizedBox(height: 5.h),
+          Text(
+            '• تنبيهات الصلاة على النبي مع ساعات الهدوء.\\n'
+            '• استمرار تشغيل القرآن في الخلفية وتظليل الكلمات.\\n'
+            '• توزيع أوراد الختمة على الصلوات تلقائياً.\\n'
+            '• تحسين شاشة (حاسب نفسك) ومنطق الختمة.\\n'
+            '• حذف إشعارات الصلوات الفارغة وتنظيفها.',
+            style: TextStyle(fontSize: 13.sp, fontFamily: 'Cairo', height: 1.5),
+          ),
+        ],
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذر تحميل معلومات التطبيق (${error.runtimeType})'),
+        ),
+      );
+    }
   }
 
   Widget _buildMenuButton({
@@ -179,6 +408,8 @@ class _MoreScreenState extends State<MoreScreen> {
     required VoidCallback onTap,
     String? imagePath,
     double? imageSize,
+    String? subtitle,
+    Widget? trailing,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = Theme.of(context).colorScheme.surface;
@@ -188,7 +419,7 @@ class _MoreScreenState extends State<MoreScreen> {
 
     return Container(
       margin: EdgeInsets.only(bottom: 16.h),
-      height: 80.h,
+      height: subtitle == null && trailing == null ? 80.h : 96.h,
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(15.r),
@@ -235,21 +466,46 @@ class _MoreScreenState extends State<MoreScreen> {
                 else if (iconWidget != null)
                   iconWidget,
                 SizedBox(width: 20.w),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontFamily: AppConsts.expoArabic,
-                    color: textColor,
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: AppConsts.expoArabic,
+                          color: textColor,
+                          fontSize: subtitle == null ? 18.sp : 16.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (subtitle != null)
+                        Text(
+                          subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: AppConsts.cairo,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                            fontSize: 11.sp,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                const Spacer(),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  size: 20.w,
-                ),
+                if (trailing != null)
+                  trailing
+                else
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    size: 20.w,
+                  ),
               ],
             ),
           ),
@@ -875,8 +1131,9 @@ class _SalawatReminderDialogState extends State<SalawatReminderDialog> {
                           activeThumbColor: const Color(0xFFD0A871),
                           onChanged: (val) => setState(() {
                             _unlockEnabled = val;
-                            if (val && _unlockMode == 'none')
+                            if (val && _unlockMode == 'none') {
                               _unlockMode = 'saly_3ala_mo7amad';
+                            }
                           }),
                         ),
                       ],

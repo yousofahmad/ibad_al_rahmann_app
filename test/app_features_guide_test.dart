@@ -28,6 +28,9 @@ Future<void> _pumpGuide(
   await tester.pumpAndSettle();
 }
 
+Finder _featureTitle(String title) =>
+    find.byWidgetPredicate((widget) => widget is Text && widget.data == title);
+
 void main() {
   testWidgets('يعرض الميزات المضافة عبر البحث بلا إيموجي', (tester) async {
     await _pumpGuide(tester);
@@ -41,7 +44,7 @@ void main() {
     ]) {
       await tester.enterText(find.byType(TextField), title);
       await tester.pumpAndSettle();
-      expect(find.text(title), findsOneWidget);
+      expect(_featureTitle(title), findsOneWidget);
       for (final text in tester.widgetList<Text>(find.byType(Text))) {
         expect(
           text.data ?? '',
@@ -56,8 +59,8 @@ void main() {
     await _pumpGuide(tester);
     await tester.enterText(find.byType(TextField), 'رمضان');
     await tester.pumpAndSettle();
-    expect(find.text('لوحة رمضان وتنبيهات العيد'), findsOneWidget);
-    expect(find.text('إدارة مدن متعددة لمواقيت الصلاة'), findsNothing);
+    expect(_featureTitle('لوحة رمضان وتنبيهات العيد'), findsOneWidget);
+    expect(_featureTitle('إدارة مدن متعددة لمواقيت الصلاة'), findsNothing);
     await tester.enterText(find.byType(TextField), 'لا توجد ميزة بهذا الاسم');
     await tester.pumpAndSettle();
     expect(find.textContaining('لم يتم العثور'), findsOneWidget);
@@ -66,11 +69,19 @@ void main() {
   testWidgets('يعمل تصنيف المدن واتجاه RTL والثيم الداكن', (tester) async {
     await _pumpGuide(tester, mode: ThemeMode.dark);
     final category = find.text('المدن والمواقع');
+    final categoriesList = find.byType(ListView).first;
+    final categoriesScrollable = tester.state<ScrollableState>(
+      find.descendant(of: categoriesList, matching: find.byType(Scrollable)),
+    );
+    categoriesScrollable.position.jumpTo(
+      categoriesScrollable.position.maxScrollExtent,
+    );
+    await tester.pumpAndSettle();
     expect(category, findsOneWidget);
     await tester.ensureVisible(category);
     await tester.tap(category);
     await tester.pumpAndSettle();
-    expect(find.text('إدارة مدن متعددة لمواقيت الصلاة'), findsOneWidget);
+    expect(_featureTitle('إدارة مدن متعددة لمواقيت الصلاة'), findsOneWidget);
     expect(find.text('لوحة رمضان وتنبيهات العيد'), findsNothing);
     final context = tester.element(find.byType(AppFeaturesGuideScreen));
     expect(Directionality.of(context), TextDirection.rtl);

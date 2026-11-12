@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -14,13 +13,9 @@ import 'package:ibad_al_rahmann/screens/prayer_alarms_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ibad_al_rahmann/core/theme/theme_manager/theme_cubit.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 
 import 'package:ibad_al_rahmann/main.dart'; // To access scaffoldMessengerKey
 import 'package:ibad_al_rahmann/core/helpers/cache_helper.dart';
-import 'package:ibad_al_rahmann/services/app_logger.dart';
-import 'package:ibad_al_rahmann/services/background_service.dart';
 import 'package:ibad_al_rahmann/widgets/app_loading_dialog.dart';
 import 'package:ibad_al_rahmann/screens/app_features_guide_screen.dart';
 
@@ -34,8 +29,6 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen>
     with WidgetsBindingObserver {
   final PrayerService _prayerService = PrayerService();
-  late final Future<PackageInfo> _packageInfoFuture;
-  String? _installedVersionLabel;
 
   @override
   void dispose() {
@@ -47,54 +40,6 @@ class _SettingsScreenState extends State<SettingsScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadSettings();
-    }
-  }
-
-  Future<void> _showNativeLog(BuildContext context) async {
-    try {
-      final dir = await getApplicationSupportDirectory();
-      final file = File('${dir.path}/native_prayer_log.txt');
-      String content = "لا يوجد سجل متاح حالياً.";
-      if (await file.exists()) {
-        content = await file.readAsString();
-      }
-      if (!context.mounted) return;
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text("سجل الأذان (النيتف)"),
-          content: SingleChildScrollView(
-            child: SelectableText(content, textDirection: TextDirection.ltr),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: content));
-                if (!context.mounted) return;
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'تم نسخ السجل كله',
-                      textDirection: TextDirection.rtl,
-                    ),
-                  ),
-                );
-              },
-              child: const Text("نسخ السجل كله"),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text("إغلاق"),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("خطأ: $e")));
     }
   }
 
@@ -110,7 +55,6 @@ class _SettingsScreenState extends State<SettingsScreen>
   int _customVolume = 100;
   String _audioStream = 'alarm';
   String _hijriSystem = PrayerService.systemUmmAlQura;
-  bool _enableNativeLogging = true;
   bool _isSyncingToDrive = false;
   String? _googleEmail;
   String? _lastSyncTime;
@@ -119,14 +63,6 @@ class _SettingsScreenState extends State<SettingsScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _packageInfoFuture = PackageInfo.fromPlatform();
-    _packageInfoFuture.then((packageInfo) {
-      if (!mounted) return;
-      setState(() {
-        _installedVersionLabel =
-            '${packageInfo.version}+${packageInfo.buildNumber}';
-      });
-    });
     _is24Hour = _prayerService.is24Hour;
     _hijriOffset = _prayerService.manualHijriOffset;
     _localHijriDelta = _prayerService.localHijriDelta;
@@ -148,7 +84,6 @@ class _SettingsScreenState extends State<SettingsScreen>
         _useCustomVolume = prefs.getBool('use_custom_notif_volume') ?? false;
         _customVolume = prefs.getInt('custom_notif_volume_level') ?? 100;
         _audioStream = prefs.getString('audio_stream_channel') ?? 'alarm';
-        _enableNativeLogging = prefs.getBool('enable_native_logging') ?? true;
         _googleEmail = email;
         _lastSyncTime = syncTime;
       });
@@ -1138,7 +1073,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             ),
           ),
 
-          // 6. Support
+          // Prayer-accuracy diagnostics and contact remain in Settings.
           _buildSectionHeader("الدعم"),
           _buildListTile(
             "تشخيص دقة أوقات الصلاة",
@@ -1147,166 +1082,10 @@ class _SettingsScreenState extends State<SettingsScreen>
             onTap: () => _showAccuracyDialog(context),
           ),
           _buildListTile(
-            "تفعيل سجل الإشعارات",
-            "تسجيل الإشعارات للمساعدة في حل المشاكل (يُنصح بتفعيله)",
-            Icons.receipt_long_rounded,
-            trailing: Switch(
-              value: _enableNativeLogging,
-              activeThumbColor: const Color(0xFFD0A871),
-              onChanged: (val) async {
-                final prefs = CacheHelper.prefs;
-                await prefs.setBool('enable_native_logging', val);
-                if (val) {
-                  try {
-                    final dir = await getApplicationSupportDirectory();
-                    final file = File('${dir.path}/native_prayer_log.txt');
-                    if (await file.exists()) {
-                      await file.delete();
-                    }
-                  } catch (_) {}
-                }
-                setState(() => _enableNativeLogging = val);
-              },
-            ),
-          ),
-          if (_enableNativeLogging)
-            _buildListTile(
-              "عرض سجل الإشعارات",
-              "قراءة السجل الخاص بالإشعارات وتصديره",
-              Icons.receipt_rounded,
-              onTap: () => _showNativeLog(context),
-            ),
-          _buildListTile(
-            "الإبلاغ عن مشكلة وإرسال السجل",
-            "إرسال تقرير مفصل مع ملف السجل للتشخيص والمساعدة عبر الواتساب أو البريد",
-            Icons.support_agent_rounded,
-            onTap: () async {
-              AppLoadingDialog.show(
-                context,
-                message: 'جاري تجهيز تقرير السجل...',
-              );
-              try {
-                final nativeLog = await BackgroundService.getNativeLog(
-                  lines: 500,
-                );
-                if (context.mounted) AppLoadingDialog.hide(context);
-                if (context.mounted) {
-                  await AppLogger.reportIssue(
-                    context,
-                    nativeLogContent: nativeLog,
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) AppLoadingDialog.hide(context);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
-                }
-              }
-            },
-          ),
-          // ─ مشاركة اللوغ — يعمل بدون USB ────────────────────
-          _buildListTile(
-            "مشاركة سجل التطبيق",
-            "إرسال ملف اللوج لتشخيص مشاكل التهنيج — يعمل بدون اتصال بالكمبيوتر",
-            Icons.bug_report_outlined,
-            onTap: () async {
-              AppLoadingDialog.show(context, message: 'جاري تجميع اللوج...');
-              try {
-                final nativeLog = await BackgroundService.getNativeLog(
-                  lines: 500,
-                );
-                if (context.mounted) AppLoadingDialog.hide(context);
-                await AppLogger.shareLog(nativeLogContent: nativeLog);
-              } catch (e) {
-                if (context.mounted) AppLoadingDialog.hide(context);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
-                }
-              }
-            },
-          ),
-          _buildListTile(
-            "تنظيف السجل",
-            "يحذف السطور الروتينية والمكررة ويحتفظ بالأخطاء والتهنيج فقط",
-            Icons.auto_fix_high_outlined,
-            onTap: () async {
-              final snack = ScaffoldMessenger.of(context);
-              snack.showSnackBar(
-                const SnackBar(content: Text('جاري تحليل السجل...')),
-              );
-              final result = await AppLogger.smartClean();
-              if (context.mounted) {
-                final kept = result['kept'] ?? 0;
-                final removed = result['removed'] ?? 0;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'تم التنظيف: حُذف $removed سطر روتيني، تبقى $kept سطر مهم ✓',
-                    ),
-                    duration: const Duration(seconds: 4),
-                  ),
-                );
-              }
-            },
-          ),
-          _buildListTile(
             "تواصل معنا",
             "أرسل لنا ملاحظاتك أو استفساراتك",
             Icons.mail_outline,
             onTap: () => _showContactSheet(),
-          ),
-          _buildListTile(
-            "عن التطبيق",
-            "الإصدار ${_installedVersionLabel ?? '...'}",
-            Icons.info_outline,
-            onTap: () async {
-              final packageInfo = await _packageInfoFuture;
-              if (!context.mounted) return;
-              showAboutDialog(
-                context: context,
-                applicationName: "عباد الرحمن",
-                applicationVersion:
-                    "${packageInfo.version}+${packageInfo.buildNumber}",
-                applicationIcon: Image.asset(
-                  "assets/images/logo.png",
-                  width: 50.w,
-                  height: 50.w,
-                ),
-                children: [
-                  Text(
-                    "تطبيق إسلامي شامل يهدف لخدمة المسلمين في شتى بقاع الأرض.",
-                    style: TextStyle(fontSize: 14.sp, fontFamily: 'Cairo'),
-                  ),
-                  SizedBox(height: 10.h),
-                  Text(
-                    "التحديثات الأخيرة:",
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      fontFamily: 'Cairo',
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFFD0A871),
-                    ),
-                  ),
-                  SizedBox(height: 5.h),
-                  Text(
-                    "• تنبيهات الصلاة على النبي مع ساعات الهدوء.\n"
-                    "• استمرار تشغيل القرآن في الخلفية وتظليل الكلمات.\n"
-                    "• توزيع أوراد الختمة على الصلوات تلقائياً.\n"
-                    "• تحسين شاشة (حاسب نفسك) ومنطق الختمة.\n"
-                    "• حذف إشعارات الصلوات الفارغة وتنظيفها.",
-                    style: TextStyle(
-                      fontSize: 13.sp,
-                      fontFamily: 'Cairo',
-                      height: 1.5,
-                    ),
-                  ),
-                ],
-              );
-            },
           ),
         ],
       ),

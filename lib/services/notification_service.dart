@@ -302,15 +302,29 @@ class NotificationService {
       // --- Azkar ---
       // We no longer schedule Azkar IDs (1, 3, 4, 5) from Dart.
       // We instruct the Kotlin side to schedule them using its NativeAzkarScheduler.
-      try {
-        await _platform.invokeMethod('rescheduleNativeAlarms', {});
-      } catch (e) {
+      if (isUserAction) {
+        try {
+          await _platform.invokeMethod('rescheduleNativeAlarms', {});
+        } catch (e) {
+          AppLogger.logEvent(
+            'NotificationService',
+            'native_azkar_reschedule_failed',
+            {'error_type': e.runtimeType.toString()},
+          );
+          debugPrint("Error rescheduling native alarms: $e");
+        }
+      } else {
+        // Background native refreshes have already rescheduled these alarms
+        // through NativePrayerScheduler/AlarmReceiver. Avoid a redundant
+        // Flutter method-channel call from isolates without that channel.
         AppLogger.logEvent(
           'NotificationService',
-          'native_azkar_reschedule_failed',
-          {'error_type': e.runtimeType.toString()},
+          'native_azkar_reschedule_skipped',
+          {
+            'reason': 'background_refresh_delegated_to_native_scheduler',
+            'existing_azkar_alarm_ids_preserved': true,
+          },
         );
-        debugPrint("Error rescheduling native alarms: $e");
       }
 
       await rescheduleWird();
@@ -540,23 +554,17 @@ class NotificationService {
           }
         }
 
-        // Kahf & Friday Salawat (Friday Morning 09:00 AM)
+        // Kahf & Friday Salawat (Friday daytime, one hour after Fajr)
         if (targetDate.weekday == DateTime.friday &&
             (prefs.getBool('notif_kahf_salawat') ?? true)) {
-          final fridayMorningTime = DateTime(
-            targetDate.year,
-            targetDate.month,
-            targetDate.day,
-            9,
-            0,
-          );
+          final fridayMorningTime = dayTimes.fajr.add(const Duration(hours: 1));
           if (fridayMorningTime.isAfter(now)) {
             await _scheduleNative(
               _kahfFridayMorningAlarmIdBase + i,
               'يوم الجمعة',
               'لا تنس قراءة سورة الكهف والإكثار من الصلاة على النبي ﷺ',
-              9,
-              0,
+              fridayMorningTime.hour,
+              fridayMorningTime.minute,
               'saly_3ala_mo7amad',
               payload: 'kahf',
               year: fridayMorningTime.year,
