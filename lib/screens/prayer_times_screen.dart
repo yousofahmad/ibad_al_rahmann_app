@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ibad_al_rahmann/core/helpers/app_formatters.dart';
 import 'package:ibad_al_rahmann/core/app_constants.dart';
-import 'package:ibad_al_rahmann/services/notification_service.dart';
 import 'package:intl/intl.dart';
 import '../services/prayer_service.dart';
 import '../services/egyptian_hijri_calendar.dart';
@@ -304,10 +303,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     try {
       await PrayerService().updateLocation();
       await _loadData();
-      final times = PrayerService().getPrayerTimes();
-      if (times != null) {
-        await NotificationService.scheduleAll(times, isUserAction: true);
-      }
     } finally {
       if (mounted) AppLoadingDialog.hide(context);
     }
