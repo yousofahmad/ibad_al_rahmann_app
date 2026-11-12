@@ -26,195 +26,154 @@ class PrayerTimesCubit extends Cubit<PrayerTimesState> {
     final startedAt = DateTime.now();
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cachedLat =
+      final savedLat =
           prefs.getDouble('last_lat') ?? prefs.getDouble('latitude');
-      final cachedLng =
+      final savedLng =
           prefs.getDouble('last_lng') ?? prefs.getDouble('longitude');
-      final cachedTimestampMs = prefs.getInt('last_gps_update_ms');
-      final cachedFix =
-          cachedLat != null &&
-              cachedLng != null &&
-              cachedLat.isFinite &&
-              cachedLng.isFinite &&
-              cachedLat >= -90 &&
-              cachedLat <= 90 &&
-              cachedLng >= -180 &&
-              cachedLng <= 180
-          ? PrayerLocationFix(
-              latitude: cachedLat,
-              longitude: cachedLng,
-              timestamp: cachedTimestampMs == null
-                  ? null
-                  : DateTime.fromMillisecondsSinceEpoch(cachedTimestampMs),
-            )
-          : null;
+      final savedTimestampMs = prefs.getInt('last_gps_update_ms');
+      final DateTime? newerThan = savedTimestampMs == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(savedTimestampMs);
 
-      final resolution =
-          await PrayerLocationResolver.resolve(
-            cachedFix: cachedFix,
-            getCurrentFix:
-                () async {
-                  final accessCheckStartedAt = DateTime.now();
-                  bool? serviceEnabled;
-                  LocationPermission? permission;
-                  try {
-                    serviceEnabled =
-                        await Geolocator.isLocationServiceEnabled();
-                    permission = await Geolocator.checkPermission();
-                    if (!serviceEnabled) {
-                      throw const PrayerLocationAcquisitionException(
-                        'location_service_disabled',
-                      );
-                    }
-                    if (permission == LocationPermission.denied ||
-                        permission == LocationPermission.deniedForever) {
-                      throw const PrayerLocationAcquisitionException(
-                        'location_permission_unavailable',
-                      );
-                    }
-                    AppLogger.logEvent(
-                      'PrayerLocationRefresh',
-                      'prayer_times_access_check_finished',
-                      {
-                        'duration_ms': DateTime.now()
-                            .difference(accessCheckStartedAt)
-                            .inMilliseconds,
-                        'service_enabled': serviceEnabled,
-                        'permission': permission.name,
-                        'outcome': 'allowed',
-                        'coordinates_logged': false,
-                      },
-                    );
-                  } catch (error) {
-                    AppLogger.logEvent(
-                      'PrayerLocationRefresh',
-                      'prayer_times_access_check_finished',
-                      {
-                        'duration_ms': DateTime.now()
-                            .difference(accessCheckStartedAt)
-                            .inMilliseconds,
-                        'service_enabled': serviceEnabled,
-                        'permission': permission?.name,
-                        'outcome': 'failed',
-                        'safe_failure_type': error.runtimeType.toString(),
-                        'coordinates_logged': false,
-                      },
-                    );
-                    rethrow;
-                  }
-
-                  const timeout = Duration(seconds: 6);
-                  final fixStartedAt = DateTime.now();
-                  AppLogger.logEvent(
-                    'PrayerLocationRefresh',
-                    'prayer_times_current_fix_started',
-                    {
-                      'accuracy': 'medium',
-                      'timeout_ms': timeout.inMilliseconds,
-                      'coordinates_logged': false,
-                    },
-                  );
-                  try {
-                    final position = await Geolocator.getCurrentPosition(
-                      locationSettings: const LocationSettings(
-                        accuracy: LocationAccuracy.medium,
-                        timeLimit: timeout,
-                      ),
-                    ).timeout(timeout);
-                    AppLogger.logEvent(
-                      'PrayerLocationRefresh',
-                      'prayer_times_current_fix_finished',
-                      {
-                        'duration_ms': DateTime.now()
-                            .difference(fixStartedAt)
-                            .inMilliseconds,
-                        'fix_age_ms': DateTime.now()
-                            .difference(position.timestamp)
-                            .inMilliseconds,
-                        'accuracy_m': position.accuracy,
-                        'outcome': 'success',
-                        'coordinates_logged': false,
-                      },
-                    );
-                    return PrayerLocationFix(
-                      latitude: position.latitude,
-                      longitude: position.longitude,
-                      timestamp: position.timestamp,
-                      accuracy: position.accuracy,
-                    );
-                  } catch (error) {
-                    AppLogger.logEvent(
-                      'PrayerLocationRefresh',
-                      'prayer_times_current_fix_finished',
-                      {
-                        'duration_ms': DateTime.now()
-                            .difference(fixStartedAt)
-                            .inMilliseconds,
-                        'outcome': 'failed',
-                        'safe_failure_type': error.runtimeType.toString(),
-                        'coordinates_logged': false,
-                      },
-                    );
-                    rethrow;
-                  }
-                },
-            getLastKnownFix: () async {
-              final lookupStartedAt = DateTime.now();
-              AppLogger.logEvent(
-                'PrayerLocationRefresh',
-                'prayer_times_last_known_lookup_started',
-                {'coordinates_logged': false},
+      final resolution = await PrayerLocationResolver.resolve(
+        newerThan: newerThan,
+        getCurrentFix: () async {
+          final accessCheckStartedAt = DateTime.now();
+          bool? serviceEnabled;
+          LocationPermission? permission;
+          try {
+            serviceEnabled = await Geolocator.isLocationServiceEnabled();
+            permission = await Geolocator.checkPermission();
+            if (!serviceEnabled) {
+              throw const PrayerLocationAcquisitionException(
+                'location_service_disabled',
               );
-              try {
-                final position = await Geolocator.getLastKnownPosition()
-                    .timeout(const Duration(seconds: 1));
-                AppLogger.logEvent(
-                  'PrayerLocationRefresh',
-                  'prayer_times_last_known_lookup_finished',
-                  {
-                    'duration_ms': DateTime.now()
-                        .difference(lookupStartedAt)
-                        .inMilliseconds,
-                    'outcome': position == null ? 'empty' : 'success',
-                    'fix_age_ms': position == null
-                        ? null
-                        : DateTime.now()
-                              .difference(position.timestamp)
-                              .inMilliseconds,
-                    'coordinates_logged': false,
-                  },
-                );
-                if (position == null) return null;
-                return PrayerLocationFix(
-                  latitude: position.latitude,
-                  longitude: position.longitude,
-                  timestamp: position.timestamp,
-                  accuracy: position.accuracy,
-                );
-              } catch (error) {
-                AppLogger.logEvent(
-                  'PrayerLocationRefresh',
-                  'prayer_times_last_known_lookup_finished',
-                  {
-                    'duration_ms': DateTime.now()
-                        .difference(lookupStartedAt)
-                        .inMilliseconds,
-                    'outcome': 'failed',
-                    'safe_failure_type': error.runtimeType.toString(),
-                    'coordinates_logged': false,
-                  },
-                );
-                rethrow;
-              }
+            }
+            if (permission == LocationPermission.denied ||
+                permission == LocationPermission.deniedForever) {
+              throw const PrayerLocationAcquisitionException(
+                'location_permission_unavailable',
+              );
+            }
+            AppLogger.logEvent(
+              'PrayerLocationRefresh',
+              'prayer_times_access_check_finished',
+              {
+                'duration_ms': DateTime.now()
+                    .difference(accessCheckStartedAt)
+                    .inMilliseconds,
+                'service_enabled': serviceEnabled,
+                'permission': permission.name,
+                'outcome': 'allowed',
+                'coordinates_logged': false,
+              },
+            );
+          } catch (error) {
+            AppLogger.logEvent(
+              'PrayerLocationRefresh',
+              'prayer_times_access_check_finished',
+              {
+                'duration_ms': DateTime.now()
+                    .difference(accessCheckStartedAt)
+                    .inMilliseconds,
+                'service_enabled': serviceEnabled,
+                'permission': permission?.name,
+                'outcome': 'failed',
+                'safe_failure_type': error.runtimeType.toString(),
+                'failure_reason': error is PrayerLocationAcquisitionException
+                    ? error.reason
+                    : null,
+                'coordinates_logged': false,
+              },
+            );
+            rethrow;
+          }
+
+          const timeout = Duration(seconds: 6);
+          final fixStartedAt = DateTime.now();
+          AppLogger.logEvent(
+            'PrayerLocationRefresh',
+            'prayer_times_current_fix_started',
+            {
+              'accuracy': 'medium',
+              'timeout_ms': timeout.inMilliseconds,
+              'coordinates_logged': false,
             },
           );
+          try {
+            final position = await Geolocator.getCurrentPosition(
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.medium,
+                timeLimit: timeout,
+              ),
+            ).timeout(timeout);
+            AppLogger.logEvent(
+              'PrayerLocationRefresh',
+              'prayer_times_current_fix_finished',
+              {
+                'duration_ms': DateTime.now()
+                    .difference(fixStartedAt)
+                    .inMilliseconds,
+                'fix_age_ms': DateTime.now()
+                    .difference(position.timestamp)
+                    .inMilliseconds,
+                'accuracy_m': position.accuracy,
+                'outcome': 'success',
+                'coordinates_logged': false,
+              },
+            );
+            return PrayerLocationFix(
+              latitude: position.latitude,
+              longitude: position.longitude,
+              timestamp: position.timestamp,
+              accuracy: position.accuracy,
+            );
+          } catch (error) {
+            AppLogger.logEvent(
+              'PrayerLocationRefresh',
+              'prayer_times_current_fix_finished',
+              {
+                'duration_ms': DateTime.now()
+                    .difference(fixStartedAt)
+                    .inMilliseconds,
+                'outcome': 'failed',
+                'safe_failure_type': error.runtimeType.toString(),
+                'failure_reason': error is PrayerLocationAcquisitionException
+                    ? error.reason
+                    : null,
+                'coordinates_logged': false,
+              },
+            );
+            rethrow;
+          }
+        },
+      );
       final fix = resolution.fix;
       if (fix == null) {
         AppLogger.logEvent('PrayerLocationRefresh', 'prayer_times_fix_failed', {
           'source': 'none',
           'current_failure': resolution.currentFailure,
-          'last_known_failure': resolution.lastKnownFailure,
           'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
+          'coordinates_logged': false,
+        });
+        return null;
+      }
+
+      final incomingTimestampMs = fix.timestamp?.millisecondsSinceEpoch;
+      final latestSavedTimestampMs = prefs.getInt('last_gps_update_ms');
+      if (incomingTimestampMs == null ||
+          (latestSavedTimestampMs != null &&
+              incomingTimestampMs <= latestSavedTimestampMs)) {
+        final reason = incomingTimestampMs == null
+            ? 'current_fix_timestamp_unavailable'
+            : 'current_fix_not_newer_than_saved';
+        AppLogger.logEvent('PrayerLocationRefresh', 'prayer_times_fix_failed', {
+          'source': 'current_position_rejected',
+          'current_failure': reason,
+          'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
+          'fix_age_ms': fix.timestamp == null
+              ? null
+              : DateTime.now().difference(fix.timestamp!).inMilliseconds,
           'coordinates_logged': false,
         });
         return null;
@@ -224,31 +183,30 @@ class PrayerTimesCubit extends Cubit<PrayerTimesState> {
       await prefs.setDouble('last_lng', fix.longitude);
       await prefs.setDouble('latitude', fix.latitude);
       await prefs.setDouble('longitude', fix.longitude);
-      final savedTimestampMs = prefs.getInt('last_gps_update_ms');
-      final incomingTimestampMs = fix.timestamp?.millisecondsSinceEpoch;
-      if (resolution.source != PrayerLocationFixSource.savedCoordinates &&
-          incomingTimestampMs != null &&
-          (savedTimestampMs == null ||
-              incomingTimestampMs >= savedTimestampMs)) {
-        await prefs.setInt('last_gps_update_ms', incomingTimestampMs);
-      }
+      await prefs.setInt('last_gps_update_ms', incomingTimestampMs);
 
+      final savedPlaceIsValid =
+          savedLat != null &&
+          savedLng != null &&
+          savedLat.isFinite &&
+          savedLng.isFinite &&
+          savedLat >= -90 &&
+          savedLat <= 90 &&
+          savedLng >= -180 &&
+          savedLng <= 180;
       final withinSavedPlaceArea =
-          cachedFix != null &&
+          savedPlaceIsValid &&
           Geolocator.distanceBetween(
-                cachedFix.latitude,
-                cachedFix.longitude,
+                savedLat,
+                savedLng,
                 fix.latitude,
                 fix.longitude,
               ) <=
               250;
-      final useSavedPlaceName =
-          resolution.source == PrayerLocationFixSource.savedCoordinates ||
-          withinSavedPlaceArea;
       String city = '';
       String country = '';
       String isoCode = '';
-      if (useSavedPlaceName) {
+      if (withinSavedPlaceArea) {
         city = prefs.getString('last_city_name') ?? '';
         country = prefs.getString('last_country_name') ?? '';
         isoCode = prefs.getString('last_iso_country_code') ?? '';
@@ -262,7 +220,6 @@ class PrayerTimesCubit extends Cubit<PrayerTimesState> {
       AppLogger.logEvent('PrayerLocationRefresh', 'prayer_times_fix_resolved', {
         'source': resolution.source?.name,
         'current_failure': resolution.currentFailure,
-        'last_known_failure': resolution.lastKnownFailure,
         'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
         'fix_age_ms': fix.timestamp == null
             ? null

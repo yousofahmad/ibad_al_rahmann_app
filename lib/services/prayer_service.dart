@@ -387,31 +387,12 @@ class PrayerService extends ChangeNotifier {
     Duration currentFixTimeout = const Duration(seconds: 6),
   }) async {
     final prefs = CacheHelper.prefs;
-    final cachedLat =
-        prefs.getDouble('last_lat') ?? prefs.getDouble('latitude');
-    final cachedLng =
-        prefs.getDouble('last_lng') ?? prefs.getDouble('longitude');
-    final cachedTimestampMs = prefs.getInt('last_gps_update_ms');
-    final cachedFix =
-        cachedLat != null &&
-            cachedLng != null &&
-            cachedLat.isFinite &&
-            cachedLng.isFinite &&
-            cachedLat >= -90 &&
-            cachedLat <= 90 &&
-            cachedLng >= -180 &&
-            cachedLng <= 180
-        ? PrayerLocationFix(
-            latitude: cachedLat,
-            longitude: cachedLng,
-            timestamp: cachedTimestampMs == null
-                ? null
-                : DateTime.fromMillisecondsSinceEpoch(cachedTimestampMs),
-          )
-        : null;
-
+    final savedTimestampMs = prefs.getInt('last_gps_update_ms');
+    final DateTime? newerThan = savedTimestampMs == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(savedTimestampMs);
     final resolution = await PrayerLocationResolver.resolve(
-      cachedFix: cachedFix,
+      newerThan: newerThan,
       getCurrentFix: () async {
         final accessCheckStartedAt = DateTime.now();
         bool? serviceEnabled;
@@ -457,6 +438,9 @@ class PrayerService extends ChangeNotifier {
               'permission': permission?.name,
               'outcome': 'failed',
               'safe_failure_type': error.runtimeType.toString(),
+              'failure_reason': error is PrayerLocationAcquisitionException
+                  ? error.reason
+                  : null,
               'coordinates_logged': false,
             },
           );
@@ -503,75 +487,25 @@ class PrayerService extends ChangeNotifier {
                 .inMilliseconds,
             'outcome': 'failed',
             'safe_failure_type': error.runtimeType.toString(),
+            'failure_reason': error is PrayerLocationAcquisitionException
+                ? error.reason
+                : null,
             'coordinates_logged': false,
           });
-          rethrow;
-        }
-      },
-      getLastKnownFix: () async {
-        final lookupStartedAt = DateTime.now();
-        AppLogger.logEvent(
-          'PrayerLocationRefresh',
-          'last_known_lookup_started',
-          {'trigger': trigger, 'coordinates_logged': false},
-        );
-        try {
-          final position = await Geolocator.getLastKnownPosition().timeout(
-            const Duration(seconds: 1),
-          );
-          AppLogger.logEvent(
-            'PrayerLocationRefresh',
-            'last_known_lookup_finished',
-            {
-              'trigger': trigger,
-              'duration_ms': DateTime.now()
-                  .difference(lookupStartedAt)
-                  .inMilliseconds,
-              'outcome': position == null ? 'empty' : 'success',
-              'fix_age_ms': position == null
-                  ? null
-                  : DateTime.now()
-                        .difference(position.timestamp)
-                        .inMilliseconds,
-              'coordinates_logged': false,
-            },
-          );
-          if (position == null) return null;
-          return PrayerLocationFix(
-            latitude: position.latitude,
-            longitude: position.longitude,
-            timestamp: position.timestamp,
-            accuracy: position.accuracy,
-          );
-        } catch (error) {
-          AppLogger.logEvent(
-            'PrayerLocationRefresh',
-            'last_known_lookup_finished',
-            {
-              'trigger': trigger,
-              'duration_ms': DateTime.now()
-                  .difference(lookupStartedAt)
-                  .inMilliseconds,
-              'outcome': 'failed',
-              'safe_failure_type': error.runtimeType.toString(),
-              'coordinates_logged': false,
-            },
-          );
           rethrow;
         }
       },
     );
 
     final fix = resolution.fix;
-    final ageMs = fix?.timestamp == null
-        ? null
-        : DateTime.now().difference(fix!.timestamp!).inMilliseconds;
     AppLogger.logEvent('PrayerLocationRefresh', 'fix_resolved', {
       'trigger': trigger,
+      'outcome': fix == null ? 'failed' : 'success',
       'source': resolution.source?.name ?? 'none',
       'current_failure': resolution.currentFailure,
-      'last_known_failure': resolution.lastKnownFailure,
-      'fix_age_ms': ageMs,
+      'fix_age_ms': fix?.timestamp == null
+          ? null
+          : DateTime.now().difference(fix!.timestamp!).inMilliseconds,
       'coordinates_logged': false,
     });
     return resolution;
@@ -626,7 +560,6 @@ class PrayerService extends ChangeNotifier {
       String? reason,
       String? distanceBucket,
       String? currentFailure,
-      String? lastKnownFailure,
     }) {
       AppLogger.logEvent('PrayerLocationRefresh', 'attempt_finished', {
         'trigger': trigger,
@@ -639,7 +572,6 @@ class PrayerService extends ChangeNotifier {
         'reason': reason,
         'distance_bucket': distanceBucket,
         'current_failure': currentFailure,
-        'last_known_failure': lastKnownFailure,
         'coordinates_logged': false,
       });
     }
@@ -667,31 +599,38 @@ class PrayerService extends ChangeNotifier {
       if (fix == null) {
         logFinished(
           'failed',
-          reason: 'no_current_last_known_or_saved_location',
+          reason: 'current_position_unavailable',
           currentFailure: resolution.currentFailure,
-          lastKnownFailure: resolution.lastKnownFailure,
+        );
+        return;
+      }
+
+      final prefs = CacheHelper.prefs;
+      final savedTimestampMs = prefs.getInt('last_gps_update_ms');
+      final incomingTimestampMs = fix.timestamp?.millisecondsSinceEpoch;
+      if (incomingTimestampMs == null ||
+          (savedTimestampMs != null &&
+              incomingTimestampMs <= savedTimestampMs)) {
+        logFinished(
+          'failed',
+          reason: incomingTimestampMs == null
+              ? 'current_fix_timestamp_unavailable'
+              : 'current_fix_not_newer_than_saved',
+          currentFailure: incomingTimestampMs == null
+              ? 'current_fix_timestamp_unavailable'
+              : 'current_fix_not_newer_than_saved',
         );
         return;
       }
 
       final oldLat = _coordinates?.latitude;
       final oldLng = _coordinates?.longitude;
-
       _coordinates = Coordinates(fix.latitude, fix.longitude);
-
-      final prefs = CacheHelper.prefs;
       await prefs.setDouble('last_lat', fix.latitude);
       await prefs.setDouble('last_lng', fix.longitude);
       await prefs.setDouble('latitude', fix.latitude);
       await prefs.setDouble('longitude', fix.longitude);
-      final savedTimestampMs = prefs.getInt('last_gps_update_ms');
-      final incomingTimestampMs = fix.timestamp?.millisecondsSinceEpoch;
-      if (resolution.source != PrayerLocationFixSource.savedCoordinates &&
-          incomingTimestampMs != null &&
-          (savedTimestampMs == null ||
-              incomingTimestampMs >= savedTimestampMs)) {
-        await prefs.setInt('last_gps_update_ms', incomingTimestampMs);
-      }
+      await prefs.setInt('last_gps_update_ms', incomingTimestampMs);
 
       bool shouldReschedule = true;
       double? distanceMeters;
@@ -724,12 +663,9 @@ class PrayerService extends ChangeNotifier {
         ),
       );
       logFinished(
-        resolution.source == PrayerLocationFixSource.currentPosition
-            ? 'success'
-            : 'fallback',
-        reason: 'location_${resolution.source?.name ?? 'unavailable'}',
+        'success',
+        reason: 'location_current_position',
         currentFailure: resolution.currentFailure,
-        lastKnownFailure: resolution.lastKnownFailure,
         distanceBucket: distanceMeters == null
             ? null
             : _locationDistanceBucket(distanceMeters),
@@ -1305,9 +1241,7 @@ class PrayerService extends ChangeNotifier {
       rethrow;
     }
     AppLogger.logEvent('PrayerLocationRefresh', 'manual_update_complete', {
-      'outcome': source == PrayerLocationFixSource.currentPosition
-          ? 'success'
-          : 'fallback',
+      'outcome': 'success',
       'source': source.name,
       'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
       'coordinates_logged': false,
@@ -1329,20 +1263,32 @@ class PrayerService extends ChangeNotifier {
         return null;
       }
 
-      _coordinates = Coordinates(fix.latitude, fix.longitude);
       final prefs = CacheHelper.prefs;
+      final savedTimestampMs = prefs.getInt('last_gps_update_ms');
+      final incomingTimestampMs = fix.timestamp?.millisecondsSinceEpoch;
+      if (incomingTimestampMs == null ||
+          (savedTimestampMs != null &&
+              incomingTimestampMs <= savedTimestampMs)) {
+        AppLogger.logEvent('PrayerLocationRefresh', 'manual_update_finished', {
+          'outcome': 'failed',
+          'reason': incomingTimestampMs == null
+              ? 'current_fix_timestamp_unavailable'
+              : 'current_fix_not_newer_than_saved',
+          'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
+          'current_failure': incomingTimestampMs == null
+              ? 'current_fix_timestamp_unavailable'
+              : 'current_fix_not_newer_than_saved',
+          'coordinates_logged': false,
+        });
+        return null;
+      }
+
+      _coordinates = Coordinates(fix.latitude, fix.longitude);
       await prefs.setDouble('last_lat', fix.latitude);
       await prefs.setDouble('last_lng', fix.longitude);
       await prefs.setDouble('latitude', fix.latitude);
       await prefs.setDouble('longitude', fix.longitude);
-      final savedTimestampMs = prefs.getInt('last_gps_update_ms');
-      final incomingTimestampMs = fix.timestamp?.millisecondsSinceEpoch;
-      if (resolution.source != PrayerLocationFixSource.savedCoordinates &&
-          incomingTimestampMs != null &&
-          (savedTimestampMs == null ||
-              incomingTimestampMs >= savedTimestampMs)) {
-        await prefs.setInt('last_gps_update_ms', incomingTimestampMs);
-      }
+      await prefs.setInt('last_gps_update_ms', incomingTimestampMs);
       notifyListeners();
       unawaited(
         _updateCityNameFromCoordinates(
@@ -1352,12 +1298,9 @@ class PrayerService extends ChangeNotifier {
         ),
       );
       AppLogger.logEvent('PrayerLocationRefresh', 'manual_update_finished', {
-        'outcome': resolution.source == PrayerLocationFixSource.currentPosition
-            ? 'success'
-            : 'fallback',
+        'outcome': 'success',
         'source': resolution.source?.name,
         'current_failure': resolution.currentFailure,
-        'last_known_failure': resolution.lastKnownFailure,
         'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
         'coordinates_logged': false,
       });
