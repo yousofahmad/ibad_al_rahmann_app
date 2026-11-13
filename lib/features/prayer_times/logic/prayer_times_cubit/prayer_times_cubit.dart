@@ -147,43 +147,108 @@ class PrayerTimesCubit extends Cubit<PrayerTimesState> {
             rethrow;
           }
         },
+        getLastKnownFix: () async {
+          final lookupStartedAt = DateTime.now();
+          AppLogger.logEvent(
+            'PrayerLocationRefresh',
+            'prayer_times_last_known_lookup_started',
+            {'coordinates_logged': false},
+          );
+          try {
+            final position = await Geolocator.getLastKnownPosition().timeout(
+              const Duration(seconds: 1),
+            );
+            final ageMs = position == null
+                ? null
+                : DateTime.now().difference(position.timestamp).inMilliseconds;
+            AppLogger.logEvent(
+              'PrayerLocationRefresh',
+              'prayer_times_last_known_lookup_finished',
+              {
+                'duration_ms': DateTime.now()
+                    .difference(lookupStartedAt)
+                    .inMilliseconds,
+                'outcome': position == null ? 'empty' : 'fallback_available',
+                'source': PrayerLocationFixSource.lastKnownPosition.name,
+                'is_stale': position != null,
+                'fix_age_ms': ageMs,
+                'accuracy_m': position?.accuracy,
+                'coordinates_logged': false,
+              },
+            );
+            if (position == null) return null;
+            return PrayerLocationFix(
+              latitude: position.latitude,
+              longitude: position.longitude,
+              timestamp: position.timestamp,
+              accuracy: position.accuracy,
+            );
+          } catch (error) {
+            AppLogger.logEvent(
+              'PrayerLocationRefresh',
+              'prayer_times_last_known_lookup_finished',
+              {
+                'duration_ms': DateTime.now()
+                    .difference(lookupStartedAt)
+                    .inMilliseconds,
+                'outcome': 'failed',
+                'source': PrayerLocationFixSource.lastKnownPosition.name,
+                'safe_failure_type': error.runtimeType.toString(),
+                'coordinates_logged': false,
+              },
+            );
+            rethrow;
+          }
+        },
       );
       final fix = resolution.fix;
-      if (fix == null) {
+      final source = resolution.source;
+      if (fix == null || source == null) {
         AppLogger.logEvent('PrayerLocationRefresh', 'prayer_times_fix_failed', {
           'source': 'none',
           'current_failure': resolution.currentFailure,
+          'last_known_failure': resolution.lastKnownFailure,
           'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
           'coordinates_logged': false,
         });
         return null;
       }
 
+      final isCurrentFix = source == PrayerLocationFixSource.currentPosition;
       final incomingTimestampMs = fix.timestamp?.millisecondsSinceEpoch;
-      final latestSavedTimestampMs = prefs.getInt('last_gps_update_ms');
-      if (incomingTimestampMs == null ||
-          (latestSavedTimestampMs != null &&
-              incomingTimestampMs <= latestSavedTimestampMs)) {
-        final reason = incomingTimestampMs == null
-            ? 'current_fix_timestamp_unavailable'
-            : 'current_fix_not_newer_than_saved';
-        AppLogger.logEvent('PrayerLocationRefresh', 'prayer_times_fix_failed', {
-          'source': 'current_position_rejected',
-          'current_failure': reason,
-          'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
-          'fix_age_ms': fix.timestamp == null
-              ? null
-              : DateTime.now().difference(fix.timestamp!).inMilliseconds,
-          'coordinates_logged': false,
-        });
-        return null;
-      }
+      if (isCurrentFix) {
+        final latestSavedTimestampMs = prefs.getInt('last_gps_update_ms');
+        if (incomingTimestampMs == null ||
+            (latestSavedTimestampMs != null &&
+                incomingTimestampMs <= latestSavedTimestampMs)) {
+          final reason = incomingTimestampMs == null
+              ? 'current_fix_timestamp_unavailable'
+              : 'current_fix_not_newer_than_saved';
+          AppLogger.logEvent(
+            'PrayerLocationRefresh',
+            'prayer_times_fix_failed',
+            {
+              'source': 'current_position_rejected',
+              'current_failure': reason,
+              'last_known_failure': resolution.lastKnownFailure,
+              'duration_ms': DateTime.now()
+                  .difference(startedAt)
+                  .inMilliseconds,
+              'fix_age_ms': fix.timestamp == null
+                  ? null
+                  : DateTime.now().difference(fix.timestamp!).inMilliseconds,
+              'coordinates_logged': false,
+            },
+          );
+          return null;
+        }
 
-      await prefs.setDouble('last_lat', fix.latitude);
-      await prefs.setDouble('last_lng', fix.longitude);
-      await prefs.setDouble('latitude', fix.latitude);
-      await prefs.setDouble('longitude', fix.longitude);
-      await prefs.setInt('last_gps_update_ms', incomingTimestampMs);
+        await prefs.setDouble('last_lat', fix.latitude);
+        await prefs.setDouble('last_lng', fix.longitude);
+        await prefs.setDouble('latitude', fix.latitude);
+        await prefs.setDouble('longitude', fix.longitude);
+        await prefs.setInt('last_gps_update_ms', incomingTimestampMs);
+      }
 
       final savedPlaceIsValid =
           savedLat != null &&
@@ -210,27 +275,31 @@ class PrayerTimesCubit extends Cubit<PrayerTimesState> {
         city = prefs.getString('last_city_name') ?? '';
         country = prefs.getString('last_country_name') ?? '';
         isoCode = prefs.getString('last_iso_country_code') ?? '';
-      } else {
+      } else if (isCurrentFix) {
         await prefs.remove('last_city_name');
         await prefs.remove('last_country_name');
         await prefs.remove('last_iso_country_code');
         unawaited(_updatePlaceNameForFix(fix, prefs));
       }
 
+      final fixAgeMs = fix.timestamp == null
+          ? null
+          : DateTime.now().difference(fix.timestamp!).inMilliseconds;
       AppLogger.logEvent('PrayerLocationRefresh', 'prayer_times_fix_resolved', {
-        'source': resolution.source?.name,
+        'outcome': isCurrentFix ? 'success' : 'fallback',
+        'source': source.name,
+        'is_stale': !isCurrentFix,
         'current_failure': resolution.currentFailure,
+        'last_known_failure': resolution.lastKnownFailure,
         'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
-        'fix_age_ms': fix.timestamp == null
-            ? null
-            : DateTime.now().difference(fix.timestamp!).inMilliseconds,
+        'fix_age_ms': fixAgeMs,
         'coordinates_logged': false,
       });
 
       final position = Position(
         latitude: fix.latitude,
         longitude: fix.longitude,
-        timestamp: fix.timestamp ?? DateTime.now(),
+        timestamp: fix.timestamp ?? DateTime.fromMillisecondsSinceEpoch(0),
         accuracy: fix.accuracy ?? 0,
         altitude: 0,
         altitudeAccuracy: 0,

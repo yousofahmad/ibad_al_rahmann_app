@@ -1,6 +1,6 @@
 import 'dart:async';
 
-enum PrayerLocationFixSource { currentPosition }
+enum PrayerLocationFixSource { currentPosition, lastKnownPosition }
 
 class PrayerLocationFix {
   const PrayerLocationFix({
@@ -21,11 +21,13 @@ class PrayerLocationResolution {
     required this.fix,
     required this.source,
     this.currentFailure,
+    this.lastKnownFailure,
   });
 
   final PrayerLocationFix? fix;
   final PrayerLocationFixSource? source;
   final String? currentFailure;
+  final String? lastKnownFailure;
 }
 
 class PrayerLocationAcquisitionException implements Exception {
@@ -39,35 +41,53 @@ class PrayerLocationResolver {
 
   static Future<PrayerLocationResolution> resolve({
     required Future<PrayerLocationFix> Function() getCurrentFix,
+    required Future<PrayerLocationFix?> Function() getLastKnownFix,
     DateTime? newerThan,
   }) async {
+    String? currentFailure;
     try {
       final currentFix = await getCurrentFix();
-      if (newerThan != null && currentFix.timestamp == null) {
-        return const PrayerLocationResolution(
-          fix: null,
-          source: null,
-          currentFailure: 'current_fix_timestamp_unavailable',
-        );
-      }
-      if (newerThan != null && !currentFix.timestamp!.isAfter(newerThan)) {
-        return const PrayerLocationResolution(
-          fix: null,
-          source: null,
-          currentFailure: 'current_fix_not_newer_than_saved',
-        );
+      if (newerThan != null) {
+        final timestamp = currentFix.timestamp;
+        if (timestamp == null) {
+          throw const PrayerLocationAcquisitionException(
+            'current_fix_timestamp_unavailable',
+          );
+        }
+        if (!timestamp.isAfter(newerThan)) {
+          throw const PrayerLocationAcquisitionException(
+            'current_fix_not_newer_than_saved',
+          );
+        }
       }
       return PrayerLocationResolution(
         fix: currentFix,
         source: PrayerLocationFixSource.currentPosition,
       );
     } catch (error) {
-      return PrayerLocationResolution(
-        fix: null,
-        source: null,
-        currentFailure: _safeFailureReason(error),
-      );
+      currentFailure = _safeFailureReason(error);
     }
+
+    String? lastKnownFailure;
+    try {
+      final lastKnownFix = await getLastKnownFix();
+      if (lastKnownFix != null) {
+        return PrayerLocationResolution(
+          fix: lastKnownFix,
+          source: PrayerLocationFixSource.lastKnownPosition,
+          currentFailure: currentFailure,
+        );
+      }
+    } catch (error) {
+      lastKnownFailure = _safeFailureReason(error);
+    }
+
+    return PrayerLocationResolution(
+      fix: null,
+      source: null,
+      currentFailure: currentFailure,
+      lastKnownFailure: lastKnownFailure,
+    );
   }
 
   static String _safeFailureReason(Object error) {
