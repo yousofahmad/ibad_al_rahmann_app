@@ -343,13 +343,18 @@ class PrayerService extends ChangeNotifier {
 
       // Defer heavy notification and alarm scheduling until after app startup
       Future.delayed(const Duration(seconds: 1), () {
+        unawaited(
+          _rebuildNotificationsFromAvailableCoordinates(
+            trigger: 'app_startup',
+            locationSource: 'saved_coordinates',
+            fixAgeMs: _savedLocationAgeMs(),
+          ),
+        );
         if (WidgetsBinding.instance.lifecycleState ==
             AppLifecycleState.resumed) {
           _refreshLocationInBackground();
           // Also check if GPS is stale (> 7 days) and silently refresh in background
           refreshLocationIfStale();
-        } else {
-          scheduleNotifications(isUserAction: false);
         }
       });
     } finally {
@@ -611,6 +616,80 @@ class PrayerService extends ChangeNotifier {
     }
   }
 
+  int? _savedLocationAgeMs() {
+    final savedTimestampMs = CacheHelper.prefs.getInt('last_gps_update_ms');
+    if (savedTimestampMs == null) return null;
+    return DateTime.now()
+        .difference(DateTime.fromMillisecondsSinceEpoch(savedTimestampMs))
+        .inMilliseconds;
+  }
+
+  Future<void> _rebuildNotificationsFromAvailableCoordinates({
+    required String trigger,
+    required String locationSource,
+    int? fixAgeMs,
+    String? currentFailure,
+    String? lastKnownFailure,
+  }) async {
+    if (getPrayerTimes() == null) {
+      AppLogger.logEvent(
+        'PrayerLocationRefresh',
+        'notification_rebuild_finished',
+        {
+          'trigger': trigger,
+          'outcome': 'skipped_no_prayer_coordinates',
+          'location_source': locationSource,
+          'is_stale': true,
+          'fix_age_ms': fixAgeMs,
+          'current_failure': currentFailure,
+          'last_known_failure': lastKnownFailure,
+          'coordinates_logged': false,
+        },
+      );
+      return;
+    }
+
+    final startedAt = DateTime.now();
+    try {
+      await scheduleNotifications(
+        isUserAction: false,
+        scheduleLocationRefresh: false,
+      );
+      AppLogger.logEvent(
+        'PrayerLocationRefresh',
+        'notification_rebuild_finished',
+        {
+          'trigger': trigger,
+          'outcome': 'scheduled',
+          'location_source': locationSource,
+          'is_stale': true,
+          'fix_age_ms': fixAgeMs,
+          'current_failure': currentFailure,
+          'last_known_failure': lastKnownFailure,
+          'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
+          'coordinates_logged': false,
+        },
+      );
+    } catch (error) {
+      AppLogger.logEvent(
+        'PrayerLocationRefresh',
+        'notification_rebuild_finished',
+        {
+          'trigger': trigger,
+          'outcome': 'failed',
+          'location_source': locationSource,
+          'is_stale': true,
+          'fix_age_ms': fixAgeMs,
+          'current_failure': currentFailure,
+          'last_known_failure': lastKnownFailure,
+          'safe_failure_type': error.runtimeType.toString(),
+          'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
+          'coordinates_logged': false,
+        },
+      );
+    }
+  }
+
   Future<void> _refreshLocationInBackground({
     String trigger = 'app_start',
     DateTime? expectedPrayerAt,
@@ -667,11 +746,25 @@ class PrayerService extends ChangeNotifier {
       final resolution = await _resolveLocationFix(trigger: trigger);
       final fix = resolution.fix;
       if (fix == null) {
-        logFinished(
-          'failed',
-          reason: 'current_position_unavailable',
+        final savedAgeMs = _savedLocationAgeMs();
+        final hasSavedPrayerTimes = getPrayerTimes() != null;
+        await _rebuildNotificationsFromAvailableCoordinates(
+          trigger: trigger,
+          locationSource: 'saved_coordinates',
+          fixAgeMs: savedAgeMs,
           currentFailure: resolution.currentFailure,
           lastKnownFailure: resolution.lastKnownFailure,
+        );
+        logFinished(
+          hasSavedPrayerTimes ? 'fallback' : 'failed',
+          reason: hasSavedPrayerTimes
+              ? 'gps_and_last_known_unavailable_notifications_rebuilt_from_saved_coordinates'
+              : 'current_and_last_known_positions_unavailable',
+          currentFailure: resolution.currentFailure,
+          lastKnownFailure: resolution.lastKnownFailure,
+          locationSource: hasSavedPrayerTimes ? 'saved_coordinates' : null,
+          isStale: hasSavedPrayerTimes,
+          fixAgeMs: savedAgeMs,
         );
         return;
       }
@@ -681,10 +774,16 @@ class PrayerService extends ChangeNotifier {
           : DateTime.now().difference(fix.timestamp!).inMilliseconds;
       if (resolution.source == PrayerLocationFixSource.lastKnownPosition) {
         _coordinates = Coordinates(fix.latitude, fix.longitude);
-        await updatePersistentElements();
+        await _rebuildNotificationsFromAvailableCoordinates(
+          trigger: trigger,
+          locationSource: resolution.source!.name,
+          fixAgeMs: fixAgeMs,
+          currentFailure: resolution.currentFailure,
+          lastKnownFailure: resolution.lastKnownFailure,
+        );
         logFinished(
           'fallback',
-          reason: 'last_known_position_used_without_rescheduling',
+          reason: 'last_known_position_used_and_notifications_rebuilt',
           currentFailure: resolution.currentFailure,
           lastKnownFailure: resolution.lastKnownFailure,
           locationSource: resolution.source?.name,
@@ -700,14 +799,28 @@ class PrayerService extends ChangeNotifier {
       if (incomingTimestampMs == null ||
           (savedTimestampMs != null &&
               incomingTimestampMs <= savedTimestampMs)) {
-        logFinished(
-          'failed',
-          reason: incomingTimestampMs == null
-              ? 'current_fix_timestamp_unavailable'
-              : 'current_fix_not_newer_than_saved',
+        final savedAgeMs = _savedLocationAgeMs();
+        await _rebuildNotificationsFromAvailableCoordinates(
+          trigger: trigger,
+          locationSource: 'saved_coordinates',
+          fixAgeMs: savedAgeMs,
           currentFailure: incomingTimestampMs == null
               ? 'current_fix_timestamp_unavailable'
               : 'current_fix_not_newer_than_saved',
+          lastKnownFailure: resolution.lastKnownFailure,
+        );
+        logFinished(
+          'fallback',
+          reason: incomingTimestampMs == null
+              ? 'current_fix_timestamp_unavailable_notifications_rebuilt_from_saved_coordinates'
+              : 'current_fix_not_newer_than_saved_notifications_rebuilt_from_saved_coordinates',
+          currentFailure: incomingTimestampMs == null
+              ? 'current_fix_timestamp_unavailable'
+              : 'current_fix_not_newer_than_saved',
+          lastKnownFailure: resolution.lastKnownFailure,
+          locationSource: 'saved_coordinates',
+          isStale: true,
+          fixAgeMs: savedAgeMs,
         );
         return;
       }
@@ -1298,10 +1411,24 @@ class PrayerService extends ChangeNotifier {
     final fix = resolution?.fix;
     final source = resolution?.source;
     if (resolution == null || fix == null || source == null) {
+      final savedAgeMs = _savedLocationAgeMs();
+      final hasSavedPrayerTimes = getPrayerTimes() != null;
+      await _rebuildNotificationsFromAvailableCoordinates(
+        trigger: 'manual_update',
+        locationSource: 'saved_coordinates',
+        fixAgeMs: savedAgeMs,
+        currentFailure: resolution?.currentFailure,
+        lastKnownFailure: resolution?.lastKnownFailure,
+      );
       AppLogger.logEvent('PrayerLocationRefresh', 'manual_update_complete', {
-        'outcome': 'failed',
+        'outcome': hasSavedPrayerTimes ? 'fallback' : 'failed',
         'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
-        'reason': 'current_and_last_known_positions_unavailable',
+        'reason': hasSavedPrayerTimes
+            ? 'current_and_last_known_positions_unavailable_notifications_rebuilt_from_saved_coordinates'
+            : 'current_and_last_known_positions_unavailable',
+        'source': hasSavedPrayerTimes ? 'saved_coordinates' : null,
+        'is_stale': hasSavedPrayerTimes,
+        'fix_age_ms': savedAgeMs,
         'current_failure': resolution?.currentFailure,
         'last_known_failure': resolution?.lastKnownFailure,
         'coordinates_logged': false,
@@ -1327,13 +1454,21 @@ class PrayerService extends ChangeNotifier {
           },
         );
       } else {
-        await updatePersistentElements();
+        await _rebuildNotificationsFromAvailableCoordinates(
+          trigger: 'manual_update',
+          locationSource: source.name,
+          fixAgeMs: fix.timestamp == null
+              ? null
+              : DateTime.now().difference(fix.timestamp!).inMilliseconds,
+          currentFailure: resolution.currentFailure,
+          lastKnownFailure: resolution.lastKnownFailure,
+        );
         AppLogger.logEvent(
           'PrayerLocationRefresh',
           'manual_update_schedule_finished',
           {
-            'outcome': 'skipped_fallback',
-            'reason': 'stale_location_not_used_for_rescheduling',
+            'outcome': 'scheduled_from_fallback',
+            'reason': 'last_known_position_used_and_notifications_rebuilt',
             'source': source.name,
             'is_stale': true,
             'fix_age_ms': fix.timestamp == null

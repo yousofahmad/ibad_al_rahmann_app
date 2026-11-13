@@ -177,6 +177,100 @@ void main() {
     },
   );
 
+  test(
+    'background rebuild keeps enabled fasting and Friday reminders scheduled',
+    () async {
+      await configure(
+        settings: {
+          'iftar_alarm': true,
+          'suhoor_alarm': true,
+          'iftar_mode': 'all_year',
+          'suhoor_mode': 'all_year',
+          'notif_fasting_thursday': true,
+          'notif_fasting_white_days': true,
+          'notif_jumua': true,
+          'notif_kahf_salawat': true,
+        },
+        dates: {
+          '2026-11-04': hijri(12, 5),
+          '2026-11-05': hijri(13, 5),
+          '2026-11-06': hijri(14, 5),
+          '2026-11-07': hijri(15, 5),
+          '2026-11-08': hijri(16, 5),
+        },
+      );
+      final now = DateTime(2026, 11, 4, 0, 30);
+      final times = await PrayerService.getPrayerTimesForDateStatic(now);
+      expect(times, isNotNull);
+
+      await NotificationService.scheduleAll(times!, nowOverride: now);
+
+      DateTime scheduledFor(int id) {
+        final reminder = alarms.singleWhere((alarm) => alarm['id'] == id);
+        return DateTime(
+          reminder['year'] as int,
+          reminder['month'] as int,
+          reminder['day'] as int,
+          reminder['hour'] as int,
+          reminder['minute'] as int,
+        );
+      }
+
+      final scheduledIds = alarms.map((alarm) => alarm['id'] as int).toSet();
+      expect(
+        scheduledIds,
+        containsAll(<int>{400, 401, 410, 411, 2302, 2453, 2503, 2851, 2862}),
+      );
+      final thursdayTimes = await PrayerService.getPrayerTimesForDateStatic(
+        DateTime(2026, 11, 5),
+      );
+      final fridayTimes = await PrayerService.getPrayerTimesForDateStatic(
+        DateTime(2026, 11, 6),
+      );
+      expect(thursdayTimes, isNotNull);
+      expect(fridayTimes, isNotNull);
+      expect(
+        scheduledFor(2851),
+        thursdayTimes!.isha.add(const Duration(hours: 1)),
+      );
+      expect(
+        scheduledFor(2862),
+        fridayTimes!.fajr.add(const Duration(hours: 1)),
+      );
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('iftar_alarm'), isTrue);
+      expect(prefs.getBool('suhoor_alarm'), isTrue);
+      expect(prefs.getBool('notif_fasting_thursday'), isTrue);
+      expect(prefs.getBool('notif_fasting_white_days'), isTrue);
+      expect(prefs.getBool('notif_jumua'), isTrue);
+      expect(prefs.getBool('notif_kahf_salawat'), isTrue);
+    },
+  );
+
+  test(
+    'background rebuild keeps the enabled Monday fasting reminder',
+    () async {
+      await configure(
+        settings: {'notif_fasting_monday': true},
+        dates: {
+          '2026-11-08': hijri(19, 5),
+          '2026-11-09': hijri(20, 5),
+          '2026-11-10': hijri(21, 5),
+          '2026-11-11': hijri(22, 5),
+        },
+      );
+      final now = DateTime(2026, 11, 8, 0, 30);
+      final times = await PrayerService.getPrayerTimesForDateStatic(now);
+      expect(times, isNotNull);
+
+      await NotificationService.scheduleAll(times!, nowOverride: now);
+
+      expect(alarms.map((alarm) => alarm['id']), contains(2407));
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('notif_fasting_monday'), isTrue);
+    },
+  );
+
   Map<String, dynamic> alarm(int id) =>
       alarms.singleWhere((a) => a['id'] == id);
   DateTime scheduled(Map<String, dynamic> a) => DateTime(
